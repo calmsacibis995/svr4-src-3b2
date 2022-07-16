@@ -1,0 +1,97 @@
+#ident	"@(#)pkgcore:ifiles/postinstall	1.14"
+
+error=no
+while read from to comment
+do
+	echo $to 		# for installf
+	echo $to >&2		# for the user
+	cp $from $to >&2 || error=yes
+done <<!ENDOFLIST! | installf $PKGINST -
+	/etc/fs/bfs/fsck /usr/lib/fs/bfs/fsck
+	/etc/fs/bfs/fstyp /usr/lib/fs/bfs/fstyp
+	/etc/fs/bfs/mkfs /usr/lib/fs/bfs/mkfs
+	/etc/fs/bfs/mount /usr/lib/fs/bfs/mount
+	/etc/fs/proc/mount /usr/lib/fs/proc/mount
+	/etc/fs/fd/mount /usr/lib/fs/fd/mount
+	/etc/fs/rfs/mount /usr/lib/fs/rfs/mount
+	/etc/fs/s5/clri /usr/lib/fs/s5/clri
+	/usr/lib/fs/s5/df /etc/fs/s5/df
+	/etc/fs/s5/fsck /usr/lib/fs/s5/fsck
+	/etc/fs/s5/fstyp /usr/lib/fs/s5/fstyp
+	/etc/fs/s5/mkfs /usr/lib/fs/s5/mkfs
+	/etc/fs/s5/mount /usr/lib/fs/s5/mount
+	/sbin/autopush /usr/sbin/autopush
+	/sbin/bcheckrc /usr/sbin/bcheckrc
+	/sbin/brc /usr/sbin/brc
+	/sbin/ckconfig /usr/sbin/ckconfig
+	/sbin/ckmunix /usr/sbin/ckmunix
+	/sbin/clri /usr/sbin/clri
+	/sbin/df /usr/sbin/df
+	/sbin/disks /usr/sbin/disks
+	/sbin/fmthard /usr/sbin/fmthard
+	/sbin/fsck /usr/sbin/fsck
+	/sbin/fsdb /usr/sbin/fsdb
+	/sbin/fsstat /usr/sbin/fsstat
+	/sbin/fstyp /usr/sbin/fstyp
+	/sbin/fsys /usr/sbin/fsys
+	/sbin/hdefix /usr/sbin/hdefix
+	/sbin/labelit /usr/sbin/labelit
+	/sbin/led /usr/sbin/led
+	/sbin/mkfs /usr/sbin/mkfs
+	/sbin/mknod /usr/sbin/mknod
+	/sbin/mount /usr/sbin/mount
+	/sbin/mountall /usr/sbin/mountall
+	/sbin/npump /usr/sbin/npump
+	/sbin/pump /usr/sbin/pump
+	/sbin/rc0 /usr/sbin/rc0
+	/sbin/rc1 /usr/sbin/rc1
+	/sbin/rc2 /usr/sbin/rc2
+	/sbin/rc3 /usr/sbin/rc3
+	/sbin/rc6 /usr/sbin/rc6
+	/sbin/init /usr/sbin/init
+	/sbin/setclk /usr/sbin/setclk
+	/sbin/sh /usr/bin/sh
+	/sbin/shutdown /usr/sbin/shutdown
+	/sbin/su /usr/bin/su
+	/sbin/uadmin /usr/sbin/uadmin
+	/sbin/umount /usr/sbin/umount
+	/sbin/umountall /usr/sbin/umountall
+	/usr/bin/who /sbin/who 
+	/usr/lib/fs/s5/labelit /etc/fs/s5/labelit 
+	/usr/sbin/buildsys /sbin/buildsys
+	/usr/sbin/ports /sbin/ports
+	/usr/sbin/setmnt /sbin/setmnt
+	/usr/bin/uname /sbin/uname
+!ENDOFLIST!
+
+#make necessary links for files copied above
+installf $PKGINST /usr/sbin/switchout=/usr/sbin/mkfs l
+installf $PKGINST /usr/lib/rsh=/usr/bin/sh l
+installf $PKGINST /usr/bin/jsh=/usr/bin/sh l
+
+# append the SMTP cron entries to root's cron entries
+if [ -f /var/spool/cron/crontabs/smtp ]
+then
+	cat /var/spool/cron/crontabs/smtp >> /var/spool/cron/crontabs/root
+	rm /var/spool/cron/crontabs/smtp
+fi
+
+if [ ! -d /proc ]
+then
+	# make directory node for /proc since we
+	# don't want to modify /proc if it is
+	# already up and running!
+	installf $PKGINST /proc d 555 root root || error=yes
+fi
+
+if [ ! -d /dev/fd ]
+then
+	installf $PKGINST /dev/fd d 555 root root || error=yes
+fi
+
+installf -f $PKGINST || error=yes
+
+[ $error = no ] && exit 0
+
+exit 2
+

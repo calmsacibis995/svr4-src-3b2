@@ -1,0 +1,16 @@
+#ident	"@(#)oamintf:devices/Prototype	1.4"
+!MENU=/usr/sadm/sysadm/menu
+!INTFBIN=/usr/sadm/sysadm/bin
+
+d intf $MENU/devices 0755 bin bin
+v intf $MENU/devices/devices.menu 0644 bin bin
+f intf $MENU/devices/Menu.drive 0644 bin bin
+f intf $MENU/devices/Menu.disk 0644 bin bin
+f intf $MENU/devices/Text.diskerr 0644 bin bin
+f intf $MENU/devices/Help 0644 bin bin
+f intf $INTFBIN/getdlst 0755 bin bin
+f intf $INTFBIN/getdisk 0755 bin bin
+f intf $INTFBIN/showgrp 0755 bin bin
+f intf $INTFBIN/valdrive 0755 bin bin
+f intf $INTFBIN/valdisk 0755 bin bin
+f intf $INTFBIN/ckdisk 0755 bin bin

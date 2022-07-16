@@ -1,0 +1,6 @@
+#ident	"@(#)pkg.face:depend	1.2"
+
+P	dfm directory and file management utilities
+P	terminf Terminal Information Utilities
+P	ed Editing Utilities
+P	usrenv user environment utilities

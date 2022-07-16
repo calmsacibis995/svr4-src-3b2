@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/gate	1.1"
+*
+*	GATE
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+rox	-	gate	-	-	-

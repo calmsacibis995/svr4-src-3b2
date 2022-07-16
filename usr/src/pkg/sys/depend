@@ -1,0 +1,4 @@
+#ident	"@(#)pkg.sys:depend	1.1.4.1"
+# P indicates a prerequisite for installation
+# I indicates an incompatible package
+# R indicates a reverse depedency

@@ -1,0 +1,35 @@
+#ident	"@(#)filemgmt:fileage/help	1.1"
+ABSTRACT:
+	
+	The "fileage" tasks prints the names of all files older than
+	the date you specify.  
+
+	In the first field, please enter the name of the directory 
+	you would like to search.  There is no default for this field.
+	The directory name must be an absolute path (beginning with
+	slash (/)) to an existing directory.  Warning:  Short path-
+	names such as "/" or "/usr" will take longer to search.
+
+	The second field allows you to enter a positive integer value 
+	that specifies how old files will be before they are reported.  
+	If you don't enter a number, all files older than 90 days will be 
+	reported.
+	
+TITLE:List files older than a particular date
+
+F1:Directory to be searched: 
+F2:Age of files to be reported, in days: 
+schnokhelp:
+
+	No files were found in the directory you specified that
+	were older than the number you specified.  You may
+	specify a different directory and number of days, or
+	you may quit the "fileage" task.
+
+schokhelp:
+
+	No files were found in the directory you specified that
+	were older than the number you specified.  You may
+	specify a different directory and number of days, or
+	you may quit the "fileage" task.
+

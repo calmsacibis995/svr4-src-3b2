@@ -1,0 +1,7 @@
+#ident	"@(#)pkg.ufs:ufs/preremove	1.1"
+FAILURE=2		# exit code if anything goes wrong
+MASTER=/etc/master.d	# home of master.d files
+
+/etc/drvinstall -u -m $MASTER/ufs -v 1.0	|| exit $FAILURE
+
+exit 10			# indicates that the system should be rebooted

@@ -1,0 +1,9 @@
+#ident	"@(#)pkg.face:pkginfo	1.1"
+
+PKG="face"
+VERSION="Release 4 Issue 1"
+ARCH="3B2"
+NAME="AT&T Framed Access Command Environment"
+CLASSES="none OAMadmin OAMmif"
+CATEGORY=applications
+PREDEPEND=face

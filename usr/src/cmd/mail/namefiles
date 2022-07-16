@@ -1,0 +1,4 @@
+#ident	"@(#)mail:namefiles	1.2"
+#ident "@(#)namefiles	1.2 'attmail mail(1) command'"
+/etc/mail/lists
+/etc/mail/names

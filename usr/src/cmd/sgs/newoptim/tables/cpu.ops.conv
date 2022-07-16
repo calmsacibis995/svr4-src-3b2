@@ -1,0 +1,14 @@
+/*#ident	"@(#)newoptim:tables/cpu.ops.conv	1.4"*/
+
+G_ADD2
+G_AND2
+G_CLR
+G_DEC
+G_DIV2
+G_INC
+G_MOD2
+G_MUL2
+G_OR2
+G_SUB2
+G_TST
+G_XOR2

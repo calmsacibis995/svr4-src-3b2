@@ -1,0 +1,26 @@
+*#ident	"@(#)kernel:master.d/kmacct	1.2"
+*
+* Kernel Memory Manager (KMA) Accounting
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ocs	-	kmac	-
+						nkmasym (%i) = {KMARRAY}
+						kmadepth (%i) = {SDEPTH}
+						nkmabuf (%i) = {NKMABUF}
+						kmasymtab[KMARRAY] (%0x58)
+						kmastack[KMARRAY*SDEPTH] (%i)
+						kmabuf[NKMABUF] (%0x10)
+$$$
+* KMARRAY is the number of entries in the symbol table
+
+KMARRAY = 150
+
+* SDEPTH is the depth of stack to trace back (no larger than MAXDEPTH 
+* from sys/kmacct.h)
+
+SDEPTH = 5
+
+* NKMABUF is the number of buffer headers to allocate (one for each
+* buffer that has been allocated and not yet returned).
+
+NKMABUF = 1000

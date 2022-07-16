@@ -1,0 +1,222 @@
+#ident	"@(#)cmd-3b2:inst/bin/toNfstab	1.15.3.2"
+
+#	Convert old fstab format to new format
+#
+#	old file-system-table format:
+#
+#	column 1	block special file name of file system
+#	column 2	mount-point directory
+#	column 3	"-r" if to be mounted read-only
+#			"-d" if distributed (remote) resource
+#	column 4	file system type (may be column 4)
+#	column 5+	ignored
+#	White-space separates columns.
+#	Lines beginning with "#" are comments.  Empty lines are ignored.
+#	a '-' in any field is a no-op.
+#
+#  the new format is
+#  special fsckdev mountp fstype fsckpass automnt mntflags
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+#outfile=/etc/tmp.vfstab
+#calling sequence: toNfstab root_of_hard_disk
+HARDDISK=$1
+outfile=${HARDDISK}/etc/tmp.vfstab
+
+echo '#special fsckdev mountp fstype fsckpass automnt mntflags' >$outfile
+echo '/dev/SA/diskette1 /dev/rdiskette /install s5 - no -' >>$outfile
+echo '/dev/diskette /dev/rdiskette /install s5 - no -' >>$outfile
+echo '/proc - /proc proc - no -' >>$outfile
+echo '/dev/fd - /dev/fd fd - no -' >>$outfile
+echo '/dev/root /dev/rroot - s5 - no -' >>$outfile
+
+if [ -r ${HARDDISK}/etc/vfstab ]
+then
+	scat ${HARDDISK}/etc/vfstab |
+	while  read dev fsck fs fstype fsckpass auto fsflags dummy
+	do
+		case ${dev} in
+		# ignore comments, empty lines, no action, and old header
+		'#'* | '' | '-' | special)
+			continue
+			;;
+		esac
+
+		case ${fsflags} in
+		'-r' | 'ro')
+			fsflags='ro'
+			;;
+		'-' | '')	fsflags='-'
+			;;
+		*)	# Can't handle this
+			echo warning: /etc/vfstab contains unknown mntflags: ${fsflags}
+			;;
+		esac
+
+
+		case "${fstype}" in
+		"DUFST")
+			fstype=rfs
+			;;
+		"RFS")
+			fstype=rfs
+			;;
+		"BFS")
+			fstype=bfs
+			;;
+		"S51K")
+			fstype=s5
+			;;
+		"S52K")
+			fstype=s5
+			;;
+		"PROC")
+			fstype=proc
+			;;
+		esac
+		
+
+		echo $dev $fsck $fs $fstype $fsckpass $auto $fsflags >>$outfile
+	done
+else
+	scat ${HARDDISK}/etc/fstab |
+	while  read dev fs fsflags fstype dummy
+	do
+		fsckpass=1
+		case ${dev} in
+		# ignore comments, empty lines, and no action
+		'#'* | '' | '-')
+			continue
+		esac
+
+		if [ "$fs" = "/stand" ]
+		then
+			fstype=bfs
+		fi
+
+		case ${fsflags} in
+		'-r')
+			fsflags='ro'
+			if [ "$fstype" = "" ]
+			then
+				fstype=s5
+			fi
+			;;
+		'-d')
+			fsflags='-'
+			if [ "$fstype" = "" ]
+			then
+				fstype=rfs
+			fi
+			;;
+		'-dr' | '-rd') #  remote mounts are done in rmountall
+			fsflags='ro'
+			if [ "$fstype" = "" ]
+			then
+				fstype=rfs
+			fi
+			;;
+		'-')
+			fsflags='-'
+			;;
+		*)		# It isn't an option, must be fstype
+			if [ "$fstype" = "" ]
+			then
+				fstype=${fsflags}
+			fi
+
+			if [ "$fstype" = "" ]
+			then
+				fstype=s5
+			fi
+			fsflags='-'
+			;;
+		esac
+ 		if [ "${fstype}" = "-" ]
+ 		then
+ 			fstype=s5
+ 		fi
+
+		rdev=`basename ${dev}`
+		rdevbase=${rdev}
+		if [ -c /dev/rdsk/${rdev} ]
+		then
+			rdev=/dev/rdsk/${rdev}
+		elif [ -c /dev/r${rdev} ]
+		then
+			rdev=/dev/r${rdev}
+		else
+			rdev=-
+			fsckpass=-
+			fi
+		echo $dev $rdev $fs $fstype $fsckpass yes $fsflags >>$outfile
+	done
+fi
+
+# pretty print
+l1=0 l2=0 l3=0 l4=0 l5=0 l6=0
+exec <$outfile
+while read a1 a2 a3 a4 a5 a6 a7
+do
+	for ii in 1 2 3 4 5 6
+	do
+		eval x=\$a$ii
+		x=`expr x$x : x$x`
+		eval test \$l$ii -lt $x
+		if [ $? = 0 ]
+		then
+			eval l$ii=$x
+		fi
+	done
+done
+
+exec <$outfile
+while read a1 a2 a3 a4 a5 a6 a7
+do
+	for ii in 1 2 3 4 5 6
+	do
+		eval x=\$a$ii
+		eval y=\$l$ii
+		echo "$x \c"
+		x=`expr x$x : x$x`
+		x=`expr $y - $x`
+		while [ $x -gt 4 ]
+		do
+			echo "     \c"
+			x=`expr $x - 5`
+		done
+		while [ $x -gt 3 ]
+		do
+			echo "    \c"
+			x=`expr $x - 4`
+		done
+		while [ $x -gt 2 ]
+		do
+			echo "   \c"
+			x=`expr $x - 3`
+		done
+		while [ $x -gt 1 ]
+		do
+			echo "  \c"
+			x=`expr $x - 2`
+		done
+		while [ $x -gt 0 ]
+		do
+			echo " \c"
+			x=`expr $x - 1`
+		done
+	done
+
+	echo $a7
+done >${HARDDISK}/etc/vfstab
+
+if [ -x ${HARDDISK}/usr/bin/sort ]
+then
+	#use chroot to access ld.so and .so libs on hard disk.
+	chroot ${HARDDISK} /usr/bin/sort -u +0 -1 -o /etc/vfstab /etc/vfstab
+fi

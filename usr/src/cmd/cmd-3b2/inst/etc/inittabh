@@ -1,0 +1,5 @@
+ap::sysinit:/sbin/autopush -f /etc/iu.ap
+rs::sysinit:/inst/etc/insth < /dev/console > /dev/console 2>&1
+wm::sysinit:/sbin/sh -c "echo INSTALLATION NOT COMPLETED" > /dev/console 2>&1
+rf::sysinit:/sbin/uadmin 2 2			# Return to firmware
+is:s:initdefault:

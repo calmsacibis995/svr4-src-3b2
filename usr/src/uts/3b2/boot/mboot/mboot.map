@@ -1,0 +1,12 @@
+#ident	"@(#)boot:boot/mboot/mboot.map	1.1"
+
+#
+#	mapfile for mboot (matches COFF's ifile)
+#
+
+mbcode	= LOAD  ?RX V0x2004000 P0x2004000 L512 A0x200;
+mbbss	= LOAD  ?RW V0x2004200 P0x2004200 L1024 A0x200;
+
+mbcode	: $PROGBITS ?A;
+
+mbbss	: $NOBITS ?A;

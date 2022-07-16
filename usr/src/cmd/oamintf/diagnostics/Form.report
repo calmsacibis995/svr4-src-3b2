@@ -1,0 +1,48 @@
+#ident	"@(#)oamintf:diagnostics/Form.report	1.5"
+
+################################################################################
+#	Module Name: Form.report
+################################################################################
+form="Reporting Disk Errors"
+
+framemsg=`readfile $INTFBASE/form.msg`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+ 
+done=`message -w "Creating $F1 report.";
+
+      if [ "$F1" = "full" ];
+      then
+	set -l OPT=-f;
+      else
+	set -l OPT=-s;
+      fi;
+
+      /usr/sbin/hdelogger $OPT > $DSKRPT;
+
+      if [ $RET -eq 0 ];
+      then
+	set -l CMD="OPEN TEXT $OBJ_DIR/Text.report2";
+      else
+	set -l CMD="OPEN TEXT $OBJ_DIR/Text.report3";
+      fi`$CMD
+
+name="Report type:"
+lininfo=Form.report:diskrpt
+nrow=1
+ncol=3
+frow=1
+fcol=16
+rows=1
+columns=7
+
+value=full
+rmenu={ full summary }
+menuonly=true
+
+invalidmsg=const "ERROR: Choices are full and summary."
+choicemsg=const "Select full or summary."
+
+name=RESET
+button=8
+action=RESET

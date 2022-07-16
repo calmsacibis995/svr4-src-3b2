@@ -1,0 +1,29 @@
+#ident	"@(#)pkg.editors:prototype	1.6"
+
+# packaging files
+i pkginfo
+i depend
+i postinstall
+
+# directory references
+d none	/usr/preserve	777	bin	bin
+d none	/usr/bin	?	?	?
+d none	/usr/lib	?	?	?
+d none	/etc/init.d	?	?	?
+d none	/etc/rc2.d	?	?	?
+
+# package objects:
+!default 555 bin bin
+f none	/usr/bin/vi
+f none	/usr/bin/ctags
+f none	/usr/lib/expreserve
+f none	/usr/lib/exrecover
+
+f none	/etc/init.d/PRESERVE	444 root sys
+
+# linked files
+l none	/usr/bin/edit=/usr/bin/vi
+l none	/usr/bin/vedit=/usr/bin/vi
+l none	/usr/bin/ex=/usr/bin/vi
+l none	/usr/bin/view=/usr/bin/vi
+l none	/etc/rc2.d/S02PRESERVE=/etc/init.d/PRESERVE

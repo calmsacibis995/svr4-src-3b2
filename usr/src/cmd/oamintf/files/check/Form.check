@@ -1,0 +1,48 @@
+#ident	"@(#)filemgmt:check/Form.check	1.4.1.2"
+Form="File System Check"
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO 
+`readfile $INTFBASE/form.msg | message -p`
+
+begrow=any
+begcol=any
+
+done=`indicator -w;
+	if [ "$F2" = "unknown" ];
+	then
+		message "Attempting to identify the file system type. Please Wait";
+		$OAMBASE/bin/findtype "$F1";
+		regex -e -v "$RET"
+			'^0$' 'OPEN TEXT $OBJ_DIR/Text.findtype "$F1" ';
+	else
+		$OAMBASE/bin/ckerrs "$F1" "$F2";
+		regex -e -v "$RET"
+			'^0$' 'OPEN $OBJ_DIR/Form.checkfs "$F1" "$F2" '
+			'^.*$' 'OPEN TEXT $OBJ_DIR/Text.cknok ';
+ 	fi;
+	`
+
+name="Device that contains the file system:"
+lininfo=Form.check:F1
+nrow=1
+ncol=1
+frow=1
+fcol=39
+rows=1
+columns=20
+rmenu={ `getdev fs:* | /bin/egrep -v "usr|root" | sort` }
+valid=`$OAMBASE/bin/validdev "$F1"`
+value="diskette1"
+invalidmsg="Error - $F1 is not a valid device"
+
+name="File System Type (IMPORTANT: DO NOT GUESS):" 
+lininfo=Form.check:F2
+nrow=2
+ncol=1
+frow=2
+fcol=45
+rows=1
+columns=14
+rmenu={ `$OAMBASE/bin/sysfs; echo unknown` }
+menuonly=true
+invalidmsg="Error - $F2 is not a valid file system type"

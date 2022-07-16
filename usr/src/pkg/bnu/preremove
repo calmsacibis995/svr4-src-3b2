@@ -1,0 +1,20 @@
+#ident	"@(#)pkg.bnu:preremove	1.1.1.8"
+
+# Since BNU does not supply uugetty, it need not be concerned
+# with incoming services, they are handled by sac/ttymon. So
+# we no longer manipulate inittab here.
+
+# Remove cron entries
+
+CRONTAB=$BASEDIR/var/spool/cron/crontabs/root
+TEMPCRON=$BASEDIR/usr/tmp/cron.$$
+
+crontab -l >$TEMPCRON 2>/dev/null
+ed $TEMPCRON <<-!  >/dev/null 2>&1
+	g/uudemon/d
+	w
+	q
+!
+
+crontab $TEMPCRON 2>/dev/null
+

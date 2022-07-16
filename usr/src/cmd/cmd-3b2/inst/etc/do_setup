@@ -1,0 +1,55 @@
+#ident	"@(#)cmd-3b2:inst/etc/do_setup	1.2.5.1"
+#
+#	Sets up the file system on In-Core Disk 
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+set -u
+ROOT=/
+
+ln ${ROOT}/usr/bin/ln ${ROOT}/usr/bin/mv
+ln ${ROOT}/usr/bin/ln ${ROOT}/usr/bin/cp
+ln ${ROOT}/inst/bin/fsys ${ROOT}/sbin/fsys
+
+for r in r ''
+do
+	for s in 0 1 2 3 4 5 6 7
+	do
+		ln ${ROOT}/dev/${r}dsk/c0d0s${s} ${ROOT}/dev/${r}ifdsk0${s}
+	done
+	for s in 0 1 2 3 4 5 6 7 8 9 a b c d e f
+	do
+		ln ${ROOT}/dev/${r}dsk/c1d0s${s} ${ROOT}/dev/${r}idsk0${s}
+	done
+done
+
+ln ${ROOT}/dev/console ${ROOT}/dev/syscon
+ln ${ROOT}/dev/console ${ROOT}/dev/systty
+ln ${ROOT}/dev/dsk/c0d0s6 ${ROOT}/dev/install
+ln ${ROOT}/dev/rdsk/c0d0s6 ${ROOT}/dev/rinstall
+ln ${ROOT}/dev/dsk/c0d0s6 ${ROOT}/dev/diskette
+ln ${ROOT}/dev/rdsk/c0d0s6 ${ROOT}/dev/rdiskette
+ln ${ROOT}/dev/rdsk/c0d0s6 ${ROOT}/dev/rsave
+ln ${ROOT}/dev/dsk/c0d0s6 ${ROOT}/dev/save
+ln ${ROOT}/dev/dsk/c0d0s6 ${ROOT}/dev/SA/diskette1
+ln ${ROOT}/dev/rdsk/c0d0s6 ${ROOT}/dev/rSA/diskette1
+ln ${ROOT}/dev/dsk/c1d0s6 ${ROOT}/dev/SA/disk1
+ln ${ROOT}/dev/rdsk/c1d0s6 ${ROOT}/dev/rSA/disk1
+ln ${ROOT}/dev/mem ${ROOT}/dev/mainstore
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/u3b
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/pdp11
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/vax
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/u370
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/u3b5
+ln ${ROOT}/usr/bin/false ${ROOT}/usr/bin/u3b15
+ln ${ROOT}/usr/bin/true ${ROOT}/usr/bin/u3b2
+ln ${ROOT}/sbin/sh ${ROOT}/sbin/jsh
+
+ln -s /dev/fd/0 ${ROOT}/dev/stdin
+ln -s /dev/fd/1 ${ROOT}/dev/stdout
+ln -s /dev/fd/2 ${ROOT}/dev/stderr

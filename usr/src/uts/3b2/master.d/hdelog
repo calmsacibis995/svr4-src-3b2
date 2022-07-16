@@ -1,0 +1,8 @@
+*#ident	"@(#)kernel:master.d/hdelog	1.1"
+*
+*  HARD DISK ERROR LOGGER
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+rcso	  -	  hde	 16	 
+	hdeedct	( %i )	={ 2*#D(IDISK) }
+	hdeeqdt	[ 2*#D(IDISK) ]	( %s %s %s %s %l )

@@ -1,0 +1,6 @@
+Input types: troff
+Output types: postscript
+Printer types: postscript
+Filter type: slow
+Command: /usr/lib/lp/postscript/dpost
+Options: PAGES * = -o*, COPIES * = -c*, LENGTH * = -l*, MODES portrait = -pp, MODES landscape = -pl, MODES group\= * = -n*, MODES x\= * = -x*, MODES y\= * = -y*, MODES magnify\= * = -m*, MODES ptsize\= * = -s*, CHARSET * = -f*

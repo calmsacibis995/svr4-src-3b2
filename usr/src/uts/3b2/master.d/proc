@@ -1,0 +1,11 @@
+*#ident	"@(#)fs:master.d/proc	1.7"
+*
+* PROC
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orxj	-	pr	-	-	-
+						prname(%15c) = {NAMEPR}
+
+$$$
+
+NAMEPR = "proc"

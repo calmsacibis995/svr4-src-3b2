@@ -1,0 +1,16 @@
+#ident	"@(#)pkg.bnu:r.need	1.1.1.2"
+#
+#	'need' CLASS removal script
+#
+#	input:	filename - pathname on target system
+#
+#	replace old file from /etc/uucp/OlD if possible
+#
+while read filename
+do
+	rm $filename >/dev/null 2>&1
+	# OlD file may not exist if it wasn't on system to begin with ...
+	mv $BASEDIR/etc/uucp/OlD/`basename $filename` $filename >/dev/null 2>&1
+done
+#
+exit 0

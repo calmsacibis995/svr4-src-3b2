@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/iuart	1.8"
+*
+*  IUART
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orsnf13	  1	  iu	 0	 2	13	
+						iu_tty[2] (%0x50)

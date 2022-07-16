@@ -1,0 +1,26 @@
+#ident	"@(#)oamintf:devices/partition/Text.partok	1.2"
+
+################################################################################
+#	Module Name: Text.partok
+################################################################################
+title="Disk Partitioning"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+rows=5
+columns=75
+
+text="
+$ARG1 has been partitioned as requested:
+
+`prtvtoc -s $DEV`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

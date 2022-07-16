@@ -1,0 +1,11 @@
+*#ident	"@(#)fs:master.d/specfs	1.5"
+*
+* SPECFS
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orxj	-	spec	-	-	-
+						specname(%15c)= { NAMESPEC }
+
+$$$
+
+NAMESPEC = "specfs"

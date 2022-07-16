@@ -1,0 +1,12 @@
+#ident	"@(#)oamintf:softwaremgmt/software.menu	1.5"
+#menu#Software Installation and Information Management
+#help#software.help^Software Installation and Information Management
+#life#permanent
+
+check^Checks Accuracy of Installation^check/check.menu
+defaults^Sets Installation Defaults^defaults/defaults.menu
+install^Installs Software Packages^install/Form.install
+interact^Stores Interactions with Package^interact/Form.interact
+list^Displays Information about Packages^list/Form.list
+read_in^Stores Packages Without Installing^read_in/Form.read_in
+remove^Removes Packages^remove/Form.remove

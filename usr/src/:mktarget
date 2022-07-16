@@ -1,0 +1,37 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+
+#ident	"@(#)mk::mktarget	1.3"
+SYMLINK=${SYMLINK:-"ln -s"}
+UID_NAME=`id|sed 's/[()]/ /gp'|awk '{print $2}'`
+
+# Check for the existance of target directories
+test -d ${ROOT:-"/"} || mkdir -p $ROOT
+cat -s target.dirs	|	# print contents of the target directory list
+egrep -v "^$|^#"	|	# get rid of blank lines and comments
+while read TARGETDIR MODE OWNER GROUP SYMDIRS
+do
+	test ! -d ${ROOT}/${TARGETDIR} && {
+		mkdir ${ROOT}/${TARGETDIR}
+		echo ${ROOT}/${TARGETDIR}
+	}
+			
+	test "$UID_NAME" = "root" && {
+		test ! -z "$MODE" -a "$MODE" != "-" && chmod $MODE ${ROOT}/$TARGETDIR
+		test ! -z "$OWNER" -a "$OWNER" != "-" && chown $OWNER ${ROOT}/$TARGETDIR
+		test ! -z "$GROUP" -a "$GROUP" != "-" && chgrp $GROUP ${ROOT}/$TARGETDIR
+	}
+	# Attempt to symbolically link directories if 
+	# there are any specified.
+	for SYMDIR in $SYMDIRS
+	do
+		echo "${SYMLINK} $TARGETDIR $ROOT/$SYMDIR"
+		eval "${SYMLINK} $TARGETDIR $ROOT/$SYMDIR"
+	done
+done
+

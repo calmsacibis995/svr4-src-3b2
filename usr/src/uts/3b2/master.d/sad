@@ -1,0 +1,27 @@
+*#ident	"@(#)kernel:master.d/sad	1.6"
+*
+* SAD - STREAMS Administrative Driver
+*
+* Warning: #DEV must be at least 2 for things to work.
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+rfsn	-	sad	-	  8
+						saddev[#D] (%l%l%i)
+						sadcnt (%i) = {#D}
+						strpcache[NSTRPHASH] (%l)
+						nstrphash (%i) = {NSTRPHASH}
+						strpmask (%i) = {NSTRPHASH - 1}
+						autopush[NAUTOPUSH] (%l%i%i%l%l%l%i%s%s%s%s%s%s%s%s)
+						nautopush (%i) = {NAUTOPUSH}
+$$$
+*
+* hash list size
+* MUST be a power of 2
+*
+NSTRPHASH = 64
+
+*
+* maximum number of devices to use
+* autopush with
+*
+NAUTOPUSH = 32

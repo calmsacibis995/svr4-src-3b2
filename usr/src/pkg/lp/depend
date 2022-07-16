@@ -1,0 +1,5 @@
+#ident	"@(#)pkg.nlp:lp/ifiles/depend	1.3"
+P	dfm	directory and file management utilities
+P	usrenv	user environment utilities
+P	terminf	terminal information utilities
+P	nsu	network services utilities

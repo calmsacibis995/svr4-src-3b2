@@ -1,0 +1,42 @@
+#ident	"@(#)pkg.nfs:postinstall	1.2"
+#
+# Initialize FAILURE to 1 (fatal error)
+#
+FAILURE=1
+#
+# Install NFS driver
+#
+BOOT=/boot
+MASTER=/etc/master.d
+
+installf $PKGINST $BOOT/NFS f || exit $FAILURE
+installf $PKGINST $BOOT/KLM f || exit $FAILURE
+installf $PKGINST $MASTER/nfs f || exit $FAILURE
+installf $PKGINST $MASTER/klm f || exit $FAILURE
+
+/etc/drvinstall -d $BOOT/NFS -v 1.0 || exit $FAILURE
+/etc/drvinstall -d $BOOT/KLM -v 1.0 || exit $FAILURE
+
+touch /etc/system
+
+#
+#	add entry in /etc/dfs/fstypes
+#
+if [ ! -d /etc/dfs ]
+then	mkdir /etc/dfs
+fi
+
+if [ -s /etc/dfs/fstypes ]
+then	if grep '^nfs' /etc/dfs/fstype > /dev/null 2>&1
+	then :
+	else echo "nfs	nfs utilities: version 1.0" >> /etc/dfs/fstypes
+	fi
+else	echo "nfs	nfs utilities: version 1.0" > /etc/dfs/fstypes
+fi
+
+#
+#	end with installf -f and exit message (required reboot)
+#
+
+installf -f $PKGINST
+exit 	10

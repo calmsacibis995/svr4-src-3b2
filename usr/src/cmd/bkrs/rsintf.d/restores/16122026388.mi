@@ -1,0 +1,9 @@
+#ident	"@(#)bkrs:rsintf.d/restores/16122026388.mi	1.5"
+#status#new
+main:restore_service:operator^Set/Display the Restore Operator^Form.setup
+main:restore_service:respond^Respond to Restore Job Prompts^Form.rsoper
+main:restore_service:restore^Restore from Backup Archives^Form.restore
+main:restore_service:status^Modify/Report Pending Restore Request Status^
+main:restore_service:status:full^Display a Full Report of Pending Restore Requests^Text.full
+main:restore_service:status:modify^Modify the Status of Pending Requests^Form.modify
+main:restore_service:status:selective^Display a Selective Report of Pending Restore Requests^Form.select

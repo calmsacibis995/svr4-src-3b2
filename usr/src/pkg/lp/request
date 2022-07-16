@@ -1,0 +1,36 @@
+#ident	"@(#)pkg.nlp:lp/ifiles/request	1.9"
+trap "exit 3" 1 2 3 15
+
+ALLOW=`ckyorn -d n \
+	-h 'If you answer "y" the disable and enable commands
+	will  be  marked  to  allow  ANY user to disable or enable a
+	printer.  This is the way the old LP Spooler worked, and is
+	useful on small systems where anybody who notices a problem
+	with a printer should be able to stop further printing on
+	the printer (i.e. DISABLE the printer).
+	\\n\\nIf you answer "n" the disable and enable commands
+	will not be so marked, thus preventing anyone except the
+	"root" and "lp" users from using them.  This is NOT the way
+	the old LP Spooler worked, but is likely to be appropriate
+	for larger systems where regular users should not be
+	interfering with printers.' \
+	-p "Should the disable and enable commands be available to ALL users?"
+` || exit $?
+
+POST=`ckyorn -d n \
+	-h 'If you answer "y" the programs necessary for using
+	PostScript printers will be installed.
+	\\n\\nIf you answer "n" these programs will not be installed.
+	This will prevent the use of a PostScript printer, but will
+	conserve space on the hard disk.' \
+	-p "Will you be attaching a PostScript printer to this system?"
+` || exit $?
+
+echo ALLOW=$ALLOW > $1
+
+if [ $POST = 'y' ]
+then
+    echo "CLASSES=$CLASSES post" >> $1
+fi
+
+exit $?

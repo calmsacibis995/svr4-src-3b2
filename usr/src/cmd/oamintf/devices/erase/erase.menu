@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:devices/erase/erase.menu	1.2"
+#menu#Devices Available
+
+diskette^Floppy Diskette^Form.diskette

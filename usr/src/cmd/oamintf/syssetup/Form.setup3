@@ -1,0 +1,50 @@
+#ident	"@(#)oamintf:syssetup/Form.setup3	1.3"
+
+# Form.setup3 will ask for y/n of set up of logins
+
+Form=Sets Up Machine Identification and Security
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp "setup3:ABSTRACT"
+
+framemsg=`readfile $INTFBASE/form.msg`
+
+begrow=distinct
+begcol=distinct
+
+done=`if [ "$F3" = "y" ] ;
+      then
+	set -l SETCMD="OPEN FORM $OBJ_DIR/Form.addusr";
+      else
+	message -w "Login(s) have not been set-up. There are no more steps.";
+	set -l SETCMD="OPEN TEXT $OBJ_DIR/Text.setup2";
+      fi`$SETCMD
+
+
+name="The next step is to set up logins."
+nrow=1
+ncol=1
+
+name="The first one should be for yourself."
+nrow=2
+ncol=1
+
+name="Do you want to set up logins? "
+nrow=4
+ncol=1
+frow=4
+fcol=32
+rows=1
+columns=1
+value=n
+rmenu={ y n }
+menuonly=true
+invalidmsg=const "ERROR - Please enter y or n."
+choicemsg=const "Please enter y or n."
+valid=`valyorn $F3`
+
+#for a form object
+
+name=RESET
+button=8
+action=reset
+

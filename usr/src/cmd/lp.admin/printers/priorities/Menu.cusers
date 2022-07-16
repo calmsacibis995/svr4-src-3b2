@@ -1,0 +1,12 @@
+#ident	"@(#)lp.admin:printers/priorities/Menu.cusers	1.1"
+
+menu=Choices
+lifeterm=shortterm
+multiselect=true
+framemsg="MARK any number of choices and press ENTER when finished."
+
+done=`getitems " "|set -l Form_Choice`close
+
+name=all
+
+`indicator -w;fmlcut -f1 -d: /etc/passwd | /usr/bin/sort | regex '^(.*)$0$' 'name=$m0'`

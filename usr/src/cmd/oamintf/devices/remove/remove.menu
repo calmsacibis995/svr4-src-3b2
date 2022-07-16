@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:devices/remove/remove.menu	1.2"
+#menu#Devices Available
+
+disk^Integral Disk^Form.disk

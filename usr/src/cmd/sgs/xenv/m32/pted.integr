@@ -1,0 +1,40 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)xenv:m32/pted.integr	1.4"
+
+# list of system header sub-directories - release dependent
+SYSLIST="des net netinet nfs rpc rpcsvc sys"
+
+if [ "on" = "$INTGR" ]
+then
+	if [ $# -eq 0 ]
+	then
+		echo "usage: "${0}" mach"
+		exit 1
+	else	
+		mach=${1}
+		SRC=`cd ../../../../;pwd`
+		HEAD=$SRC/head
+		SYSHEAD=$SRC/uts/$mach
+		BASE=`cd ../../../../../../;pwd`
+		INC=$BASE/usr/include
+		MACHSYS=$INC/${mach}sys
+		if [ -d $HEAD -a -d $SYSHEAD ]
+		then
+			rm -rf $INC
+			mkdir $INC $MACHSYS
+			cd $HEAD
+			find . -print|cpio -pdu $INC
+			cd $SYSHEAD
+			find $SYSLIST -print|cpio -pdu $INC
+			find $SYSLIST -print|cpio -pdlu $MACHSYS
+		else
+			echo ${0}:" ERROR files not in expected places"
+			exit 1
+		fi
+	fi
+fi

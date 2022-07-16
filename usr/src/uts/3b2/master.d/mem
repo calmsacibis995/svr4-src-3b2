@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/mem	1.7"
+*
+* MEM
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orcsn	-	mm	19

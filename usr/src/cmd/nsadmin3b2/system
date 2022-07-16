@@ -1,0 +1,55 @@
+*ident	"@(#)nsadmin3b2:system	1.5"
+*
+*  SYSTEM SPECIFICATION FILE FOR THE 3B2
+*
+
+*
+* DEFAULT picks the kernel out of the current boot directory
+*
+BOOT: DEFAULT
+
+* Drivers appearing in /boot that ARE to be configured, even though no device
+* appears in the EDT (software drivers are in this category)
+*
+INCLUDE: MAU
+
+* Drivers appearing in /boot that are NOT to be configured even though
+* the device appears in the EDT
+*
+EXCLUDE:
+
+* Devices appearing in the EDT that are to be ignored
+*
+EXCLUDE: SBD
+
+* System device specifications
+*
+* NOTE:  With VTOC, specifications are not required.
+* 	 following is an example of what should go here
+*
+*	ROOTDEV: /dev/dsk/c1d0s0
+*	SWAPDEV: /dev/dsk/c1d1s1 0 3528
+
+*	S5 == System V file system
+INCLUDE: S5
+
+*	Required Modules
+INCLUDE: IDISK
+INCLUDE: HDELOG
+INCLUDE: KMA
+INCLUDE: MEM
+INCLUDE: GENTTY
+INCLUDE: IUART
+INCLUDE: LDTERM
+INCLUDE: TTCOMPAT
+INCLUDE: PROC
+INCLUDE: FD
+INCLUDE: FIFOFS
+INCLUDE: NAMEFS
+INCLUDE: PIPEMOD
+INCLUDE: SAD
+INCLUDE: HRT
+INCLUDE: BFS
+INCLUDE: SPECFS
+INCLUDE: TS
+INCLUDE: RT

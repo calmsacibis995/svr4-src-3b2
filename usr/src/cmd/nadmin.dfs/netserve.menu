@@ -1,0 +1,6 @@
+#ident	"@(#)nadmin.dfs:netserve.menu	1.1"
+#menu#Network Services Management
+#help#netserve.help^Network Services Management
+#life#permanent
+
+remote_files^Distributed File System Management^remote_files/Menu.rfiles

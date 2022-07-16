@@ -1,0 +1,98 @@
+#ident	"@(#)lp.admin:printers/filters/Form.options	1.2"
+
+form=Filter Options Template for $ARG1
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+
+`indicator -w;`
+
+close=`message -w "Adding $ARG1 to filter table";
+		 lpfilter -f $ARG1 -F $basicdata; 
+	message "";
+	`
+done=`message -w;
+	if [ -n "$F2" -a -n "$F3"  ];
+	then message "Saving template";
+	echo "Options: $F2 $F3 = $F4" >> $basicdata;
+	else
+	message "Template incomplete - reenter or press [CANCEL] to exit";
+	fi;
+	`update
+
+####################################################################################
+
+name=
+nrow=1
+ncol=1
+frow=1
+fcol=1
+rows=1
+columns=44
+inactive=true
+value=const "Keyword     Pattern         Replacement"
+
+#
+#	F2
+#
+name=
+nrow=2 
+ncol=1
+frow=2
+fcol=1
+rows=1
+columns=7
+value=
+menuonly=true
+rmenu={ CHARSET COPIES CPI FORM INPUT LENGTH LPI MODES OUTPUT PAGES PRINTER TERM WIDTH }
+fieldmsg="Enter option keyword or press [CHOICES] for selection"
+invalidmsg="Press [CHOICES] for selection or [CANCEL] to exit"
+
+name=
+nrow=2 
+ncol=1
+frow=2
+fcol=11
+rows=1
+columns=14
+value=
+valid=`
+    regex -v "$F3"
+	'[^\\][=,]'	'error1'
+	'^[=,]'		'error2'
+	'^.*$'		'ok'
+    | set -l badval;
+    if [ "$badval" = 'ok' ];
+    then
+	true;
+    else
+	false;
+    fi;
+`
+fieldmsg='Enter the pattern to be specified by the user'
+invalidmsg="Badval is [$badval]"
+
+name="= "
+nrow=2
+ncol=26
+frow=2
+fcol=28
+rows=1
+columns=16
+scroll=true
+value=
+valid=`
+    regex -v "$F4"
+	'[^\\][=,]'	'error'
+	'^[=,]'		'error'
+	'^.*$'		'ok'
+    | set -l badval;
+    if [ "$badval" = 'ok' ];
+    then
+	true;
+    else
+	false;
+    fi;
+`
+fieldmsg='Enter the string to be used when the pattern matches.'
+invalidmsg='You must precede commas and equal signs with a backslash'
+

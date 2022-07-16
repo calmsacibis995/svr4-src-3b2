@@ -1,0 +1,34 @@
+#ident	"@(#)bkrs:bkintf.d/backups/08455426588.mi	1.4"
+#status#new
+main:backup_service:backup^Start Backup Jobs^Form.backup
+main:backup_service:history^Backup History Management^
+main:backup_service:reminder^Schedule Backup Reminder^
+main:backup_service:respond^Respond to Backup Job Prompts^bkoper
+main:backup_service:schedule^Schedule Automatic Backups^
+main:backup_service:setup^Backup Control Table Management^
+main:backup_service:status^Backup Status Management^
+main:backup_service:history:full^Display a Full Report of Backup History Information^bkhistory
+main:backup_service:history:limit^Limit the Backup History Log Size^Form.limit
+main:backup_service:history:selective^Display a Selective Report of Backup History Information^Form.select
+main:backup_service:reminder:add^Add Entries to the Schedule of Backup Reminder Messages^Form.add
+main:backup_service:reminder:display^Display the Schedule of Backup Reminder Messages^Text.display
+main:backup_service:reminder:modify^Modify Entries in the Schedule of Backup Reminder Messages^Form.modify
+main:backup_service:reminder:remove^Remove Entries from the Schedule of Backup Reminder Messages^Form.remove
+main:backup_service:schedule:add^Add Entries to the Backup Schedule^Form.add
+main:backup_service:schedule:display^Display the Backup Schedule^Text.display
+main:backup_service:schedule:modify^Modify Entries in the Backup Schedule^Form.modify
+main:backup_service:schedule:remove^Remove Entries from the Backup Schedule^Form.remove
+main:backup_service:setup:add^Add a New Backup Table Entry^Form.add
+main:backup_service:setup:exception_list^Backup Exception List Management^
+main:backup_service:setup:full^Display a Full Backup Table Report^Form.full
+main:backup_service:setup:modify^Modify an Existing Backup Table Entry^Form.modify
+main:backup_service:setup:remove^Remove an Existing Backup Table Entry^Form.remove
+main:backup_service:setup:rotation^Set Backup Table Rotation Period^Form.rotate
+main:backup_service:setup:summary^Display a Summary Backup Table Report^Form.summary
+main:backup_service:setup:exception_list:add^Add Entries to the Backup Exception List^Form.add
+main:backup_service:setup:exception_list:display^Display Entries in the Backup Exception List^Form.display
+main:backup_service:setup:exception_list:remove^Remove Entries from the Backup Exception List^Form.remove
+main:backup_service:status:full^Display a Full Report of Pending Backup Requests^Text.full
+main:backup_service:status:limit^Limit the Backup Status Log Size^Form.limit
+main:backup_service:status:modify^Modify the Status of Pending Backup Requests^Form.modify
+main:backup_service:status:selective^Display a Selective Report of Backup Requests^Form.select

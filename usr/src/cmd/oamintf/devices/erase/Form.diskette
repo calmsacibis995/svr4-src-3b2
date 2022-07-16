@@ -1,0 +1,57 @@
+#ident	"@(#)oamintf:devices/erase/Form.diskette	1.5"
+
+################################################################################
+#	Module Name: Form.diskette
+################################################################################
+form="Erase Contents of Diskette"
+
+framemsg=`readfile $INTFBASE/form.msg`
+
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+
+done=OPEN TEXT $OBJ_DIR/Text.diskette $F2
+
+name=Device group:
+lininfo=devgrp
+nrow=1
+ncol=3
+frow=1
+fcol=17
+rows=1
+columns=14
+show=`showgrp diskette;
+	if [ $RET -eq 0 ];
+	then
+	  echo true;
+	else
+	  echo false;
+	fi`
+
+rmenu={ `getdgrp type=diskette | sort` }
+valid=`getdgrp type=diskette $F1 | grep diskette > /dev/null;
+	if [ "$RET" -eq 0 ];
+	then
+	  echo true;
+	else
+	  echo false;
+	fi`
+invalidmsg=const "ERROR: Invalid device group entered."
+
+name=Device drive:
+lininfo=devdr
+nrow=2
+ncol=3
+frow=2
+fcol=17
+rows=1
+columns=14
+
+rmenu=OPEN MENU $OBJ_DIR/../Menu.drive $F1 diskette
+valid=`valdrive $F1 diskette $F2`
+
+invalidmsg=const "ERROR: Invalid device entered."
+
+name=RESET
+button=8
+action=RESET

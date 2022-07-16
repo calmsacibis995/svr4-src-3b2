@@ -1,0 +1,7 @@
+#ident	"@(#)bkrs:bkintf.d/backups/bkhist/bkhist.menu	1.6"
+#menu#Backup History Information
+#life#permanent
+
+full^Display a Full Report of Backup History Information^bkhistory -l
+limit^Limit the Backup History Log Size^setup/Form.setup
+selective^Display a Selective Report of Backup History Information^select/Form.select

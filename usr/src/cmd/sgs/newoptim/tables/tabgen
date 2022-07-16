@@ -1,0 +1,237 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)newoptim:tables/tabgen	1.5"
+echo "/*								*/" >optab.h
+echo "/*	opent.oopcode and opent.nongens values	*/" >>optab.h
+echo "/*								*/" >>optab.h
+OFFSET=`wc -l optab.h | sed -e "s/^  *//" -e "s/ .*$//"`
+TABDIR=$1
+OPSDIR=$2
+echo "TAIL
+MISC
+FILTER" | ./defgen `wc -l optab.h` $OFFSET B >>optab.h
+echo "LABEL
+HLABEL
+ASMS
+LOOP
+TYPE" | ./defgen `wc -l optab.h` $OFFSET A >>optab.h
+echo "PS_2BYTE
+PS_4BYTE
+PS_ALIGN
+PS_BSS
+PS_BYTE
+PS_COMM
+PS_DATA
+PS_DOUBLE
+PS_EXT
+PS_FILE
+PS_FLOAT
+PS_GLOBL
+PS_HALF
+PS_IDENT
+PS_LOCAL
+PS_PREVIOUS
+PS_SECTION
+PS_SET
+PS_SIZE
+PS_STRING
+PS_TEXT
+PS_TYPE
+PS_VERSION
+PS_WEAK
+PS_WORD 
+PS_ZERO" | ./defgen `wc -l optab.h` $OFFSET P >>optab.h
+cat $OPSDIR/is25.ops.alc $OPSDIR/is25.ops.cb > is25.ops1
+ed is25.ops1 <<!
+g/^$/d
+1,\$s/\$/ tttt/
+w is25.ops2
+q
+!
+cat $OPSDIR/cpu.ops.al $OPSDIR/mis.ops.al $OPSDIR/mis.ops.cb $OPSDIR/cpu.ops.asm $OPSDIR/cpu.ops.c > ops5
+ed ops5 <<!
+g/^$/d
+g/^\/\*.*\*\/$/d
+w ops6
+q
+!
+sort +0 -1 is25.ops2 ops6 | tr "[a-z]" "[A-Z]" >is25.ops3
+ed is25.ops3 <<!
+g/ TTTT/s/^/I/
+g/ TTTT/s/ TTTT//
+g/^I\/\*/d
+g/^\/\*/d
+w is25.ops4
+q
+!
+cat is25.ops4 |  ./defgen `wc -l optab.h` $OFFSET O  >>optab.h
+cat $OPSDIR/cpu.ops.int $OPSDIR/cpu.ops.conv $OPSDIR/mis.ops.int $OPSDIR/mis.ops.conv > ops7
+ed ops7 <<!
+g/^$/d
+g/^\/\*.*\*\/$/d
+w ops8
+q
+!
+sort ops8 | tr "[a-z]" "[A-Z]" |  ./defgen `wc -l optab.h` $OFFSET G  >>optab.h
+echo "/*								*/" >optab.c
+echo "#include	\"ANodeTypes.h\""				>>optab.c
+echo "#include	\"OperndType.h\""				>>optab.c
+echo "#include	\"OpTabTypes.h\""					>>optab.c
+echo "#include	\"optab.h\""					>>optab.c
+echo "" 							>>optab.c
+echo "struct opent optab[] = { "				>>optab.c
+echo "{\"UNDEFINED\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"TAIL\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"MISC\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"FILTER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"BUPPER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"ALOWER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"LABEL\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"HLABEL\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"ASMS\",NOFLAG,NOFLAG,NOFLAG,OREGALL,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"LOOP\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"TYPE\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"AUPPER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"PLOWER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+# Assume the string is the only meaningful field in
+# the psuedo op initializations
+echo "{\".2byte\"},"						>>optab.c
+echo "{\".4byte\"},"						>>optab.c
+echo "{\".align\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TWORD,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".bss\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TWORD,TWORD,TNONE,0,
+	(OOPR0|OOPR1|OOPR2),NOFLAG,NOFLAG,NOFLAG},"		>>optab.c
+echo "{\".byte\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TBYTE,TBYTE,TBYTE,TBYTE,0,
+	(OOPR0|OOPR1|OOPR2|OOPR3),NOFLAG,NOFLAG,NOFLAG},"	>>optab.c
+echo "{\".comm\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TWORD,TNONE,TNONE,0,
+	(OOPR0|OOPR1),NOFLAG,NOFLAG,NOFLAG},"			>>optab.c
+echo "{\".data\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".double\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TDOUBLE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".ext\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TDBLEXT,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".file\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".float\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TSINGLE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".globl\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TBYTE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".half\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	THALF,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".ident\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".local\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TBYTE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".previous\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".section\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".set\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TWORD,TNONE,TNONE,0,
+	(OOPR0|OOPR1),NOFLAG,NOFLAG,NOFLAG},"			>>optab.c
+#echo "{\".size\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	#TNONE,TWORD,TNONE,TNONE,0,
+	#(OOPR0|OOPR1),NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+#try this::::
+echo "{\".size\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TBYTE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".string\"},"						>>optab.c
+echo "{\".text\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,0,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".type\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TWORD,TNONE,TNONE,0,
+	(OOPR0|OOPR1),NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".version\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".weak\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TBYTE,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".word\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TWORD,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\".zero\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TWORD,TNONE,TNONE,TNONE,0,
+	OOPR0,NOFLAG,NOFLAG,NOFLAG},"		>>optab.c
+echo "{\"PUPPER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"OLOWER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+cat $TABDIR/is25.tab.alc $TABDIR/is25.tab.cb $TABDIR/cpu.tab.al $TABDIR/mis.tab.al $TABDIR/mis.tab.cb $TABDIR/cpu.tab.asm $TABDIR/cpu.tab.c >ops9
+ed ops9 <<!
+g/^$/d
+g/^\/\*.*\*\/$/d
+w opsA
+q
+!
+sort opsA >>optab.c
+echo "{\"OUPPER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "{\"GLOWER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+cat $TABDIR/cpu.tab.int $TABDIR/cpu.tab.conv $TABDIR/mis.tab.int $TABDIR/mis.tab.conv 		>opsB
+ed opsB <<!
+g/^$/d
+g/^\/\*.*\*\/$/d
+w opsC
+q
+!
+sort opsC 		>>optab.c
+echo "{\"GUPPER\",NOFLAG,NOFLAG,NOFLAG,NOFLAG,NOFLAG,
+	TNONE,TNONE,TNONE,TNONE,4,
+	NOFLAG,NOFLAG,NOFLAG,NOFLAG},"				>>optab.c
+echo "};" 				>>optab.c
+rm ops[5-9ABC]
+rm is25.ops[1-4]

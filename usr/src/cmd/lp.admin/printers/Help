@@ -1,0 +1,8 @@
+#ident	"@(#)lp.admin:printers/Help	1.1"
+ABSTRACT:
+	The printer_service menu will help you set up and control the Line
+	Printer Service system. You can use this menu to start and
+	stop the print service, and check its status; add new
+	printers and change the configuration of existing printers;
+	add, change, and mount forms; add and change filters; and
+	monitor user print requests.

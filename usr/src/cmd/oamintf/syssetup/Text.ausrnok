@@ -1,0 +1,29 @@
+#ident	"@(#)oamintf:syssetup/Text.ausrnok	1.1"
+################################################################################
+#	Module Name: Text.ausrnok
+################################################################################
+title="Error Adding a User"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+lifetime=shortterm
+
+close=`rm -f $UADDERR`
+
+rows=6
+columns=75
+
+text="
+An error occurred attempting to add user $ARG1 to the system.
+
+   `readfile $UADDERR`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

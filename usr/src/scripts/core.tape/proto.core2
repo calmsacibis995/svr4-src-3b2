@@ -1,0 +1,23 @@
+/dev/null
+1422 96
+d--775 0 3
+	boot	d--775 0 3
+		TS		---444 0 0	../usr/src/uts/3b2/disp/TS
+		SPECFS		---444 0 0	../usr/src/uts/3b2/fs/specfs/SPECFS
+		FD		---444 0 0	../usr/src/uts/3b2/fs/fd/FD
+		SAD		---444 0 0	../usr/src/uts/3b2/io/SAD
+		LDTERM		---444 0 0	../usr/src/uts/3b2/io/LDTERM
+		HRT		---444 0 0	../usr/src/uts/3b2/io/HRT
+		FIFOFS		---444 0 0	../usr/src/uts/3b2/fs/fifofs/FIFOFS
+		NAMEFS		---444 0 0	../usr/src/uts/3b2/fs/namefs/NAMEFS
+		INTP		---444 0 0	../usr/src/uts/3b2/exec/intp/INTP
+		HDELOG		---444 0 0	../usr/src/uts/3b2/io/HDELOG
+		IDISK		---444 0 0	../usr/src/uts/3b2/io/IDISK
+		GENTTY		---444 0 0	../usr/src/uts/3b2/io/GENTTY
+		IUART		---444 0 0	../usr/src/uts/3b2/io/IUART
+		KERNEL          ---555 0 0      ../usr/src/uts/3b2/KERNEL
+		MEM		---444 0 0	../usr/src/uts/3b2/io/MEM
+		KMA		---444 0 0	../usr/src/uts/3b2/os/KMA
+	$
+$
+:#ident	"@(#)core.tape:proto.core2	1.4"

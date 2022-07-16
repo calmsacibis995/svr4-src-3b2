@@ -1,0 +1,209 @@
+
+#ident	"@(#)cmd-3b2:inst/etc/p_check	1.7.2.5"
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+
+p_error()
+{
+	if [ "$#" -lt 3 ]
+	then
+		echo "p_check: p_error: wrong number of parameters passed"
+		return 1
+	fi
+
+
+	echo "\
+Disk partition $1 is reserved (on any disk) for $2 partition 
+use only.  Your vfstab indicates that this system has $3 on it.
+Upgrade is not possible.  INSTALLATION ABORTED.
+Please refer to System Adminstration Guide."
+
+	exit 1
+
+}
+
+t_error()
+{
+
+	if [ "$#" -lt 4 ]
+	then
+		echo "p_check: p_error: wrong number of parameters passed"
+		return 1
+	fi
+
+
+	echo "\
+Your Disk_$1 vtoc indicates that partition $2 is 
+used for $3.  Partition $4 should be used for this. 
+Upgrade is not possible.  INSTALLATION ABORTED.
+Please refer to System Adminstration Guide."
+
+	exit 1
+
+}
+
+
+
+check()
+{
+	if [ "$#" -lt 3 ]
+	then
+		echo "p_check: check: wrong number of parameters passed"
+		return 1
+	fi
+
+	disk=$1
+	partn=$2
+	tag=$3
+
+	if [ "${tag}" = "0" ]
+	then 
+	 	return 0
+	fi
+
+	case "${tag}" in
+
+	$v_root) 
+		if [ "${partn}"  != "${p_root}" ]
+		then
+			t_error $disk $partn root  $p_root
+		fi
+		;;
+
+	$v_swap) 
+		if [ "${partn}"  != "${p_swap}" ]
+		then
+			t_error $disk $partn swap  $p_root
+		fi
+		;;
+
+	$v_stand) 
+		if [ "${partn}"  != "${p_stand}" ]
+		then
+			t_error $disk $partn stand  $p_root
+		fi
+		;;
+
+	$v_usr)	
+		if [ "${partn}"  != "${p_usr}" ]
+		then
+			t_error $disk $partn usr  $p_root
+		fi
+		;;
+
+	
+	$v_backup) 
+		if [ "${partn}"  != "${p_backup}" ]
+		then
+			t_error $disk $partn whole_disk  $p_root
+		fi
+		;;
+
+	$v_boot) 
+		if [ "${partn}"  != "${p_boot}" ]
+		then
+			t_error $disk $partn boot  $p_root
+		fi
+		;;
+
+	$v_var)	
+		if [ "${partn}"  != "${p_var}" ]
+		then 
+			t_error $disk $partn var  $p_root
+		fi
+		;;
+
+	$v_home)	
+		if [ "${partn}"  != "${p_home}" ]
+		then 
+			t_error $disk $partn home  $p_root
+		fi
+		;;
+	*)	return 0
+		;;
+
+	esac
+
+}
+
+
+#check vfstab entries
+fstab <${HARD}/etc/vfstab | while read dev rdev dir fstype junk
+do
+	case "${dev}" in
+
+	/dev/dsk/c1d?s${p_boot} | /dev/idsk?${p_boot}) 
+			p_error $dev boot $dir
+			;;
+
+	/dev/dsk/c1d?s${p_root} | /dev/idsk?${p_root})
+			p_error $dev root $dir
+			 ;;
+
+	/dev/dsk/c1d?s${p_swap} | /dev/idsk?${p_swap})
+			p_error $dev swap $dir
+			 ;;
+
+	/dev/dsk/c1d?s${p_stand} | /dev/idsk?${p_stand})
+			if [ "${dir}" != "/stand" ]
+			then
+				p_error $dev stand  $dir
+			fi
+			;;
+
+	/dev/dsk/c1d?s${p_usr} | /dev/idsk?${p_usr})
+			if [ "${dir}" != "/usr" ]
+			then
+				p_error $dev usr  $dir
+			fi
+			;;
+
+	/dev/dsk/c1d?s${p_var} | /dev/idsk?${p_var})
+			if [ "${dir}" != "/var" ]
+			then
+				p_error $dev var  $dir
+			fi
+			;;
+
+	/dev/dsk/c1d?s${p_home} | /dev/idsk?${p_home})
+			if [ "${dir}" != "/home" ]
+			then
+				p_error $dev home  $dir
+			fi
+			;;
+	/dev/dsk/c1d?s[0-9] | /dev/idsk?[0-9])
+				p_error $dev system  $dir
+			;;
+	esac
+
+done
+
+
+
+#check if tags in vtoc match with reserved partition numbers.
+prtvtoc -h ${RROOT_0} 2> /dev/null | while read vtocline
+do
+	set -- ${vtocline}
+
+	check 0 $1 $2
+
+done
+
+if [ -n "${DRIVEID_1:-}" ]
+then
+	prtvtoc -h ${RROOT_1} 2> /dev/null | \
+
+	while read vtocline
+	do
+		set -- ${vtocline}
+
+		check 1 $1 $2
+	done
+fi
+
+exit 0

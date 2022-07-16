@@ -1,0 +1,23 @@
+#ident	"@(#)cmd-3b2:inst/bin/fstab	1.2.3.3"
+#
+# fstab
+#
+# Extract integral hard disk entries from a vfstab file. Ignores
+# comments, blank lines and references to external devices.
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+
+while read dev rdev dir fstype fsckpass automnt flags
+do
+	case "${dev}" in
+	/dev/dsk/c1d*s* | /dev/idsk* )
+		echo "${dev} ${rdev} ${dir} ${fstype} ${fsckpass} ${automnt} ${flags}"
+		;;
+	esac
+done

@@ -1,0 +1,26 @@
+/*#ident	"@(#)newoptim:tables/is25.ops.cb	1.4"*/
+
+call
+jbc
+jbs
+je
+jg
+jge
+jgeu
+jgu
+jl
+jle
+jleu
+jlu
+jmp
+jne
+jneg
+jnneg
+jnpos
+jnz
+jpos
+jsb
+jz
+save
+ret
+rsb

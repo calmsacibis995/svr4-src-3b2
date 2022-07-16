@@ -1,0 +1,74 @@
+#ident	"@(#)oamintf:syssetup/Text.datedisp	1.1"
+################################################################################
+#	Module Name: Text.datedisp
+#	Calling Sequence: nodename.menu
+#	Functional Description: This Text object displays the System-Name and
+#				the Network Node-Name
+#	How:
+#	Inputs:
+#	Functions Called:
+#	Issues:
+################################################################################
+
+Title=Display System Date and Time Information
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp "display:ABSTRACT"
+
+rows=12
+columns=72
+
+framemsg=`readfile $INTFBASE/display.msg`
+
+`date +%B | set -l MM ;
+ date +%d | set -l DD ;
+ date +%Y | set -l YY ;
+ date +%I | set -l HH ;
+ date +%M | set -l MN ;
+ date +%p | set -l AP ;
+ echo $TZ | fmlcut -c6-7 | set -l A1 ;
+ regex -v $A1 'DT' 'yes' '.*' 'no' | set -l XX ;
+ echo $TZ | fmlcut -c1-4 | regex 'GMT0' 'Greenwich' 'AST4' 'Atlantic' 'EST5' 'Eastern' 'CST6' 'Central' 'MST7' 'Mountain' 'PST8' 'Pacific' 'YST8' 'Yukon' 'AST1' 'Alaska' 'BST1' 'Bering' 'HST1' 'Hawaii' '.*' ' ' | set -l FTZ`
+
+#if [ $STZ = "GMT0" ] ;
+#then
+#set -l FTZ="Greenwich" ;
+#elif [ $STZ = "AST4" ] ;
+#then
+#set -l FTZ="Atlantic" ;
+#elif [ $STZ = "EST5" ] ;
+#then
+#set -l FTZ="Eastern" ;
+#elif [ $STZ = "CST6" ] ;
+#then
+#set -l FTZ="Central" ;
+#elif [ $STZ = "MST7" ] ;
+#then
+#set -l FTZ="Mountain" ;
+#elif [ $STZ = "PST8" ] ;
+#then
+#set -l FTZ="Pacific" ;
+#elif [ $STZ = "YST8" ] ;
+#then
+#set -l FTZ="Yukon" ;
+#elif [ $STZ = "AST1 ] ;
+#then
+#set -l FTZ="Alaska" ;
+#elif [ $STZ = "BST1 ] ;
+#then
+#set -l FTZ="Bering" ;
+#elif [ $STZ = "HST1 ] ;
+#then
+#set -l FTZ="Hawaii" ;
+#else
+#set -l FTZ=" " ;
+#fi`
+
+text="
+   Date: 			$MM $DD, $YY
+   Time: 			$HH:$MN
+   AM/PM:			$AP
+   Timezone:			$FTZ
+   Daylight savings time?	$XX
+   
+   "
+

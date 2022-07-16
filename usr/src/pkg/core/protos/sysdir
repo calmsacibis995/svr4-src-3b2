@@ -1,0 +1,142 @@
+#ident	"@(#)pkgcore:protos/sysdir	1.13"
+
+d sysdir / 755 root sys
+d sysdir /bck 775 root sys
+d sysdir /boot 775 root sys
+d sysdir /config 775 root bin
+d sysdir /dev 775 root sys
+d sysdir /dev/term 775 root root
+d sysdir /dgn 775 root root
+d sysdir /etc 775 root sys
+d sysdir /etc/cron.d 755 root sys
+d sysdir /var/cron 755 root sys
+d sysdir /etc/default 775 root sys
+d sysdir /etc/fs 775 root sys
+d sysdir /etc/fs/bfs 775 root sys
+d sysdir /etc/fs/proc 775 root sys
+d sysdir /etc/fs/rfs 775 root sys
+d sysdir /etc/fs/s5 775 root sys
+d sysdir /etc/fs/fd 775 root sys
+d sysdir /etc/init.d 775 root sys
+d sysdir /etc/mail 775 bin mail
+d sysdir /etc/mail/lists 775 bin mail
+d sysdir /etc/master.d 775 root sys
+d sysdir /etc/rc.d 775 root sys
+d sysdir /etc/rc0.d 775 root sys
+d sysdir /etc/rc1.d 775 root sys
+d sysdir /etc/rc2.d 775 root sys
+d sysdir /etc/rc3.d 775 root sys
+d sysdir /etc/saf 755 bin bin
+d sysdir /etc/save.d 775 root sys
+d sysdir /etc/shutdown.d 775 root sys
+d sysdir /etc/tm 775 root sys
+d sysdir /etc/vtoc 775 root sys
+d sysdir /export 775 root sys
+d sysdir /home 775 root sys
+d sysdir /mnt 775 root sys
+d sysdir /opt 775 root sys
+d sysdir /save 775 root sys
+d sysdir /sbin 775 root sys
+d sysdir /usr 775 root sys
+d sysdir /usr/3bnet 775 root sys
+d sysdir /usr/admin 755 root sys
+d sysdir /usr/admin/checkfsys.d 755 root sys
+d sysdir /usr/admin/makefsys.d 755 root sys
+d sysdir /usr/admin/menu 755 root sys
+d sysdir /usr/admin/menu/diagnostics 755 root sys
+d sysdir /usr/admin/menu/diskmgmt 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/checkfsys.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/cpdisk.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/erase.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/format.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/harddisk 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/harddisk/display.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/harddisk/partitioning.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/harddisk/rmdisk.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/makefsys.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/mountfsys.d 755 root sys
+d sysdir /usr/admin/menu/diskmgmt/umountfsys.d 755 root sys
+d sysdir /usr/admin/menu/filemgmt 755 root sys
+d sysdir /usr/admin/menu/filemgmt/backup.d 755 root sys
+d sysdir /usr/admin/menu/filemgmt/bupsched 755 root sys
+d sysdir /usr/admin/menu/filemgmt/restore.d 755 root sys
+d sysdir /usr/admin/menu/filemgmt/store.d 755 root sys
+d sysdir /usr/admin/menu/machinemgmt 755 root sys
+d sysdir /usr/admin/menu/packagemgmt 755 root sys
+d sysdir /usr/admin/menu/softwaremgmt 755 root sys
+d sysdir /usr/admin/menu/softwaremgmt/installpkg.d 755 root sys
+d sysdir /usr/admin/menu/softwaremgmt/removepkg.d 755 root sys
+d sysdir /usr/admin/menu/softwaremgmt/runpkg.d 755 root sys
+d sysdir /usr/admin/menu/syssetup 755 root sys
+d sysdir /usr/admin/menu/ttymgmt 755 root sys
+d sysdir /usr/admin/menu/usermgmt 755 root sys
+d sysdir /usr/admin/menu/usermgmt/modgroup 755 root sys
+d sysdir /usr/admin/menu/usermgmt/moduser 755 root sys
+d sysdir /usr/admin/mountfsys.d 755 root sys
+d sysdir /usr/admin/umountfsys.d 755 root sys
+d sysdir /usr/bin 775 root bin
+d sysdir /usr/include 775 root bin
+d sysdir /usr/lbin 775 bin bin
+d sysdir /usr/lib 775 root bin
+d sysdir /usr/lib 775 root bin
+d sysdir /usr/lib/cftime 775 bin bin
+d sysdir /usr/lib/chrclass 775 bin bin
+d sysdir /usr/lib/chrtbl 775 bin bin
+d sysdir /usr/lib/class 775 root bin
+d sysdir /usr/lib/class/RT 775 root bin
+d sysdir /usr/lib/class/TS 775 root bin
+d sysdir /usr/lib/config 775 bin bin
+d sysdir /usr/lib/font 775 bin bin
+d sysdir /usr/lib/fs 775 root sys 
+d sysdir /usr/lib/fs/bfs 775 root sys
+d sysdir /usr/lib/fs/proc 775 root sys
+d sysdir /usr/lib/fs/rfs 775 root sys
+d sysdir /usr/lib/fs/s5 775 root sys
+d sysdir /usr/lib/fs/fd 775 root sys
+d sysdir /usr/lib/lex 775 bin bin
+d sysdir /usr/lib/libp 775 bin bin
+d sysdir /usr/lib/macros 775 bin bin
+d sysdir /usr/lib/mail 775 bin mail
+d sysdir /usr/lib/mail/surrcmd 775 bin mail
+d sysdir /usr/lib/mailx 775 root sys
+d sysdir /usr/share/lib/mailx 775 root sys
+d sysdir /usr/lib/pump 775 bin bin
+d sysdir /usr/lib/sa 775 adm bin
+d sysdir /usr/lib/saf 775 root bin
+d sysdir /usr/lib/tabset 775 bin bin
+d sysdir /usr/lib/term 775 bin bin
+d sysdir /usr/lib/tmac 775 bin bin
+d sysdir /usr/lib/trouble 775 bin bin
+d sysdir /usr/sbin 775 root bin
+d sysdir /usr/share 755 root sys
+d sysdir /usr/src 775 bin bin
+d sysdir /var 775 root sys
+d sysdir /var/adm 775 root sys
+d sysdir /var/adm/passwd 775 adm adm
+d sysdir /var/adm/log 775 adm adm
+d sysdir /var/adm/sa 775 adm sys
+d sysdir /var/mail 775 root mail
+d sysdir /var/mail/:saved 775 root mail
+d sysdir /var/news 777 bin bin
+d sysdir /var/options 775 root sys
+d sysdir /var/preserve 777 bin bin
+d sysdir /var/saf 755 bin bin
+d sysdir /var/spool 775 root bin
+d sysdir /var/spool/cron 0700 root sys
+d sysdir /var/spool/cron/atjobs 755 root sys
+d sysdir /var/spool/cron/crontabs 755 root sys
+d sysdir /var/spool/smtpq 775 root mail
+d sysdir /var/tmp 777 sys sys
+s sysdir /bin=/usr/bin
+s sysdir /lib=/usr/lib
+s sysdir /shlib=/usr/lib
+s sysdir /usr/lib/cron=/etc/cron.d
+s sysdir /usr/options=/var/options
+s sysdir /usr/mail=/var/mail
+s sysdir /usr/news=/var/news
+s sysdir /usr/preserve=/var/preserve
+s sysdir /usr/pub=/usr/share/lib
+s sysdir /usr/spool=/var/spool
+s sysdir /usr/tmp=/var/tmp
+s sysdir /etc/log=/var/adm/log
+s sysdir /usr/adm=/var/adm

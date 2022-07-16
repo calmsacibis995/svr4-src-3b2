@@ -1,0 +1,1227 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)nifg:cg/mau/stin	1.75"
+#	stin - input description for pcc2 code generator
+#
+#
+
+SHAPES
+
+#	basic shapes
+
+F:	'FREE';			# evaluate for effects only
+CC:	'CC';			# evaluate for condition codes (ignore value)
+# NAIL nodes for copy, jumps, and uninitialized storage
+
+COPY:	'COPY';
+COPYASM:'COPYASM';
+NOP:	'NOP';
+JUMP:	'JUMP';
+RETURN:	'RETURN';
+NPRETURN:'NPRETURN';
+UNINIT:	'UNINIT';
+CURCAP: 'CURCAP';		#stack pointer
+FCON:	'FCON';			#floating constant
+CURFRAME: 'CURFRAME';		# current stack frame ( two words)
+EXRAISE: 'EXRAISE';		# raise an exception
+EXTEST:	'EXTEST';		# test an ex (noop)
+RSAVE:	'RSAVE';		# save caller save registers
+RREST:	'RREST';		# restore caller save registers
+CAPRET:	'CAPRET';		# return from capcall
+
+# Different flavors of constants
+Cplit:	POSRANGE 6:0;		# 0 - 63: positive literal
+Cb:	POSRANGE 8:1;		# 0 - 255
+Cs:	SGRANGE 15:2;		# -32768 - 32767
+C: :1;				# constant
+
+N:	'NAME'	:9;		# including address constants
+T:	'TEMP'	:4;		# temporary
+A:	'AUTO'	:4;		# auto
+P:	'PARAM'	:4;		# incoming arg
+CSE:	'CSE';			# common subexpression
+r:	'REG'	:0;		# "register"
+# registers are numbered as follows because of break between scratch
+# and user registers
+#	0-2	%r0-2	regular scratch
+#	3-4	%f0,%f3	MAU scratch
+#	5-10	%r3-8	regular user register
+#	11-12	%f1-2	MAU user register
+R:	r{0-2,5-10};		# regular registers
+SR:	r{0-2};			# regular scratch registers
+MR:	r{3-4,11-12};		# MAU registers
+SMR:	r{3-4};			# MAU scratch register
+
+#	addressing modes
+AP:	A, P;
+STK:	A, P, T;		# K(%sp) or K(%ap)
+ROFF:	R, R+C:4, R-C:4;
+OREG:	*(*ROFF):10, *STK:5, *ROFF:5;	# PCC1 "OREG" node
+PTRS:	*STK, *(*ROFF);		# pointer on stack
+NSTK:	N, STK;			# jump targets
+IMMED:	R, CURFRAME, STK, N;	# "direct" refs to memory or registers
+FIMMED:	STK, R, N,CURCAP,CSE;	# direct refs for immediate frame pointers
+FUNC:	R,N,STK,C;		# for function calls
+MEM:	STK, N;			# "direct " refs to memory only
+SRC:	SR, C;			# for count of block moves
+AWD1:	STK, R, OREG, N,CURCAP,CSE;	# addressable words
+AWD:	AWD1, *N:5;		# same, including indirect of global
+AWDnR1: STK, OREG, N, CURCAP, CSE, *N;	# addressable words that aren't in registers
+AWDnR:	STK, OREG, N;		# addressable words that aren't in registers
+DAWD:	STK, R, N;		# directly addressable word
+DAWDnR:	STK, N, *ROFF;		#
+IAWD:	*STK:5, *R:5, *N:5;	# indirectly addressable word
+MAUAWD:	AWDnR, MR, *N;		# same as AWD, but REG shape is MAU reg
+MAUAWDnR: AWDnR, *N;
+
+AAWD:	& AWDnR;
+STAWD:	R, &STK, (R+C), (R-C);	# structure AWD
+RNODE:	'RNODE';		# return node
+QNODE:	'QNODE';		# ?: operator node
+
+BC:	'CONV' AWD[c];		# character converted to int or short
+SC:	'CONV' AWD[s];		# short converted to int
+UBC:	'CONV' AWD[uc];		# unsigned char converted to int or short
+USC:	'CONV' AWD[us];		# unsigned short converted to int
+
+IC:     'CONV' R[susiuip];	# int converted to short, char, or float type
+ICB:    IC[cuc];		# int converted to [unsigned] char or short
+ICH:    IC[sus];		# int converted to [unsigned] char or short
+
+MEMADR:	'UAND' NSTK:1;		# address of stack items or name
+
+BSRC:	AWD[c], BC[iui], Cb;	# character operand
+UBSRC:	AWD[uc], UBC[iui], Cb;
+SUBSRC:	BSRC, UBSRC;
+HSRC:	AWD[s], SC[iui], Cs;	# short operands to int operations
+HSRCnconv: AWD[sus], Cs;	# any halfword source with no convert
+UHSRC:	AWD[us], USC[iui], Cs;
+SUHSRC:	HSRC, UHSRC;
+WSRC:	AWD[iuip], C;
+
+WSRCnC:	AWD[iuip], C;		# no conversion
+UWSRCnC:	AWD[uip];	# unsigned
+SWSRCnC:	AWD[i], C;	# signed
+UWSRCnCnR:	AWDnR[uip];	# unsigned, not a register
+SWSRCnCnR:	AWDnR[i], C[i];	# signed, not a register
+
+BDST:	AWD[cuc];
+HDST:	AWD[sus];
+WDST:	AWD[iuip];
+SWDST:	AWD[i];
+FRPTR:	AWD[F];			# any frame pointer
+
+
+SSRC:	MAUAWD[f], CSE[f];	# single
+DSRC:	MAUAWD[d], CSE[d];	# double
+SSRCnR:	AWDnR[f];		# single, not a register
+DSRCnR:	AWDnR[d];		# double, not a register
+SSRCconv: 'CONV' SSRC;		# converted (to double) single
+SSRCnRconv: 'CONV' SSRCnR;
+DSRCconv: 'CONV' DSRC;		# converted (to single) double
+DSRCnRconv: 'CONV' DSRCnR;
+
+SDST:	MAUAWD[f], CSE[f];
+DDST:	MAUAWD[d], CSE[d];
+SDSTnR:	MAUAWDnR[f];
+DDSTnR:	MAUAWDnR[d];
+
+#	useful subtrees to recognize
+
+FLD:	'FLD' AWD[cucsusiui];		# bit field
+
+# Block moves
+
+#frame select: to take adresses of
+
+SELECT: ( IMMED 'FSELECT' STK );
+
+#chain: for assigning to
+CHAIN:	'FCHAIN' IMMED;
+
+#pair of blocks: for block compares and moves; must
+#be scratch registers (they get clobbered)
+BB:	SR[p] 'CM' SR[p] ;
+
+# for exceptions
+EXGETV: 'EXGETV';
+ 
+
+OPCODES
+
+DCOST	:6;			# default opcode cost
+
+#	convert to/from double
+# The way to get truncating movsw and movdw in the MAU is to change rounding mode
+# MAU instructions cannot take CPU register operands, so intermediate
+# temporaries have to be allocated and used via the ZT and Zt macros
+
+'CONV'	[i] SSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovss	AL,A2\n"
+					"	mmovsw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movw	Zt,A1\n":24;
+'CONV'	[uip] SSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"	mfrnds2	AL,A2\n"
+					"ZL.3	\B\G\B	ZL3\n"
+					"	\C\L\R\W	ZT\n"
+					"	\B\R\B	ZL1\n"
+					"Zk.siu"
+					"ZL3:	mfcmps	A2,Zksi\n"
+					"	\B\L\B	ZL2\n"
+					"	mfcmps	A2,Zksu\n"
+					"	\B\G\E\B	ZL2\n"
+					"	mfsubs2	Zksu,A2\n"
+					"ZL2:\n"
+					"	mmovsw	A2,Zt\n"
+					"ZL1:\n"
+					"Zr"		#restore rounding mode
+					"	movw	Zt,A1\n":24;
+'CONV'	[i] DSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovdd	AL,A2\n"
+					"	mmovdw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movw	Zt,A1\n":28;
+'CONV'	[uip] DSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"	mfrndd2	AL,A2\n"
+					"ZL.3	\B\G\B	ZL3\n"
+					"	\C\L\R\W	ZT\n"
+					"	\B\R\B	ZL1\n"
+					"Zk.diu"
+					"ZL3:	mfcmpd	A2,Zkdi\n"
+					"	\B\L\B	ZL2\n"
+					"	mfcmpd	A2,Zkdu\n"
+					"	\B\G\E\B	ZL2\n"
+					"	mfsubd2	Zkdu,A2\n"
+					"ZL2:\n"
+					"	mmovdw	A2,Zt\n"
+					"ZL1:\n"
+					"Zr"		#restore rounding mode
+					"	movw	Zt,A1\n":28;
+'CONV'	[sus] SSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovss	AL,A2\n"
+					"	mmovsw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movtwh	Zt,A1\n":32;
+'CONV'	[sus] DSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovdd	AL,A2\n"
+					"	mmovdw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movtwh	Zt,A1\n":36;
+'CONV'	[cuc] SSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovss	AL,A2\n"
+					"	mmovsw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movtwb	Zt,A1\n":32;
+'CONV'	[cuc] DSRC	{1:SR 1:SMR $1 $< $C}
+					"ZR"		#change rounding mode
+					"RL!2	mmovdd	AL,A2\n"
+					"	mmovdw	A2,ZT\n"
+					"Zr"		#restore rounding mode
+					"	movtwb	Zt,A1\n":36;
+'CONV'	[f] UWSRCnCnR 	{$1:SMR $< $C}
+					"ZL.1"		# template uses 2 labels
+					"	mmovwx	AL,A1\n"
+					"	\B\G\E\B	ZL1\n"
+					"Zk.su"
+					"	mfadds2	Zksu,A1\n"
+					"ZL1:\n";
+'CONV'	[f] SWSRCnCnR 	{$1:SMR $< $C}
+					"	mmovws	AL,A1\n":24;
+'CONV'	[d] UWSRCnCnR 	{$1:SMR $< $C} 
+					"ZL.1"		# template uses 2 labels
+					"	mmovwx	AL,A1\n"
+					"	\B\G\E\B	ZL1\n"
+					"Zk.du"
+					"	mfaddd2	Zkdu,A1\n"
+					"ZL1:\n";
+'CONV'	[d] SWSRCnCnR 	{$1:SMR $< $C} 
+					"	mmovwd	AL,A1\n":28;
+
+# The following four templates are needed for stincc and not for pcc2.
+# Stincc will not allocate a temporary and store a reg operand on its own
+# when doesn't find a matching template.
+
+'CONV'	[f] R[uip]	{$1:SMR $< $C}
+					"	movw	AL,ZT\n"
+					"	mmovws	Zt,A1\n"
+					"ZL.1"	# template uses 2 labels
+					"	\B\G\E\B	ZL1\n"
+					"Zk.su"
+					"	mfadds2 Zksu,A1\n"
+					"ZL1:\n";
+
+'CONV'	[f] R[i]	{$1:SMR $< $C}
+					"	movw	AL,ZT\n"
+					"	mmovws	Zt,A1\n":24;
+'CONV'	[d] R[uip]	{$1:SMR $< $C}
+					"	movw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n"
+					"ZL.1"	# template uses 2 labels
+					"	\B\G\E\B	ZL1\n"
+                                        "Zk.du"
+                                        "	mfaddd2 Zkdu,A1\n"
+                                        "ZL1:\n";
+					
+'CONV'	[d] R[i]	{$1:SMR $< $C}
+					"	movw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n":24;
+'CONV'	[d] SSRC	{$1:SMR $< $C}
+					"RL!1	mmovsd	AL,A1"
+					"E?	mmovsd	AL,A1\n":24;
+'CONV'	[f] DSRC	{$1:SMR $l $< $C}
+					"	mmovds	AL,A1\n":24;
+'CONV'	[f] AWD[us]	{$1:SMR $< $C}
+					"	movzhw	AL,ZT\n"
+					"	mmovws	Zt,A1\n":32;
+'CONV'	[f] AWD[s]	{$1:SMR $< $C}
+					"	movbhw	AL,ZT\n"
+					"	mmovws	Zt,A1\n":32;
+'CONV'	[f] AWD[uc]	{$1:SMR $< $C}
+					"	movzbw	AL,ZT\n"
+					"	mmovws	Zt,A1\n":32;
+'CONV'	[f] AWD[c]	{$1:SMR $< $C}
+					"	movbbw	AL,ZT\n"
+					"	mmovws	Zt,A1\n":32;
+'CONV'	[d] AWD[us]	{$1:SMR $l $< $C}
+					"	movzhw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n":36;
+'CONV'	[d] AWD[s]	{$1:SMR $l $< $C}
+					"	movbhw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n":36;
+'CONV'	[d] AWD[uc]	{$1:SMR $l $< $C}
+					"	movzbw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n":36;
+'CONV'	[d] AWD[c]	{$1:SMR $l $< $C}
+					"	movbbw	AL,ZT\n"
+					"	mmovwd	Zt,A1\n":36;
+
+#	integral conversions
+
+'CONV'[sus] AWD[uc]	{$1:SR $< $C}	"	movzbh	AL,A1\n":10;
+'CONV'[sus] AWD[c]	{$1:SR $< $C}	"	movbbh	AL,A1\n":10;
+
+# 'CONV'[sus] AWD[uc]	{$1:SR $<}	"RL!1	movzbh	AL,A1\n":10;
+# 'CONV'[sus] AWD[c]	{$1:SR $<}	"RL!1	movbbh	AL,A1\n":10;
+
+'CONV'[iuip] AWD[uc]	{$1:SR $< $C}	"	movzbw	AL,A1\n":10;
+'CONV'[iuip] AWD[c]	{$1:SR $< $C}	"	movbbw	AL,A1\n":10;
+
+'CONV'[iuip] AWD[us]	{$1:SR $< $C}	"	movzhw	AL,A1\n":10;
+'CONV'[iuip] AWD[s]	{$1:SR $< $C}	"	movbhw	AL,A1\n":10;
+
+#'CONV'[cuc] AWD[sus]	{$1:SR $< $C}	"RL!1	movthb	AL,A1"
+#					"E?	movthb	AL,A1\n":10;
+#'CONV'[cuc] AWD[iuip]	{$1:SR $< $C}	"RL!1	movtwb	AL,A1"
+#					"E?	movtwb	AL,A1\n":10;
+#'CONV'[sus] AWD[iuip]	{$1:SR $< $C}	"RL!1	movtwh	AL,A1"
+#					"E?	movtwh	AL,A1\n":10;
+
+# 'CONV'[cuc] AWD[sus]	{$1:SR $<}	"RL!1	movthb	AL,A1\n":10;
+# 'CONV'[cuc] AWD[iuip]	{$1:SR $<}	"RL!1	movtwb	AL,A1\n":10;
+# 'CONV'[sus] AWD[iuip]	{$1:SR $<}	"RL!1	movtwh	AL,A1\n":10;
+# 'CONV'[cuc] AWD[sus]	{$1:SR $< $C}	"	movthb	AL,A1\n":10;
+# 'CONV'[cuc] AWD[iuip]	{$1:SR $< $C}	"	movtwb	AL,A1\n":10;
+# 'CONV'[sus] AWD[iuip]	{$1:SR $< $C}	"	movtwh	AL,A1\n":10;
+
+'CONV'[iuip] AWD[iuip]	{ $L }		"";
+
+ICB			{ $L }		"";
+ICH			{ $L }		"";
+
+#	leaf nodes (Also matches some conversions of leaves)
+
+'FLD' AWD[ucusui]	{$1:SR $< }	"	extzv	&ZHR,&SR,AL,A1\n":11;
+'FLD' AWD[ucusui]	{$1:SR $< $C}	"	extzv	&ZHR,&SR,AL,A1\n"
+					"	cmpw	A1,&0\nZb":14;
+
+'FLD' AWD[csi]		{$1:SR $< }
+					"Z?R	\A\R\S\W3	&32-SR,AL,A1"
+					"E	\L\L\S\W3	&32-ZHR-SR,AL,A1\n"
+					"	\A\R\S\W3	&32-SR,A1,A1\n";
+'FLD' AWD[csi]		{$1:SR $< $C}
+					"Z?R	\A\R\S\W3	&32-SR,AL,A1"
+					"E	\L\L\S\W3	&32-ZHR-SR,AL,A1\n"
+					"	\A\R\S\W3	&32-SR,A1,A1\n"
+					"	cmpw	A1,&0\nZb";
+
+UBSRC			{$C}		"	cmpb	AR,&0\nZb":4;
+HSRC			{$C}		"	cmph	AR,&0\nZb":4;
+WSRC			{$C}		"	cmpw	AR,&0\nZb":3;
+SSRC			{$C 1:SMR}	"RR!1	mmovss	AR,A1\n"
+					"	mfcmps	A1,&0.0\nZb";
+DSRC			{$C 1:SMR}	"RR!1	mmovdd	AR,A1\n"
+					"	mfcmpd	A1,&0.0\nZb":25;
+
+WSRC			{$1:SR $> }	"RR!1	movw	AR,A1\n":5;
+HSRC			{$1:SR $C $> }	"	movbhw	AR,A1\n":10;
+UHSRC			{$1:SR $C $> }	"	movzhw	AR,A1\n":10;
+BSRC			{$1:SR $C $> }	"	movbbw	AR,A1\n":10;
+UBSRC			{$1:SR $C $> }	"	movzbw	AR,A1\n";
+SSRC			{$1:SMR $> }	"RR!1	mmovss	AR,A1\n":5;
+DSRC			{$1:SMR $>}	"RR!1	mmovdd	AR,A1\n":20;
+# a null leaf node is required because in the return(i?a:b) case
+# a subtree is reduced to a RNODE node , which cfix wants to put into
+# a reg. This template lies to cfix, saying the 'result' will go into
+# the MAU scratch register.
+RNODE		{$1:SMR}		"";
+
+# current value of the top of the cap
+CURCAP			{$1}		"	movw	%sp,A1\n";
+# current value of the stack frame pointer
+CURFRAME		{$1 $P }	"	movw	%ap,A1\n"
+					"	movw	%fp,I1\n";
+FIMMED[F]		{$1:SR $P}	"	movw	AR,A1\n"
+					"	movw	IR,I1\n";
+'STAR'[F] AWD[p]	{ $< $1:SR $P }	"RL!1	movw	AL,A1\n"
+					"	movw	4(A1),I1\n"
+					"	movw	0(A1),A1\n";
+
+#	constant initialization
+#	handled by code in local.c
+
+#'INIT' [cuc]	C	{$N}		"	ZB":0;
+#'INIT' [sus]	C	{$N}		"	.half	CL\n":0;
+#'INIT' [iuip]	C	{$N}		"	.word	CL\n":0;
+#'INIT' [f]	C	{$N}		"	.single	CL\n":0;
+#'INIT' [d]	C	{$N}		"	.double	CL\n":0;
+
+#uninitialized storage
+
+UNINIT [cuc]		{$N}		"	.zero	C.\n";
+UNINIT [sus]		{$N}		"	.align	2\n"
+					"	.zero	2*C.\n";
+UNINIT [iuilulpf]	{$N}		"	.align	4\n"
+					"	.zero	4*C.\n";
+UNINIT [Fd]		{$N}		"	.align	4\n"
+					"	.zero	8*C.\n";
+
+#		function arguments
+'ARG'[f]	('UCALL' FUNC)[f]	{$< $A $N}		"ZFL"
+						"Zof	pushw	%r0\n";
+'ARG'[d]	('UCALL' FUNC)[d]	{$< $A $N}		"ZFL"
+						"Zod	pushw	%r0\n"
+						"	pushw	%r1\n";
+'ARG'[f]	(FUNC 'CALL' F)[f]	{$< $A $N}		"ZFL"
+						"Zof	pushw	%r0\n";
+'ARG'[d]	(FUNC 'CALL' F)[d]	{$< $A $N}		"ZFL"
+						"Zod	pushw	%r0\n"
+						"	pushw	%r1\n";
+
+'ARG'[F] IMMED		{$N}		"	pushw	AL\n"
+					"	pushw	IL\n":28;
+'ARG'[iuip] WSRCnC	{$N}		"	pushw	AL\n":11;
+'ARG'[s]    AWD[s]	{$N 1:SR}	"	movbhw	AL,A1\n"
+					"	pushw	A1\n":21;
+'ARG'[us]   AWD[us]	{$N 1:SR}	"	movzhw	AL,A1\n"
+					"	pushw	A1\n":21;
+'ARG'[c]  AWD[c]	{$N 1:SR}	"	movbbw	AL,A1\n"
+					"	pushw	A1\n":21;
+'ARG'[uc]  AWD[uc]	{$N 1:SR}	"	movzbw	AL,A1\n"
+					"	pushw	A1\n":21;
+'ARG'[f]    SSRCnR	{$N } 		"Zof	pushw	AL\n";
+'ARG'[f]    SSRC	{$N } 
+					"	addw2	&4,%sp\n"
+					"	mmovss	AL,-4(%sp)\n";
+
+'ARG'   PTRS[d]	{ $N 1:SR $< }	"R(LL)!1	movw	A(LL),A1\n"
+					"Zod	pushw	0(A1)\n"
+					"	pushw	4(A1)\n";
+'ARG'   DSRCnR	{$N}
+					"Zod	pushw	AL\n"
+					"	pushw	ZDL\n";
+'ARG'	DSRC	{$N}	
+					"	addw2	&8,%sp\n"
+					"	mmovdd	AL,-8(%sp)\n":20;
+
+'ARG'[p] MEMADR		{$N}		"	pushaw	A(LL)\n":16;
+
+#	take address of
+
+'UAND'	AWDnR		{$1:SR $<}	"	movaw	AL,A1\n":11;
+
+=[p] AWD,MEMADR		{$E}		"	movaw	A(RL),AL\n":11;
+
+# = AWD,MEMADR		{$L}		"	movaw	A(RL),AL\n":11;
+# = AWD,MEMADR		{$R}		"	movaw	A(RL),AL\n":11;
+
+
+#	arithmetic ops -- take advantage of mod N bit arithmetic
+
++[cuc] SUBSRC,SUBSRC	{$1:SR $< $>}
+					"RR=1	addb2	AL,AR"
+					"ERL=1	addb2	AR,AL"
+					"E	addb3	AR,AL,A1\n":6;
+
+#  To save on templates, there are no special templates for unsigned short.
+#  They are left to be converted to unsigned ints and then operated on.
+#  Thus the "us" type included in the operator for word operands
+#  The conversion from signed short to int have also to do explicitly, 
+#  though HSRC includes SC.  This is because languages like ADA won't
+#  accept 'overflow' flag exception sometimes.
+
++[iui] HSRC,HSRC	{$-H $1:SR $< $> $C}
+					"RR=1	addh2	AL,AR"
+					"ERL=1	addh2	AR,AL"
+					"E	addh3	AR,AL,A1\n":6;
+
++[s] HSRC,HSRC	{$1:SR $< $> $C}
+					"RR=1	addh2	AL,AR"
+					"ERL=1	addh2	AR,AL"
+					"E	addh3	AR,AL,A1\n":6;
+#+[iuius] UHSRC,UHSRC	{$1 $< $>}
+#					"RR=1	\A\D\D\H2	{uhalf}AL,AR"
+#					"ERL=1	\A\D\D\H2	{uhalf}AR,AL"
+#					"E	\A\D\D\H3	{uhalf}AR,AL,A1\n":6;
+
++[iuipusc] WSRC,WSRC	{$1:SR $< $> $C}
+					"RR=1	addw2	AL,AR"
+					"ERL=1	addw2	AR,AL"
+					"E	addw3	AR,AL,A1\n":6;
++[f] SSRCnR,SSRCnR	{$1:SMR  $C}
+					"	mmovss	AR,A1\n"
+					"	mfadds2	AL,A1\n";
++[f] SSRC,SSRC	{$1:SMR $< $> $C}
+					"RR=1	mfadds2	AL,AR"
+					"ERL=1	mfadds2	AR,AL"
+					"E	mfadds3	AR,AL,A1\n":12;
++[d] DSRCnR,DSRCnR	{$1:SMR  $C}
+					"	mmovdd	AR,A1\n"
+					"	mfaddd2	AL,A1\n";
++[d] DSRC,DSRC	{$1:SMR $< $> $C}
+					"RR=1	mfaddd2	AL,AR"
+					"ERL=1	mfaddd2	AR,AL"
+					"E	mfaddd3	AR,AL,A1\n":12;
+
+-[uciui] UBSRC,UBSRC	{$1:SR $< $> $C}	"RL!1	subb3	AR,AL,A1\n"
+					"RL=1	subb2	AR,AL\n":6;
+
+-[iui] HSRC,HSRC	{$-H $1:SR $< $> $C}	"RL!1	subh3	AR,AL,A1\n"
+					"RL=1	subh2	AR,AL\n":6;
+-[s] HSRC,HSRC	{$1:SR $< $> $C}	"RL!1	subh3	AR,AL,A1\n"
+					"RL=1	subh2	AR,AL\n":6;
+#-[iuius] UHSRC,UHSRC	{$1 $< $>}	"RL!1	\S\U\B\H3	{uhalf}AR,AL,A1\n"
+#					"RL=1	\S\U\B\H2	{uhalf}AR,AL\n":6;
+
+-[iuipusc] WSRC,WSRC	{$1:SR $< $> $C}	"RL!1	subw3	AR,AL,A1\n"
+					"RL=1	subw2	AR,AL\n":5;
+-[f] SSRCnR,SSRCnR	{$1:SMR  $C}
+					"	mmovss	AR,A1\n"
+					"	mfsubs3	A1,AL,A1\n";
+-[f] SSRC,SSRC	{$1:SMR $< $> $C}
+					"RL!1	mfsubs3	AR,AL,A1\n"
+					"RL=1	mfsubs2	AR,AL\n":12;
+-[d] DSRCnR,DSRCnR	{$1:SMR  $C}
+					"	mmovdd	AR,A1\n"
+					"	mfsubd3	A1,AL,A1\n";
+-[d] DSRC,DSRC	{$1:SMR $< $> $C}
+					"RL!1	mfsubd3	AR,AL,A1\n"
+					"RL=1	mfsubd2	AR,AL\n":12;
+
+'UMINUS'[cuciui] BSRC	{$1:SR $<}	"	\\M\\N\\E\\G\\B	AL,A1\n":6;
+'UMINUS'[siui] HSRC	{$1:SR $<}	"	mnegh	AL,A1\n":6;
+#'UMINUS'[si] SUHSRC	{$1:SR $<}	"	mnegh	AL,A1\n":6;
+'UMINUS'[iuipus] WSRC	{$1:SR $<}	"	mnegw	AL,A1\n":5;
+'UMINUS'[f] SSRC	{$1:SMR $<}	"	mfnegs2	AL,A1\n":24;
+'UMINUS'[d] DSRC	{$1:SMR $<}	"	mfnegd2	AL,A1\n":24;
+
+# looks so gross because "expand" uses caps for itself
+# BC and SC templates are used to reach around conversions explicitly
+# because optim doesn't push down conversions around *.
+
+*[iuisus] UBC[iuisus],UBC[iuisus] {$1:SR $< $> $C}
+				"R(RL)=1	\\M\\U\\L\\B2	AL,AR"
+				"ER(LL)=1	\\M\\U\\L\\B2	AR,AL"
+					"E	\\M\\U\\L\\B3	AR,AL,A1\n":16;
+*[uciui] UBSRC,UBSRC	{$1:SR $< $> $C}	
+					"	\\M\\U\\L\\B3	AR,AL,A1\n";
+*[iuisus] SC,SC 	{$1:SR $< $> $C}
+				"R(RL)=1	\\M\\U\\L\\H2	AL,AR"
+				"ER(LL)=1	\\M\\U\\L\\H2	AR,AL"
+					"E	\\M\\U\\L\\H3	AR,AL,A1\n":16;
+
+*[iui] HSRC,HSRC 	{$-H $1:SR $< $> $C}	"	\\M\\U\\L\\H3	AR,AL,A1\n":16;
+*[s] HSRC,HSRC 	{$1:SR $< $> $C}	"	\\M\\U\\L\\H3	AR,AL,A1\n":16;
+
+*[iuisusc] WSRC,WSRC	{$1:SR $< $> $C}
+					"RR=1	mulw2	AL,AR"
+					"ERL=1	mulw2	AR,AL"
+					"E	mulw3	AR,AL,A1\n":16;
+*[f] SSRCnR,SSRCnR	{$1:SMR  $C}
+					"	mmovss	AR,A1\n"
+					"	mfmuls2	AL,A1\n";
+*[f] SSRC,SSRC		{$1:SMR $[ $] $C}
+					"RR=1	mfmuls2	AL,AR"
+					"ERL=1	mfmuls2	AR,AL"
+					"E	mfmuls3	AR,AL,A1\n":24;
+*[d] DSRCnR,DSRCnR	{$1:SMR  $C}
+					"	mmovdd	AR,A1\n"
+					"	mfmuld2	AL,A1\n";
+*[d] DSRC,DSRC		{$1:SMR $[ $] $C}
+					"RR=1	mfmuld2	AL,AR"
+					"ERL=1	mfmuld2	AR,AL"
+					"E	mfmuld3	AR,AL,A1\n":24;
+
+/ UWSRCnC,WSRCnC {$1:SR $< $> $C}	"RL!1	udivw3	AR,AL,A1\n"
+					"RL=1	udivw2	AR,AL\n":18;
+/ WSRCnC,UWSRCnC {$1:SR $< $> $C}	"RL!1	udivw3	AR,AL,A1\n"
+					"RL=1	udivw2	AR,AL\n":18;
+/ WSRCnC,WSRCnC	{$1:SR $< $> $C}		"RL!1	divw3	AR,AL,A1\n"
+					"RL=1	divw2	AR,AL\n":18;
+/[f] SSRCnR,SSRCnR	{$1:SMR  $C}
+					"	mmovss	AR,A1\n"
+					"	mfdivs3	A1,AL,A1\n";
+/[f] SSRC,SSRC {$1:SMR $< $> $C}
+					"RL!1	mfdivs3	AR,AL,A1\n"
+					"RL=1	mfdivs2	AR,AL\n":32;
+/[d] DSRCnR,DSRCnR	{$1:SMR  $C}
+					"	mmovdd	AR,A1\n"
+					"	mfdivd3	A1,AL,A1\n";
+/[d] DSRC,DSRC {$1:SMR $< $> $C}
+					"RL!1	mfdivd3	AR,AL,A1\n"
+					"RL=1	mfdivd2	AR,AL\n":32;
+
+% UWSRCnC,WSRCnC {$1:SR $< $> $C}	"RL!1	umodw3	AR,AL,A1\n"
+					"RL=1	umodw2	AR,AL\n":18;
+% WSRCnC,UWSRCnC {$1:SR $< $> $C}	"RL!1	umodw3	AR,AL,A1\n"
+					"RL=1	umodw2	AR,AL\n":18;
+% WSRCnC,WSRCnC	{$1:SR $< $> $C}		"RL!1	modw3	AR,AL,A1\n"
+					"RL=1	modw2	AR,AL\n":18;
+
+
+#	logical ops -- again, take advantage
+#
+#	WE 32000 versions of these instructions actually do set
+#	 condition codes correctly, even though IS25 doesn't require it
+
+&[uciui] BSRC,UBSRC	{$C}		"	bitb	AL,AR\n":7;
+&[siui] HSRC,HSRC	{$C}		"	bith	AL,AR\n":6;
+&[iuipusc] WSRC,WSRC	{$C}		"	bitw	AL,AR\n":5;
+
+&[uciui] UBSRC,UBSRC	{$C $1:SR $> $<}
+					"RR=1	andb2	AL,AR"
+					"ERL=1	andb2	AR,AL"
+					"E	andb3	AR,AL,A1\n":6;
+&[siui] HSRC,HSRC	{$C $1:SR $> $<}
+					"RR=1	andh2	AL,AR"
+					"ERL=1	andh2	AR,AL"
+					"E	andh3	AR,AL,A1\n":6;
+&[iuipusc] WSRC,WSRC	{$C $1:SR $> $<}
+					"RR=1	andw2	AL,AR"
+					"ERL=1	andw2	AR,AL"
+					"E	andw3	AR,AL,A1\n":6;
+
+|[uciui] UBSRC,UBSRC	{$C $1:SR $> $<}
+					"RR=1	orb2	AL,AR"
+					"ERL=1	orb2	AR,AL"
+					"E	orb3	AR,AL,A1\n":6;
+|[siui] HSRC,HSRC	{$C $1:SR $> $<}
+					"RR=1	orh2	AL,AR"
+					"ERL=1	orh2	AR,AL"
+					"E	orh3	AR,AL,A1\n":6;
+|[iuipsusc] WSRC,WSRC	{$C $1:SR $> $<}
+					"RR=1	orw2	AL,AR"
+					"ERL=1	orw2	AR,AL"
+					"E	orw3	AR,AL,A1\n":6;
+
+^[uciui] UBSRC,UBSRC	{$C $1:SR $> $<}
+					"RR=1	xorb2	AL,AR"
+					"ERL=1	xorb2	AR,AL"
+					"E	xorb3	AR,AL,A1\n":6;
+^[siui] HSRC,HSRC	{$C $1:SR $> $<}
+					"RR=1	xorh2	AL,AR"
+					"ERL=1	xorh2	AR,AL"
+					"E	xorh3	AR,AL,A1\n":6;
+^[iuipusc] WSRC,WSRC	{$C $1:SR $> $<}
+					"RR=1	xorw2	AL,AR"
+					"ERL=1	xorw2	AR,AL"
+					"E	xorw3	AR,AL,A1\n":6;
+
+~[ucsusiui] UBSRC	{$1:SR $<}	"	mcomb	AL,A1\n":6;
+~[siui] HSRC		{$1:SR $<}	"	mcomh	AL,A1\n":6;
+~[iuipusc] WSRC	{$1:SR $<}	"	mcomw	AL,A1\n":6;
+
+#	shifts
+
+<<	WSRCnC,WSRCnC	{$1:SR $> $< $C}	"	\\L\\L\\S\\W3	AR,AL,A1\n":5;
+
+>>	WSRCnC,WSRCnC	{$1:SR $> $< $C}	"	\\L\\R\\S\\W3	AR,AL,A1\n":5;
+
+>>A	SWSRCnC,SWSRCnC	{$1:SR $> $< $C}	"	\\A\\R\\S\\W3	AR,AL,A1\n":5;
+
+#	assignment ops -- mod N bits!
+
++=[uc] BDST,UBSRC	{$L }		"	addb2	AR,AL\n":6;
++=[s] HDST,HSRC		{$L $C}		"	addh2	AR,AL\n":6;
++=[iuipusc] WDST,WSRC	{$L $C}		"	addw2	AR,AL\n":5;
++=[f] SDSTnR,SSRCnR	{$L $C 1:SMR}	"	mmovss	AR,A1\n"
+					"	mfadds2	A1,AL\n";
++=[f] SDST,SSRC		{$L $C}		"	mfadds2	AR,AL\n":24;
++=[d] DDSTnR,DSRCnR	{$L $C 1:SMR}	"	mmovdd	AR,A1\n"
+					"	mfaddd2	A1,AL\n";
++=[d] DDST,DSRC		{$L $C}		"	mfaddd2	AR,AL\n":24;
+
+-=[uc] BDST,UBSRC	{$L $C}		"	subb2	AR,AL\n":6;
+-=[s] HDST,HSRC		{$L $C}		"	subh2	AR,AL\n":6;
+-=[iuipusc] WDST,WSRC	{$L $C}		"	subw2	AR,AL\n":5;
+-=[f] SDSTnR,SSRCnR	{$L $C 1:SMR}	"	mmovss	AR,A1\n"
+					"	mfsubs2	A1,AL\n";
+-=[f] SDST,SSRC		{$L $C}		"	mfsubs2	AR,AL\n":24;
+-=[d] DDSTnR,DSRCnR	{$L $C 1:SMR}	"	mmovdd	AR,A1\n"
+					"	mfsubd2	A1,AL\n";
+-=[d] DDST,DSRC		{$L $C}		"	mfsubd2	AR,AL\n":24;
+
+*=[uc] BDST,UBSRC	{$L $C}		"	\\M\\U\\L\\B2	AR,AL\n":16;
+*=[s] HDST,HSRC		{$L $C}		"	\\M\\U\\L\\H2	AR,AL\n":16;
+*=[iuipusc] WDST,WSRC	{$L $C}		"	mulw2	AR,AL\n":16;
+*=[f] SDSTnR,SSRCnR	{$L $C 1:SMR}	"	mmovss	AR,A1\n"
+					"	mfmuls2	A1,AL\n";
+*=[f] SDST,SSRC		{$L $C}		"	mfmuls2	AR,AL\n":32;
+*=[d] DDSTnR,DSRCnR	{$L $C 1:SMR}	"	mmovdd	AR,A1\n"
+					"	mfmuld2	A1,AL\n";
+*=[d] DDST,DSRC		{$L $C}		"	mfmuld2	AR,AL\n":32;
+
+/= WDST,UWSRCnC		{$L $C}		"	udivw2	AR,AL\n":18;
+/= AWD[uip],WSRCnC	{ }		"	udivw2	AR,AL\n":18;
+/= AWD[iuip],WSRCnC	{ }		"	divw2	AR,AL\n":18;
+/=[f] SDSTnR,SSRCnR	{$L $C 1:SMR}	"	mmovss	AR,A1\n"
+					"	mfdivs2	A1,AL\n";
+/=[f] SDST,SSRC		{$L $C}		"	mfdivs2	AR,AL\n":32;
+/=[d] DDSTnR,DSRCnR	{$L $C 1:SMR}	"	mmovdd	AR,A1\n"
+					"	mfdivd2	A1,AL\n";
+/=[d] DDST,DSRC		{$L $C}		"	mfdivd2	AR,AL\n":32;
+
+%= AWD[uip],WSRCnC	{ }		"	umodw2	AR,AL\n":18;
+%= WDST,UWSRCnC		{$L $C}		"	umodw2	AR,AL\n":18;
+%= WDST,WSRCnC		{$L $C}		"	modw2	AR,AL\n":18;
+
+|=[cuc] BDST,UBSRC	{$L}		"	orb2	AR,AL\n":6;
+|=[sus] HDST,SUHSRC	{$L}		"	orh2	AR,AL\n":6;
+|=[iuip] WDST,WSRC	{$L}		"	orw2	AR,AL\n":5;
+
+&=[cuc] BDST,UBSRC	{$L}		"	andb2	AR,AL\n":6;
+&=[sus] HDST,SUHSRC	{$L}		"	andh2	AR,AL\n":6;
+&=[iuip] WDST,WSRC	{$L}		"	andw2	AR,AL\n":5;
+
+^=[cuc] BDST,UBSRC	{$L}		"	xorb2	AR,AL\n":6;
+^=[sus] HDST,SUHSRC	{$L}		"	xorh2	AR,AL\n":6;
+^=[iuip] WDST,WSRC	{$L}		"	xorw2	AR,AL\n":5;
+
+<<= WDST,WSRCnC		{$L $C}		"	\\L\\L\\S\\W3	AR,AL,AL\n":5;
+
+>>= WDST,WSRCnC		{$L $C}		"	\\L\\R\\S\\W3	AR,AL,AL\n":5;
+
+>>=A SWDST,SWSRCnC	{$L $C}		"	\\A\\R\\S\\W3	AR,AL,AL\n":5;
+
+#	comparisons
+
+'CMP'	WSRC,WSRC	{$C}		"	\C\M\P\W	AR,AL\nZb":6;
+'CMP'	HSRC,HSRC	{$C}		"	\C\M\P\W	{shalf}AR,AL\nZb":6;
+'CMP'	UHSRC,UHSRC	{$C}		"	\C\M\P\W	{uhalf}AR,AL\nZb":6;
+'CMP'	BSRC,BSRC	{$C}		"	\C\M\P\W	{sbyte}AR,AL\nZb":6;
+'CMP'	UBSRC,UBSRC	{$C}		"	\C\M\P\W	{ubyte}AR,AL\nZb":6;
+
+# frame pointers cannot use fcmpd because +0 == -0
+# Only defined for equal/nonequal test
+'CMP'	IMMED[F],IMMED[F] { $C }	"	cmpw	AL,AR\n" 
+					"ZL.1	jne	ZL1\n"
+					"	cmpw	IL,IR\n"
+					"ZL1:\n";
+
+# For IEEE fp standard compatibility:
+# to properly handle non-trapping NaNs, which can be equal or non-equal, 
+# but are unordered, two types of floating point compares are needed.
+
+# Comparisons that raise exceptions for all NaN operands
+
+# floating point exception raising comparisons:
+
+'CMPE'	SSRC,SSRC		{$C}	"	mfcmpts	AL,AR\nZb":16;
+'CMPE'	SSRCconv[d],SSRCconv[d]	{$C}	"	mfcmpts	AL,AR\nZb":16;
+'CMPE'	DSRC,DSRC		{$C}	"	mfcmptd	AL,AR\nZb":24;
+
+# Comparisons for floating point == and != , no trapping on non-trapping NaNs.
+
+'CMP'	SSRCnR,SSRCnR	{$C 1:SMR}	"	mmovss	AL,A1\n"
+					"	mfcmps	A1,AR\nZb";
+'CMP'	SSRC,SSRC		{$C}	"	mfcmps	AL,AR\nZb":16;
+
+'CMP'	SSRCnRconv[d],SSRCnRconv[d]	{$C 1:SMR }
+					"	mmovss	AL,A1\n"
+					"	mfcmps	A1,AR\nZb";
+'CMP'	SSRCconv[d],SSRCconv[d]	{$C}	"	mfcmps	AL,AR\nZb":16;
+
+'CMP'	DSRCnR,DSRCnR	{$C 1:SMR }	"	mmovdd	AL,A1\n"
+					"	mfcmpd	A1,AR\nZb";
+'CMP'	DSRC,DSRC		{$C}	"	mfcmpd	AL,AR\nZb":24;
+
+
+#	post increment, decrement (rhs is amount)
+
+++[cuc] BDST,C	{$N}			"	addb2	&CR,AL\n":7;
+++[sus] HDST,C	{$N}			"	addh2	&CR,AL\n":7;
+++[iuip] WDST,C	{$N}			"	addw2	&CR,AL\n":6;
+
+++[cuc] BDST,C	{$1:SR $l}		"	movb	AL,A1\n"
+					"	addb2	&CR,AL\n":12;
+++[sus] HDST,C	{$1:SR $l}		"	movh	AL,A1\n"
+					"	addh2	&CR,AL\n":12;
+++[iuip] WDST,C	{$1:SR $l}		"	movw	AL,A1\n"
+					"	addw2	&CR,AL\n":11;
+
+--[cuc] BDST,C	{$N}			"	subb2	&CR,AL\n":7;
+--[sus] HDST,C	{$N}			"	subh2	&CR,AL\n":7;
+--[iuip] WDST,C	{$N}			"	subw2	&CR,AL\n":6;
+
+--[cuc] BDST,C	{$1:SR $l}		"	movb	AL,A1\n"
+					"	subb2	&CR,AL\n":12;
+--[sus] HDST,C	{$1:SR $l}		"	movh	AL,A1\n"
+					"	subh2	&CR,AL\n":12;
+--[iuip] WDST,C	{$1:SR $l}		"	movw	AL,A1\n"
+					"	subw2	&CR,AL\n":11;
+
+
+#	assignment
+
+#	same size or smaller integers
+
+=[iuip] WDST,WSRC	{$E $C}		"RL!R	movw	AR,AL"
+					"E?	movw	AR,AL\n";
+=[sus] HDST,HSRCnconv	{$E $C}		"RL!R	movh	AR,AL"
+					"E?	movh	AR,AL\n";
+=[cuc] BDST,BSRC	{$E $C}		"RL!R	movb	AR,AL"
+					"E?	movb	AR,AL\n";
+=[cuc] BDST,UBSRC	{$E $C}		"RL!R	movb	AR,AL"
+					"E?	movb	AR,AL\n";
+
+#	bigger integers
+
+=[sus] HDST,UBSRC	{$L $C}		"	movzbh	AR,AL\n":10;
+=[sus] HDST,BSRC	{$L $C}		"	movbbh	AR,AL\n":10;
+=[iuip] WDST,UBSRC	{$L $C}		"	movzbw	AR,AL\n":10;
+=[iuip] WDST,BSRC	{$L $C}		"	movbbw	AR,AL\n":10;
+
+=[iuip] WDST,HSRC	{$L $C}		"	movbhw	AR,AL\n":10;
+=[iuip] WDST,UHSRC	{$L $C}		"	movzhw	AR,AL\n":10;
+
+# Assignments of Frame pointers and doubles:
+=[F] DAWD[F],DAWD[F] {$E }		"RL!R	movw	AR,AL\n"
+					"RL!R	movw	ZDR,ZDL\n":24;
+
+# =[F] DAWD[F],DAWD[F] {$L }		"RL!R	movw	AR,AL\n"
+#					"RL!R	movw	ZDR,ZDL\n":24;
+# =[F] DAWD[F],DAWD[F] {$R }		"RL!R	movw	AR,AL\n"
+#					"RL!R	movw	ZDR,ZDL\n":24;
+
+# OK to share result side register because it is not destroyed.
+=[F] IAWD[F],DAWD[F] {1 $L $[}
+				"YR(LL)!1	movw	A(LL),A1\n"
+					"	movw	AR,0(A1)\n"
+					"	movw	ZDR,4(A1)\n":24;
+
+# =[F] IAWD[F],DAWD[F] {1 $R $[}
+#				"R(LL)!1	movw	A(LL),A1\n"
+#					"	movw	AR,0(A1)\n"
+#					"	movw	ZDR,4(A1)\n":24;
+
+# lhs may be unallocated r0,r1 in case of function return.
+# have to be careful that an address in r0 isn't wiped out before finished
+=[F] DAWD[F],IAWD[F]	{1 $L $[}
+				"YR(RL)!1	movw	A(RL),A1\n"
+					"	movw	0(A1),AL\n"
+					"	movw	4(A1),ZDL\n":24;
+
+# =[F] DAWD[F],IAWD[F]	{1 $L $[}
+#				"R(RL)!1	movw	A(RL),A1\n"
+#					"D1!L	movw	0(A1),AL\n"
+#					"	movw	4(A1),ZDL\n"
+#					"D1=L	movw	0(A1),AL\n":24;
+# =[F] DAWD[F],IAWD[F]	{1 $R $[}
+#				"YR(RL)!1	movw	A(RL),A1\n"
+#					"	movw	0(A1),AL\n"
+#					"	movw	4(A1),ZDL\n":24;
+
+=[F] IAWD[F],IAWD[F]	{2 $L $]}
+				"R(RL)!1	movw	A(RL),A1\n"
+					"	movw	A(LL),A2\n"
+					"	movw	0(A1),0(A2)\n"
+					"	movw	4(A1),4(A2)\n":24;
+=[F] IAWD[F],IAWD[F] {2 $R $[}
+				"R(LL)!1	movw	A(LL),A1\n"
+					"	movw	A(RL),A2\n"
+					"	movw	0(A2),0(A1)\n"
+					"	movw	4(A2),4(A1)\n":24;
+
+#	floating point -- better have conversions where appropriate!
+=[f] DAWDnR,DAWDnR	{$E $C}		"Zof	movw	AR,AL\n";
+
+# =[f] DAWDnR,DAWDnR	{$L}		"	movw	AR,AL\n";
+# =[f] DAWDnR,DAWDnR	{$R}		"	movw	AR,AL\n";
+# =[f] DAWDnR,DAWDnR	{$L $C}		"	movw	AR,AL\n";
+# =[f] DAWDnR,DAWDnR	{$R $C}		"	movw	AR,AL\n";
+
+=[f] SDST,SSRC		{$E $C}		"RL!R	mmovss	AR,AL"
+					"E?	mmovss	AR,AL\n";
+
+# =[f] SDST,SSRC	{$L}		"RL!R	mmovss	AR,AL\n";
+# =[f] SDST,SSRC	{$R}		"RL!R	mmovss	AR,AL\n";
+# =[f] SDST,SSRC	{$L $C}		"	mmovss	AR,AL\n";
+# =[f] SDST,SSRC	{$R $C}		"	mmovss	AR,AL\n";
+ 
+=[d] DAWDnR,DAWDnR	{$E}		"Zod	movw	AR,AL\n"
+					"	movw	ZDR,ZDL\n";
+
+# =[d] DAWDnR,DAWDnR	{$L}		"	movw	AR,AL\n"
+#					"	movw	ZDR,ZDL\n";
+# =[d] DAWDnR,DAWDnR	{$R}		"	movw	AR,AL\n"
+#					"	movw	ZDR,ZDL\n";
+# =[d] DAWDnR,DAWDnR	{$L $C}		"	movw	AR,AL\n"
+#					"	movw	ZDR,ZDL\n";
+# =[d] DAWDnR,DAWDnR	{$R $C}		"	movw	AR,AL\n"
+#					"	movw	ZDR,ZDL\n";
+
+#	the next two templates are order sensitive to the third
+=[d]	DAWDnR,('UCALL' FUNC)		{ $A $> $L}		"ZFR"
+						"Zod	movw	%r0,AL\n"
+						"	movw	%r1,ZDL\n";
+=[d]    DAWDnR,(FUNC 'CALL' F)		{ $A $> $L}		"ZFR"
+						"Zod	movw	%r0,AL\n"
+						"	movw	%r1,ZDL\n";
+ 
+=[d] DDST,DSRC		{$E $C}		"RL!R	mmovdd	AR,AL"
+					"E?	mmovdd	AR,AL\n":24;
+
+# =[d] DDST,DSRC	{$L}		"RL!R	mmovdd	AR,AL\n":24;
+# =[d] DDST,DSRC	{$R}		"RL!R	mmovdd	AR,AL\n":24;
+# =[d] DDST,DSRC	{$L $C}		"	mmovdd	AR,AL\n":24;
+# =[d] DDST,DSRC	{$R $C}		"	mmovdd	AR,AL\n":24;
+
+=[f] MR[f],DSRCnRconv[f]	{$L $C}	"	mmovds  AR,AL\n";
+=[f] SDSTnR,DSRCnRconv[f]	{1:SMR $L $C}	
+					"	mmovds	AR,A1\n"
+					"	mmovss	A1,AL\n";
+=[d] MR[d],SSRCnRconv[d]	{$L $C}	"	mmovsd  AR,AL\n";
+=[d] DDSTnR,SSRCnRconv[d]	{1:SMR $L $C}	
+					"	mmovsd	AR,A1\n"
+					"	mmovdd	A1,AL\n";
+
+=[f] SDST,DSRCconv[f]	{$L $C}		"	mmovds	AR,AL\n":22;
+=[d] DDST,SSRCconv[d]	{$L $C}		"	mmovsd	AR,AL\n":22;
+
+#	the result of a ?: op should be placed in %f0. In the current
+# implementation, A1 is %f0 - the only SMR.
+=[f] QNODE,MR		{$1:SMR $> }	"RR!1	mmovss	AR,A1\n";
+=[d] QNODE,MR		{$1:SMR $> }	"RR!1	mmovdd	AR,A1\n";
+#	the reason for the following null template is that return(i?a:b)
+# is rewritten as  = QNODE(= RNODE [bc])
+=[fd] 	QNODE[fd],RNODE[fd]	{$N}	"";
+ 
+= RNODE[f],AWDnR[f]	{ $L}		"Zof	movw	AR,%r0\n";
+= RNODE[d],DAWDnR[d]	{ $L}		"Zod	movw	ZDR,%r1\n"
+					"	movw	AR,%r0\n";
+= RNODE[f],MR[f]	{ $L}		"	mmovss	AR,ZT\n"
+					"Zof	movw	Zt,%r0\n";
+= RNODE[d],MR[d]	{ $L}		"	mmovdd	AR,ZdT\n"
+					"Zod	movw	Zt,%r0\n"
+					"	movw 	Zdt,%r1\n";
+= RNODE,('UCALL' FUNC)		{ $A $> $L}	"ZFR";
+= RNODE,(FUNC 'CALL' F)		{ $A $> $L}	"ZFR";
+
+#= FLD,UBSRC	{$L 1:SR}	
+#					"RR!1	movzbw	AR,A1\n"
+#					"	insv	A1,&ZHL,&SL,AL\n":28;
+#= FLD,BSRC	{$L 1:SR}	
+#					"RR!1	movbbw	AR,A1\n"
+#					"	insv	A1,&ZHL,&SL,AL\n":28;
+#= FLD,UHSRC	{$L 1:SR}
+#					"RR!1	movzhw	AR,A1\n"
+#					"	insv	A1,&ZHL,&SL,AL\n":28;
+#= FLD,HSRC	{$L 1:SR}
+#					"RR!1	movbhw	AR,A1\n"
+#					"	insv	A1,&ZHL,&SL,AL\n":28;
+#
+#= FLD,WSRC	{$L 1:SR} 		"	insv	AR,&ZHL,&SL,AL\n":18;
+
+= FLD,R		{$L} 			"	insv	AR,&ZHL,&SL,AL\n":18;
+# assignment of frame pointers
+# curframe here; others done as doubles
+
+=[F]    FRPTR,CURFRAME	{ $L }		"	movw	%ap,AL\n"
+					"	movw	%fp,IL\n";
+
+
+#	structure assignment, arguments
+
+# complicated. do it in zzzcode()
+
+'STASG'	(& (IMMED 'FSELECT' AP )),STAWD		{$L 3:SR $]}
+					"ZS";
+# For case where result is desired, might just as well demand a register
+# now as later.
+'STASG'	R,STAWD		{$L 3:SR $< $>}	"YZS1":24;	#need result
+'STASG'	STAWD,STAWD	{$N 3:SR $< $>}	"ZS0":20;
+
+'STARG'	STAWD	{$N 3:SR $<}		"Zs":24;
+
+#  goto (for fortran)
+
+'GOTO'	C		{$N}		"	jmp	CL\n";
+'GOTO'	NSTK		{$N}		"	jmp	*AL\n";
+'GOTO'	R		{$N}		"	jmp	0(AL)\n";
+
+
+#	comma (list separator)
+
+'CM'	F,F		{$N}		"";
+
+#	comma op (eval left, eval right, return right value)
+
+'COMOP'	F,F		{$N}		"";
+'COMOP'	F,r		{$R}		"";
+# 'COMOP'	F,CC		{$C}		"";
+
+#       semicolon - as comma op, but can't be rewritten
+
+'SEMI'		F,F	{$N}		"";
+'SEMI'		F,CC	{$C}		"";
+'SEMI'[!fd]	F,R	{$R}		"Y";
+'SEMI'[fd]	F,MR	{$R}		"Y";
+
+#	let - handled by special code in bprt()
+'LET'			R[!fd],r	{$R}		"";
+'LET'			NOP[!fd],r	{$R}		"";
+'LET'			MR[fd],r	{$R}		"";
+'LET'			NOP[fd],r	{$R}		"";
+
+#	CALL
+'CALL'[f]	FUNC,F	{$A $1:SMR $<}		"ZF."
+					"FZof	movw	%r0,ZT\n"
+					"F	mmovss	Zt,%f0\n";
+'UCALL'[f]	FUNC	{$A $1:SMR $<}		"ZF."
+					"FZof	movw	%r0,ZT\n"
+					"F	mmovss	Zt,%f0\n";
+
+'CALL'[d]	FUNC,F	{$A $1:SMR $<}		"ZF."
+					"FZod	movw	%r0,ZdT\n"
+					"F	movw	%r1,Zdt\n"
+					"F	mmovdd	Zt,%f0\n";
+'UCALL'[d]	FUNC	{$A $1:SMR $<}		"ZF."
+					"FZod	movw	%r0,ZdT\n"
+					"F	movw	%r1,Zdt\n"
+					"F	mmovdd	Zt,%f0\n";
+
+'CALL'		FUNC,F	{$A $1:SR $<}		"ZF."; 
+'UCALL'		FUNC	{$A $1:SR $<}		"ZF."; 
+
+#	generate a label
+
+'GENLAB'	F	{$N}		".\\LL:\n";
+'GENLAB' 	r	{$L} 		".\\LL:\n";
+# 'GENLAB' 	CC	{$C} 		".\\LL:\n";
+
+#	conditional branch
+
+'GENBR'		CC	{$N}		"	ZC";
+
+#	generate a branch
+
+'GENUBR'	F	{$N}		"	jmp	.\\LL\n";
+'GENUBR'	C	{$N}		"	jmp	.\\LL\n";
+'GENUBR'	R	{$N}	 	"	jmp	0(AL)\n";
+
+# add this to pick up integer constants with best possible code for stincc
+=[iuip]	WDST,C		{ $C $L }	"	movw	AR,AL\n";
+
+#############################
+#	NAIL nodes	    #
+#############################
+
+#
+# copy the name field verbatim
+# 
+COPY			{$N}		"C.";
+COPYASM			{$A $1:SR $<}	"C.";
+NOP			{$N}		"";
+
+#
+# Jump and return both jump to the label field.
+# In RETURN, this has been set to the common return point
+#
+JUMP			{$N}		"	jmp	.\\LL\n";
+RETURN			{$N}		"	jmp	.\\LL\n";
+#
+# Nopop return: want the %sp after return to be the current %sp.
+# Do this by moving it to the %ap; the return will set the new %sp to
+# the old %ap. Note that this means nested functions will not work (NONEST
+# should be on)
+
+NPRETURN		{$N}		"	movw	%sp,%ap\n"
+					"	jmp	.\\LL\n";
+
+# Variable length return: this destroys the contents of the
+# two registers, but we are returning anyway!
+# use %ap to hold the future sp (as in NPRETURN)- this points just
+# past the value we are copying.
+# must copy %fp since block move trashes all its operands, and its not polite
+# to trash the %fp.
+# count and from are in scratch regs;
+# A1 is used for the %fp.
+
+'VLRETURN' SR, SR	{1:SR $N $-H}	"	addw3	%sp,AR,A1\n"
+					"	addw2	&3,A1\n"
+					"	andw2	&-4,A1\n"
+					"	cmpw	A1,%sp\n"
+					"ZL.1	jle	ZL1\n"
+					"	movw	A1,%sp\n"
+					"ZL1:"
+					"	pushw	A1\n"
+					"	movw	%fp,A1\n"
+					"ZM"
+					"	\P\O\P\W\t%sp\n"
+					"	movw	%sp,%ap\n"
+					"	movw	%fp,%r0\n"
+					"	jmp	.\\LL\n";
+
+
+'VLRETURN' SR, SR	{1:SR $N $H }	"ZL.2	subw3	%sp,_stk_lim,A1\n"
+					"	cmpw	AR,A1\n"
+					"	jle	ZL1\n"
+					"	call	&0,*_stk_ov\n"
+					"ZL1:"
+					"	addw3	%sp,AR,A1\n"
+					"	addw2	&3,A1\n"
+					"	andw2	&-4,A1\n"
+					"	cmpw	A1,%sp\n"
+					"	jle	ZL2\n"
+					"	movw	A1,%sp\n"
+					"ZL2:"
+					"	pushw	A1\n"
+					"	movw	%fp,A1\n"
+					"ZM"
+					"	\P\O\P\W\t%sp\n"
+					"	movw	%sp,%ap\n"
+					"	movw	%fp,%r0\n"
+					"	jmp	.\\LL\n";
+
+
+#
+# Allocate on the stack
+#
+
+'ALLOC'	WSRC		{$1:SR $-H}	"	movw	%sp,A1\n"
+					"	addw2	AL,%sp\n";
+
+'ALLOC' WSRC		{2:SR $1 $H}	"ZL.1	movw	%sp,A1\n"
+					"	subw3	%sp,_stk_lim,A2\n"
+					"	cmpw	AL,A2\n"
+					"	jle	ZL1\n"
+					"	call	&0,*_stk_ov\n"
+					"ZL1:	addw3	%sp,AL,A2\n"
+					"	movw	A2,%sp\n";
+# block moves
+# from/to must be in scratch regs
+
+'BMOVE' SRC, BB		{1:SR $< $N }	"ZM";
+'BMOVEO' SRC, BB	{1:SR $< $N }	"ZM";
+
+# block compares- no special instruction, just do a loop
+# from/to must be in scratch regs
+
+'BCMP'	SR, BB	{ $C }			"ZP";
+# get the stack frame that called us
+
+'FCHAIN' CURFRAME	{$1:SR $P }	"	movw	-32(%fp),A1\n"
+					"	movw	-28(%fp),I1\n";
+
+'FCHAIN' MEM		{$1:SR $P}	"	movw	IL,A1\n"
+					"	movw	-28(A1),I1\n"
+					"	movw	-32(A1),A1\n";
+
+'FCHAIN' R		{ $L }		"	movw	-32(IL),AL\n"
+					"	movw	-28(IL),IL\n";
+
+# select values from stack frame
+# can't make these adressing modes becuase of sty problems- does
+# not want binary leaf ops
+'FSELECT'[f] IMMED ,STK	{ 1:SR 1:SMR $2 $< $C}	"Zf.	mmovss	ZA.,A2\n";
+'FSELECT'[iuip] IMMED ,STK	{$1:SR $< $C}	"Zf.	movw	ZA.,A1\n";
+'FSELECT'[c] IMMED, STK		{$1:SR $< $C}	"Zf.	movbbw	ZA.,A1\n";
+'FSELECT'[uc] IMMED, STK	{$1:SR $< $C}	"Zf.	movzbw	ZA.,A1\n";
+'FSELECT'[s] IMMED, STK		{$1:SR $< $C}	"Zf.	movbhw	ZA.,A1\n";
+'FSELECT'[us] IMMED, STK	{$1:SR $< $C}	"Zf.	movzhw	ZA.,A1\n";
+'FSELECT'[F] IMMED, STK		{$1:SR $P $C}	"Zf.	movw	ZG.,I1\n"
+						"	movw	ZA.,A1\n";
+'FSELECT'[d] IMMED ,STK	{ 1:SR 1:SMR $2 $< $C}	"Zf.	mmovdd	ZA.,A2\n";
+
+#take the address of a value in a stack frame
+
+'UAND'	SELECT		{$1:SR $< $C}		"ZfL	movaw	ZAL,A1\n";
+
+#assignment to selects
+=[iuip]	SELECT,AWD		{1:SR $L $C}	"ZfL	movw	AR,ZAL\n";
+=[f]	SELECT,AWDnR1		{1:SR $L $C}	"ZfL	movw	AR,ZAL\n";
+=[f]	SELECT,MR		{1:SR $L $C}	"ZfL	mmovss	AR,ZT\n"
+						"Zof	movw	Zt,ZAL\n";
+=[cuc]	SELECT,AWD		{1:SR $L $C}	"ZfL	movb	AR,ZAL\n";
+=[sus]	SELECT,AWD		{1:SR $L $C}	"ZfL	movh	AR,ZAL\n";
+=[Fd]	SELECT,AWDnR1		{1:SR $L $C}	"ZfL	movw	IR,ZGL\n"
+						"	movw	AR,ZAL\n";
+=[Fd]	SELECT,MR		{1:SR $L $C}	"ZfL	mmovdd	AR,ZdT\n"
+						"Zod	movw	Zdt,ZGL\n"
+						"	movw	Zt,ZAL\n";
+
+#assignment to FCHAIN: set the ap and fp pointers
+
+=[F]	CHAIN, IMMED		{$L 1:SR}	"YZa(LL)"
+						"	movw	AR, -32(Zp(LL))\n"
+						"	movw	IR, -28(Zp(LL))\n";
+
+#convert to/from pointers and FRPTRs
+#to fptr: %ap is start of area; %fp is 52 bytes farther
+'FCONV'[F] AWD[p]		{$1:SR $P $< }	"RL!1	movw	AL,A1\n"
+						"	addw3	A1,&36,I1\n";
+
+#from fptr: area starts at %ap.
+'FCONV'[p] IMMED[F]		{$1:SR $< $C}	"RL!1	movw	AL,A1\n";
+
+#exceptions: raise an exception:
+EXRAISE			{$N}			"ZE";
+#test an exception: This is a trap machine: no-op:
+EXTEST			{$N}			"";
+
+RSAVE			{$N}			"ZV";
+
+RREST			{$N}			"ZO";
+
+'CAPCALL'[fd]	C		{ $A $1:SMR $< }	"	jsb	CL\n";
+'CAPCALL'[fd]	R		{ $A $1:SMR $< }	"	jsb	0(AL)\n";
+'CAPCALL'[fd]	NSTK		{ $A $1:SMR $< }	"	jsb	*AL\n";
+
+'CAPCALL'	C		{ $A $1:SR $< }	"	jsb	CL\n";
+'CAPCALL'	R		{ $A $1:SR $< }	"	jsb	0(AL)\n";
+'CAPCALL'	NSTK		{ $A $1:SR $< }	"	jsb	*AL\n";
+
+CAPRET			{$N}			"	rsb\n";
+
+# for exception handling
+EXGETV				{ $1:SR }	"	movw	*_stk_ov,A1\n";
+
+'EXSETV' R			{ $1:SR }	"	movw	*_stk_ov,A1\n"
+						"	movw	AL,*_stk_ov\n";
+
+'UOP1' C	{ 1:SR }			"ZL.1	subw3	%sp,_stk_lim,A1\n"
+						"	cmpw	AL,A1\n"
+						"	jle	ZL1\n"
+						"	call	&0,*_stk_ov\n"
+						"ZL1:";

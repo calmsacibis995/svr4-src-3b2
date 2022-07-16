@@ -1,0 +1,75 @@
+#ident	"@(#)pkg.emd:postinstall	1.1"
+#
+#	postinstall script for emd package
+#
+# error function - put out a slightly more descriptive error message
+#	arg 1 is message #
+#	arg 2 is optional argument for message
+#
+error() {
+	errflag=1
+	case $1 in
+	1)
+		echo ERROR: drvinstall on $2 failed
+		;;
+	2)
+		echo ERROR: could not create $2
+		;;
+	3)
+		echo ERROR: $2 failed
+		;;
+	4)
+		echo ERROR: copy failed
+		;;
+	5)
+		# message put out elsewhere
+		;;
+	6)
+		echo ERROR: installation error
+		;;
+	*)
+		echo ERROR: undefined error
+		;;
+	esac
+	}
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+# Configure drivers and make nodes
+#
+CMAJOR=`/etc/drvinstall -d /boot/CLONE -v 1.0 -nb` || error 1 CLONE
+NETADDR=`/usr/bin/eiasetup` || error 3 /usr/bin/eiasetup
+for i in `/etc/getmajor 2`
+do
+	installf $PKGINST $BASEDIR/dev/emd$i c $CMAJOR $i 0600 root sys \
+		|| error 2 $BASEDIR/dev/emd$i
+	echo "Initializing Ethernet address for board $i to $NETADDR"
+	echo "If you want to change this later, edit /etc/emd$i.addr"
+	echo $NETADDR >/etc/emd$i.addr
+done
+/etc/drvinstall -m $MASTER/emd -s $SYSTEM -o $BOOT -v 1.0 >/dev/null || \
+	error 1 EMD
+#
+# Remove the NI device entry from the Equipped Device Table (EDT).
+#
+/etc/edittbl -d -r -t /dgn/edt_data <<EOF >/dev/null 2>&1
+2 NI a 19 0 1 0 1 0 0
+EOF
+#
+# Add the EMD device entry to the Equipped Device Table (EDT).
+#
+/etc/edittbl -d -i -t /dgn/edt_data <<EOF >/dev/null 2>&1
+2 EMD a 19 0 1 0 1 0 0
+EOF
+#
+#	finished installing files: tell OAM
+#
+installf -f $PKGINST || error 6
+#
+#	make a new UNIX(R)
+#
+touch $SYSTEM
+errflag=`expr ${errflag:=0} + 10`
+exit $errflag

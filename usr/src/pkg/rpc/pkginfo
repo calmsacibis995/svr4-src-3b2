@@ -1,0 +1,12 @@
+
+#ident	"@(#)pkg.rpc:pkginfo	1.2"
+
+#
+# required parameters
+#
+
+PKG="rpc"
+VERSION=""
+NAME="Remote Procedure Call Utilities"
+CLASSES="none"
+CATEGORY="system"

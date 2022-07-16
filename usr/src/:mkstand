@@ -1,0 +1,33 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+#ident	"@(#)mk::mkstand	1.7"
+#
+#	make UNIX System stand-alone libraries and commands
+#
+trap "exit 1" 1 2 3 15
+MAKE=${MAKE:-make}
+if vax
+then
+	cd /usr/src/lib/lib2
+	echo "$MAKE -f lib2.mk SYS=VAX install clobber"
+	$MAKE -f lib2.mk SYS=VAX install clobber
+	cd /usr/src/stand/vax
+	echo "$MAKE -f vax.mk install clobber"
+	$MAKE -f vax.mk install clobber
+elif pdp11
+then
+	cd /usr/src/lib/lib2
+	echo "$MAKE -f lib2.mk SYS=PDP install clobber"
+	$MAKE -f lib2.mk SYS=PDP install clobber
+	cd /usr/src/stand/pdp11
+	echo "$MAKE -f pdp11.mk install clobber"
+	$MAKE -f pdp11.mk install clobber
+else
+	echo ":mkstand: Warning: no stand-alone environment for this machine"
+fi
+exit 0

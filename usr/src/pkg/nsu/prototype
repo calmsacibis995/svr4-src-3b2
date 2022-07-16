@@ -1,0 +1,184 @@
+#ident	"@(#)pkg.nsu:prototype	1.19.3.3"
+#
+#	All files/directories are defined as relocatable. Although
+#	BASENAME is not used at this time (i.e. defaults to /)
+#	doing this may facilitate future development.
+#
+#	installation files:
+#		'request' gets number of pseudo-ttys from installer
+#		'postinstall' installs drivers, etc
+#		'preremove' uninstalls drivers, etc
+#		'ptm' class only installed if PTNUM > 0
+#
+i pkginfo
+i postinstall
+i preremove
+i request
+
+#	These are the only "variables" we use, since they are guaranteed
+#	to be set by OAM at installation time. If they change, remember
+#	to change directories made below.
+!OAMBASE=/usr/sadm/sysadm
+!PKGINST=nsu
+!PKGSAV=/var/sadm/pkg/$PKGINST/save
+#
+#	directories: default owner=root group=sys mode=0775
+#
+!default 775 root sys
+d none	/boot	?	?	?
+d none	/dev	?	?	?
+d none	/etc	?	?	?
+d none	/etc/master.d	?	?	?
+d none	/usr	?	?	?
+d none	/usr/adm	?	?	?
+d none	/usr/adm/streams	775	adm	adm
+d none	/usr/bin	?	?	?
+d none	/usr/include	?	?	?
+d none	/usr/include/sys	?	?	?
+d none	/usr/lib	?	?	?
+d none	/usr/net
+d none	/usr/net/nls
+d none	/usr/lib/saf	?	?	?
+d none	/usr/sbin	?	?	?
+d none  /usr/sadm	?	?	?
+d none  /usr/sadm/sysadm	?	?	?
+d none  $OAMBASE/menu	?	?	?
+d none  $OAMBASE/menu/netservices	?	?	?
+d none  $OAMBASE/menu/netservices/name_to_addr	?	?	?
+d none  $OAMBASE/menu/netservices/name_to_addr/loopback	?	?	?
+d none  $OAMBASE/menu/netservices/name_to_addr/loopback/bin	?	?	?
+#
+#	driver object files: default owner=root group=root mode=500
+#	use already mkboot-ed files for managability
+#
+!default 0500 root root
+e none	/boot/CLONE=/usr/src/uts/3b2/io/CLONE
+e none	/boot/CONNLD=/usr/src/uts/3b2/io/CONNLD
+e none	/boot/KMACCT=/usr/src/uts/3b2/io/KMACCT
+e pt	/boot/PTEM=/usr/src/uts/3b2/io/PTEM
+e pt	/boot/PCKT=/usr/src/uts/3b2/io/PCKT
+e pt	/boot/PTM=/usr/src/uts/3b2/io/PTM
+e pt	/boot/PTS=/usr/src/uts/3b2/io/PTS
+e none	/boot/SOCKMOD=/usr/src/uts/3b2/io/SOCKMOD
+e none	/boot/TIMOD=/usr/src/uts/3b2/io/TIMOD
+e none	/boot/TIRDWR=/usr/src/uts/3b2/io/TIRDWR
+e none	/boot/TICLTS=/usr/src/uts/3b2/io/TICLTS
+e none	/boot/TICOTS=/usr/src/uts/3b2/io/TICOTS
+e none	/boot/TICOTSORD=/usr/src/uts/3b2/io/TICOTSORD
+#
+#	configuration files: default owner=root group=root mode=444
+#
+!default 0444 root root
+e none	/etc/master.d/clone=/usr/src/uts/3b2/master.d/clone
+e none	/etc/master.d/connld=/usr/src/uts/3b2/master.d/connld
+e none	/etc/master.d/kmacct=/usr/src/uts/3b2/master.d/kmacct
+e pt	/etc/master.d/ptem=/usr/src/uts/3b2/master.d/ptem
+e pt	/etc/master.d/pckt=/usr/src/uts/3b2/master.d/pckt
+e pt	/etc/master.d/ptm=/usr/src/uts/3b2/master.d/ptm
+e pt	/etc/master.d/pts=/usr/src/uts/3b2/master.d/pts
+e none	/etc/master.d/sockmod=/usr/src/uts/3b2/master.d/sockmod
+e none	/etc/master.d/timod=/usr/src/uts/3b2/master.d/timod
+e none	/etc/master.d/tirdwr=/usr/src/uts/3b2/master.d/tirdwr
+e none	/etc/master.d/ticlts=/usr/src/uts/3b2/master.d/ticlts
+e none	/etc/master.d/ticots=/usr/src/uts/3b2/master.d/ticots
+e none	/etc/master.d/ticotsord=/usr/src/uts/3b2/master.d/ticotsord
+#
+#	commands: default owner=root, group=sys, mode=0100
+#
+!default 0100 root sys
+f none	/usr/sbin/nlsadmin 0755 root adm
+f none	/usr/sbin/kmacntl
+s none	/usr/bin/kmacntl=/usr/sbin/kmacntl
+f none	/usr/sbin/kmapr
+s none	/usr/bin/kmapr=/usr/sbin/kmapr
+f none	/usr/sbin/kmamkdb
+s none	/usr/bin/kmamkdb=/usr/sbin/kmamkdb
+f none	/usr/sbin/strace
+f none	/usr/sbin/strclean
+f none	/usr/sbin/strerr
+s none	/usr/bin/strace=/usr/sbin/strace
+s none	/usr/bin/strclean=/usr/sbin/strclean
+s none	/usr/bin/strerr=/usr/sbin/strerr
+f none	/usr/sbin/syslogd
+#
+#	header files: default owner=bin group=bin mode=0444
+#
+!default 0444 bin bin
+f none	/usr/include/listen.h=/usr/src/head/listen.h
+f none	/usr/include/netconfig.h=/usr/src/head/netconfig.h
+f none	/usr/include/netdir.h=/usr/src/head/netdir.h
+f none	/usr/include/sac.h=/usr/src/head/sac.h
+f none	/usr/include/tiuser.h
+#
+#	library routines: default owner=root group=bin mode=444
+#
+!default 0444 root bin
+f none	/usr/lib/libnls.a
+f none	/usr/lib/pt_chmod 04111 root bin
+f none	/usr/lib/libsocket.so
+f none	/usr/lib/libsocket.a
+
+!default 0644 root bin
+f none	/usr/lib/straddr.so
+
+#
+#	listener files: default owner=root group=bin mode=755
+#
+!default 0755 root sys	
+f none	/usr/lib/saf/listen
+f none	/usr/lib/saf/dbfconv
+f none	/usr/lib/saf/nlps_server
+#
+#	OAM directories: default owner=root group=sys mode=0755
+#
+!default 0755 root sys
+d none	/usr/sadm	?	?	?
+d none	$OAMBASE	?	?	?
+x OAMadmin	$OAMBASE/add-ons
+x OAMadmin	$OAMBASE/add-ons/$PKGINST
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/display
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify
+d none	/var/sadm	?	?	?
+d none	/var/sadm/pkg	?	?	?
+x OAMadmin	/var/sadm/pkg/$PKGINST
+x OAMadmin	$PKGSAV
+d OAMmif	$PKGSAV/intf_install
+#
+#	administrative files: default owner=root group=sys mode=0755
+#
+!default 0644 bin bin
+f OAMmif	$PKGSAV/intf_install/selection.mi
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/display/Text.ns_list
+l OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/display/Help=$OAMBASE/add-ons/$PKGINST/netservices/selection/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify/Menu.ns_nid
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify/Form.ns_modify
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify/Text.ns_modify
+l OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify/Help=$OAMBASE/add-ons/$PKGINST/netservices/selection/Help
+#
+#	OAM shell scripts: default owner=root group=sys mode=755
+#
+!default 0755 bin bin
+f OAMadmin	$OAMBASE/bin/nslist
+f OAMadmin	$OAMBASE/bin/chgnetconf
+#
+#	OAM Scripts for Name to Address Mapping...
+#
+!default 0644 bin bin
+f none $OAMBASE/menu/netservices/name_to_addr/Help
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Form.lbserv
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Help
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Menu.loopback
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.badport
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.exists
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.lts
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.lts_ord
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ord
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots_lts
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots_ord
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.success
+f none $OAMBASE/menu/netservices/name_to_addr/loopback/bin/loopback.serv 0755 bin bin
+f none $OAMBASE/menu/netservices/name_to_addr/map.menu

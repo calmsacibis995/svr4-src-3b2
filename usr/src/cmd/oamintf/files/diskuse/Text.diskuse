@@ -1,0 +1,24 @@
+#ident	"@(#)filemgmt:diskuse/Text.diskuse	1.2"
+#	Functional Description: This Text object displays a screen
+#				of file system space usage information.
+Title="Displays File System Space Usage Information"
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp diskusetask 
+
+begrow=distinct
+begcol=distinct
+rows=18
+columns=75
+
+text="
+
+   Diskuse processing involves accessing each disk mounted
+   on your system. In environments with remotely mounted 
+   file systems, processing may appear to be slow.
+
+   Press [CONT] to display diskuse for file systems available
+   from your machine or press [QUIT] to quit."
+
+name=CONT
+button=11
+action=OPEN TEXT $OBJ_DIR/Text.duse2

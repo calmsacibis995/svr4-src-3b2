@@ -1,0 +1,46 @@
+#ident	"@(#)oamintf:diagnostics/Text.repair3	1.6"
+
+################################################################################
+#	Module Name: Text.repair3
+################################################################################
+title="Advice on Repairing Disk Errors"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="   
+Now, with the system quiet, you may run the program that repairs the
+disk.  Type: \"/sbin/hdefix -a\".  The program will repair each of the
+reported bad blocks.  As a result of this repair, some file system
+damage may occur.  This damage may be detected by the \"/sbin/fsck\" 
+program used during the start up sequence.  \"/sbin/fsck\" may report
+damage and its repair.
+
+NOTE:  Even if \"/sbin/fsck\" does not report any damage, some files
+within the file system may be corrupted.  (After all, bad blocks get
+reported when attempts to access them fail.) Use the command
+\"sysadm restore\" to restore the file systems.
+
+If you wish for the system to be put in single user press CONT.
+
+WARNING: Once started, this procedure CANNOT BE STOPPED!"
+
+rows=18
+columns=77
+
+altslks
+
+name=
+button=12
+action=
+
+name=
+button=13
+action=
+
+name=CONT
+button=11
+action=`run /usr/sadm/sysadm/bin/chgstate 60 s`
+
+name=CANCEL
+button=14
+action=CLEANUP

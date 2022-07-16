@@ -1,0 +1,59 @@
+#ident	"@(#)pkg.usrenv:prototype	1.13"
+# source locations relative to the prototype file
+
+# packaging files
+i pkginfo
+i compver
+i depend
+i preremove
+i postinstall
+
+# directories (When the directory file type works take off the '#'s)
+d none	/bin		?	?	?
+d none	/boot		?	?	?
+d none	/etc		?	?	?	
+d none	/etc/master.d	?	?	?
+d none	/usr		?	?	?	
+d none	/usr/bin	?	?	?
+d none	/usr/lib	?	?	?
+
+# package objects
+!default 555 bin bin
+f none	/usr/bin/env
+f none	/usr/bin/nice
+f none	/usr/bin/nohup
+f none	/usr/sbin/lnsxts	0744	root	root
+f none	/usr/bin/tty
+f none	/boot/SXT=/usr/src/uts/3b2/io/SXT
+f none	/etc/master.d/sxt=/usr/src/uts/3b2/master.d/sxt	444 bin bin
+f none	/usr/bin/at		4555	root	bin
+f none	/usr/bin/atq		4555	root	bin
+f none	/usr/bin/atrm		4555	root	bin
+f none	/usr/bin/banner
+f none	/usr/bin/batch
+f none	/usr/bin/bc
+f none	/usr/bin/cal
+f none	/usr/bin/calendar
+f none	/usr/bin/crontab	4555	root	bin
+f none	/usr/bin/csh
+f none	/usr/bin/dc
+f none	/usr/bin/factor
+f none	/usr/bin/finger
+f none	/usr/bin/ksh
+f none	/usr/bin/last
+f none	/usr/bin/logname
+f none	/usr/bin/script		4555	root	bin
+f none	/usr/bin/shl		4755	root	bin
+f none	/usr/bin/tabs
+f none	/usr/bin/units
+f none	/usr/lib/calprog
+f none	/usr/lib/lib.b		444	bin	bin
+f none	/usr/share/lib/unittab	444	bin	bin
+
+# linked files
+l none	/usr/bin/u3b2=/usr/bin/true
+l none	/usr/bin/u3b=/usr/bin/false
+l none	/usr/bin/u3b15=/usr/bin/false
+l none	/usr/bin/vax=/usr/bin/false
+l none	/usr/bin/pdp11=/usr/bin/false
+l none	/usr/bin/rksh=/usr/bin/ksh

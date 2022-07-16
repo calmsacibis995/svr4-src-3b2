@@ -1,0 +1,15 @@
+#ident	"@(#)pkg.dfs:dfs/pkginfo	1.3"
+#
+# 	RFS pkginfo
+#
+PKG="dfs"
+NAME="dfs utilities"
+ARCH="3B2"
+VERSION="1.2"
+CATEGORY="utilities"
+BASEDIR=""
+CLASSES="none"
+PREDEPEND="dfs"
+MAXINST="1"
+ISTATES="2"
+RSTATES="2"

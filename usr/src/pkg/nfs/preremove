@@ -1,0 +1,9 @@
+#ident	"@(#)pkg.nfs:preremove	1.2"
+#
+# Deinstall NFS 
+#
+DRVPATH=/etc/master.d
+/etc/drvinstall -u -f -m $DRVPATH/nfs -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/klm -v 1.0 || exit 1
+
+exit 0

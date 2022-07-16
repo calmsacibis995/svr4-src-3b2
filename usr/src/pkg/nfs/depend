@@ -1,0 +1,6 @@
+#ident	"@(#)pkg.nfs:depend	1.1"
+P  sysadm	System Administration Utilities
+P  nsu		Networking Support Utilities
+P  inet		Internet Utilities
+P  rpc		Remote Procedure Call Utilities
+P  dfm		Directory and File Management Utilities

@@ -1,0 +1,58 @@
+#ident	"@(#)bnu.admin:Form.acudev4	1.6"
+
+################################################################################
+#
+#	Module Name: Form.acudev4
+#
+#	Functional Description: This Form adds a modem for use by BNU
+#			
+################################################################################
+form="Add a Modem Device for use by Basic Networking"
+
+`readfile $INTFBASE/form.msg | message -s`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+
+begrow=current
+begcol=current
+
+done=`set -l NEWLN="ACU $F3 - $F4 $ARG1 \T"; set -l BNU0="ACU";set -l BNU1="-"; set -l BNU2="$ARG1";` OPEN FORM $OBJ_DIR/Form.cf_adev "$NEWLN" "$BNU0" "$F3" "$BNU1" "$F4" "$BNU2"
+
+#F1
+name=Device Type: ACU
+nrow=1
+ncol=2
+frow=1
+
+#F2
+name=Modem Type: $ARG1
+nrow=2
+ncol=2
+frow=2
+
+#F3
+name=Port:
+nrow=3
+ncol=2
+frow=3
+fcol=9
+rows=1
+columns=14
+rmenu=OPEN MENU $OBJ_DIR/Menu.ports
+invalidmsg=Press CHOICES to select valid response.
+lininfo=aport
+
+#F4
+name=Speed:
+nrow=4
+ncol=2
+frow=4
+fcol=9
+rows=1
+columns=6
+rmenu={ 4800 }
+menuonly=TRUE
+value=4800
+invalidmsg=Press CHOICES to select valid response.
+lininfo=aspeed
+

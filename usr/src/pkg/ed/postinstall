@@ -1,0 +1,5 @@
+#ident	"@(#)pkg.editors:postinstall	1.3"
+
+installf $PKGINST /usr/options/$PKG.name
+echo $NAME > /usr/options/$PKG.name
+installf -f $PKGINST

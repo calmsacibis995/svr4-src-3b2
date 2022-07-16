@@ -1,0 +1,60 @@
+#ident	"@(#)pkg.dfm:prototype	1.14"
+# source locations releative to the prototype file
+
+# packaging files
+i pkginfo
+i compver
+i depend
+i postinstall
+
+# directories
+d none	/bin		?	?	?
+d none	/usr		?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/ccs	?	?	?
+d none	/usr/ccs/bin	?	?	?
+d none	/usr/lib	?	?	?
+
+# package objects:
+!default 555 bin bin
+f none	/usr/ccs/bin/ar
+f none 	/usr/bin/od
+f none 	/usr/bin/sum
+f none	/usr/bin/tail
+f none 	/usr/bin/touch
+f none	/usr/bin/nawk
+f none	/usr/bin/bdiff
+f none	/usr/bin/bfs
+f none	/usr/bin/col
+f none	/usr/bin/comm
+f none	/usr/bin/csplit
+f none	/usr/bin/cut
+f none	/usr/bin/diff3
+f none	/usr/bin/dircmp
+f none	/usr/bin/egrep
+f none	/usr/bin/fgrep
+f none	/usr/bin/join
+f none	/usr/bin/newform
+f none	/usr/bin/nl
+f none	/usr/bin/oawk
+f none	/usr/bin/pack
+f none	/usr/bin/paste
+f none	/usr/bin/sdiff
+f none	/usr/bin/strings
+f none	/usr/bin/split
+f none	/usr/bin/tr
+f none	/usr/bin/uniq
+f none	/usr/bin/unpack
+f none	/usr/lib/diff3prog
+l none	/usr/bin/pcat=/usr/bin/unpack
+l none	/usr/bin/awk=/usr/bin/oawk
+f none	/usr/bin/head
+f none	/usr/bin/fmt
+f none	/usr/bin/fold
+f none	/usr/bin/compress
+l none	/usr/bin/uncompress=/usr/bin/compress
+l none	/usr/bin/zcat=/usr/bin/compress
+f none	/usr/bin/more
+l none	/usr/bin/page=/usr/bin/more
+f none	/usr/bin/gcore
+f none	/usr/lib/more.help	0644	bin	bin

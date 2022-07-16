@@ -1,0 +1,17 @@
+#ident	"@(#)filemgmt:file.menu	1.4"
+#menu#Manage File Systems
+#help#file.help^Manage File Systems
+#life#permanent
+#rows#$DISPLAYH
+
+check^Check a File System^check/Form.check
+defaults^Manage Defaults^defaults/defaults.menu
+diskuse^Display Disk Usage^diskuse/Form.diskuse
+display^Display Installed Types^display/Text.dispfstyp
+fileage^List Files by Age^fileage/Form.fileage
+filesize^List Files by Size^filesize/Form.filesize
+identify^Identify File System Type^identify/Form.identify
+list^List Mounted File Systems^list/Text.listfiles
+make^Create a File System^make/Form.make
+mount^Mount a File System^mount/Form.mount
+unmount^Unmount a File System^unmount/Form.unmount

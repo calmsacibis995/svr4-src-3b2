@@ -1,0 +1,56 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+#ident	"@(#)bkrs:bkintf.d/backups/bkrem/add/Makefile	1.4"
+
+BKBIN=$(ROOT)/usr/sadm/bkup/bin
+OAMBASE=$(ROOT)/usr/sadm/sysadm
+SBIN=$(ROOT)/sbin
+USBIN=$(ROOT)/usr/sbin
+ETCBKUP=$(ROOT)/etc/bkup
+DIR = $(ROOT)/bin
+INC = $(ROOT)/usr/include
+ADDDIR = $(OAMBASE)/add-ons/sysadm/backup_service/reminder/add
+INSTALL = install
+STRIP = strip
+SIZE = size
+PRODUCT = add
+
+$(PRODUCT): all
+
+.sh:
+	cp $< $*
+
+O_DFILES=Form.add Text.addok Text.addnok Help
+
+all: $(O_SHFILES)
+
+clean:
+
+clobber:
+
+install: all $(ADDDIR)
+	for i in $(O_DFILES) ;\
+	do \
+		$(INSTALL) -m 644 -g bin -u bin -f $(ADDDIR) $$i ;\
+	done
+
+size: all
+	$(SIZE) $(MAINS)
+
+strip: all
+	$(STRIP) $(MAINS)
+
+$(ADDDIR):
+	if [ ! -d `dirname $(ADDDIR)` ] ;\
+	then \
+		mkdir `dirname $(ADDDIR)` ;\
+	fi
+	if [ ! -d $(ADDDIR) ] ;\
+	then \
+		mkdir $(ADDDIR) ;\
+	fi

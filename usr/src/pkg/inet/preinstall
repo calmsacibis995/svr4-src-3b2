@@ -1,0 +1,36 @@
+#ident	"@(#)pkg.inet:preinstall	1.2"
+#
+#	The machine must have 2 Meg of memory to run.
+#
+
+MEG=`expr "\`/etc/prtconf\`" : ".*Memory size: \([0-9]*\).*"` || exit 1
+
+if
+	test "$MEG" = ""
+then
+	MEG=1
+fi
+
+if
+	test  $MEG -lt 2
+then
+	echo "**ERROR**   ${PKGINST} cannot be installed --"
+	echo "At least 2 Megabytes of memory must be available."
+	exit 1
+fi
+
+#
+#	must have DLPI-based EMD
+#
+if [ ! -d /var/sadm/pkg/emd ]
+then
+	echo "**ERROR**	${PKGINST} cannot be installed --"
+	echo  "It requires the DLPI-based EMD package."
+	if [ -n "`/etc/getmajor EMD 2>/dev/null`" ]
+	then
+		echo "The EMD package on this machine is an older version."
+		echo "Please remove it and install the new one."
+	fi
+	exit 1
+fi
+exit 0

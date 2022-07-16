@@ -1,0 +1,19 @@
+#ident	"@(#)face:src/oam/face.mi	1.6"
+#status#new
+main:applications:FACE^Framed Access Command Environment Administration^
+main:applications:FACE:mail_services^Mail Services Administration^
+main:applications:FACE:mail_services:add^Add Mail Services to Programs Menu^Text.amail
+main:applications:FACE:mail_services:remove^Remove Mail Services from Programs Menu^Text.dmail
+main:applications:FACE:programs^Global Program Administration^
+main:applications:FACE:programs:add^Add Global Programs^Form.add
+main:applications:FACE:programs:list^List Global Programs^Menu.list
+main:applications:FACE:programs:modify^Modify Global Programs^Menu.mod
+main:applications:FACE:programs:remove^Remove Global Programs^Menu.del
+main:applications:FACE:spell_checker^Spell Checker Administration^
+main:applications:FACE:spell_checker:add^Add Spell Checker to Programs Menu^Text.aspell
+main:applications:FACE:spell_checker:remove^Remove Spell Checker from Programs Menu^Text.dspell
+main:applications:FACE:users^FACE User Administration^
+main:applications:FACE:users:add^Add FACE Environment for a UNIX System User^Form.define
+main:applications:FACE:users:list^List FACE Users on This System^Menu.ulist 
+main:applications:FACE:users:modify^Modify FACE Environment for a FACE User^Form.mod
+main:applications:FACE:users:remove^Remove FACE Environment for a FACE User^Form.undefine

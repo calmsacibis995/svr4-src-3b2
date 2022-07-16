@@ -1,0 +1,11 @@
+#ident	"@(#)pkg.ipc:pkginfo	1.1.1.1"
+PKG="ipc"
+NAME="Inter-Process Communication Utilities"
+ARCH="3B2"
+VERSION=""
+CATEGORY="system"
+CLASSES="none"
+MAXINST="1"
+ISTATES="S 2"
+RSTATES="S 2"
+PREDEPEND=ipc

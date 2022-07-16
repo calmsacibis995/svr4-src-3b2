@@ -1,0 +1,13 @@
+*#ident	"@(#)fs:master.d/s5	1.6"
+*
+* S5
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orxj	-	s5	-	-	-
+						s5name(%15c)= {NAMES5}
+						ninode(%l) = {NINODE}
+
+$$$
+
+NAMES5 = "s5"
+NINODE = 400

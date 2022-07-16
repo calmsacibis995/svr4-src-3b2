@@ -1,0 +1,11 @@
+#ident	"@(#)bkrs:bkintf.d/backups/backup.menu	1.12"
+#menu#Backup Scheduling, Setup, and Control
+#life#permanent
+
+backup^Start Backup Jobs^backup/Form.backup
+history^Backup History Information^bkhist/bkhist.menu
+reminder^Schedule Backup Reminder^bkrem/bkrem.menu
+respond^Respond to Backup Job Prompts^bkoper
+schedule^Schedule Automatic Backups^bksched/bksched.menu
+setup^Backup Control Table Management^bksetup/bksetup.menu
+status^Backup Status Management^bkstat/bkstat.menu

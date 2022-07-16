@@ -1,0 +1,108 @@
+#ident	"@(#)bkrs:proto.bkrs	1.3.1.2"
+
+!OAMBASE=/usr/sadm/sysadm
+
+d bkrs /etc/bkup 755 root sys
+d bkrs /sbin 555 bin bin
+d bkrs /usr/lib/getdate ? ? ?
+d bkrs /usr/lib/libadmIO 755 root sys
+d bkrs /usr/sbin 555 bin bin
+d bkrs /usr/sadm 555 bin bin
+d bkrs /usr/sadm/sysadm 555 bin bin
+d bkrs /usr/sadm/bkup 755 bin bin
+d bkrs /usr/sadm/bkup/bin 755 bin bin
+d bkrs /var/sadm/bkup 755 root sys
+d bkrs /var/sadm/bkup/logs 755 root sys
+d bkrs /var/sadm/bkup/toc 755 root sys
+
+f bkrs /sbin/ffile 700 root sys
+l bkrs /sbin/incfile=/sbin/ffile
+f bkrs /sbin/fdp 700 root sys
+l bkrs /sbin/fimage=/sbin/fdp
+f bkrs /sbin/fdisk 700 root sys
+f bkrs /sbin/migration 700 root sys
+
+f bkrs /etc/bkup/bkreg.tab 600 root sys
+f bkrs /etc/bkup/rsmethod.tab 644 root sys
+f bkrs /etc/bkup/rsstrat.tab 644 root sys
+
+f bkrs /lib/libTL.a 644 bin bin
+
+f bkrs /usr/lib/libadmIO.a 644 bin bin
+f bkrs /usr/lib/libbrmeth.a 644 bin bin
+f bkrs /usr/lib/getdate/bkrsdates 444 bin bin
+
+f bkrs /usr/lib/libadmIO/CTC 700 root sys
+
+f bkrs /usr/include/table.h 444 bin bin
+f bkrs /usr/include/bkrs.h 444 bin bin
+
+f bkrs /usr/sbin/bkstatus 100 root sys
+f bkrs /usr/sbin/bkexcept 100 root sys
+f bkrs /usr/sbin/backup 100 root sys
+f bkrs /usr/sbin/bkoper 100 root sys
+f bkrs /usr/sbin/rsnotify 100 root sys
+f bkrs /usr/sbin/bkreg 100 root sys
+
+f bkrs /sbin/bkhistory 100 root sys
+f bkrs /sbin/rsoper 100 root sys
+f bkrs /sbin/restore 100 root sys
+f bkrs /sbin/rsstatus 100 root sys
+f bkrs /sbin/urestore 4111 root sys
+f bkrs /sbin/ursstatus 4111 root sys
+
+f bkrs /usr/sadm/bkup/bin/exconv.sed 400 root sys
+f bkrs /usr/sadm/bkup/bin/bkdaemon 100 root sys
+
+f bkrs /usr/sadm/bkup/bin/add 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkhfull 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkhsel 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkhtofile 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkid 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkmadd 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkmsg 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkregdisp 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkregvals 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bksadd 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkscddisp 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkschg 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkssel 755 bin bin
+f bkrs /usr/sadm/bkup/bin/bkup 755 bin bin
+f bkrs /usr/sadm/bkup/bin/brfindtab 755 bin bin
+f bkrs /usr/sadm/bkup/bin/change 755 bin bin
+f bkrs /usr/sadm/bkup/bin/chgmsg 755 bin bin
+f bkrs /usr/sadm/bkup/bin/chgscd 755 bin bin
+f bkrs /usr/sadm/bkup/bin/cron_parse 755 bin bin
+f bkrs /usr/sadm/bkup/bin/delscd 755 bin bin
+f bkrs /usr/sadm/bkup/bin/errdays 755 bin bin
+f bkrs /usr/sadm/bkup/bin/errnewtag 755 bin bin
+f bkrs /usr/sadm/bkup/bin/erroldtag 755 bin bin
+f bkrs /usr/sadm/bkup/bin/errweeks 755 bin bin
+f bkrs /usr/sadm/bkup/bin/full 755 bin bin
+f bkrs /usr/sadm/bkup/bin/get_rotvals 755 bin bin
+f bkrs /usr/sadm/bkup/bin/getrpd 755 bin bin
+f bkrs /usr/sadm/bkup/bin/newtag 755 bin bin
+f bkrs /usr/sadm/bkup/bin/oldtag 755 bin bin
+f bkrs /usr/sadm/bkup/bin/rest 755 bin bin
+f bkrs /usr/sadm/bkup/bin/rsid 755 bin bin
+f bkrs /usr/sadm/bkup/bin/rsop 755 bin bin
+f bkrs /usr/sadm/bkup/bin/rsschg 755 bin bin
+f bkrs /usr/sadm/bkup/bin/rsstat 755 bin bin
+f bkrs /usr/sadm/bkup/bin/summary 755 bin bin
+f bkrs /usr/sadm/bkup/bin/tag_exists 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valbkids 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valdays 755 bin bin
+f bkrs /usr/sadm/bkup/bin/validdate 755 bin bin
+f bkrs /usr/sadm/bkup/bin/validdays 755 bin bin
+f bkrs /usr/sadm/bkup/bin/validmons 755 bin bin
+f bkrs /usr/sadm/bkup/bin/validweeks 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valmeth 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valmonths 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valpaths 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valrpath 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valrsids 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valusers 755 bin bin
+f bkrs /usr/sadm/bkup/bin/valweeks 755 bin bin
+
+!include bkintf.d/backups/prototype
+!include rsintf.d/restores/prototype

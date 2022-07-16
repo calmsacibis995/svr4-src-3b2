@@ -1,0 +1,5 @@
+Input types: postscript
+Output types: postscript
+Printer types: postscript
+Filter type: fast
+Command: /usr/lib/lp/postscript/postio

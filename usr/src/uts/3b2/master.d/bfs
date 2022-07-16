@@ -1,0 +1,11 @@
+*#ident	"@(#)kernel:master.d/bfs	1.2"
+*
+* BFS
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+oxrj	-	bf	-	-	-
+						bfname(%15c)= {NAMEBF}
+
+$$$
+
+NAMEBF = "bfs"

@@ -1,0 +1,13 @@
+#ident	"@(#)lp.admin:printers/reports/Text.form.stat	1.1"
+
+#	Module Name: Text.form.stat 
+
+title="Form Status" 
+
+
+begrow=36
+begrow=1
+rows=10
+columns=40
+text="`lpstat -f$ARG1`"
+

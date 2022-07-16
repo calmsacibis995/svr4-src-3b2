@@ -1,0 +1,550 @@
+#ident	"@(#)cmd-3b2:inst/etc/insth	1.24.5.6"
+
+#
+# insth
+#
+# Install the remainder of the Essential Utilities UNIX system (while booted 
+# from the hard disk).
+#
+
+. /inst/etc/define
+
+read TYPE < /inst/etc/type
+
+eval `pdinfo /dev/rdsk/c1d0s0`
+
+echo "\nChecking the hard disk file systems." >&2
+/etc/fs/s5/fsck -y -D -b ${ROOT_0}
+
+fstab < /etc/vfstab | while read dev rdev dir junk
+do
+	if [ ${dev} != ${STAND_0} ]
+	then
+		ignore /etc/fs/s5/fsck -y -D ${dev}
+		if fsinfo -s ${dev}
+		then
+			/etc/fs/s5/mount ${dev} ${dir}  2> /dev/null
+		else
+			echo "The ${dev} (${dir}) file system is corrupt." >&2
+			if [ ${TYPE} != part -a "'${dir}'" = "'/usr'" ]
+			then
+				fstabmnt -u < /etc/vfstab
+				exit 1
+			else
+				continue
+			fi
+		fi
+	else
+		/etc/fs/bfs/fsck ${dev}
+		>/etc/mnttab
+		/etc/fs/bfs/mount ${dev} ${dir}  2> /dev/null
+	fi
+done
+
+ignore	rm -f /usr/admin/menu/usermgmt/modgroup  2> /dev/null
+
+EUNAME="Essential System Utilities"
+EUPROMPT=" \
+Please insert the $EUNAME floppy number 1."
+EUHELP=" \
+There are several floppy diskettes labelled \"$EUNAME\". 
+Please place the one identified as floppy number\"#1\" in the floppy drive 
+and close the drive door."
+EUQUIT="Type \"go\" when ready"
+EUWRONG="
+Incorrect floppy."
+EUERROR="
+Error installing $EUNAME"
+EUMSG="
+Installing $EUNAME.
+This should take no more than ten minutes per additonal floppy."
+
+while true
+do
+	DBUG=''
+	case `askx -H shell -H trace -H use_disk2 -m "$EUPROMPT" -q "$EUQUIT" \
+		-h "$EUHELP" -c go -c quit` in
+	go)
+		;;
+	quit)
+		exit 0
+		;;
+	shell)
+		trap ":" 2 3
+		rm -f /.profile /sbin/-sh
+		echo '
+			s5mount() {
+				/etc/fs/s5/mount $1  $2
+			}
+			bfsmount() {
+				/etc/fs/bfs/mount $1  $2
+			}
+			s5fsck() {
+				/etc/fs/s5/fsck $*
+			}
+			bfsfsck() {
+				/etc/fs/bfs/fsck $*
+			}
+			umount() {
+				/sbin/umount $1
+			}
+			cat() {
+				scat $*
+			}
+			labelit() {
+				dlabelit $*
+			}
+		' > /.profile
+		ln /sbin/sh /sbin/-sh
+		if /sbin/-sh
+		then :
+		else :
+		fi
+		trap '' 2 3
+		rm -f /.profile /sbin/-sh
+		continue
+		;;
+	trace)
+		set -x
+		EUDBUG=1
+		DBUG=-D
+		;;
+	use_disk2)
+		echo "\nPlease give device name(eg: /dev/dsk/c1d1s0) to use: \c"
+		read device2
+		;;
+	esac
+
+	if [ -z "${device2:-}" ]
+	then
+		if fsys -s -f install -m /install -r ${FLOPPY}
+		then
+			if [ ! -s /install/core/pkgmap ] 
+			then
+				echo "$EUWRONG" >&2
+				ignore fsys -u ${FLOPPY}
+				continue
+			fi
+			INST=/inst/bin/pkginstall
+			if [ ! -s $INST ]
+			then	
+				# use path off of 1st floppy
+				cp '/install/core/reloc.1/$PKGBIN/pkginstall' $INST
+				chmod +x $INST
+			fi
+	
+		       	if $INST $DBUG -M -f s5 -m /install -d ${FLOPPY} /install core
+			then
+				ignore fsys -u ${FLOPPY}
+				break
+			else
+				# installation of ESU by pkginstall failed
+				echo "$EUERROR" >&2
+			fi
+		else
+			echo "$EUWRONG" >&2
+		fi
+		ignore fsys -u ${FLOPPY}
+	else
+		
+		if /etc/fs/s5/mount ${device2} /install 
+		then
+			if [ ! -s /install/core/pkgmap ] 
+			then
+				echo "Incorrect device!!!" >&2
+				ignore umount /install
+				continue
+			fi
+			INST=/inst/bin/pkginstall
+			if [ ! -s $INST ]
+			then	
+				cp '/install/core/reloc.1/$PKGBIN/pkginstall' $INST
+				chmod +x $INST
+			fi
+	
+			if $INST /install core
+			then
+				ignore umount /install
+				break
+			else
+				# installation of EU by pkginstall failed
+				echo "$EUERROR" >&2
+			fi
+		else
+			echo "Cannot mount to /install" >&2 
+		fi
+		ignore umount /install
+	fi
+done
+
+#get nodename from user, if one not found in /etc/nodename
+if [ -s /etc/nodename ]
+then
+	read dflt_node < /etc/nodename
+	dft="-d $dflt_node"
+fi
+
+while true
+do
+	use_nodename=`askx -q "\
+Give  nodename to be used to identify your system: " \
+			    -h "\
+The nodename is used to identify your system in a network. Each system
+architecture places a requrirement on size of this name. If there is a node
+name saved on your earlier system in /etc/nodename then it will be
+displayed as default, and  you can chose it by simply hitting return, otherwise 
+enter a name for your system and hit return." \
+			-s -a  ${dft:-} `
+	if uname -S ${use_nodename:-}
+	then
+		break;
+	fi
+done
+
+
+cd /inst/final
+FILES="`find . -print`"
+echo "${FILES}" | cpio -pdmu /
+cd /
+
+if [ ${EXIST_STAND_0} -eq 1 ]
+then
+	mv /etc/system /stand
+	mv /etc/mini_system /stand
+	mv /dgmon /stand
+	cd /stand
+	>mUNIX
+	for i in `/usr/bin/ls`
+	do
+		if [ $i = system -o $i = mini_system ]
+		then
+			/usr/bin/ln -s /stand/$i /etc/$i
+		else
+			ignore rm -f /$i
+			/usr/bin/ln -s /stand/$i /$i
+		fi
+		cd /
+	done
+else
+	if [ -r /stand/filledt ]
+	then
+		mv /stand/filledt /
+	fi
+		
+	rm -rf /stand
+fi
+sync
+
+if [ ${TYPE} != part ]
+then
+	hdelogger -i
+else
+	(
+	umask 022
+	echo "\
+*
+* FLOPPY RESTORE PROCEDURE - PARTIAL RESTORE SAVED FILES
+*
+* The \"Partial Restore Procedure\"  has  saved  (what it considers to be) 
+* the basic system configuration files. Copies of replaced configuration
+* files are placed within  /usr/old.  You may wish to compare these with 
+* the new files and consider similar tuning of your new system." \
+	> /usr/old/README
+	)
+	echo "
+See /usr/old/README regarding changes to system configuration files." >&2
+fi
+
+if [ ${TYPE} = upgrade ]
+then
+	#  rm old rc.d stuff that has been moved to init.d
+	#  it has been saved in /usr/old
+	cd /etc/rc.d
+	rm -f 0_firstcheck .0_firstcheck 
+	rm -f ANNOUNCE MOUNTFILESYS README RMTMPFILES
+	rm -f acct autoconfig cron disks ports sysetup uucp
+	rm -f /etc/shutdown.d/ANNOUNCE
+
+	read move < /inst/etc/move-file
+	cd /usr/${move}
+	#  lots of inittab changes;
+	#  start with new, add in old tty lines, expanding 
+	#  xx:2:....:/etc/getty tty....     to
+	#  xx:234:....    for new init 3 and 4 states.
+	#  keep initdefault line
+	#  keep sac entry
+	if [ -f etc/inittab ]
+	then
+		a=`ignore grep "^sc:" etc/inittab 2>/dev/null`
+		b=`ignore grep "^sc:" /etc/inittab 2>/dev/null`
+                x=`ignore grep :initdefault: etc/inittab 2> /dev/null`
+                y="is:2:initdefault:"
+                sed \
+			-e "s?^$b?${a:-$b}?" \
+			-e '/^sc:/p' \
+                        -e '/:.*:respawn:/d' \
+                        -e '/:.*:off:/d' \
+                        -e "s/^$y/${x:-$y}/" \
+				< /etc/inittab > etc/Ninittab
+                sed  \
+			-e '/^ap:/d' \
+                        -e '/^zu:/d' \
+                        -e '/^fs:/d' \
+                        -e '/^ck:/d' \
+                        -e '/^xdc:/d' \
+                        -e '/^mt:/d' \
+			-e '/^ac:/d' \
+                        -e '/^pt:/d' \
+                        -e '/^is:/d' \
+                        -e '/^p1:/d' \
+                        -e '/^p3:/d' \
+                        -e '/^fl:/d' \
+                        -e '/^lt:/d' \
+                        -e '/^su:/d' \
+                        -e '/^s0:/d' \
+                        -e '/^s1:/d' \
+                        -e '/^s2:/d' \
+                        -e '/^s3:/d' \
+			-e '/^s6:/d' \
+                        -e '/^of:/d' \
+                        -e '/^fw:/d' \
+                        -e '/^RB:/d' \
+                        -e '/^rb:/d' \
+			-e '/^sc:/d' \
+                                < etc/inittab |
+                        sed \
+                        -e '/^[1-9][0-9]*[1-9]:.*:off:/s/:.*:off:/:234:off:/' \
+                        -e '/^ct:.*:off:/s//ct:234:off:/' \
+                        -e '/^co:.*:off:/s//co:234:off:/' \
+                        -e '/^he:.*:off:/s//he:234:off:/' \
+                        -e '/^[1-9][0-9]*[1-9]:.*:respawn:/s/:.*:respawn:/:234:respawn:/' \
+                        -e '/^ct:.*:respawn:/s//ct:234:respawn:/' \
+                        -e '/^co:.*:respawn:/s//co:234:respawn:/' \
+                        -e '/^he:.*:respawn:/s//he:234:respawn:/' \
+                                >> etc/Ninittab
+		cp etc/Ninittab etc/inittab # preserve modes, etc
+		rm etc/Ninittab 
+	fi
+	if [ -f etc/profile ]
+	then
+		sed \
+			-e '/	stty ixon -ixany$/d' \
+			-e '/	echo "UNIX System V Release .*"$/,/	echo .Copyright (c) 1984 AT&T Technologies, Inc..*/d' \
+			< etc/profile > etc/Nprofile
+		cp etc/Nprofile etc/profile # preserve modes, etc
+		rm etc/Nprofile 
+	fi
+
+	find . ! -type d -print | cpio -pdum /
+
+	echo "Upgrading system to use shadow passwd file." >&2
+	/usr/bin/pwconv 
+	echo  >&2
+
+	echo "Upgrading system to use ttymon instead of getty." >&2
+	/usr/sbin/ttyconv
+	echo  >&2
+
+	# Modify admin login shells.
+	for LOGIN in checkfsys makefsys mountfsys powerdown \
+		setup sysadm umountfsys
+	do
+		/usr/bin/passmgmt -m -s /usr/bin/$LOGIN $LOGIN ||
+		echo "WARNING: change of login shell failed for \"$LOGIN\""
+	done
+
+
+	# upgrade the root crontab file
+	# Note: for now, use the old location for compatability (since the
+	# symbollic links will be followed anyway.
+
+	if grep '/usr/lib/cron/logchecker' /usr/spool/cron/crontabs/root> /dev/null
+	then
+		:
+	else
+		cat >> /usr/spool/cron/crontabs/root <<-!
+0 2 * * 0,4 /usr/lib/cron/logchecker
+!
+	fi
+
+	#  Copy back master.d/hdelog since entries 
+	#  may have been added for XDC, SCSI, ...
+	if [ -f /usr/old/etc/master.d/hdelog ]
+	then
+		cp /usr/old/etc/master.d/hdelog /etc/master.d/hdelog 
+		ignore /usr/sbin/mkboot /boot/HDELOG
+	fi
+
+	# If already on 3.0 keep /etc/system and /etc/master.d/kernel
+	UOE=/usr/old/etc
+	if grep NSRMOUNT $UOE/master.d/kernel > /dev/null 2>&1  &&
+		[ "`cd / ; ignore what etc/master.d/kernel`"  = \
+			"`cd /usr/old; ignore what etc/master.d/kernel`" ]
+	then
+		if [ -f $UOE/system ]
+		then
+			cp /etc/system $UOE/system.3.0
+			cp $UOE/system /etc/system 
+		fi
+		if /usr/sbin/etc/mkboot -m $UOE/master.d -k /boot/KERNEL > /dev/null 2>&1
+		then
+			cp /etc/master.d/kernel $UOE/master.d/kernel.3.0
+			cp $UOE/master.d/kernel /etc/master.d/kernel
+		else 
+			echo /usr/sbin/mkboot of /boot/KERNEL failed
+			echo check $UOE/master.d/kernel file
+		fi
+	fi
+
+	(
+	umask 022
+	echo "\
+*
+* FLOPPY RESTORE PROCEDURE - UPGRADE SAVED FILES
+*
+* The \"Release Upgrade Procedure\" has saved (what it considers to be) 
+* the basic system configuration files.  Most of these files are copied 
+* back to their original  location;  a few are replaced with new 
+* distribution copies. A new /etc/system file was provided as part of
+* the new release. It will include only the MAU driver.
+* Optional packages must be reinstalled.
+*
+* Pre-upgrade  copies of  replaced configuration files are placed within
+* /usr/old. You may wish to compare these with the new files and consider
+* similar tuning of your new system." > /usr/old/README
+	)
+	echo "
+See /usr/old/README regarding changes to system configuration files." >&2
+fi
+
+# Remove old Tty simple administration files.
+
+	ignore rm -f /usr/admin/menu/ttymgmt/baud
+	ignore rm -f /usr/admin/menu/ttymgmt/disable
+	ignore rm -f /usr/admin/menu/ttymgmt/enable
+
+cd /
+sync;sync;sync
+rmdir /inst/LOCK < /dev/null  # remove lock directory first
+sync;sync;sync
+if [ ${TYPE} = upgrade ]
+then
+	rm -rf /usr/${move} < /dev/null
+fi
+
+
+if [ ${TYPE} != full ]
+then
+	rm -f /etc/rc2.d/S00firstcheck < /dev/null
+	rm -f /etc/rc.d/setup < /dev/null
+fi
+
+/inst/bin/toNfstab /
+
+
+echo "
+This Release of UNIX System V contains software designed to enhance security.
+Two areas affected by this software are 1) the shell, and 2) the User Password
+Mechanism.
+
+Please refer to the Security Section of the UNIX System V Release 4.0 Release
+Notes for further information on how to determine the current security status
+and how to install or remove these security features on your system.
+
+Installation is now complete. The system is restarting itself from
+the hard disk. It will be ready to use when you receive the \"Console
+Login\" prompt. This should take no more than five minutes." >&2
+
+#
+# Remove /dev/sad and remake 
+#
+
+rm -rf /dev/sad
+MAJOR=`/usr/sbin/drvinstall -d /boot/SAD -v 1.0`
+/usr/bin/mkdir /dev/sad
+/usr/bin/chmod 555 /dev/sad
+/usr/bin/chown root /dev/sad
+/usr/bin/chgrp sys /dev/sad
+/sbin/mknod /dev/sad/admin c $MAJOR 1
+/usr/bin/chmod 600 /dev/sad/admin
+/usr/bin/chown root /dev/sad/admin
+/usr/bin/chgrp sys /dev/sad/admin
+/sbin/mknod /dev/sad/user c $MAJOR 0
+/usr/bin/chmod 666 /dev/sad/user
+/usr/bin/chown root /dev/sad/user
+/usr/bin/chgrp sys /dev/sad/user
+
+#
+# Remove /dev/log and remake
+#
+
+rm -rf /dev/log
+rm -rf /dev/conslog
+MAJOR=`/usr/sbin/drvinstall -d /boot/LOG -v 1.0`
+/sbin/mknod /dev/conslog c $MAJOR 0
+/usr/bin/chmod 620 /dev/conslog
+/usr/bin/chown root /dev/conslog
+/usr/bin/chgrp sys /dev/conslog
+/sbin/mknod /dev/log c $MAJOR 5
+/usr/bin/chmod 640 /dev/log
+/usr/bin/chown root /dev/log
+/usr/bin/chgrp sys /dev/log
+
+if [ -f /boot/DISP ]
+then
+	rm -f /boot/DISP
+fi
+
+#
+# update the /etc/boot_tab used by cunix
+#
+
+fstab < /etc/vfstab | while read dev rdev dir fstype fsckpass automnt flags
+do
+	if [ "'${dir}'" = "'/usr'" ]
+	then
+     	   echo "${dev} ${rdev} ${dir} ${fstype} ${fsckpass} ${automnt} ${flags}\n" 
+	fi
+done	> /etc/boot_tab
+
+if [ ! -s /etc/boot_tab ]
+then
+	echo " '/usr' has to be mounted before cunix \n"
+	exit 1
+fi
+
+
+/usr/sbin/cunix -f /etc/mini_system -o /stand/mUNIX
+/usr/sbin/cunix -v -f /etc/system -o /stand/unix -d
+
+if [ ${EXIST_STAND_0} -eq 1 ]
+then
+	chmod 755 /stand/unix
+	chmod 755 /stand/mUNIX
+	chmod 755 /stand
+	ignore rm /mUNIX /filledt /dgmon
+else
+	chmod 755 /unix
+	chmod 755 /mUNIX
+fi
+	
+if [ -f /usr/ccs/bin/strip ]
+then
+	if [ ${EXIST_STAND_0} -eq 1 ]
+	then
+		ignore /usr/ccs/bin/strip /stand/mUNIX
+	else
+		ignore /usr/ccs/bin/strip /mUNIX
+	fi
+fi
+
+#unmount all except /usr
+fstabmnt -u -s /usr < /etc/vfstab
+
+rm -rf /inst
+sync;sync;sync
+sleep 5
+
+umount /usr  2> /dev/null
+
+exec uadmin 2 1

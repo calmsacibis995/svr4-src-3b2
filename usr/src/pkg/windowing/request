@@ -1,0 +1,14 @@
+#ident	"@(#)pkg.windowing:request	1.3"
+#
+#	request script for windowing package installation
+#
+#	Find out how many windowing terminals the user wants configured
+#
+PROMPT="Enter the number of Windowing Terminals to configure on your system."
+HELPMSG="NOTE: since each Windowing Terminal configured allocates memory, 
+	choose only the number of terminals you expect to be doing windowing 
+	simultaneously."
+
+WTNUM=`ckrange -l 1 -u 100 -p "$PROMPT" -h "$HELPMSG"` || exit $?
+echo "WTNUM=$WTNUM" >$1
+exit $?

@@ -1,0 +1,9 @@
+#ident	"@(#)filemgmt:list/help	1.2"
+ABSTRACT:
+	The "list" task lists all currently mounted file systems. 
+TITLE:Lists Mounted File Systems
+listtask:
+
+	The "list" task lists all file systems currently mounted on your
+	system.  The output you are looking at came from the mount(1M)
+	command.

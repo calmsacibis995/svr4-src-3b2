@@ -1,0 +1,15 @@
+#ident	"@(#)pkg.sysadm:pkginfo	1.5"
+
+#
+# "must" parameters
+#
+
+PKG="sysadm"
+PREDEPEND="sysadm"
+VERSION=""
+NAME="System Administration Utilities"
+ARCH="3B2"
+
+# the order of classes is important here
+CLASSES="none bkrs edsys spu OAMadmin OAMmif"
+CATEGORY="system"

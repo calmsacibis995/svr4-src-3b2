@@ -1,0 +1,4 @@
+#ident	"@(#)pkg.inet:depend	1.2"
+P  sysadm	System Administration Utilities
+P  nsu		Networking Support Utilities
+P  emd		EMD Utility

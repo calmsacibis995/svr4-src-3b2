@@ -1,0 +1,9 @@
+*#ident	"@(#)kernel:master.d/ptem	1.3"
+*
+* PTEM - Pseudo-TTY streams module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	ptem	-	-	-
+						ptem[#C] (%0x18)
+						ptem_cnt(%i) = { #C }
+$$

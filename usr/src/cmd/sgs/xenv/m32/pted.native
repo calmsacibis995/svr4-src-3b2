@@ -1,0 +1,280 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)xenv:m32/pted.native	1.48"
+#
+#	3b15/3b5/3b2 native pathedit
+#
+#
+#	This script is called by master pathedit when building native
+#	3b15/3b5/3b2 SGS. The format of the call is
+#		pted.native <machine>
+#	where machine is 3b15, 3b5 or 3b2.
+#
+
+# 
+# Function mkadir: attempts to make the directory structure specified
+# in $1.  Since the -p flag to make is not present on older systems,
+# it may be necessary to create intermediate directories.  The
+# function creates the directories by tricking the shell into using
+# recursion.
+#
+
+mkadir() {
+	dir=`dirname $1`
+	if [ ! -d $dir ] 
+	then
+		(mkadir $dir) 
+		mkdir $1
+	elif [ ! -d $1 ]
+	then
+		mkdir $1
+	fi
+}
+
+
+__MNAME=u$1
+BASE=`cd ../../../../../..; pwd`
+
+cont="T"
+echo "Do you want the SGS built with the default parameters? (y or n): \c"
+while [ "$cont" = "T" ]
+do
+	x=`line`
+	if [ "$x" = "y" ]
+	then
+		stdparam="T"
+		cont="F"
+	elif [ "$x" = "n" ]
+	then
+		stdparam="F"
+		cont="F"
+	else
+		echo "Please type 'y' or 'n': \c"
+	
+	fi
+done
+
+if [ "$stdparam" = "T" ]
+then
+	__CBIN=/usr/ccs/bin
+	__CLIB=/usr/ccs/lib
+	__USRLIB=/usr/lib
+	__INC=/usr/include
+	__ETC=/etc
+	__LPASS=.
+	__MAC=ABWRMAC
+	__PREFIX=
+	__OWN=bin
+	__GRP=bin
+else
+	echo "Are you building a WE32100 FPE ONLY SGS(y or n):  \c"
+	x=`line`
+	if [ "$x" = "y" ]
+	then
+		__MAC=BMAC
+		echo "Warning: the code produced by this SGS will not run on WE32001 based processors."
+		echo "If you do not want to continue hit break and restart."
+	else
+		echo "Are you building a MAU SGS(y or n): \c"
+		l=`line`
+		if [ "$l" = "y" ]
+		then
+			__MAC=BMAUMAC
+			echo "Warning: the code produced by this SGS will not run on WE32001 based processors"
+			echo "or WE32100 processors without a MAU."
+			echo "If you do not want to continue hit break and restart."
+		else
+			__MAC=ABWRMAC
+		fi
+	fi
+
+	echo "Enter absolute directory for run-time binaries:  \c"
+	x=`line`
+	__CBIN=${x:=/usr/ccs/bin}
+
+	echo "Enter absolute directory for run-time libraries:  \c"
+	x=`line`
+	__CLIB=${x:=/usr/ccs/lib}
+
+	echo "Enter absolute directory for non-CCS run-time usr libraries:  \c"
+	x=`line`
+	__USRLIB=${x:=/usr/lib}
+
+	echo "Enter absolute directory for header files:  \c"
+	x=`line`
+	__INC=${x:=/usr/include}
+
+	echo "Enter absolute directory for etc files:  \c"
+	x=`line`
+	__ETC=${x:=/etc}
+
+	echo "Enter location of cross lint1, lint2:  \c"
+	x=`line`
+	__LPASS=${x:=/usr/ccs/lib}
+
+	echo "Enter generic prefix for names:  \c"
+	__PREFIX=`line`
+
+	echo "Enter owner of executables:  \c"
+	x=`line`
+	__OWN=${x:=bin}
+
+	echo "Enter group of executables:  \c"
+	x=`line`
+	__GRP=${x:=bin}
+fi
+
+__PROOT=""
+__INCDIR=/tmp
+__TMPDIR=/var/tmp
+__DBO=FBO
+__ARCH=AR32W
+__CPP=$__LIBDIR/cpp
+
+(mkadir $BASE/$__CBIN)
+(mkadir $BASE/$__CLIB)
+(mkadir $BASE/$__USRLIB)
+(mkadir $BASE/$__CLIB/fp)
+(mkadir $BASE/$__CLIB/fp/libp)
+(mkadir $BASE/$__INC)
+(mkadir $BASE/$__INC/sys)
+(mkadir $BASE/$__ETC)
+
+echo "\n These parameters are used for your SGS:\n"
+echo "CCSBIN:		$__CBIN"
+echo "CCSLIB:		$__CLIB"
+echo "USRLIB:		$__USRLIB"
+echo "INC:		$__INC"
+echo "ETC:		$__ETC"
+echo "LPASS:		$__LPASS"
+echo "PREFIX:		$__PREFIX"
+echo "OWN:		$__OWN"
+echo "GRP:		$__GRP"
+
+echo "Do you want the SGS built with these parameters (y or n): \c"
+x=`line`
+if [ "$x" != "y" ]
+then
+	echo "run pathedit again."
+	exit
+fi
+
+cp paths.h ../../inc/m32/paths.h
+cp sgs.h ../../inc/m32/sgs.h
+chmod 0644 ../../inc/m32/paths.h ../../inc/m32/sgs.h
+echo "\n ******** Making paths.h ********"
+ed ../../inc/m32/paths.h <<!
+1,\$s|SGS|$__PREFIX|g
+1,\$s|M32BINDIR|$__CBIN|
+1,\$s|M32LIBPATH|$__CLIB:$__USRLIB|
+1,\$s|M32ABILIBDIR|$__CLIB/minabi|
+1,\$s|M32LIBDIR|$__CLIB|
+1,\$s|M32INCDIR|$__INCDIR|
+1,\$s|M32TMPDIR|$__TMPDIR|
+1,\$s|M32CPP|$__CPP|
+w
+q
+!
+echo "\n ******** Making sgs.h ********"
+
+ed ../../inc/m32/sgs.h <<Y
+g|SGS|s|".*"|"$__PREFIX"|
+1,\$s|FBOMAGIC|${__DBO}MAGIC|
+w
+q
+Y
+
+echo "\n ******** Setting proper version of elftypes.h *******"
+rm -f ../../inc/common/sys/elftypes.h
+ln ../../inc/common/sys/etype_M32.h ../../inc/common/sys/elftypes.h
+
+
+if [ -s ../../sgs.mk ]
+then
+	chmod 0644 ../../sgs.mk
+fi
+echo "\n ******** Making global makefile ********"
+ed ../../sgs.mk.um32 <<X
+1,\$s|lib; .*make|lib; make|
+1,\$s|-f \"\$(CCSBIN).*|true ] ; \\\|
+1,\$s|^MAC=.*|MAC=$__MAC|
+1,\$s|^CCSLIB.*|CCSLIB=$__CLIB|
+1,\$s|$(CCSBIN)/$(SGS)env||
+1,\$s|xenv/m32; make install|xenv/m32; make CCSBIN=\$(ROOT)$__CBIN CCSLIB=\$(ROOT)$__CLIB install|
+w ../../sgs.mk
+q
+X
+echo "\n ******** Making SGS makefile ********"
+if [ "${1}" = "3b2" ]
+then
+ed template.mk <<X
+1,\$s|^CCSBIN=.*|CCSBIN=$__CBIN|
+1,\$s|^CCSLIB=.*|CCSLIB=$__CLIB|
+1,\$s|^INC=.*|INC=$__INC|
+1,\$s|^INCSYS=.*|INCSYS=$__INC|
+1,\$s|^DFLTINC.*|DFLTINC=$__INC|
+1,\$s|^ETC.*|ETC=$__ETC|
+1,\$s|^LPASS.*|LPASS=$__LPASS|
+1,\$s|^SGS=.*|SGS=$__PREFIX|
+1,\$s|^ARCH.*|ARCH=$__ARCH|
+1,\$s|^DBO.*|DBO=$__DBO|
+1,\$s|^MAC=.*|MAC=$__MAC|
+1,\$s|^LINK_MODE=.*|LINK_MODE=-dn|
+1,\$s|^ROOT.*|ROOT=$__PROOT|
+1,\$s|^MNAME.*|MNAME=$__MNAME|
+1,\$s|^NATIVE.*|NATIVE=yes|
+1,\$s|^MAKE.*|MAKE=make|
+1,\$s|^OWN.*|OWN=$__OWN|
+1,\$s|^GRP.*|GRP=$__GRP|
+g|make.mk|d
+g|	cp |d
+w makefile
+q
+X
+else
+ed template.mk <<X
+1,\$s|^CCSBIN=.*|CCSBIN=$__CBIN|
+1,\$s|^CCSLIB=.*|CCSLIB=$__CLIB|
+1,\$s|^INC=.*|INC=$__INC|
+1,\$s|^INCSYS=.*|INCSYS=$__INC|
+1,\$s|^DFLTINC.*|DFLTINC=$__INC|
+1,\$s|^ETC.*|ETC=$__ETC|
+1,\$s|^SGS=.*|SGS=$__PREFIX|
+1,\$s|^ARCH.*|ARCH=$__ARCH|
+1,\$s|^DBO.*|DBO=$__DBO|
+1,\$s|^MAC=.*|MAC=$__MAC|
+1,\$s|^MNAME.*|MNAME=$__MNAME|
+1,\$s|^ROOT.*|ROOT=$__PROOT|
+1,\$s|^MAKE.*|MAKE=make|
+1,\$s|^OWN.*|OWN=$__OWN|
+1,\$s|^GRP.*|GRP=$__GRP|
+g|make.mk|d
+g|	cp |d
+w makefile
+q
+X
+fi
+chmod 0644 makefile
+#
+chmod 0644 ../../../../lib/.libmk.temp
+echo "\n ******** Making library makefile ********"
+ed ../../../../lib/.libmk.temp <<X
+1,\$s|^CCSLIB=.*|CCSLIB=$(ROOT)$__CLIB|
+1,\$s|^CCSBIN=.*|CCSBIN=$(ROOT)$__CBIN|
+1,\$s|^LIBP=.*|LIBP=$(ROOT)$__CLIB/libp|
+1,\$s|^SGS.*|SGS=$__PREFIX|
+1,\$s|^MAC=.*|MAC=$__MAC|
+1,\$s|^MACH=.*|MACH=m32|
+1,\$s|^OWN.*|OWN=$__OWN|
+1,\$s|^GRP.*|GRP=$__GRP|
+w ../../../../lib/.lib.mk
+q
+X
+chmod 0644 ../../../../lib/.lib.mk
+#
+#
+#

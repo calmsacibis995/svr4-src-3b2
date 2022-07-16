@@ -1,0 +1,10 @@
+#ident	"@(#)portmgmt:port_monitors/Text.pm_lsall	1.1"
+
+title=List Port Monitors
+lifetime=shortterm
+text="`sacadm -l|sed 's/./~&/'| tr ~ '\12'`
+
+   Press [CANCEL] to return to the port monitor list."
+columns=55
+rows=18
+`message "Press [CANCEL] to return to the port monitor list."`

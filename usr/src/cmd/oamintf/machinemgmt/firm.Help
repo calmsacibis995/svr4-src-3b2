@@ -1,0 +1,36 @@
+#ident	"@(#)oamintf:machinemgmt/firm.Help	1.1"
+ABSTRACT:
+	The "firmware" task will cause the machine to enter firmware mode.
+	Entering firmware mode allows you to run machine diagnostics and
+	other special functions not available from the UNIX(r) system.
+	
+	Before the machine enters firmware mode, it stops all running
+	programs, closes any open files and writes out information to disk
+	(such as directory information).
+	
+	The "firmware" task displays all users currently logged into the
+	system before it asks you to specify a "grace period".  The grace
+	period is the amount of time (in seconds) the machine will wait
+	before it actually shuts down.  Users who are logged in will be
+	notified that they must log off within this period or the machine
+	will log them off automatically.
+	
+	NOTE: the visual interface is not available in firmware mode.  After
+	you bring the machine back to a multi-user mode, you will need to
+	reinvoke "sysadm" to use it again.
+
+
+Form.firm:firm:Number of Seconds Before Entering Firmware Mode
+	Enter the number of seconds to wait before shutting down the machine
+	and entering firmware mode.  Users will be warned to clean up and
+	log off in the amount of time you specify here.  You may specify any
+	integer between '0' and '9999'.
+	
+	Do not enter '0' unless absolutely necessary because it causes an
+	immediate change to firmware mode to occur.  An immediate change to
+	firmware places the machine in firmware mode as fast as possible.
+	It does not allow other users to clean up and log off.
+	
+	WARNING:  Once you press SAVE, the current task cannot be stopped and
+	the visual interface will not be available until the machine has been
+	returned to a multi-user mode.

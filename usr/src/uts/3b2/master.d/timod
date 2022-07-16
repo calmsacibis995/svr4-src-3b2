@@ -1,0 +1,9 @@
+*#ident	"@(#)kernel:master.d/timod	1.2"
+*
+* TIMOD  TLI cooperating module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	tim
+						tim_tim[#C] (%0x28)
+						tim_cnt (%i) = { #C }
+$$

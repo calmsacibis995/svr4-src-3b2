@@ -1,0 +1,302 @@
+#ident	"@(#)cmd-3b2:inst/etc/asktype	1.7.1.2"
+
+#
+# asktype
+#
+# Get installation type (full restore, rel. upgrade etc.) from user and attach
+# hard disk swap partition.
+#
+
+
+HELPFULL="\
+The \"Full Restore\" replaces everything on the integral hard disk(s) with
+a ${TM} Essential Utilities  UNIX  system.  Nothing is assumed
+to  be  on the hard disk(s) and nothing is retained.  Choose this option
+only if you have a brand-new system or are willing to  DESTROY the files
+now on your hard disk(s)."
+
+PARTIALMSG="\
+The  \"Partial  Restore\"  replaces  the  Essential  Utilities files with
+${TM} files on the integral hard disk(s). Other files are not
+affected.  This will  UNDO  your terminal and user login configuration."
+
+HELPPARTIAL="\
+The  \"Partial Restore\"  replaces the  Essential  Utilities files with
+${TM} files.  It does not destroy user-created files.  Note 
+that this RESETS the basic configuration (terminals, logins, etc.) to 
+those of a  brand-new system. This procedure may be useful to restore
+a severely damaged system to a usable state, or to remove a forgotten
+\"root\" password."
+
+DUALMSG="\
+The \"Dual Disk Upgrade\"  converts an existing  single-disk  system to a dual 
+integral disk configuration. It may only be run on a ${OLDTM} system or 
+subsequent releases.  Any files already on disk 2 will be LOST. It is highly 
+recommended that you have CURRENT  backups of EVERY disk 1  partition BEFORE 
+running this procedure."
+
+HELPDUAL="\
+The \"Dual Disk Upgrade\" converts an  existing 3B2  single-disk  system to a 
+dual integral disk configuration. Existing files on disk 1 are not damaged.
+Disk 2 is assumed to be empty; any data on it will be DESTROYED. The \"/usr\"
+file system may be moved to disk 2.  Vacated and  new disk space (on disk 1 
+and disk 2, respectively) is allocated to one or more additional partitions."
+
+RELEASEMSG="\
+The \"Release Upgrade\" option replaces most of the Essential Utilities system
+files on the integral hard disk(s) with  ${TM}  files.  The system
+configuration, and user files are not affected."
+
+FEATURES="\
+	o Floating Point Assist software support
+	o XM (expansion module) software support"
+
+HELPRELEASE="\
+The \"Release Upgrade\" replaces most of the  Essential Utilities system files
+with those distributed in ${TM}. User files and most configuration
+files  are  retained.  Kernel  and  device   driver  tunable  parameters  in
+/etc/master.d are set to ${TM} default values.  Optional  packages
+should be reinstalled.  Replaced  configuration files are saved in  /usr/old.
+Upgrade features include:
+
+${FEATURES}"
+
+#assign: DRIVEID_0 DRIVEID_1 CYLSIZE_0 CYLSIZE_1 NSECTOR_0 NSECTOR_1 EXIST_STAND_0
+eval `pdinfo /dev/rdsk/c1d1s6 /dev/rdsk/c1d0s${p_root}`
+
+#
+# Check for a dual-disk system
+#
+if [ -n "${DRIVEID_1:-}" ]
+then
+
+	FULLMSG="\
+The \"Full Restore\" will destroy EVERYTHING on both hard disks and install a 
+${TM} Essential Utilities UNIX system." 
+
+else
+	FULLMSG="\
+The \"Full Restore\" will destroy EVERYTHING on the hard disk and install a 
+${TM} Essential Utilities UNIX system." 
+
+fi
+
+#check for first disk to be 72MB
+SIZE_32=63000   # size of 32 mb hard disk
+SIZE_72=140000  # size of 72 mb hard disk
+
+eval `eval fmthard -p -c0 \\\${RSIX_0}`
+
+if [ "${disksize_0:-}" -lt "${SIZE_72}" ]
+then
+	echo "\n \"SVR4.0\" installation needs first disk to be 72MB.
+	       **  INSTALLATION INCOMPLETE. ** " >&2
+
+	exit 0
+fi
+
+
+while :
+do
+
+#commented out to  provide only full restore as available option for source customers
+#	case `askx -m "
+#${TM} Installation
+#
+#	1)  Full Restore
+#	2)  Partial Restore
+#	3)  Dual-Disk Upgrade
+#	4)  Release Upgrade
+#
+#When responding to a question, you may use the \"backspace\" key
+#to erase the last character typed or the \"@\" key to erase the
+#the entire line. Enter \"help\" for additional information." \
+#	-q "Selection?" -h "\
+#
+#${FULLMSG}
+#
+#${PARTIALMSG}
+#
+#${DUALMSG}
+#
+#${RELEASEMSG}" \
+#	-c 1 -c 2 -c 3 -c 4 -c quit` in
+#
+
+
+	case `askx -H shell -H trace -m "
+${TM} Installation
+
+	1)  Full Restore
+
+When responding to a question, you may use the \"backspace\" key
+to erase the last character typed or the \"@\" key to erase the
+the entire line. Enter \"help\" for additional information." \
+	    -q "Selection?" -h "\
+
+${FULLMSG}" \
+	    -c 1 -c quit` in
+	1)
+		TYPE=full
+
+# Comment out for source code customers.
+#	case `askx -H trace -c y -c n -m "
+#- Full Restore --
+#
+#{FULLMSG}" \
+#	    -q "Continue?" -h "${HELPFULL}" ` in
+#	y)
+#		;;
+#	n)
+#		continue ;;
+#	trace)
+#		EUDEBUG=1
+#		set -x ;;
+#	esac
+
+
+		#
+		# Enable swapping with a minimal swap area. Assumes that
+		# the base of the swap area is constant across drive IDs.
+		# Fmthard -t writes a VTOC with the smallest supported
+		# required partition sizes.
+		#
+		fmthard -t ${RSIX_0} > /dev/null
+		dswap ${RSIX_0}
+		;;
+
+	2)
+		TYPE=part
+
+		case `askx -H trace -c y -c n -m "\
+-- Partial Restore --
+
+${PARTIALMSG}" \
+		    -q "Continue?" -h "${HELPPARTIAL}" ` in
+		y)
+			;;
+		n)
+			continue
+			;;
+		trace)
+			EUDEBUG=1
+			set -x
+			;;
+		esac
+		dswap ${RSIX_0}
+		;;
+
+	3)
+		TYPE=dual
+
+		if [ -z "${DRIVEID_1:-}" ]
+		then
+			echo "
+This machine is not equipped with a second hard disk on its integral
+controller. A \"Dual Disk Upgrade\" is not possible." >&2
+			continue
+		fi
+		case `askx -H trace -c y -c n -m "\
+-- Dual Disk Upgrade --
+
+${DUALMSG}" \
+		    -q "Continue?" -h "${HELPDUAL}" ` in
+		y)
+			;;
+		n)
+			continue ;;
+		trace)
+			EUDEBUG=1
+			set -x ;;
+		esac
+		dswap ${RROOT_0}
+		;;
+	4)
+		TYPE=upgrade
+
+		case `askx -H trace -H shell -c y -c n -m "\
+-- Release Upgrade --
+
+${RELEASEMSG}" \
+		    -q "Continue?" -h "${HELPRELEASE}"` in
+		y)
+			;;
+		n)
+			continue ;;
+		trace)
+			EUDEBUG=1
+			set -x ;;
+		shell)
+			/sbin/sh   
+			continue ;;
+		esac
+		dswap ${RROOT_0}
+		;;
+
+	quit)
+		exit 0
+		;;
+	shell)
+		trap ":" 2 3
+		rm -f /.profile /sbin/-sh
+		echo '
+			s5mount() {
+				/etc/fs/s5/mount $1  $2
+			}
+			bfsmount() {
+				/etc/fs/bfs/mount $1  $2
+			}
+			s5fsck() {
+				/etc/fs/s5/fsck $*
+			}
+			bfsfsck() {
+				/etc/fs/bfs/fsck $*
+			}
+			umount() {
+				/sbin/umount $1
+			}
+			cat() {
+				scat $*
+			}
+			labelit() {
+				dlabelit $*
+			}
+			ck() {
+				/etc/fs/s5/fsck $ROOT_0
+			}
+			mnt() {
+				/etc/fs/s5/mount $ROOT_0  $HARD 
+				PATH=$PATH:$HARD/sbin:$HARD/usr/sbin:$HARD/etc:$HARD/usr/bin
+			}
+			umnt() {
+				/sbin/umount $ROOT_0
+			}
+			chg() {
+				if [ -x $HARD/etc/chroot ]
+				then
+					$HARD/etc/chroot $HARD /sbin/sh
+				else
+					echo $ROOT_0 not mounted
+					echo or $HARD/etc/chroot does not exist
+				fi
+			}
+		' > /.profile
+		ln /sbin/sh /sbin/-sh
+		if /sbin/-sh
+		then :
+		else :
+		fi
+		trap '' 2 3
+		rm -f /.profile /sbin/-sh
+		continue
+		;;
+
+	trace)
+		EUDEBUG=1
+		set -x
+		continue
+		;;
+	esac
+
+	break
+done

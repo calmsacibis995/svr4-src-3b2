@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/coff	1.2"
+*
+* COFF
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+eoxr	-     	  coff	-

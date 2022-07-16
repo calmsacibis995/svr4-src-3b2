@@ -1,0 +1,12 @@
+#ident	"@(#)oamintf:diagnostics/repair.Help	1.1"
+ABSTRACT:
+	The "diskrepair" task explains how to perform disk error
+	repairs on built-in disks.  It optionally allows you to place
+	the machine in firmware mode so the repair work can be done.
+
+	WARNING:  Because this is a repair function, it should only be
+	performed by qualified service personnel.
+	
+	NOTE:  Disk errors most probably result in the loss of files
+	or damage to data.  It will be necessary to restore the
+	repaired disk from backup copies.

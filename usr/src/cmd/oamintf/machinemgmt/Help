@@ -1,0 +1,7 @@
+#ident	"@(#)oamintf:machinemgmt/Help	1.1"
+ABSTRACT:
+	The items in the "machine" menu provide functions for machine
+	operations.  They include the ability to define the default program
+	to be used for booting the system, to power down the system, to
+	enter the firmware monitor, to reboot, and to display all users
+	logged into the system.

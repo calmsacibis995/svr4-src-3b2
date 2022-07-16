@@ -1,0 +1,32 @@
+#ident	"@(#)lp.admin:printers/forms/Form.display	1.2"
+
+#######################################################
+#
+#       Module Name: printer_service/forms/Form.display
+#       Author: David C. Miller
+#       Date: July 1988
+#
+#######################################################
+
+form=List Available Forms
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $PRINTSERV/HELP/forms/display.help "Display Available Forms"
+
+
+
+name=Enter form names ...
+nrow=1
+ncol=1
+frow=1
+fcol=21
+rows=1
+columns=54
+
+# default=ALL
+
+valid=`regex -v "$F1" 'unknown pattern'`
+# \fIKnown form-list\fR [FORMS] or ALL, mandatory.
+
+choicemsg="A list of the forms known to the system."
+invalidmsg="A list of the forms known to the system."
+fieldmsg="A list of the forms known to the system."

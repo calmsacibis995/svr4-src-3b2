@@ -1,0 +1,33 @@
+#ident	"@(#)oamintf:devices/format/Text.flopok	1.5"
+
+################################################################################
+#	Module Name: Text.flopok
+#
+#	Functional Description: This Text object is displayed when the user
+#				successfully formats a floppy diskette.
+################################################################################
+title="Format of Diskette Complete"
+
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp Text.flopok:ABSTRACT
+
+lifetime=shortterm
+
+text="
+The diskette in the $ARG2 drive is now formatted.  It may be
+removed."
+
+rows=5
+columns=70
+
+altslks
+
+name=CONT
+button=11
+action=OPEN TEXT $OBJ_DIR/Text.diskette $ARG1 $ARG2
+
+name=CANCEL
+button=14
+action=`devfree $VPID $ARG2`CLEANUP

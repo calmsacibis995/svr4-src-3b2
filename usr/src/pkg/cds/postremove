@@ -1,0 +1,68 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)pkg4.m32:cds/postremove	1.4"
+#-------
+# postremove - restore the CCS that was made "coresident",
+# if there was one.
+#
+# Take care of /usr/lib/cpp.
+#
+# CORESIDENT set by request script
+#-------
+
+if	[ -h /usr/lib/cpp -a ! -f /usr/ccs/lib/cpp ]
+then	rm -f /usr/lib/cpp
+fi
+
+#-------
+# unmvci4 - relocate the header files for CI4 from /usr/occs/include
+# to /usr/include, and restore the old cc.
+#-------
+unmvci4()
+{
+(
+	BIN=/usr/bin
+	INC=/usr/include
+	SAV=/usr/occs
+
+	#-------
+	# If there is no save directory, then give up.
+	#-------
+	if	[ ! -d "$SAV" ]
+	then	exit 0
+	fi
+	if	[ ! -d "$SAV/include" ]
+	then	exit 0
+	fi
+	if	[ ! -d "$SAV/bin" ]
+	then	exit 0
+	fi
+
+	cd $SAV/include
+
+	find . -depth -print | cpio -plmud $INC 2>/dev/null	|| exit 1
+
+	if	[ -f "$SAV/bin/cc" ]
+	then
+		mv -f "$SAV/bin/cc" "$BIN/cc" 	|| exit 1
+		chmod 755 "$BIN/cc"		|| exit 1
+		chgrp bin "$BIN/cc"		|| exit 1
+		chown bin "$BIN/cc"		|| exit 1
+	fi
+
+	cd $INC
+	rm -rf $SAV
+)
+}
+
+#-------
+# This is where the action is.
+#-------
+if	[ "$CORESIDENT" = y ]
+then	unmvci4
+fi
+exit 0

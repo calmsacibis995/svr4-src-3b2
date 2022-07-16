@@ -1,0 +1,95 @@
+#ident	"@(#)lp.admin:printers/classes/Help	1.1"
+ABSTRACT:
+	[GENERAL]
+	The "classes" menu gives you several tasks:  for adding new
+	classes; displaying the classes currently defined; modifying the list
+	of associated printers; and removing classes from the system.
+	
+	Classes allow printers with similar capabilities or physical locations
+	to be grouped together.  A request for printing may be submitted to a
+	class, in which case the request will be printed on the first
+	available printer in that class.  The definitions of classes are
+	numerous, including, but not limited to:  all printers on this floor,
+	all a certain type of laser printer, all non-impact printers, or
+	all printers that may support a certain form.  Naturally, a printers
+	may appear in more than one class.  Classes may also be placed in a
+	reject or accept state like printers, but the enabling and disabling
+	of classes is not possible.
+	
+add.help:ABSTRACT:
+add.help:	[GENERAL]
+add.help:	You use the "add" task to create new classes and to add printers to
+add.help:	existing classes.  When you first create a class it will be necessary
+add.help:	to use the "accept" task to allow it to accept print requests.  The
+add.help:	order in which you add printers to a class is significant.  When the
+add.help:	Line Printer Service processes a print request queued for a class, it
+add.help:	will be printed on the first available printer in that class.  What
+add.help:	this means is that the first printer added to a class will take the
+add.help:	brunt of the work.
+add.help:	
+add.help:	For this reason it may be desirable to periodically use the "remove"
+add.help:	task to remove the first printer in a class then put it back with the
+add.help:	"add" task.  This will tend to distribute the wear over all the
+add.help:	printers in the class.  However, if your printers are usually busy
+add.help:	this probably won't be a problem.
+add.help:	
+add.help:	[Enter the name of the class ...]
+add.help:	You are expected to enter the name of the class you want to create.
+add.help:	If you are adding a printer to a class, enter the name of that class.
+add.help:	A class name may consist of letters, digits and underscores.
+add.help:	
+add.help:	[Enter the name of the printer to add to the class:]
+add.help:	You are expected to enter the name of a printer to be added to this
+add.help:	class.  Separate multiple names with a comma.
+add.help:	
+add.help:	You may add all of the printers to this class by entering "all."
+display.help:ABSTRACT:
+display.help:	[GENERAL]
+display.help:	You use the "display" task to examine the
+display.help:	configuration of one or more classes.  You may want to do
+display.help:	this, for instance, if you suspect a configuration mistake
+display.help:	is causing a problem.
+display.help:	
+display.help:	This task will show you the class requested and the printers that
+display.help:	make up that class.
+display.help:	
+display.help:	[Enter the name of the class ...]
+display.help:	You are expected to enter the name of the class you would like to know
+display.help:	about.  Separate multiple names with a comma.
+display.help:	
+display.help:	Enter "all" to get information about all of the classes.
+menu.help:ABSTRACT:
+menu.help:	[GENERAL]
+menu.help:	The "classes" menu gives you several tasks:  for adding new
+menu.help:	classes; displaying the classes currently defined; modifying the list
+menu.help:	of associated printers; and removing classes from the system.
+menu.help:	
+menu.help:	Classes allow printers with similar capabilities or physical locations
+menu.help:	to be grouped together.  A request for printing may be submitted to a
+menu.help:	class, in which case the request will be printed on the first
+menu.help:	available printer in that class.  The definitions of classes are
+menu.help:	numerous, including, but not limited to:  all printers on this floor,
+menu.help:	all a certain type of laser printer, all non-impact printers, or
+menu.help:	all printers that may support a certain form.  Naturally, a printers
+menu.help:	may appear in more than one class.  Classes may also be placed in a
+menu.help:	reject or accept state like printers, but the enabling and disabling
+menu.help:	of classes is not possible.
+menu.help:	
+remove.help:ABSTRACT:
+remove.help:	[GENERAL]
+remove.help:	You use the "remove" task to either remove a printer from a class or
+remove.help:	to remove a class from the Line Printer Service.  You may want to do
+remove.help:	this is a printer is being moved to a different location and the class
+remove.help:	consists of only the printers in a given locale.
+remove.help:	
+remove.help:	[Enter the name of the class ...]
+remove.help:	You are expected to enter the name of the class you want to remove.
+remove.help:	If you are removing a printer from a class, enter the name of that class.
+remove.help:	A class name may consist of letters, digits and underscores up to 14
+remove.help:	characters in length.
+remove.help:	
+remove.help:	[Enter the name of the printer to remove from the class:]
+remove.help:	You are expected to enter the name of a printer to be removed from this
+remove.help:	class.  Separate multiple names with a comma.
+remove.help:	
+remove.help:	If you want to remove this class enter "all" for the printer name.

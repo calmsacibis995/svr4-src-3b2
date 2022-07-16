@@ -1,0 +1,11 @@
+#ident	"@(#)bkrs:bkintf.d/backups/bksched/Help	1.3"
+
+ABSTRACT: Schedule Backups to Run Automatically
+	The "schedule" menu allows you to schedule backups to run
+	automatically.  You can add scheduled backups, change the existing
+	schedule, display the current schedule or remove backups from the
+	schedule.  Since the backups are scheduled to run automatically and
+	are not associated with a terminal, you must choose to run them
+	either in automatic or background mode.
+
+TITLE: Schedule Backups to Run Automatically

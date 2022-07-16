@@ -1,0 +1,41 @@
+#ident	"@(#)oamintf:diagnostics/Text.repair1	1.4"
+
+################################################################################
+#	Module Name: Text.repair1
+################################################################################
+title="Advice on Repairing Disk Errors"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="
+NOTE:  Disk errors most probably result in the loss of files
+and/or damage to data.  It will be necessary to restore the
+repaired disk from backup copies.
+
+To repair a disk without causing unnecessary damage, the system must
+be as inactive as you can make it.  This state, traditionally known
+as \"single user\", can be entered by logging in as \"root\" on the
+console terminal, and typing:
+
+		              init s"
+
+rows=12
+columns=75
+
+altslks
+
+name=
+button=12
+action=
+
+name=
+button=13
+action=
+
+name=CONT
+button=11
+action=OPEN TEXT $OBJ_DIR/Text.repair2
+
+name=CANCEL
+button=14
+action=CLEANUP

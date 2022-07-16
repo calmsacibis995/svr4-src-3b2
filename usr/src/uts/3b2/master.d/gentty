@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/gentty	1.9"
+*
+* GENTTY
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orcsn	-	sy	20

@@ -1,0 +1,39 @@
+#ident	"@(#)pkg.windowing:preremove	1.1"
+#
+#	preremove script for windowing package
+#
+error() {
+	errflag=1
+	}
+#
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+#	uninstall each supplied driver
+#
+for DRIVER in XT
+do
+	driver=`echo $DRIVER | tr [A-Z] [a-z]`
+	/etc/drvinstall -u -m $MASTER/$driver -s $SYSTEM -o $BOOT -v 1.0 \
+		>/dev/null 2>&1 || error
+	echo "$DRIVER driver uninstalled."
+done
+#
+#	re-make the kernel
+#
+FREE=`expr "\`df / 2>/dev/null\`" : '.*: *\([0-9]*\)'`
+NEED=`du -s $BOOT/KERNEL | cut -f1`
+if [ "$NEED" -gt "$FREE" ]
+    then
+	echo "postinstall: ERROR: not enough space for mkboot"
+	echo "	TOFIX: free space and then re-remove this package."
+	exit 12
+fi
+/etc/mkboot -m $MASTER -d $BOOT -k $BOOT/KERNEL || error
+#
+#	reboot required to get changes
+#
+errflag=`expr 0$errflag + 10`
+exit $errflag

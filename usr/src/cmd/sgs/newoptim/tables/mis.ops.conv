@@ -1,0 +1,11 @@
+/*#ident	"@(#)newoptim:tables/mis.ops.conv	1.4"*/
+
+G_MFABS1
+G_MFADD2
+G_MFDIV2
+G_MFMUL2
+G_MFNEG1
+G_MFREM2
+G_MFRND1
+G_MFSQR1
+G_MFSUB2

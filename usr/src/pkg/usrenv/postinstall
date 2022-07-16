@@ -1,0 +1,49 @@
+#ident	"@(#)pkg.usrenv:postinstall	1.9"
+# install SXT driver (for shl) using drvinstall and check error
+
+BOOT=/boot
+MASTER=/etc/master.d
+
+installf $PKGINST $BOOT/SXT f || exit 2
+installf $PKGINST $MASTER/sxt f || exit 2
+
+MAJOR=`/etc/drvinstall -m $MASTER/sxt -d $BOOT/SXT -v 1.0` || exit 2
+
+# Create the nodes
+#
+# The number of DEVICES and the number of LAYERS per DEVICE is hard
+# coded here the number of DEVICES must agree with the corresponding
+# number in the master.d entry for sxt.
+# The number of devices is currently 6 (0-5) and each device has 8
+# layers (0-7).
+
+installf $PKGINST /dev/sxt d 775 root sys || exit 2
+
+MINOR=0
+
+for i in 00 01 02 03 04 05
+do
+	for j in 0 1 2 3 4 5 6 7
+	do
+		echo /dev/sxt/$i$j c $MAJOR $MINOR 620 root tty
+		MINOR=`expr $MINOR + 1`
+	done
+done | installf $PKGINST -
+if [ $? -ne 0 ]
+then
+	exit 2
+fi
+
+#	Create /usr/options file for upward compatability
+
+installf $PKGINST /usr/options/$PKG.name
+echo $NAME > /usr/options/$PKG.name
+
+installf $PKGINST /usr/options/shell.name
+echo "Shell Programming Utilities" > /usr/options/shell.name
+
+installf $PKGINST /usr/options/calc.name
+echo "Calculation Utilities" > /usr/options/calc.name
+
+installf -f $PKGINST || exit 2
+exit 10

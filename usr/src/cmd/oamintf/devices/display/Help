@@ -1,0 +1,21 @@
+#ident	"@(#)oamintf:devices/display/Help	1.2"
+ABSTRACT:
+	The "display" task allows you to display the partitioning
+	of a hard disk and its hardware location.
+
+devgrp:Device Group
+	Enter the device group you will be working with.
+	Press CHOICES to see the available device groups.
+
+devdr:Device Drive
+	Enter the particular disk drive for which to display information.
+	Press CHOICES to see available choices for this field.
+
+Text.display:ABSTRACT
+	You are looking at a display of the device information you requested.
+
+Text.disperr:ABSTRACT
+	An error occurred while attempting to create the display you
+	requested.  Examine the message in the error display for things
+	you may do to correct the situation.  You may attempt to repeat
+	the task, or you may press CANCEL to leave the "display" task.

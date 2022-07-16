@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/pipemod	1.2"
+*
+* PIPEMOD - Generic Module To Flush STREAMS-based pipes and FIFOs.
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	pipe	-	-	-
+$$

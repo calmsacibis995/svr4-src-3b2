@@ -1,0 +1,14 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)pkg4.m32:cds/space	1.3"
+/usr/add-on/include                26     0
+/usr/add-on/include/sys            15     0
+/usr/ccs/bin                      492     0
+/usr/ccs/lib                     3661     0
+/usr/ccs/lib/fp                   991     0
+/usr/ccs/lib/minabi               512     0
+/usr/include                      297     0

@@ -1,0 +1,144 @@
+/dev/null
+1422 192
+d--775 0 3
+	ctc	d--775 0 3
+		install	d--775 0 0
+			INSTALL	---555 2 2	tape/ctc/install/INSTALL
+		$
+		new	d--775 0 3
+			boot	d--755 0 3
+				ctc.o	---554 0 0	tape/ctc/new/boot/ctc.o
+			$
+			etc	d--775 0 3
+				master.d	d--775 0 3
+					ctc	---554 0 0	tape/ctc/new/etc/master.d/ctc
+				$
+				rc.d	d--775 0 3
+					ctc	---554 0 0	tape/ctc/new/etc/rc.d/ctc
+				$
+			$
+			dgn	d--775 0 0
+				CTC	---555 0 0	tape/ctc/new/dgn/CTC
+				X.CTC	---555 0 0	tape/ctc/new/dgn/X.CTC
+			$
+			lib	d--775 2 2
+				pump	d--775 2 2
+					ctc	---555 0 0	tape/ctc/new/lib/pump/ctc
+				$
+			$
+		$
+	$
+	st	d--775 0 0
+		install	d--775 0 0
+			INSTALL	---555 2 2	tape/st/install/INSTALL
+		$
+		new	d--775 0 3
+			boot	d--755 0 3
+				st01	---554 0 0	tape/st/new/boot/st01
+			$
+			etc	d--775 0 3
+				master.d	d--775 0 3
+					st01	---444 0 0	tape/st/new/etc/master.d/st01
+				$
+				scsi	d--775 0 3
+					compress.d	d--775 0 3
+						qtape	---555 0 3	tape/st/new/etc/scsi/compress.d/qtape
+					$
+					mkdev.d	d--775 0 3
+						qtape1	---444 0 0	tape/st/new/etc/scsi/mkdev.d/qtape1
+						qtape2	---444 0 0	tape/st/new/etc/scsi/mkdev.d/qtape2
+					$
+				$
+			$
+			usr	d--775 0 3
+				lib	d--775 0 3
+					scsi	d--775 0 3
+						tapecntl.d	d--755 0 3
+							qtape	---444 0 3	tape/st/new/usr/lib/scsi/tapecntl.d/qtape
+						$
+					$
+				$
+			$
+		$
+		spec	d--775 0 3
+			usr	d--775 0 3
+				lib	d--775 0 3
+					scsi	d--775 0 3
+						tapecntl	---555 0 0	tape/st/spec/usr/lib/scsi/tapecntl
+					$
+				$
+			$
+		$
+	$
+	ha	d--775 0 0
+		install	d--775 0 0
+			INSTALL	---555 2 2	tape/ha/install/INSTALL
+			Plist	---555 2 2	tape/ha/install/Plist
+			unpack	---555 2 2	tape/ha/install/unpack
+		$
+		new	d--775 0 3
+			boot	d--755 0 3
+				scsi	---554 0 0	tape/ha/new/boot/scsi
+				sh00	---554 0 0	tape/ha/new/boot/sh00
+			$
+			dev	d--775 0 3
+				scsi	d--775 0 3
+				$
+				mt	d--775 0 3
+				$
+				rmt	d--775 0 3
+				$
+			$
+			etc	d--775 0 3
+				scsi	d--775 0 3
+					mkdev		---555 0 0	tape/ha/new/etc/scsi/mkdev
+					tc.index	---444 0 0	tape/ha/new/etc/scsi/tc.index
+					mkdev.d		d--775 0 3
+						disk1	---444 0 0	tape/ha/new/etc/scsi/mkdev.d/disk1
+						qtape1	---444 0 0	tape/ha/new/etc/scsi/mkdev.d/qtape1
+						9track1	---444 0 0	tape/ha/new/etc/scsi/mkdev.d/9track1
+						host1	---444 0 0	tape/ha/new/etc/scsi/mkdev.d/host1
+					$
+					edittbl	---555 0 0	tape/ha/new/etc/scsi/edittbl
+					rc.scsi	---554 0 0	tape/ha/new/etc/scsi/rc.scsi
+					haversion	---555 0 0	tape/ha/new/etc/scsi/haversion
+				$
+				master.d	d--775 0 3
+					scsi	---444 0 0	tape/ha/new/etc/master.d/scsi
+					sh00	---444 0 0	tape/ha/new/etc/master.d/sh00
+				$
+				prtconf.d	d--775 0 3
+					scsi	-u-555 0 0	tape/ha/new/etc/prtconf.d/scsi
+				$
+			$
+			dgn	d--775 0 0
+				SCSI	---500 0 0	tape/ha/new/dgn/SCSI
+				X.SCSI	---500 0 0	tape/ha/new/dgn/X.SCSI
+			$
+			edt	d--775 0 3
+				SCSI	d--775 0 3
+					edtgen	---500 0 0	tape/ha/new/edt/SCSI/edtgen
+				$
+			$
+			lib	d--775 2 2
+				pump	d--775 2 2
+					scsi1	---444 0 0	tape/ha/new/lib/pump/scsi1
+					scsi2	---444 0 0	tape/ha/new/lib/pump/scsi2
+				$
+			$
+		$
+		shared	d--775 0 3
+			etc	d--775 0 3
+				scsi	d--775 0 3
+					sdevlock	-u-555 0 0	tape/ha/shared/etc/scsi/sdevlock
+					sbusclr		---555 0 0	tape/ha/shared/etc/scsi/sbusclr
+				$
+				init.d	d--775 0 3
+					lock	---554 0 3	tape/ha/shared/etc/init.d/lock
+					unlock	---554 0 3	tape/ha/shared/etc/init.d/unlock
+				$
+			$
+		$
+	$
+$
+:#ident	"@(#)core.tape:proto.core4	1.1"

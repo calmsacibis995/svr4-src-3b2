@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/connld	1.1"
+*
+* CONNLD - Unique Connection STREAMS-based Module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	conn	-	-	-
+$$

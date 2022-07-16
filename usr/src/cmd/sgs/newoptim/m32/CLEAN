@@ -1,0 +1,33 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)newoptim:m32/CLEAN	1.1"
+rm -f ANode.c
+rm -f ANodeDefs.h
+rm -f ANodeTypes.h
+rm -f FNode.c
+rm -f FNodeDefs.h
+rm -f FNodeTypes.h
+rm -f GlobalDefs.c
+rm -f Line.c
+rm -f LineDefs.h
+rm -f LoopTypes.c
+rm -f LoopTypes.h
+rm -f MallocFree.c
+rm -f OperandTypes.h
+rm -f TNode.c
+rm -f TNodeDefs.h
+rm -f TNodeTypes.h
+rm -f debug.h
+rm -f defs.h
+rm -f fatal.c
+rm -f inter.c
+rm -f loop.c
+rm -f optim.c
+rm -f optim.h
+rm -f rer.c
+rm -f OpTab.c
+rm -f OpTabDefs.h OpTabTypes.h

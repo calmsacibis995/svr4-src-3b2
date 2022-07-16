@@ -1,0 +1,182 @@
+#ident	"@(#)pkg.inet:prototype	1.31"
+#
+# information files
+#
+
+i pkginfo
+i depend
+i preinstall
+i postinstall
+i preremove
+i copyright
+
+#
+# package object files and directories
+#
+!default	0775	root	sys
+d	none	/boot	?	?	?
+d	none	/etc	?	?	?
+d	none	/etc/init.d	?	?	?
+d	none	/etc/rc0.d	?	?	?
+d	none	/etc/rc1.d	?	?	?
+d	none	/etc/rc2.d	?	?	?
+d	none	/etc/inet 0775 root sys
+d	none	/etc/master.d	?	?	?
+d	none	/usr	?	?	?
+d	none	/usr/lib	?	?	?
+d	none	/usr/sbin	?	?	?
+d	none	/usr/bin	?	?	?
+d	none	/usr/include	?	?	?
+d	none	/usr/include/arpa	?	?	?
+d	none	/usr/include/protocols	?	?	?
+d	none	/usr/include/sys	?	?	?
+d 	none	/usr/sadm/sysadm/menu/netservices	?	?	?
+d 	none	/usr/sadm/sysadm/menu/netservices/name_to_addr	?	?	?
+d 	none	/usr/sadm/sysadm/menu/netservices/name_to_addr/inet	?	?	?
+d	none	/usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin	?	?	?
+
+!default	0444	root	root
+e	none	/boot/APP=/usr/src/uts/3b2/netinet/APP
+e	none	/boot/ARP=/usr/src/uts/3b2/netinet/ARP
+e	none	/boot/ICMP=/usr/src/uts/3b2/netinet/ICMP
+e	none	/boot/IP=/usr/src/uts/3b2/netinet/IP
+e	none	/boot/LLCLOOP=/usr/src/uts/3b2/netinet/LLCLOOP
+e	none	/boot/RAWIP=/usr/src/uts/3b2/netinet/RAWIP
+e	none	/boot/TCP=/usr/src/uts/3b2/netinet/TCP
+e	none	/boot/UDP=/usr/src/uts/3b2/netinet/UDP
+e	none	/etc/master.d/app=/usr/src/uts/3b2/master.d/app
+e	none	/etc/master.d/arp=/usr/src/uts/3b2/master.d/arp
+e	none	/etc/master.d/icmp=/usr/src/uts/3b2/master.d/icmp
+e	none	/etc/master.d/ip=/usr/src/uts/3b2/master.d/ip
+e	none	/etc/master.d/llcloop=/usr/src/uts/3b2/master.d/llcloop
+e	none	/etc/master.d/rawip=/usr/src/uts/3b2/master.d/rawip
+e	none	/etc/master.d/tcp=/usr/src/uts/3b2/master.d/tcp
+e	none	/etc/master.d/udp=/usr/src/uts/3b2/master.d/udp
+
+#
+#	init script
+#
+!default	0444	root	sys
+f	none	/etc/init.d/inetinit
+f	none	/etc/inet/rc.inet
+l	none	/etc/rc0.d/K69inet=/etc/init.d/inetinit
+l	none	/etc/rc1.d/K69inet=/etc/init.d/inetinit
+l	none	/etc/rc2.d/S69inet=/etc/init.d/inetinit
+
+
+!default	0444	root	sys
+f	none	/usr/lib/tcpip.so
+f	none	/usr/lib/resolv.so
+f	none	/usr/lib/libresolv.a
+
+#
+#	administrative tables
+#
+!default	0444	root	sys
+f	none	/etc/inet/hosts
+f	none	/etc/inet/inetd.conf
+f	none	/etc/inet/named.boot
+f	none	/etc/inet/networks
+f	none	/etc/inet/protocols
+f	none	/etc/inet/services
+f	none	/etc/inet/strcf
+
+!default	0444	bin	bin
+f	none	/usr/lib/nslookup.help
+
+#symlinks to traditional location
+!default	0444	root	sys
+s	none	/etc/hosts=/etc/inet/hosts
+s	none	/etc/inetd.conf=/etc/inet/inetd.conf
+s	none	/etc/named.boot=/etc/inet/named.boot
+s	none	/etc/networks=/etc/inet/networks
+s	none	/etc/protocols=/etc/inet/protocols
+s	none	/etc/services=/etc/inet/services
+s	none	/etc/strcf=/etc/inet/strcf
+
+
+#
+#	usr commands
+#
+!default	0555	bin	bin
+f	none	/usr/bin/finger
+f	none	/usr/bin/ftp
+f	none	/usr/bin/netstat 02555 bin sys
+f	none	/usr/bin/rcp 04555 root bin
+f	none	/usr/bin/rdate
+f	none	/usr/bin/rlogin 04555 root bin
+f	none	/usr/bin/rsh 04555 root bin
+f	none	/usr/bin/ruptime
+f	none	/usr/bin/rwho
+f	none	/usr/bin/talk
+f	none	/usr/bin/telnet
+f	none	/usr/bin/tftp
+f	none	/usr/bin/whois
+
+#
+#	daemons and admin commands
+#
+!default	0555	bin	bin
+f	none	/usr/sbin/arp 02555 bin sys
+f	none	/usr/sbin/gettable
+f	none	/usr/sbin/htable
+f	none	/usr/sbin/ifconfig
+f	none	/usr/sbin/in.comsat
+f	none	/usr/sbin/in.fingerd
+f	none	/usr/sbin/in.ftpd
+f	none	/usr/sbin/in.named
+f	none	/usr/sbin/nstest
+f	none	/usr/sbin/nslookup
+f	none	/usr/sbin/in.rarpd
+f	none	/usr/sbin/in.rexecd
+f	none	/usr/sbin/in.rlogind
+f	none	/usr/sbin/in.routed
+f	none	/usr/sbin/in.rshd
+f	none	/usr/sbin/in.rwhod
+f	none	/usr/sbin/in.talkd
+f	none	/usr/sbin/in.telnetd
+f	none	/usr/sbin/in.tftpd
+f	none	/usr/sbin/in.tnamed
+f	none	/usr/sbin/inetd
+f	none	/usr/sbin/ping 04555 root bin
+f	none	/usr/sbin/route
+f	none	/usr/sbin/slink 0500 root bin
+f	none	/usr/sbin/trpt
+
+#
+#	header files
+#
+!default 0444 bin bin
+f	none	/usr/include/resolv.h=/usr/src/head/resolv.h
+f	none	/usr/include/netdb.h=/usr/src/head/netdb.h
+f	none	/usr/include/arpa/ftp.h=/usr/src/head/arpa/ftp.h
+f	none	/usr/include/arpa/inet.h=/usr/src/head/arpa/inet.h
+f	none	/usr/include/arpa/nameser.h=/usr/src/head/arpa/nameser.h
+f	none	/usr/include/arpa/telnet.h=/usr/src/head/arpa/telnet.h
+f	none	/usr/include/arpa/tftp.h=/usr/src/head/arpa/tftp.h
+f	none	/usr/include/netconfig.h=/usr/src/head/netconfig.h
+f	none	/usr/include/netdir.h=/usr/src/head/netdir.h
+f	none	/usr/include/protocols/dumprestore.h=/usr/src/head/protocols/dumprestore.h
+f	none	/usr/include/protocols/routed.h=/usr/src/head/protocols/routed.h
+f	none	/usr/include/protocols/rwhod.h=/usr/src/head/protocols/rwhod.h
+f	none	/usr/include/protocols/timed.h=/usr/src/head/protocols/timed.h
+f	none	/usr/include/syslog.h=/usr/src/head/syslog.h
+f	none	/usr/include/sys/syslog.h=/usr/src/uts/3b2/sys/syslog.h
+f	none	/usr/include/sys/un.h=/usr/src/uts/3b2/sys/un.h
+
+#
+#	OAM name to address files...
+#
+!default 0644 bin bin
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Form.inethost
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Form.inetserv
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Help
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Menu.inet
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.badaddr
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.badport
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.h_exists
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.h_success
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.s_exists
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.s_success
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin/inet.host 0755 bin bin
+f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin/inet.services 0755 bin bin

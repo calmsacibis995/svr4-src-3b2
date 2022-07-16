@@ -1,0 +1,89 @@
+#ident	"@(#)cmd-3b2:inst/bin/fstabmnt	1.5.3.6"
+
+#
+# fstabmnt
+#
+# Mount (or unmount) a list of filesystems, taken from
+# stdin in vfstab format. Unmount in reverse-vfstab order
+# to handle nested mount-points.
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+set -ue
+myname="${0}"
+
+
+#default values for variables
+umount=n
+root=/
+
+
+while [ $# -ne 0 ]
+do
+	case "${1}" in
+	-r)
+		root="${2}" ; shift 2 ;;
+	-u)
+		umount=y ; shift 1 ;;
+	-U)
+		dev="${2}"
+		shift 4
+
+		if [ $# -ne 0 ]
+		then
+			${myname} -U "$@"
+		fi
+
+		ignore /sbin/umount ${dev} 2> /dev/null
+		exit 0
+		;;
+	-s)
+		skipdir="${2}" ; shift 2 ;;
+	*)
+		echo "Usage: ${myname} [ -r rootdir ] [ -u ] < vfstab" >&2 ; exit 1 ;;
+	esac
+done
+
+
+set -- ` fstab | while read dev rdev dir fstype junk
+do
+	if [ "${skipdir:-}" = "${dir}" ]
+	then
+		continue
+	fi
+	
+	echo ${dev} ${dir} ${fstype}
+done`
+
+if [ ${umount} = y ]
+then
+	if [ $# -ne 0 ]
+	then
+		exec ${myname} -U "$@"
+	fi
+	exit 0
+fi
+
+while [ $# -ne 0 ]
+do
+	case "${3}" in
+	s5)
+		/etc/fs/s5/mount ${1} ${root}/${2}   2> /dev/null
+		;;
+	bfs)
+		/etc/fs/bfs/mount ${1} ${HARD}/${2}   2> /dev/null
+		;;
+
+	*)	echo "fstabmnt:Unknown filesystem type (check vfstab)"
+		exit 1
+	esac
+
+	shift 3
+done
+
+exit 0

@@ -1,0 +1,25 @@
+*#ident	"@(#)kernel:master.d/hrt	1.4"
+*
+* TIME
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+oxr	-     	  -	-	-	-
+
+* Timer resolution is expressed as the number of times per second the
+* clock ticks.
+* The hrtimes array is used for keeping track of sleep and alarm
+* requests for the standard real-time clock.
+* The itimes array is used for keeping track of the alarm requests
+* for the clocks measuring user process virtual time and a process'
+* virtual time.
+
+						timer_resolution(%l) = { 100 }
+						hrtimes[HRTIME] (%0x3c)
+						hrtimes_size(%i) = {HRTIME}
+						itimes[HRVTIME] (%0x3c)
+						itimes_size(%i) = {HRVTIME}
+
+$$$
+
+HRTIME	= 50
+HRVTIME = 50

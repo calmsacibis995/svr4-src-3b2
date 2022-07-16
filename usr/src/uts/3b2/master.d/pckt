@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/pckt	1.3"
+*
+* PCKT - Pseudo terminal packet module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	pckt	-	-	-
+$$

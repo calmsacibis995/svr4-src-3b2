@@ -1,0 +1,27 @@
+#ident	"@(#)oamintf:usermgmt/Text.pswdok	1.4"
+################################################################################
+#	Module Name: Text.pswdok
+################################################################################
+Title="(Re-)Define User Password Information"
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+lifetime=shortterm
+
+rows=6
+columns=75
+
+text="
+The password has been defined: 
+
+   `passwd -s $ARG1`"
+
+altslks
+
+name=CONT
+button=11
+action=update $OBJ_DIR/Form.password true
+
+name=CANCEL
+button=14
+action=CLEANUP

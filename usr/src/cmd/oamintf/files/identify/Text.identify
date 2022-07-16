@@ -1,0 +1,12 @@
+#ident	"@(#)filemgmt:identify/Text.identify	1.4"
+Title="Identifies the Type of Unmounted File Systems"
+help=OPEN TEXT $INTFBASE/Text.itemhelp identifytask
+
+`readfile $INTFBASE/display.msg | message -p`
+
+close=`/usr/bin/rm /tmp/fstype /tmp/fstype.out 2>/dev/null`
+
+rows=7
+columns=58
+
+text="`readfile /tmp/fstype`"

@@ -1,0 +1,20 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+_m4_dnl_	#ident	"@(#)libc-m32:pic.def	1.1"
+
+# function reference
+_m4_define_(`_fref_',``$1'@PLT')
+
+# global data reference
+_m4_define_(`_dref_',`*`$1'@GOT')
+
+# global data address
+_m4_define_(`_daref_',``$1'@GOT')
+
+# static data reference
+_m4_define_(`_sref_',``$1'@PC')
+

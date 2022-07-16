@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:backup_serv/backup.menu	1.1"
+#menu#Backup Service Management
+#help#bkup.help^Backup Service Management
+#life#permanent

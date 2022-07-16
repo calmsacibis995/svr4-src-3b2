@@ -1,0 +1,17 @@
+#ident	"@(#)boot:boot/boot/boot.map	1.1"
+#
+#	mapfile for boot	(matchCOFF's es lbld)
+#
+#	we'll put misc.o first on the load line to insure it's read first
+#     estack and sstack are defined in misc.s
+#
+
+olbcode		= LOAD ?RX V0x0217a800 P0x0217a800 L0x3000 A0x200;
+olbbss		= LOAD ?RW V0x02184c00 P0x02184c00 L0x2400 A0x200;
+olbstack	= LOAD ?RW V0x0217d800 P0x0217d800 L0x4000 A0x200;
+
+olbbss : .bss;
+
+olbstack : .stack;
+
+olbcode : $PROGBITS ?A;

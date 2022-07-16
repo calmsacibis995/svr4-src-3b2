@@ -1,0 +1,4 @@
+#ident	"@(#)bnu.admin:systems.mi	1.2"
+main:network_services:basic_networking:systems:add^Adds Systems to the Basic Networking Database^Form.addsys
+main:network_services:basic_networking:systems:list^Lists Systems Known to Basic Networking^Form.listsys
+main:network_services:basic_networking:systems:remove^Removes Systems from the Basic Networking Database^Form.rmsys

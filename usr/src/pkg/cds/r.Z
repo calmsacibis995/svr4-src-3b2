@@ -1,0 +1,52 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)pkg4.m32:cds/r.Z	1.1"
+#-------
+# r.Z - removal class Z script
+#
+# This is present to prevent the core package files in /usr/ccs/bin
+# from being removed.
+#-------
+dirlist=
+
+while	read path
+do
+	#-------
+	# Pathnames appear in lexical order, thus directories will
+	# appear first.  We can't operate on directories until we're
+	# done, so we just keep track of their names until later.
+	#-------
+	if	[ -d "$path" ]
+	then	dirlist="$path $dirlist"
+		continue
+	fi
+	#-------
+	# Do not remove files that also belong to the core package.
+	#-------
+	case "$path"
+	{
+	/usr/ccs/bin/ar		|\
+	/usr/ccs/bin/ld		|\
+	/usr/ccs/bin/strip	|\
+	/usr/ccs/bin/what	)
+		echo $path: not removing
+		continue;;
+	}
+	echo $path
+	rm -f $path
+done
+
+for path in $dirlist
+{
+	if	[ `ls $path | wc -l` -eq 0 ]
+	then	echo $path
+		rmdir $path
+	else	echo $path: not removing
+	fi
+}
+
+exit 0

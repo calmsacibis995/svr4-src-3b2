@@ -1,0 +1,316 @@
+
+#ident	"@(#)cmd-3b2:inst/bin/optpart	1.16.3.1"
+
+
+#
+# optpart
+#
+# Allocate any disk free space into user partitions.
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+set -ue
+myname=${0}
+args="${*:-}"
+
+seq=2
+
+p_0=0	p_1=1	p_2=2	p_3=3	p_4=4	p_5=5	p_6=6	p_7=7
+p_8=8	p_9=9	p_a=10	p_b=11	p_c=12	p_d=13	p_e=14	p_f=15
+
+cylsize=1
+drive=
+rel=unk
+root=/
+SAflag=n
+
+vfstab=
+mountdir=
+
+NO_SYMLINK="\
+The directory you specified \$use_dir is a symbolic link.  Symbolic link cannot
+be specified for mountpoint"
+
+HELPQUIT="\
+Quitting at this point will result in losing space in ${1}6.  Installation will
+continue normally.  It is not possible to completely quit from the installation 
+because that would leave system in unusable state."
+
+
+Again()
+{
+	if [ -n "${vfstab}" ]
+	then
+		Undo $*
+	fi
+	exec ${myname} ${args}
+}
+
+Cleanup()
+{
+	case `askx -H trace -H shell -c y -c n -m "
+
+Quitting at this point will  result in losing ${INITIAL_FREE_SPACE} blocks.  
+Installation will continue normally." \
+		    -q "Do you really want to quit?" -h "${HELPQUIT}" ` in
+	y)
+		;;
+	n)
+		return 0 ;;
+	trace)
+		set -x ;;
+	shell)
+		/sbin/sh   
+		continue ;;
+	esac
+
+	Undo ${*:-}
+	return 1
+}
+
+Undo()
+{
+	level=0
+	while [ $# -ge 7 ]
+	do
+		eval dev_${level}=\${1} dir_${level}=\${3}
+		level=`ignore expr ${level} + 1`
+		shift 7
+	done
+	while [ ${level} -ne 0 ]
+	do
+		level=`ignore expr ${level} - 1`
+		eval dev=\${dev_${level}} dir=\${dir_${level}}
+		unmnt ${dev}
+		part=`ignore expr ${dev} : '.*\(.\)$'`
+		eval partno=\${p_${part}}
+		eval fmthard -d ${partno}:0:1:0:0 ${devraw}${part} > /dev/null
+		rrmdir -r ${root} ${homedir}
+	done
+}
+
+while [ $# -ne 0 ]
+do
+	case "${1}" in
+	-c)
+		cylsize="${2}" ; shift 2 ;;
+	-d)
+		drive="${2}" ; shift 2 ;;
+	-g)
+		rel="${2}" ; shift 2 ;;
+	-r)
+		root="${2}" ; shift 2 ;;
+	-S)
+		SAflag=y ; shift 1 ;;
+	-*)
+		echo "${myname}: \"${2}\": Unknown option" >&2 ; exit 1 ;;
+	*)
+		break ;;
+	esac
+done
+
+if [ $# -ne 1 ]
+then
+	echo "\
+Usage:	${myname} [ -c cylsize ] [ -d drivename ] [ -g release ]
+	[ -r rootdir ] devprefix" >&2
+	exit 1
+fi
+
+if expr ${1} : /dev/r > /dev/null
+then
+	devraw=${1}
+	devblk=/dev/`ignore expr ${1} : '/dev/r\(.*\)'`
+else
+	echo "${myname}: ${1}: Device name must begin with \"/dev/r\"" >&2
+	exit 1
+fi
+
+if [ ${SAflag} = y ]
+then
+	mnt()	{ /sbin/mount -F ${DEF_FS} ${1} ${2} && chmod 775 ${2} ; }
+	unmnt()	{ /sbin/umount ${1} ; }
+else
+	mnt()	{ /etc/fs/s5/mount  ${1} ${2} ; }
+	unmnt()	{ /sbin/umount ${1} ; }
+fi
+
+while true
+do
+	#
+	# "prtvtoc -f" prints several shell variable assignments:
+	#	FREE_PART	Concanentaion of free partition names (0-f)
+	#	FREE_START	Initial block of first chunk of free space
+	#	FREE_SIZE	Size of first chunk of free space
+	#	FREE_COUNT	Number of chunks of free space
+	#
+	eval `prtvtoc -f ${devraw}6`
+	INITIAL_FREE_SPACE=$FREE_SIZE
+	if [ ${FREE_COUNT} -eq 0 ]
+	then
+		break
+	fi
+	echo "
+There are ${FREE_SIZE} blocks remaining${drive:+ on disk ${drive}}." >&2
+	FREE_PART=`ignore expr "${FREE_PART}" : '[0-9]*\(.*\)'`
+	while [ ${FREE_SIZE} -ne 0 ]
+	do
+		use_part=`ignore expr "${FREE_PART}" : '\(.\)'`
+		eval use_partno=\${p_${use_part}}
+		use_have=`ignore expr "${FREE_PART}" : '.*'`
+		case ${use_have} in
+		0)
+			echo "${myname}: ${devraw}?: Out of partitions!" >&2
+			exit 1
+			;;
+		${FREE_COUNT})
+			echo "
+Allocating ${FREE_SIZE} blocks to${drive:+ disk ${drive}} partition ${use_partno}." >&2
+			use_size=${FREE_SIZE}
+			;;
+		*)
+			use_size=`askx -s -q "\
+How many blocks for${drive:+ disk ${drive}} partition ${use_partno}?" \
+			    -h "\
+There are ${FREE_SIZE} blocks remaining${drive:+ on disk ${drive}}.
+They may be distributed amongst one or more of the ${use_have} remaining
+partitions. Enter the number of blocks to be allocated to partition
+${use_partno}, \"again\" to reallocate the optional partitions
+${drive:+on disk ${drive} }or \"quit\" to quit. NOTE: partition sizes are always
+rounded up to cylinder ( ${cylsize} block ) boundaries." \
+			    -c again -c quit -n 0:${FREE_SIZE} -d ${FREE_SIZE}`
+			if [ "${use_size}" = again ]
+			then
+				Again ${vfstab}
+			elif [ "${use_size}" = quit ]
+			then
+				if Cleanup ${vfstab}
+				then
+					continue
+				else
+					exit 0
+				fi
+			fi
+			use_size=`ignore expr \( ${use_size} + ${cylsize} - 1 \) / ${cylsize} \* ${cylsize}`
+			if [ ${use_size} -gt ${FREE_SIZE} ]
+			then
+				use_size=${FREE_SIZE}
+			fi
+			;;
+		esac
+		FREE_PART=`ignore expr "${FREE_PART}" : '.\(.*\)'`
+		if [ ${use_size} -eq 0 ]
+		then
+			continue
+		fi
+		while true
+		do
+			while [ -r ${root}/${homedir}${seq} ]
+			do
+				seq=`ignore expr ${seq} + 1`
+			done
+			use_dir=`askx -q "\
+Upon what directory should the file system within ${drive:+ disk ${drive}} partition ${use_partno} 
+be mounted?" \
+			    -h "\
+Enter the absolute directory name upon which this ${use_size}-block file system
+should be mounted.  Symbolic links cannot be used as mount points.  If you 
+just hit <RETURN>, the file system will be mounted as \"${homedir}${seq}\". 
+See the \"3B2 System Administrator's Guide\" for more information about directory 
+and file names.
+
+You may also enter \"again\" to reallocate the optional partitions
+${drive:+on disk ${drive} }or \"quit\" to quit." \
+			    -c again -c quit -p -d ${homedir}${seq}`
+			if [ "${use_dir}" = again ]
+			then
+				Again ${vfstab}
+			elif [ "${use_dir}" = quit ]
+			then
+				if Cleanup ${vfstab}
+				then
+					continue
+				else
+					exit 0
+				fi
+			elif [  -h ${root}${use_dir} ]
+			then 
+				eval echo ${NO_SYMLINK}
+				continue;
+			elif [ ! -r ${root}${use_dir} ]
+			then
+				if (umask 022 ; exec rmkdir ${root}${use_dir})
+				then
+					break
+				fi
+			fi
+			case `askx -m " \
+${use_dir} already exists; should ${drive:+ disk ${drive}} partition ${use_partno} be mounted as ${use_dir}? " \
+			-c y -c n` in
+			y)
+				break;;
+			n)
+				continue;;
+			esac
+		done
+
+		while true
+		do
+
+			case `askx -q "\
+What file system type for the \"${use_dir}\" partition?" \
+			-m "\
+The file system types available for the \"${use_dir}\" partition are:
+
+		1) System V 1K
+		2) System V 2K " \
+			-s -d 1 -c 1 -c 2 -c quit -c again` in
+			quit)
+				if Cleanup ${vfstab}
+				then
+					continue
+				else
+					exit 0
+				fi
+				;;
+			again)
+				Again ${vfstab}
+				;;
+			1)
+				use_type=s5
+				use_blksz=1024
+				break
+				;;
+			2)
+				use_type=s5
+				use_blksz=2048
+				break
+				;;
+			esac
+		done
+
+		fmthard -d ${use_partno}:0:0:${FREE_START}:${use_size} ${devraw}${use_part} > /dev/null
+		FREE_START=`ignore expr ${FREE_START} + ${use_size}`
+		FREE_SIZE=`ignore expr ${FREE_SIZE} - ${use_size}`
+		vmkfs -f ${use_type} -b "${use_blksz}" ${devraw}${use_part} > /dev/null
+		dlabelit ${devraw}${use_part} `ignore expr ${use_dir} : '.*/\(.*\)$' \| ${use_dir}` ${rel} > /dev/null
+		mountdir=`ignore expr "${root}${use_dir}" : "/*\(/.*\)"`
+		/etc/fs/${use_type}/mount ${devblk}${use_part} ${mountdir} 2>/dev/null
+		mklost+found ${root}/${use_dir} ${devblk}${use_part}
+		vfstab="${vfstab} ${devblk}${use_part} ${devraw}${use_part} ${use_dir} ${use_type} 1 yes -"
+	done
+done
+if [ -n "${vfstab}" ]
+then
+	set -- ${vfstab}
+	while [ $# -ne 0 ]
+	do
+		echo "${1}\t${2}\t${3}\t${4}\t${5}\t${6}\t${7}"
+		shift 7
+	done
+fi

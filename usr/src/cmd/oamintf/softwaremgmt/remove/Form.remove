@@ -1,0 +1,105 @@
+#ident	"@(#)oamintf:softwaremgmt/remove/Form.remove	1.6"
+
+form="Remove a Software Package"
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+framemsg="`readfile $INTFBASE/form.msg`"
+
+`readfile $INTFBASE/frept.msg | set -l MSG2`
+`set -l PKGBIN="/usr/sadm/install/bin"`
+
+done=`
+	message -w ;
+	set -l opts="" ;
+	[ $F1 != installed ] &&
+		set -l opts="$opts -s $F1" ;
+
+	run sh -cf "pkgrm $opts \`echo \"$F2\" | sed 's/[ ,]/ /g\`" ;
+	message -f $MSG2;
+	echo FALSE
+`
+
+name=Location of the package to be removed:
+lininfo=pkgloc
+scroll=TRUE
+nrow=1
+ncol=2
+frow=1
+fcol=42
+rows=1
+columns=21
+value=installed
+rmenu={ installed `getdev 'mountpt:*' 'pathname:*'` }
+choicemsg=Select location of package(s) to be removed and press ENTER.
+valid=`
+	message -w;
+	if [ -z $F1 ] ;
+	then
+		set -l DEVTYPE="" ;
+		echo FALSE ;
+	elif [ $F1 = installed ] || [ $F1 = spool ] || valpath -aoy $F1 ;
+	then
+		set -l DEVTYPE="online" ;
+	elif devattr $F1 mountpt || devattr $F1 norewind ;
+	then
+		set -l DEVTYPE="offline" ;
+	else
+		set -l DEVTYPE="" ;
+		echo FALSE ;
+	fi
+`
+invalidmsg=Error - must be an absolute directory/device pathname, or valid device alias.
+
+name=Package name(s)to be removed:
+lininfo=pkgid
+scroll=TRUE
+nrow=2
+ncol=2
+frow=2
+fcol=33
+rows=1
+columns=30
+value=
+rmenu=vary `
+	if [ $DEVTYPE = online ] ;
+	then
+		if [ $F1 = installed ] ;
+		then
+			set -l CMD="OPEN MENU $OBJ_DIR/../Menu.pkg -N" ;
+		else
+			set -l CMD="OPEN MENU $OBJ_DIR/../Menu.pkg -d$F1" ;
+		fi ;
+	else
+		set -l CMD="" ;
+	fi`$CMD
+choicemsg=vary `
+	if [ $DEVTYPE = online ] ;
+	then
+		echo "MARK the items you want and press ENTER to select them." ;
+	elif [ $DEVTYPE = offline ] ;
+	then
+		echo "No choices available for off-line devices" ;
+	else
+		echo "No choices available" ;
+	fi
+`
+valid=`
+	message -w;
+	if [ -z $F2 ] ;
+	then
+		echo FALSE ;
+	else 
+		$PKGBIN/pkgname $F2 ||
+		shell "	
+			for arg in \`echo \"$F2\" | sed 's/,/ /g'\`
+			do
+				$PKGBIN/pkgname \"\$arg\" && continue
+				exit 1
+			done
+		" ;
+	fi
+`
+invalidmsg=Error - input contains an invalid package instance identifier.
+
+name=RESET
+button=8
+action=reset

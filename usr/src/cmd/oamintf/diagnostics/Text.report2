@@ -1,0 +1,26 @@
+#ident	"@(#)oamintf:diagnostics/Text.report2	1.4"
+
+################################################################################
+#	Module Name:  Text.report2
+################################################################################
+title="Reporting Disk Errors"
+
+framemsg=`readfile $INTFBASE/display.msg`
+
+close=`rm -f $DSKRPT`
+
+text="
+`readfile $DSKRPT`"
+
+rows=14
+columns=55
+
+altslks
+
+name=CONT
+button=11
+action=CLEANUP
+
+name=CANCEL
+button=14
+action=CLEANUP

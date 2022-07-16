@@ -1,0 +1,12 @@
+/* #ident	"@(#)boot:boot/filledt/dcp/ifile	1.4"	*/
+MEMORY	{
+	CONTROL:	origin	=	0x2024000,	length	=	0x9000
+
+}
+
+SECTIONS	{
+	.text:		       { } > CONTROL
+	.data:	               { } > CONTROL
+	.bss:   	       { } > CONTROL
+
+}

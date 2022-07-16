@@ -1,0 +1,53 @@
+#ident	"@(#)pkg.perf:prototype	1.4"
+
+# packaging files
+i pkginfo
+i postinstall
+i preremove
+
+# directories
+d none	/boot		?	?	?
+d none	/etc		?	?	?
+d none	/etc/init.d	?	?	?
+d none	/etc/master.d	?	?	?
+d none	/etc/rc2.d	?	?	?
+d none	/usr		?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/sbin	?	?	?
+d none	/usr/lib	?	?	?
+d none	/usr/lib/sa	775	adm	bin
+
+# package objects
+!default 555 bin bin
+f none	/boot/PRF=/usr/src/uts/3b2/io/PRF
+f none	/etc/master.d/prf=/usr/src/uts/3b2/master.d/prf	444	bin	bin
+f none	/etc/init.d/perf	444	bin	bin
+l none	/etc/rc2.d/S21perf=/etc/init.d/perf
+f none	/usr/sbin/prfdc
+s none	/etc/prfdc=/usr/sbin/prfdc
+f none	/usr/sbin/prfld
+s none	/etc/prfld=/usr/sbin/prfld
+f none	/usr/sbin/prfpr
+s none	/etc/prfpr=/usr/sbin/prfpr
+f none	/usr/sbin/prfsnap
+s none	/etc/prfsnap=/usr/sbin/prfsnap
+f none	/usr/sbin/prfstat
+s none	/etc/prfstat=/usr/sbin/prfstat
+f none	/usr/sbin/sadp	2555	bin	sys
+s none	/usr/bin/sadp=/usr/sbin/sadp
+f none	/usr/sbin/sag
+s none	/usr/bin/sag=/usr/sbin/sag
+f none	/usr/sbin/sar
+s none	/usr/bin/sar=/usr/sbin/sar
+f none	/usr/bin/timex	555	bin	sys
+f none	/usr/bin/tplot
+f none	/usr/bin/graph
+f none	/usr/lib/t300	755	bin	bin
+f none	/usr/lib/t300s	755	bin	bin
+f none	/usr/lib/t4014	755	bin	bin
+f none	/usr/lib/t450	755	bin	bin
+f none	/usr/lib/vplot	755	bin	bin
+f none	/usr/lib/sa/sa1
+f none	/usr/lib/sa/sa2
+f none	/usr/lib/sa/sadc	2555	bin	sys
+e build	/var/spool/cron/crontabs/sys=/usr/src/pkg/perf/crontab	644	root	sys

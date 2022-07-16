@@ -1,0 +1,3 @@
+#ident	"@(#)bnu:uudemon.hour	2.2"
+/usr/lib/uucp/uusched &
+/usr/lib/uucp/uuxqt &

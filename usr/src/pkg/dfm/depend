@@ -1,0 +1,7 @@
+#ident	"@(#)pkg.dfm:depend	1.2"
+# P indicates a prerequisite for installation
+# I indicates an incompatible package
+# R indicates a reverse depedency
+# P sysadmin system administration utilities
+
+

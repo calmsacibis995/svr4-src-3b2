@@ -1,0 +1,37 @@
+#ident	"@(#)pkgcore:protos/inst	1.3"
+
+!PKGADM=/var/sadm/install
+!PKGBIN=/usr/sadm/install/bin
+!PKGLOC=/var/sadm/pkg
+!PKGOLD=/usr/options
+!PKGSCR=/usr/sadm/install/scripts
+
+# prototype from source area cmd/oamintf/Prototype
+d inst $PKGLOC 555 root sys
+d inst /var/spool/pkg 777 bin bin
+f inst /usr/include/valtools.h 444 bin bin
+f inst /usr/lib/libadm.a 444 bin bin
+f inst /usr/include/pkginfo.h 444 bin bin
+1 f inst $PKGBIN/pkginstall 500 root sys
+f inst $PKGBIN/pkgremove 500 root sys
+f inst $PKGBIN/pkgname 0555 root sys
+f inst /usr/sbin/installf 0500 root sys
+l inst /usr/sbin/removef=/usr/sbin/installf
+f inst /usr/sbin/pkgadd 500 root sys
+l inst /usr/sbin/pkgask=/usr/sbin/pkgadd
+f inst /usr/bin/pkginfo 0555 bin sys
+f inst /usr/bin/pkgparam 0555 root sys
+f inst /usr/sbin/pkgchk 500 root sys
+f inst /usr/sbin/pkgrm 500 root sys
+x inst $PKGADM 555 bin bin
+x inst $PKGADM/admin 555 bin bin
+d inst $PKGADM/logs 555 bin bin
+f inst $PKGADM/admin/default 444 root sys
+x inst $PKGSCR 555 bin bin
+f inst $PKGSCR/i.build 500 root sys
+f inst $PKGSCR/i.sed 500 root sys
+f inst $PKGSCR/i.awk 500 root sys
+f inst $PKGSCR/r.sed 500 root sys
+f inst $PKGSCR/r.awk 500 root sys
+f inst $PKGSCR/r.build 500 root sys
+f inst $PKGSCR/cmdexec 500 root sys

@@ -1,0 +1,28 @@
+#ident	"@(#)oamintf:devices/display/Text.display	1.4"
+
+################################################################################
+#	Module Name: Text.display
+################################################################################
+title="Displaying Device Information"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp Text.display:ABSTRACT
+
+close=`rm -f $DFILE`
+
+rows=17
+columns=`longline`
+
+text="
+`readfile $DFILE`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

@@ -1,0 +1,18 @@
+/* #ident	"@(#)boot:boot/boot/lbld	1.4" */
+
+MEMORY	{
+	olbcode: origin = 0x0217a800, length = 0x3000
+	olbbss:  origin = 0x02184c00, length = 0x2400
+	olbstack:origin = 0x0217d800, length = 0x4000
+	}
+SECTIONS {
+	.text:	{
+		stext = .;
+		misc.o(.text)
+		}  > olbcode
+	.data:	{} > olbcode
+	.bss:	{} > olbbss
+	.stack(NOLOAD):
+		{
+		}  > olbstack
+	}

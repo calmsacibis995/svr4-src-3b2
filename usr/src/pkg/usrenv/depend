@@ -1,0 +1,6 @@
+#ident	"@(#)pkg.usrenv:depend	1.2"
+# P indicates a prerequisite for installation
+# I indicates an incompatible package
+# R indicates a reverse dependency
+
+P dfm directory and file management utilities

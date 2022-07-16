@@ -1,0 +1,6 @@
+#ident	"@(#)cmd-inet:etc/hosts	1.1"
+#
+# Internet host table
+#
+0.0.0.0		anyhost
+127.0.0.1	localhost

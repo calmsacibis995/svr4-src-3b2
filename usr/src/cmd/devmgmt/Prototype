@@ -1,0 +1,12 @@
+#ident	"@(#)devmgmt:Prototype	1.6.1.1"
+f first /etc/device.tab 440 root sys
+f first /etc/dgroup.tab 440 root sys
+f first /usr/bin/getvol 555 root other
+f first /usr/bin/devattr 555 root other
+f first /usr/bin/getdgrp 555 root other
+f first /usr/bin/getdev 555 root other
+f first /usr/bin/listdgrp 555 root other
+f first /usr/bin/devreserv 555 root other
+f first /usr/bin/devfree 555 root other
+f first /usr/bin/putdev 555 root other
+f first /usr/bin/putdgrp 555 root other

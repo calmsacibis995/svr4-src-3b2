@@ -1,0 +1,26 @@
+#ident	"@(#)face:OBJECTS/Menu.office	1.5"
+
+menu="Office of $LOGNAME"
+
+help=OPEN TEXT OBJECTS/Text.h "Office" T.hoffice
+
+framemsg="Move to an item with arrow keys and press ENTER to select the item."
+
+name="Filecabinet: $HOME"
+action=OPEN DIRECTORY $HOME
+
+name=Other Users
+action=OPEN MENU OBJECTS/Menu.users
+
+name=Preferences
+action=OPEN MENU OBJECTS/pref/Menu.pref
+
+name=Programs Administration
+action=OPEN MENU OBJECTS/programs/Menu.install "HOME"
+
+name=Wastebasket
+action=OPEN DIRECTORY $HOME/WASTEBASKET
+
+name=""
+button=8
+action=nop

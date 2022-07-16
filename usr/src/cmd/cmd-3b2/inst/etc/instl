@@ -1,0 +1,150 @@
+#ident	"@(#)cmd-3b2:inst/etc/instl	1.2.1.1"
+#
+# instl
+#
+# Install all the floppies after the ICD floppies.
+# 
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+. /inst/etc/define
+TAPE=ctc
+read BOOTDEV < /inst/etc/bootdev
+
+if [ ${BOOTDEV} = "disk" ]
+then
+	echo "\nChecking the hard disk file systems." >&2
+	/etc/fs/s5/fsck -y -D -b ${ROOT_0}
+	
+	fstab < /etc/vfstab | while read dev rdev dir junk
+	do
+		if [ ${dev} != ${STAND_0} ]
+		then
+			ignore /etc/fs/s5/fsck -y -D ${dev}
+			if fsinfo -s ${dev}
+			then
+				/etc/fs/s5/mount ${dev} ${dir}  2> /dev/null
+			else
+				echo "The ${dev} (${dir}) file system is corrupt." >&2
+				if [ "'${dir}'" = "'/usr'" ]
+				then
+					fstabmnt -u < /etc/vfstab
+					exit 1
+				else
+					continue
+				fi
+			fi
+		else
+			/etc/fs/bfs/fsck ${dev}
+			>/etc/mnttab
+			/etc/fs/bfs/mount ${dev} ${dir}  2> /dev/null
+		fi
+	done
+fi
+
+ignore rm -rf /lib
+ln -s /usr/lib /lib
+
+while true
+do
+	SKIP=0
+	read seq < /inst/etc/last
+	if [ "$seq" -gt "$FLPY_NUM" ]
+	then
+		break
+	fi
+	while true
+	do
+		case `askx -H trace -H shell -m "\
+Please insert the Extended Boot Utilities floppy number ${seq}." \
+			-q "Type \"go\" when ready" -h "\
+There are $FLPY_NUM floppy diskettes labelled \"Extended Boot Utilities\". 
+Please place the one identified as \"#${seq}\" in the floppy drive and close
+the door." \
+			-c go -c quit` in
+		go)
+			;;
+		quit)
+			exit 1
+			;;
+		trace)
+			set -x
+			SKIP=1
+			break
+			;;
+		shell)
+			/sbin/sh
+			continue
+			;;
+		esac
+		set +e
+		if fsys -s -f install \
+			-v ${VOL}/`expr ${seq} + 1` -m /install -r ${FLOPPY}
+		then
+			break
+		else
+			echo "
+Incorrect floppy" >&2
+			SKIP=1
+			break
+		fi
+		set -e
+	done
+	if [ "$SKIP" = 1 ]
+	then
+		continue
+	fi
+	echo "
+Installing additional Essential Boot Utilities system files.
+This should take no more than ten minutes." >&2
+	cd /install
+	if [ "${seq}" -eq "${FLPY_NUM}" ]
+	then
+		case ${TAPE} in
+		ctc)
+			cd ctc
+			install/INSTALL
+			;;
+		scsi)
+			cd ha
+			install/INSTALL
+			cd ../st
+			install/INSTALL
+			;;
+		esac
+	else
+		FILES="`find . -print`"
+		echo "${FILES}" | cpio -pdmu /
+	fi
+	cd /
+	/sbin/umount ${FLOPPY} > /dev/null 2>&1
+	sync
+	seq=`expr $seq + 1`
+	echo "${seq}" > /inst/etc/last
+done
+
+# End of installation of bootable modules
+
+echo "
+You may now remove the last Extended Boot Utilities floppy." >&2
+
+# prepare for instht on hard disk to take over.
+cp /inst/etc/inittabht /etc/inittab
+
+if [ "${BOOTDEV}" = "disk" ]
+then
+	sync; sync; sync;
+	fstabmnt -u < /etc/vfstab
+
+	echo "\
+The system is restarting itself from the hard disk. This should
+take no more than five minutes. The installation procedure will
+then continue automatically." >&2
+
+	sync;sync;sync
+	exec uadmin 2 1
+fi

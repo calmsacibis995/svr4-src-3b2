@@ -1,0 +1,25 @@
+#ident	"@(#)oamintf:devices/remove/Text.rmok	1.1"
+################################################################################
+#	Module Name: Text.rmdiskok
+################################################################################
+Title="Remove Disk"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+close=`devfree $VPID $DEV 2> /dev/null`
+
+rows=6
+columns=75
+
+text="	
+The $ARG1 has been removed from the system as requested."
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

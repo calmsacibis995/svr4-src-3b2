@@ -1,0 +1,6 @@
+Input types: dmd
+Output types: postscript
+Printer types: postscript
+Filter type: slow
+Command: /usr/lib/lp/postscript/postdmd
+Options: PAGES * = -o*, COPIES * = -c*, LENGTH * = -l*, MODES portrait = -pp, MODES landscape = -pl, MODES group\= * = -n*, MODES x\= * = -x*, MODES y\= * = -y*, MODES magnify\= * = -m*

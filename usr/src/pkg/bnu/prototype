@@ -1,0 +1,261 @@
+
+#ident	"@(#)pkg.bnu:prototype	1.1.5.30"
+
+#	All files/directories are defined as relocatable. Although
+#	BASENAME is not used at this time (i.e. defaults to /)
+#	doing this may facilitate future development.
+#
+#	installation files:
+#		'request' determines if user wants his/her files or ours
+#		'postinstall'
+#		'preremove'
+#
+i pkginfo
+i depend
+i i.need
+i r.need
+i preinstall
+i postinstall
+i preremove
+i request
+#	These are the only "variables" we use, since they are guaranteed
+#	to be set by OAM at installation time. If they change, remember
+#	to change directories made below.
+!OAMBASE=/usr/sadm/sysadm
+!PKGINST=bnu
+!PKGSAV=/var/sadm/pkg/$PKGINST/sav
+#
+#	BNU directories: default owner=uucp group=uucp mode=0755
+#
+!default 755 uucp uucp
+d none	/etc	?	?	?
+d none	/etc/uucp
+d none	/etc/init.d	?	?	?
+d none	/etc/rc2.d	?	?	?
+d none	/usr		?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/lib	?	?	?
+d none	/usr/lib/uucp
+d none	/usr/include	?	?	?
+d none	/var	?	?	?
+d none	/var/spool	?	?	?
+d none	/var/spool/locks
+d none	/var/spool/uucp
+d none	/var/spool/uucppublic	0777	uucp	uucp
+d none	/var/uucp
+d none	/var/uucp/.Admin
+s none	/var/spool/uucp/.Admin=/var/uucp/.Admin
+d none	/var/uucp/.Corrupt
+s none	/var/spool/uucp/.Corrupt=/var/uucp/.Corrupt
+d none	/var/uucp/.Log
+s none	/var/spool/uucp/.Log=/var/uucp/.Log
+d none	/var/spool/uucp/.Log/uucico
+d none	/var/spool/uucp/.Log/uucp
+d none	/var/spool/uucp/.Log/uux
+d none	/var/spool/uucp/.Log/uuxqt
+d none	/var/uucp/.Old
+s none	/var/spool/uucp/.Old=/var/uucp/.Old
+d none	/var/uucp/.Sequence
+s none	/var/spool/uucp/.Sequence=/var/uucp/.Sequence
+d none	/var/uucp/.Status
+s none	/var/spool/uucp/.Status=/var/uucp/.Status
+d none	/var/uucp/.Workspace
+s none	/var/spool/uucp/.Workspace=/var/uucp/.Workspace
+d none	/var/uucp/.Xqtdir
+s none	/var/spool/uucp/.Xqtdir=/var/uucp/.Xqtdir
+#
+#	OAM directories: default owner=root group=sys mode=0755
+#
+!default 0755 root sys
+d none	/usr/sadm	?	?	?
+d none	$OAMBASE	?	?	?
+x OAMadmin	$OAMBASE/add-ons
+x OAMadmin	$OAMBASE/add-ons/$PKGINST
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/list
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/list
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/setup
+x OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/setup/add
+d none	/var/sadm	?	?	?
+d none	/var/sadm/pkg	?	?	?
+x OAMadmin	/var/sadm/pkg/$PKGINST
+x OAMadmin	$PKGSAV
+d OAMmif	$PKGSAV/intf_install
+#
+#	system initialization script: default owner=root group=sys mode=0444
+#	we pick up from rc2.d/S70uucp in case 'initpkg' changes sequencing.
+#
+!default 0444 root sys
+f none /etc/init.d/uucp=/etc/rc2.d/S70uucp
+#
+#	administrative files: default owner=root group=sys mode=0755
+#
+!default 0644 root sys
+f OAMmif	$PKGSAV/intf_install/netserv.mi
+f OAMmif	$PKGSAV/intf_install/bnu.mi
+f OAMmif	$PKGSAV/intf_install/devices.mi
+f OAMmif	$PKGSAV/intf_install/polling.mi
+f OAMmif	$PKGSAV/intf_install/systems.mi
+f OAMmif	$PKGSAV/intf_install/setup.mi
+#
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Menu.devtype
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev1
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev2
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev3
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev4
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.acudev5
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.adddev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.dirdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.othdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.streams
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.tlisdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Form.cf_adev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Menu.ports
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Text.aok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/add/Text.anok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Menu.lsdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Menu.lsdev_1
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Menu.lsdev_2
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Menu.lsdev_all
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/list/Form.listdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Menu.rmdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Menu.rmdev_1
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Menu.rmdev_2
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Menu.rmdev_all
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Form.rmdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Form.cf_rdev
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Text.rmnok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/devices/remove/Text.rmok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add/Form.addpoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add/Form.cf_apoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add/Text.aok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/add/Text.anok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/list/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/list/Form.listpoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/list/Menu.lspoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/list/Menu.lspoll_a
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Menu.rmpoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Menu.rmpoll_a
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Form.cf_rpoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Text.rmnok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Text.rmok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/polling/remove/Form.rmpoll
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.acusys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.addsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.dirsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.othsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.tlissys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Form.cf_asys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Text.aok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/add/Text.anok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/list/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/list/Menu.lssys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/list/Menu.lssys_all
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/list/Form.listsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Menu.rmsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Menu.rmsys_all
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Form.cf_rsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Form.rmsys
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Text.rmnok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/systems/remove/Text.rmok
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/setup/Help
+f OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/basic_networking/setup/add/Menu.setup
+#	OAM shell scripts: default owner=root group=sys mode=755
+#
+!default 0755 root sys
+f OAMadmin	$OAMBASE/bin/delentry
+f OAMadmin	$OAMBASE/bin/validhour
+f OAMadmin	$OAMBASE/bin/validls
+f OAMadmin	$OAMBASE/bin/validname
+f OAMadmin	$OAMBASE/bin/validnetaddr
+f OAMadmin	$OAMBASE/bin/validphone
+f OAMadmin	$OAMBASE/bin/validport
+f OAMadmin	$OAMBASE/bin/validsys
+#
+#	commands: default owner=uucp group=uucp mode=0111
+#
+!default 0111 uucp uucp
+f none	/usr/bin/ct	4111	root	uucp
+f none	/usr/bin/cu	4111	uucp	uucp
+f none	/usr/bin/uucp	4111	uucp	uucp
+f none	/usr/bin/uuglist	4111	uucp	uucp
+f none	/usr/bin/uuname	4111	uucp	uucp
+f none	/usr/bin/uustat	4111	uucp	uucp
+f none	/usr/bin/uux	4111	uucp	uucp
+f none	/usr/lib/uucp/bnuconvert	0110	uucp	uucp
+f none	/usr/lib/uucp/remote.unknown	4111	uucp	uucp
+f none	/usr/lib/uucp/uucheck	0110	uucp	uucp
+f none	/usr/lib/uucp/uucico	4111	uucp	uucp
+f none	/usr/lib/uucp/uucleanup	0110	uucp	uucp
+f none	/usr/lib/uucp/uusched	4111	uucp	uucp
+f none	/usr/lib/uucp/uuxqt	4111	uucp	uucp
+f none	/usr/bin/uudecode	0555	uucp	uucp
+f none	/usr/bin/uuencode	0555	uucp	uucp
+#
+#	shells: default owner=uucp group=uucp mode=0555
+#
+!default 0555 uucp uucp
+f none	/usr/bin/uulog
+f none	/usr/bin/uupick
+f none	/usr/bin/uuto
+f none	/usr/lib/uucp/SetUp
+f none	/usr/lib/uucp/Teardown
+f none	/usr/lib/uucp/Uutry
+f none	/usr/lib/uucp/uudemon.admin
+f none	/usr/lib/uucp/uudemon.cleanup
+f none	/usr/lib/uucp/uudemon.hour
+f none	/usr/lib/uucp/uudemon.poll
+#
+#	data files: default owner=uucp group=uucp mode=644
+#
+!default 0644 uucp uucp
+e need	/etc/uucp/Config
+s need	/usr/lib/uucp/Config=/etc/uucp/Config
+e need	/etc/uucp/Devconfig
+s need	/usr/lib/uucp/Devconfig=/etc/uucp/Devconfig
+e need	/etc/uucp/Devices
+s need	/usr/lib/uucp/Devices=/etc/uucp/Devices
+e need	/etc/uucp/Dialcodes
+s need	/usr/lib/uucp/Dialcodes=/etc/uucp/Dialcodes
+e need	/etc/uucp/Dialers
+s need	/usr/lib/uucp/Dialers=/etc/uucp/Dialers
+e need	/etc/uucp/Grades
+s need	/usr/lib/uucp/Grades=/etc/uucp/Grades
+e need	/etc/uucp/Limits
+s need	/usr/lib/uucp/Limits=/etc/uucp/Limits
+e need	/etc/uucp/Permissions	0600	uucp	uucp
+s need	/usr/lib/uucp/Permissions=/etc/uucp/Permissions
+e need	/etc/uucp/Poll
+s need	/usr/lib/uucp/Poll=/etc/uucp/Poll
+e need	/etc/uucp/Sysfiles
+s need	/usr/lib/uucp/Sysfiles=/etc/uucp/Sysfiles
+e need	/etc/uucp/Systems	0600	uucp	uucp
+s need	/usr/lib/uucp/Systems=/etc/uucp/Systems
+#
+#	header files: default owner=bin group=bin mode=444
+#
+!default 0444 bin bin
+f none	/usr/include/dial.h=/usr/src/head/dial.h

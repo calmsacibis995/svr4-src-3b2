@@ -1,0 +1,10 @@
+#ident	"@(#)boot:boot/filledt/dcp/dgmon.map	1.1"
+#
+#	mapfile for ELF filledt	(matches COFF's ifile)
+#
+control = LOAD ?RWX V0x2004480 P0x2004480 L0x7B80;
+buffers = LOAD ?RWX V0x2304000 P0x2304000 L0x100000;
+
+buffers	:	.buffers;
+
+control	:	?A;

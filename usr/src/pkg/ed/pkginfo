@@ -1,0 +1,11 @@
+#ident	"@(#)pkg.editors:pkginfo	1.3"
+
+#
+# required parameters
+#
+
+PKG="ed"
+VERSION=""
+NAME="Editing Utilities"
+CLASSES="none"
+CATEGORY="system"

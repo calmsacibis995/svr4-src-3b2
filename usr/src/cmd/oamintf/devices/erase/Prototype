@@ -1,0 +1,12 @@
+#ident	"@(#)oamintf:devices/erase/Prototype	1.2"
+!MENU=/usr/sadm/sysadm/menu
+!INTFBIN=/usr/sadm/sysadm/bin
+
+d intf $MENU/devices/erase 0755 bin bin
+v intf $MENU/devices/erase/erase.menu 0644 bin bin
+f intf $MENU/devices/erase/Form.diskette 0644 bin bin
+f intf $MENU/devices/erase/Text.erase2  0644 bin bin
+f intf $MENU/devices/erase/Text.diskette 0644 bin bin
+f intf $MENU/devices/erase/Text.eraserr 0644 bin bin
+f intf $INTFBIN/floperase 0755 bin bin
+f intf $MENU/devices/erase/Help 0644 bin bin

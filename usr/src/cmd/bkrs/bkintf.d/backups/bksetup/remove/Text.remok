@@ -1,0 +1,27 @@
+#ident	"@(#)bkrs:bkintf.d/backups/bksetup/remove/Text.remok	1.2"
+################################################################################
+#	Module Name: Text.remok
+################################################################################
+title="Adding Backup Table Entry"
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+lifetime=shortterm
+
+close=`rm -f $ERR`
+
+rows=4
+columns=60
+
+text="
+Successfully removed entry $ARG1."
+
+altslks
+
+name=CONT
+button=11
+action=update $ARG2 true
+
+name=CANCEL
+button=14
+action=CLEANUP

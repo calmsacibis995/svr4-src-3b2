@@ -1,0 +1,15 @@
+#ident	"@(#)pkg.nfs:pkginfo	1.1"
+#
+# 	NFS pkginfo
+#
+PKG="nfs"
+NAME="network file system utilities"
+ARCH="3B2"
+VERSION="1.0"
+CATEGORY="system,utilities"
+BASEDIR=""
+CLASSES="none build"
+PREDEPEND="nfs"
+MAXINST="1"
+ISTATES="2"
+RSTATES="2"

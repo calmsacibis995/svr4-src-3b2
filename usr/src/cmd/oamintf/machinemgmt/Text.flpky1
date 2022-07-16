@@ -1,0 +1,55 @@
+#ident	"@(#)oamintf:machinemgmt/Text.flpky1	1.3"
+
+################################################################################
+#	Module Name: Text.flpky1
+################################################################################
+title="Create a Floppy Key"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="
+Creating a floppy key requires you to take the system down and
+perform a procedure found in the firmware monitor.  We will tell
+you what to do and then take the system down for you.  You will
+then have to type the commands we told you about.  The
+instructions are also in Chapter 4 of the Owner/Operator Manual,
+\"Making A Floppy Key\" should you forget what we told you here.
+You will need a formatted floppy.  If you don't have one, quit
+this procedure and issue the command:
+
+                       sysadm format
+
+Be sure the floppy removable disk IS NOT WRITE PROTECTED!!
+After these instructions, you will start the \"firmware\"
+procedure.  After
+                      SELF-CHECK
+		      FIRMWARE MODE
+
+appear you should type the firmware password, which is
+
+		      mcp
+
+if you have not changed it.  To the message
+
+		     Enter name of program to execute:
+answer
+
+		     newkey
+Follow the printed instructions.  
+When the \"Enter name of program to execute:\" message reappears:
+	<>	REMOVE THE DISK!!!
+	<>	Press the OFF switch to turn off the power.
+	<>	Press ON to restart UNIX."
+
+rows=18
+columns=75
+
+altslks
+
+name=CONT
+button=11
+action=OPEN TEXT $OBJ_DIR/Text.flpky2
+
+name=CANCEL
+button=14
+action=CLEANUP

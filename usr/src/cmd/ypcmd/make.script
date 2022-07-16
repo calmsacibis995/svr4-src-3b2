@@ -1,0 +1,72 @@
+#ident	"@(#)libyp:make.script	1.1"
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*	PROPRIETARY NOTICE (Combined)
+*
+* This source code is unpublished proprietary information
+* constituting, or derived under license from AT&T's UNIX(r) System V.
+* In addition, portions of such source code were derived from Berkeley
+* 4.3 BSD under license from the Regents of the University of
+* California.
+*
+*
+*
+*	Copyright Notice 
+*
+* Notice of copyright on this source code product does not indicate 
+*  publication.
+*
+*	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+*	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+*          All rights reserved.
+*/ 
+#
+#	@(#)make.script 1.26 88/10/05 SMI
+#
+# Set the following variable to "-b" to have yp servers use the domain name
+# resolver for hosts not in the current domain. 
+#B=-b
+B=
+DIR =/etc
+DOM = `domainname`
+NOPUSH = ""
+YPDIR=/usr/etc/yp
+YPDBDIR=/var/yp
+YPPUSH=$(YPDIR)/yppush
+MAKEDBM=$(YPDIR)/makedbm
+MKNETID=$(YPDIR)/mknetid
+
+all: publickey
+
+publickey.time: $(DIR)/publickey
+	-@if [ -f $(DIR)/publickey ]; then \
+		sed "/^#/d" < $(DIR)/publickey | \
+		$(MAKEDBM) - $(YPDBDIR)/$(DOM)/publickey.byname; \
+		touch publickey.time; \
+		echo "updated publickey"; \
+		if [ ! $(NOPUSH) ]; then \
+			$(YPPUSH) publickey.byname; \
+			echo "pushed publickey"; \
+		else \
+			: ; \
+		fi \
+	else \
+		echo "couldn't find $(DIR)/publickey"; \
+	fi
+
+netid.time: $(DIR)/passwd $(DIR)/group $(DIR)/hosts $(DIR)/netid
+	@$(MKNETID) -q -p $(DIR)/passwd -g $(DIR)/group -h $(DIR)/hosts \
+		-m $(DIR)/netid > .ypjunk; \
+	$(MAKEDBM) .ypjunk $(YPDBDIR)/$(DOM)/netid.byname; \
+	rm -f .ypjunk; \
+	touch netid.time; \
+	echo "updated netid"; \
+	if [ ! $(NOPUSH) ]; then \
+		$(YPPUSH) netid.byname; \
+		echo "pushed netid"; \
+	else \
+		: ; \
+	fi
+
+publickey: publickey.time
+netid: netid.time

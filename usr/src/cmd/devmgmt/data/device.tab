@@ -1,0 +1,22 @@
+#ident	"@(#)devmgmt:data/device.tab	1.10.1.1"
+#
+#	Device Table
+#
+#  Format:  Colon-list
+#  alias:cdevice:bdevice:pathname:attrs
+#
+#  Fields:
+#	alias		The device alias (primary key)
+#	cdevice		Pathname to the inode for the character device
+#	bdevice		Pathname to the inode for the block device
+#	pathname	Pathname to the inode for the device
+#	attrs		Expression-list: attributes of the device
+#			An expression in this list is of the form attr="value"
+#			where attr is the attribute name and value is the
+#			value of that attribute.
+#
+diskette1:/dev/rdiskette:/dev/diskette::desc="Floppy Drive" mountpt="/install" volume="diskette" fmtcmd="/etc/fmtflop -v /dev/rdiskette" type="diskette" mkfscmd="/etc/mkfs -F s5 /dev/diskette 1422:512" erasecmd="true" copy="true"
+ctape1:/dev/rSA/ctape1:/dev/SA/ctape1::desc="Cartridge Tape Drive" fmtcmd="/etc/ctcfmt" type="ctape" display="true" volume="cartridge tape"
+disk1:/dev/rdsk/c1d0s6:/dev/dsk/c1d0s6::desc="Disk Drive" type="disk" display="true" remove="true" part="true"
+disk2:/dev/rdsk/c1d1s6:/dev/dsk/c1d1s6::desc="Disk Drive" type="disk" display="true" remove="true" part="true"
+spool:::/var/spool/pkg:desc="Packaging Spool Directory"

@@ -1,0 +1,34 @@
+#ident	"@(#)oamintf:Prototype	1.6"
+!MENU=/usr/sadm/sysadm/menu 
+!PKGSCR=/usr/sadm/install/scripts 
+!PKGBIN=/usr/sadm/install/bin 
+!INTFBIN=/usr/sadm/sysadm/bin 
+
+############################################################## 
+#		Top Level Directories 
+############################################################## 
+d intf /usr/sadm/sysadm 555 bin bin
+x intf /usr/sadm/sysadm/add-ons 555 bin bin
+d intf $MENU 555 bin bin
+d intf $PKGBIN 0755 bin bin
+x intf $PKGSCR 0555 bin bin
+x intf $INTFBIN 0755 bin bin
+d intf /etc/skel 0755 bin bin
+
+############################################################## 
+#		Interface File Placeholders
+############################################################## 
+
+d intf $MENU/applmgmt 0755 bin bin
+v intf $MENU/applmgmt/appl.menu 0644 bin bin
+f intf $MENU/applmgmt/Help 0644 bin bin
+
+d intf $MENU/backup_service 0755 bin bin
+v intf $MENU/backup_service/backup.menu 0644 bin bin
+
+d intf $MENU/networks 0755 bin bin
+v intf $MENU/networks/networks.menu 0644 bin bin
+
+d intf $MENU/restores 0755 bin bin
+v intf $MENU/restores/restore.menu 0644 bin bin
+

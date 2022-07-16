@@ -1,0 +1,13 @@
+#ident	"@(#)pkg.usrenv:pkginfo	1.2"
+# required parameters
+PKG="usrenv"
+ARCH="3B2"
+VERSION=""
+NAME="User Environment Utilities"
+CATEGORY="system"
+CLASSES="none"
+MAXINST="1"
+ISTATES="S 2"
+RSTATES="S 2"
+
+# Optional parameters <There are currently no optional parameters>

@@ -1,0 +1,33 @@
+#ident	"@(#)filemgmt:defaults/Form.remove	1.5"
+Form="Remove Defaults for a File System"
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+
+`readfile $INTFBASE/form.msg | message -p`
+
+done=`indicator -w;
+	message "Removing defaults for File System. Please wait...";
+	$OAMBASE/bin/rmdef "$F1" "$F2";`
+
+name="Device name that contains the file system:"
+lininfo=Form.remove:F1
+nrow=1
+ncol=1
+frow=1
+fcol=44
+rows=1
+columns=20
+rmenu={ `$OAMBASE/bin/defdev | sort ` }
+valid=` $OAMBASE/bin/valdefdev "$F1" | regex 'true' `
+invalidmsg=" $F1 -- device not in default table"
+
+name="File system name when mounted:"
+lininfo=Form.remove:F2
+nrow=2
+ncol=1
+frow=2
+fcol=32
+rows=1
+columns=20
+rmenu={ `$OAMBASE/bin/fsnames "$F1" ` }
+menuonly=true
+invalidmsg="Press CHOICES to select valid response."

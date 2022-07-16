@@ -1,0 +1,26 @@
+#ident	"@(#)bkrs:bkreg.d/table	1.4"
+#ENTRY FORMAT=tag:oname:odevice:olabel:week:day:method:options:priority:dgroup:ddevice:dchar:dmname:depend:other
+#
+#  sample rotation entry
+#
+#ROTATION=1
+#ROTATION STARTED=890101
+#
+#  sample root and usr backup to floppy using ffile and incfile
+#
+rootsun:/:/dev/root::1:0:ffile:::diskette:::root0,root1,root2,root3,root4::
+rootdai:/:/dev/root::1:1-6:incfile:::diskette:::rdai0,rdai1::
+usrdai:/usr:/dev/dsk/c1d0s2::1:1-6:incfile:::diskette:::udai0,udai1::
+usrsun:/usr:/dev/dsk/c1d0s2::1:0:ffile:::diskette:::usr0,usr1,usr2,usr3,usr4::
+#
+#  sample file system backup using fimage and incfile
+#
+partsun:/test1:/dev/dsk/c1d1s3::1:0:fimage:::diskette:::test0,test1::
+#  incremental backups go to a file
+partdai:/test1:/dev/dsk/c1d1s3::1:1-6:incfile::::/bkup0:dtype=dir,capacity=31180:part1::
+#
+#  sample partition backup using fdp
+#
+fdp3:/test1:/dev/rdsk/c1d1s3::demand::fdp:::diskette:::fdp3-1,fdp3-2,fdp3-3
+
+

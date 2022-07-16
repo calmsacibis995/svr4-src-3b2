@@ -1,0 +1,110 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)pkg4.m32:epu/prototype	1.5"
+i depend
+i i.Z
+i pkginfo
+i postinstall
+i postremove
+i r.Z
+i space
+d Z	/usr						?    ?	  ?   
+d Z	/usr/ccs					?    ?	  ?   
+d Z	/usr/ccs/bin					?    ?	  ?   
+e Z	/usr/ccs/bin/admin				0555 bin  bin 
+e Z	/usr/ccs/bin/cb					0555 bin  bin 
+e Z	/usr/ccs/bin/cdc				0555 bin  bin 
+e Z	/usr/ccs/bin/cflow				0555 bin  bin 
+e Z	/usr/ccs/bin/comb				0555 bin  bin 
+e Z	/usr/ccs/bin/cscope				0555 bin  bin 
+e Z	/usr/ccs/bin/ctc				0555 bin  bin 
+e Z	/usr/ccs/bin/ctrace				0555 bin  bin 
+e Z	/usr/ccs/bin/cxref				0555 bin  bin 
+e Z	/usr/ccs/bin/delta				0555 bin  bin 
+e Z	/usr/ccs/bin/get				0555 bin  bin 
+e Z	/usr/ccs/bin/help				0555 bin  bin 
+e Z	/usr/ccs/bin/lex				0555 bin  bin 
+e Z	/usr/ccs/bin/lprof				0555 bin  bin 
+e Z	/usr/ccs/bin/m4					0555 bin  bin 
+e Z	/usr/ccs/bin/make				0555 bin  bin 
+e Z	/usr/ccs/bin/mcs				0555 bin  bin 
+e Z	/usr/ccs/bin/prof				0555 bin  bin 
+e Z	/usr/ccs/bin/prs				0555 bin  bin 
+e Z	/usr/ccs/bin/regcmp				0555 bin  bin 
+e Z	/usr/ccs/bin/rmdel				0555 bin  bin 
+e Z	/usr/ccs/bin/sact				0555 bin  bin 
+e Z	/usr/ccs/bin/sccsdiff				0555 bin  bin 
+e Z	/usr/ccs/bin/sdb				0555 bin  bin 
+e Z	/usr/ccs/bin/unget				0555 bin  bin 
+e Z	/usr/ccs/bin/val				0555 bin  bin 
+e Z	/usr/ccs/bin/vc					0555 bin  bin 
+e Z	/usr/ccs/bin/what				0555 bin  bin 
+e Z	/usr/ccs/bin/yacc				0555 bin  bin 
+x Z	/usr/ccs/lib					0755 bin  bin 
+e Z	/usr/ccs/lib/basicblk				0555 bin  bin 
+e Z	/usr/ccs/lib/cm4defs				0444 bin  bin 
+x Z	/usr/ccs/lib/ctrace				0755 bin  bin 
+e Z	/usr/ccs/lib/ctrace/runtime.c			0444 bin  bin 
+e Z	/usr/ccs/lib/dag				0555 bin  bin 
+e Z	/usr/ccs/lib/flip				0555 bin  bin 
+x Z	/usr/ccs/lib/fp					0755 bin  bin 
+x Z	/usr/ccs/lib/fp/libp				0755 bin  bin 
+e Z	/usr/ccs/lib/fp/libp/libc.a			0444 bin  bin 
+e Z	/usr/ccs/lib/fp/libp/libm.a			0444 bin  bin 
+x Z	/usr/ccs/lib/help				0755 bin  bin 
+e Z	/usr/ccs/lib/help/ad				0444 bin  bin 
+e Z	/usr/ccs/lib/help/bd				0444 bin  bin 
+e Z	/usr/ccs/lib/help/bu				0444 bin  bin 
+e Z	/usr/ccs/lib/help/cb				0444 bin  bin 
+e Z	/usr/ccs/lib/help/cm				0444 bin  bin 
+e Z	/usr/ccs/lib/help/cmds				0444 bin  bin 
+e Z	/usr/ccs/lib/help/co				0444 bin  bin 
+e Z	/usr/ccs/lib/help/de				0444 bin  bin 
+e Z	/usr/ccs/lib/help/default			0444 bin  bin 
+e Z	/usr/ccs/lib/help/ge				0444 bin  bin 
+e Z	/usr/ccs/lib/help/he				0444 bin  bin 
+x Z	/usr/ccs/lib/help/lib				0755 bin  bin 
+e Z	/usr/ccs/lib/help/lib/help2			0555 bin  bin 
+e Z	/usr/ccs/lib/help/prs				0444 bin  bin 
+e Z	/usr/ccs/lib/help/rc				0444 bin  bin 
+e Z	/usr/ccs/lib/help/un				0444 bin  bin 
+e Z	/usr/ccs/lib/help/ut				0444 bin  bin 
+e Z	/usr/ccs/lib/help/vc				0444 bin  bin 
+x Z	/usr/ccs/lib/lex				0755 bin  bin 
+e Z	/usr/ccs/lib/lex/ncform				0444 bin  bin 
+e Z	/usr/ccs/lib/lex/nrform				0444 bin  bin 
+e Z	/usr/ccs/lib/libgen.a				0444 bin  bin 
+e Z	/usr/ccs/lib/libl.a				0444 bin  bin 
+e Z	/usr/ccs/lib/libld.a				0444 bin  bin 
+x Z	/usr/ccs/lib/libp				0755 bin  bin 
+e Z	/usr/ccs/lib/libp/libc.a			0444 bin  bin 
+e Z	/usr/ccs/lib/libp/libm.a			0444 bin  bin 
+e Z	/usr/ccs/lib/libp/libmalloc.a			0444 bin  bin 
+e Z	/usr/ccs/lib/libprof.a				0444 bin  bin 
+e Z	/usr/ccs/lib/liby.a				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-lgen				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-lgen.ln			0444 bin  bin 
+e Z	/usr/ccs/lib/llib-ll				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-ll.ln				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-lld				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-lld.ln			0444 bin  bin 
+e Z	/usr/ccs/lib/llib-ly				0444 bin  bin 
+e Z	/usr/ccs/lib/llib-ly.ln				0444 bin  bin 
+e Z	/usr/ccs/lib/lpfx				0555 bin  bin 
+x Z	/usr/ccs/lib/minabi				0755 bin  bin 
+x Z	/usr/ccs/lib/minabi/libp			0755 bin  bin 
+e Z	/usr/ccs/lib/nmf				0555 bin  bin 
+e Z	/usr/ccs/lib/xref				0555 bin  bin 
+e Z	/usr/ccs/lib/yaccpar				0444 bin  bin 
+d Z	/usr/lib					?    ?	  ?   
+e Z	/usr/lib/libcrypt_i.a				0444 bin  bin 
+e Z	/usr/lib/llib-lcrypt				0444 bin  bin 
+e Z	/usr/lib/llib-lcrypt.ln				0444 bin  bin 
+l Z	/usr/ccs/bin/ctcr=/usr/ccs/bin/ctc	       
+l Z	/usr/ccs/lib/fp/libp/libc.so=/usr/ccs/lib/libc.so
+l Z	/usr/ccs/lib/libp/libc.so=/usr/ccs/lib/libc.so 
+l Z	/usr/ccs/lib/minabi/libp/libc.so=/usr/ccs/lib/minabi/libc.so

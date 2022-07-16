@@ -1,0 +1,21 @@
+* @(#)holidays	2.0 of 1/1/89
+* Prime/Nonprime Table for UNIX Accounting System
+*
+* Curr	Prime	Non-Prime
+* Year	Start	Start
+*
+  1989	0800	1800
+*
+* only the first column (month/day) is significiant.
+*
+* month/day	Company
+* 		Holiday
+*
+1/1		New Years Day
+5/30		Memorial Day
+7/4		Indep. Day
+9/5		Labor Day
+11/24		Thanksgiving
+11/25		day after
+12/25		Christmas
+12/26		PDO after Christmas

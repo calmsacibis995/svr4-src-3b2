@@ -1,0 +1,25 @@
+#ident	"@(#)oamintf:machinemgmt/Text.booterr	1.5"
+
+################################################################################
+#	Module Name: Text.booterr
+################################################################################
+title="Boot Defaults Errors"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="
+The command \"/usr/sbin/fltboot\" could not be found.  This
+command is needed to continue on."
+
+rows=6
+columns=75
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

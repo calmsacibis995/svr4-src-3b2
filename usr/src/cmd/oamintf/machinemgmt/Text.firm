@@ -1,0 +1,26 @@
+#ident	"@(#)oamintf:machinemgmt/Text.firm	1.3"
+
+################################################################################
+#	Module Name:  Text.firm
+################################################################################
+title="Take the System to Firmware Mode"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="
+Users currently logged on:
+
+`who`"
+
+rows=10
+columns=60
+
+altslks
+
+name=CONT
+button=11
+action=OPEN FORM $OBJ_DIR/Form.firm
+
+name=CANCEL
+button=14
+action=CLEANUP

@@ -1,0 +1,26 @@
+#ident	"@(#)oamintf:devices/partition/Text.parterr	1.4"
+
+################################################################################
+#	Module Name: Text.parterr
+################################################################################
+title="Disk Partitioning Error"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+close=`rm -f $ERR`
+
+rows=5
+columns=75
+
+text="
+`readfile $ERR`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

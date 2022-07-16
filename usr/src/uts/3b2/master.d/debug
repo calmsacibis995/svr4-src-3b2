@@ -1,0 +1,6 @@
+*#ident	"@(#)debug:master.d/debug	1.1"
+*
+* DEBUG
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ox

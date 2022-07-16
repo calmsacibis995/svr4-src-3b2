@@ -1,0 +1,53 @@
+#ident	"@(#)pkg.inet:preremove	1.5"
+#
+# Issue a warning message if inet is running.
+#
+if [ ! -z "`ps -ef | grep slink | grep -v grep`" ]
+then
+	echo "WARNING: inet (slink) is still running."
+fi
+#
+# Deinstall INET
+#
+DRVPATH=/etc/master.d
+/etc/drvinstall -u -f -m $DRVPATH/app -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/arp -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/icmp -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/ip -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/llcloop -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/rawip -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/tcp -v 1.0 || exit 1
+/etc/drvinstall -u -f -m $DRVPATH/udp -v 1.0 || exit 1
+
+rm -f /dev/arp || exit 1
+rm -f /dev/icmp || exit 1
+rm -f /dev/ip || exit 1
+rm -f /dev/loop || exit 1
+rm -f /dev/rawip || exit 1
+rm -f /dev/tcp || exit 1
+rm -f /dev/udp || exit 1
+
+#
+# Remove the entries from /etc/netconfig
+#
+
+grep -v '[ 	]inet[ 	][ 	]*tcp[ 	][ 	]*/dev/tcp[ 	]' /etc/netconfig 2>/dev/null >/tmp/$$.1
+grep -v '[ 	]inet[ 	][ 	]*udp[ 	][ 	]*/dev/udp[ 	]' /tmp/$$.1 2>/dev/null >/tmp/$$.2
+grep -v '[ 	]inet[ 	][ 	]*icmp[ 	][ 	]*/dev/icmp[ 	]' /tmp/$$.2 2>/dev/null >/etc/netconfig
+
+rm -f /tmp/$$.1 /tmp/$$.2
+
+#
+#	Remove ourself from the OAM Scripts...
+#
+
+grep -v 'inet^Internet Protocols (TCP and UDP)^inet/Menu.inet' /usr/sadm/sysadm/menu/netservices/name_to_addr/map.menu 2>/dev/null >/tmp/$$.1
+mv /tmp/$$.1 /usr/sadm/sysadm/menu/netservices/name_to_addr/map.menu
+
+#
+# Remove the port monitor entry
+#
+
+sacadm -r -p inetd >/dev/null 2>&1
+
+exit 0

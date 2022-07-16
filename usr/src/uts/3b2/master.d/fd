@@ -1,0 +1,11 @@
+*#ident	"@(#)fs:master.d/fd	1.1"
+*
+* FD
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orxj	-	fd	-	-	-
+						fdname(%15c) = {NAMEFD}
+
+$$$
+
+NAMEFD = "fd"

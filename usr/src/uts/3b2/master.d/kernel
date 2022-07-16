@@ -1,0 +1,257 @@
+*#ident	"@(#)kernel:master.d/kernel	1.72"
+*
+* KERNEL
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+none	 -	  -	 -	  -	 -
+						init_tbl(%l%l%l%l%l%l%l%l%l)
+							={
+							  &cinit,
+							  &binit,
+							  &vfsinit,
+							  &finit,
+							  &strinit,
+							  &debuginit,
+							  &aioinit,
+							  0}
+						pbuf[NPBUF] (%0x58)
+						hbuf[NHBUF] (%0x10)
+						callout[NCALL] (%0x10)
+						sptmap[SPTMAP] (%0x8)
+						putbuf[PUTBUFSZ] (%c)
+						putbufsz(%i) = {PUTBUFSZ}
+						pages_pp_maximum(%i) = {PAGES_UNLOCK}
+
+						v(%i%i%i%l%i%i%i%i%i%i%i%i%i%i%i%i%i%i)
+							={NBUF,
+			  				NCALL,
+			  				NPROC,
+							0,
+							0,
+							MAXCLSYSPRI,
+			  				NCLIST,
+			  				MAXUP,
+			  				NHBUF,
+			  				NHBUF-1,
+			  				NPBUF,
+			  				SPTMAP,
+			  				MAXPMEM,
+			  				NAUTOUP,
+							BUFHWM,
+							XSDSEGS,
+							XSDSLOTS}
+						rlimits(%l%l%l%l%l%l%l%l%l%l%l%l%l%l%l%l) = {
+							SCPULIM,
+							HCPULIM,
+							SFSZLIM,
+							HFSZLIM,
+							SDATLIM,
+							HDATLIM,
+							SSTKLIM,
+							HSTKLIM,
+							SCORLIM,
+							HCORLIM,
+							SFNOLIM,
+							HFNOLIM,
+							SVMMLIM,
+							HVMMLIM}
+* scheduler
+						sys_name(%15c) = {SYS_NAME}
+						intcls(%16c) = {INITCLASS}
+						initclass(%l) = {&intcls}
+
+*tuneable.h
+						tune(%i%i%i%i%i%i%i%i%i%i%i)
+						={	GPGSLO,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							FSFLUSHR,
+							MINARMEM,
+							MINASMEM
+						}
+
+						exec_ncargs(%i) = {ARG_MAX}
+
+* file and record locking *
+						flckinfo(%l%l)
+							= {0, 0}
+* shared libraries *
+						shlbinfo(%l%l%l%l)
+							= {SHLBMAX, 0, 0, 0}
+* uname
+* TO DO: The %2c is a kludge because mkboot will
+* not allow strings of greater than 255 to be
+* allocated in a master.d file.  mkboot should
+* be fixed and this changed to %256c%c.
+* Same is true for srpc_domain below.
+						utsname(%255c%2c%255c%2c%255c%2c%255c%2c%255c%2c)
+							={SYS,00,
+							  NODE,00,
+							  REL,00,
+							  VER,00,
+							  "3B2",00}
+
+* sysinfo
+                                                architecture(%6c%c)
+                                                        ={ARCHITECTURE,0}
+                                                hw_serial(%1c%c)
+                                                        ={HW_SERIAL,0}
+                                                hw_provider(%4c%c)
+                                                        ={HW_PROVIDER,0}
+                                                srpc_domain(%255c%2c)
+                                                        ={SRPC_DOMAIN,0}
+
+* Streams
+						nstrpush (%i) ={NSTRPUSH}
+						strmsgsz (%i) ={STRMSGSZ}
+						strctlsz (%i) ={STRCTLSZ}
+						strthresh(%l) ={STRTHRESH}
+
+* Multiple groups and chown(2) restrictions
+						rstchown (%i) = { RSTCHOWN }
+						ngroups_max (%i) = { NGROUPS_MAX }
+
+* Specification of root file system
+						rootfstype (%15c) = {ROOTFSTYPE}
+
+* Directory name lookup cache
+						ncsize (%i) = { NPROC+100 }
+
+* XENIX Time variables for ftime system call
+						Timezone (%i)
+						Dstflag (%i)
+
+* state of locore trapping
+						s3btlc_state (%i) = { S3BTLC_DISABLE }
+
+* head of inet statistics list
+						ifstats (%l)
+
+$$$
+
+SYS ="UNIX_System_V"
+NODE ="unix"
+REL  = "4.0"
+VER  = "2"
+
+ARCHITECTURE="m32100"
+HW_SERIAL=""
+HW_PROVIDER="AT&T"
+SRPC_DOMAIN=""
+
+*
+* The following entries form the tunable parameter table.
+*
+
+NBUF = 100
+NCALL = 60
+NPROC = 200
+NCLIST = 0
+
+* The following stuff is for streams.
+
+NSTRPUSH = 9
+STRCTLSZ = 1024
+
+*
+* strmsgsz is the size for the maximum streams message a user can create.
+* for Release 4.0, a value of zero will indicate no upper bound.  This
+* parameter will disappear entirely in the next release.
+*
+STRMSGSZ = 0
+
+*
+* strthresh is a cap to the amount of dynamic memory that the
+* streams subsystem can consume.  Once passed, pushes, opens of
+* streams devices, and writes will fail for non-root processes.
+* strthresh is in bytes; a value of 0 means no limit
+*
+STRTHRESH = 0
+
+* maxup is the maximum number of processes per user
+
+MAXUP = 25
+
+* hashbuf must be a power of 2
+
+NHBUF = 64
+NPBUF = 20
+
+* Shared Libraries:  Maximum number of libraries that can be
+*                    attached to a process at one time.
+
+SHLBMAX = 2
+
+* Delay for delayed writes
+
+NAUTOUP = 60
+
+* default per process resource limits (set to -1 for infinite limits)
+* -1 is an infinite limit
+* S prefix is for soft limits, H prefix is for hard limits
+* CPULIM - maximum combined user and system time in seconds
+* FSZLIM - maximum file size in bytes
+* DATLIM - maximum writeable mapped memory (swap space) in bytes
+* STKLIM - maximum size of current stack in bytes
+* CORLIM - maximum size of core file in bytes
+* FNOLIM - maximum number of file descriptors
+* VMMLIM - maximum amount of simulaneously mapped virtual memory in bytes
+
+SCPULIM = 0x7fffffff
+HCPULIM = 0x7fffffff
+SFSZLIM = 0x100000
+HFSZLIM = 0x100000
+SDATLIM = 0x1000000
+HDATLIM = 0x1000000
+SSTKLIM = 0x1000000
+HSTKLIM = 0x1000000
+SCORLIM = 0x100000
+HCORLIM = 0x100000
+SFNOLIM = 0x40
+HFNOLIM = 0x400
+SVMMLIM = 0x1000000
+HVMMLIM = 0x1000000
+
+* added for paging
+
+SPTMAP = 100
+MAXPMEM = 0
+GPGSLO = 25
+FSFLUSHR = 1
+MINARMEM = 25
+MINASMEM = 25
+PUTBUFSZ = 2000
+PAGES_UNLOCK = 200
+
+* Multiple groups and chown(2) restrictions
+
+RSTCHOWN = 0
+NGROUPS_MAX = 16
+
+* Specification of root fstype
+
+ROOTFSTYPE = "s5"
+
+* Scheduler Tunables
+
+MAXCLSYSPRI = 99
+SYS_NAME = "SYS"
+INITCLASS = "TS"
+
+* XENIX Tunables for shared data
+XSDSEGS = 25
+XSDSLOTS = 3
+
+* Buffer cache tunables
+BUFHWM = 200
+ARG_MAX = 5120
+
+* possible values for s3btlc_state.  Taken from sys3b.h
+S3BTLC_DISABLE = 0
+S3BTLC_SIGNAL = 1
+S3BTLC_PRINT = 2

@@ -1,0 +1,39 @@
+#ident	"@(#)oamintf:syssetup/Text.setup2	1.3"
+################################################################################
+#	Module Name: Text.setup2
+#	Calling Sequence:
+#	Functional Description: This Text object displays a screen
+#				for completion of the task "setup"
+#	How:
+#	Inputs:
+#	Functions Called: 
+################################################################################
+
+Title=Sets Up Machine Identification and Security
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+begrow=distinct
+begcol=distinct
+
+rows=10
+columns=75
+
+text="
+
+This completes your initial set up of the machine.
+You may now log in using your login.
+
+"
+
+#	(This is for confirmation, warning and repetition text screens
+
+altslks
+
+name=CONT
+button=11
+action=CLEANUP
+
+name=CANCEL
+button=14
+action=CLEANUP

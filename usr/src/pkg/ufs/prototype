@@ -1,0 +1,57 @@
+#ident	"@(#)pkg.ufs:ufs/prototype	1.7"
+i pkginfo
+i postinstall
+i preremove
+
+!default			775	root	sys
+d none	/boot			?	?	?
+d none	/etc			?	?	?
+d none	/etc/master.d		?	?	?
+d none	/usr			?	?	?
+d none	/usr/lib		?	?	?
+d none	/usr/lib/fs		?	?	?
+d none	/usr/lib/fs/ufs
+d none	/etc/fs			?	?	?
+d none	/etc/fs/ufs
+
+!default 555 bin bin
+f none	/boot/UFS=/usr/src/uts/3b2/fs/ufs/UFS
+
+! default 444 root root
+f none	/etc/master.d/ufs=/usr/src/uts/3b2/master.d/ufs
+
+! default 555 bin bin
+f none	/etc/fs/ufs/mkfs
+f none	/usr/lib/fs/ufs/mkfs
+f none	/etc/fs/ufs/fsck
+f none	/usr/lib/fs/ufs/fsck
+f none	/etc/fs/ufs/mount
+f none	/usr/lib/fs/ufs/mount
+f none	/usr/lib/fs/ufs/df
+f none	/usr/lib/fs/ufs/clri
+f none	/usr/lib/fs/ufs/fsdb
+f none	/usr/lib/fs/ufs/fstyp
+f none	/usr/lib/fs/ufs/labelit
+f none	/usr/lib/fs/ufs/tunefs
+l none	/usr/sbin/tunefs=/usr/lib/fs/ufs/tunefs
+f none	/usr/lib/fs/ufs/ff
+f none	/usr/lib/fs/ufs/ncheck
+f none	/usr/lib/fs/ufs/ufsdump
+l none	/usr/sbin/ufsdump=/usr/lib/fs/ufs/ufsdump
+f none	/usr/lib/fs/ufs/ufsrestore
+l none	/usr/sbin/ufsrestore=/usr/lib/fs/ufs/ufsrestore
+f none	/usr/lib/fs/ufs/quot
+l none	/usr/sbin/quot=/usr/lib/fs/ufs/quot
+f none	/usr/lib/fs/ufs/repquota
+l none	/usr/sbin/repquota=/usr/lib/fs/ufs/repquota
+f none	/usr/lib/fs/ufs/quota
+l none	/usr/sbin/quota=/usr/lib/fs/ufs/quota
+f none	/usr/lib/fs/ufs/quotacheck
+l none	/usr/sbin/quotacheck=/usr/lib/fs/ufs/quotacheck
+f none	/usr/lib/fs/ufs/edquota
+l none	/usr/sbin/edquota=/usr/lib/fs/ufs/edquota
+f none	/usr/lib/fs/ufs/quotaon
+l none	/usr/sbin/quotaon=/usr/lib/fs/ufs/quotaon
+l none	/usr/lib/fs/ufs/quotaoff=/usr/lib/fs/ufs/quotaon
+l none	/usr/sbin/quotaoff=/usr/lib/fs/ufs/quotaon
+f none  /usr/lib/fs/ufs/volcopy

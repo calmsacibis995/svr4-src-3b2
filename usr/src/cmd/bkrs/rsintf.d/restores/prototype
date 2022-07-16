@@ -1,0 +1,44 @@
+#ident	"@(#)bkrs:rsintf.d/restores/prototype	1.8"
+
+# Prototype file created by edsysadm on Mon Sep 19 16:12:17 MDT 1988
+!PKGINST=sysadm
+!PKGSAV=/var/sadm/pkg/sysadm/save
+!default 0644 root sys
+x OAMadmin $OAMBASE/add-ons/$PKGINST 0755 root sys
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/Help
+x OAMadmin $OAMBASE/add-ons/$PKGINST 0755 root sys
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/Help
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/operator 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/operator/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/operator/Form.setup
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/operator/Text.setok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/operator/Text.setnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond/Form.rsoper
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond/Menu.methods
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond/Text.err
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/respond/Text.rsoper
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/restore 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/restore/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/restore/Form.restore
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/restore/Text.err
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/restore/Text.rest
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/modify 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/modify/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/modify/Form.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/modify/Text.modok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/modify/Text.modnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/full 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/full/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/full/Text.full
+x OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/selective 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/selective/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/selective/Form.select
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/selective/Text.errs
+f OAMadmin $OAMBASE/add-ons/$PKGINST/restores/status/selective/Text.select
+
+d OAMmif $PKGSAV/intf_install 0644 root sys
+f OAMmif $PKGSAV/intf_install/rest.mi 0644 root sys

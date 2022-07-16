@@ -1,0 +1,18 @@
+#ident	"@(#)oamintf:diagnostics/Prototype	1.3"
+!MENU=/usr/sadm/sysadm/menu
+!INTFBIN=/usr/sadm/sysadm/bin
+
+d intf $MENU/diagnostics 0755 bin bin
+v intf $MENU/diagnostics/diag.menu 0644 bin bin
+d intf $MENU/diagnostics/repair 0755 bin bin
+f intf $MENU/diagnostics/repair/Text.repair1 0644 bin bin
+f intf $MENU/diagnostics/repair/Text.repair2 0644 bin bin
+f intf $MENU/diagnostics/repair/Text.repair3 0644 bin bin
+d intf $MENU/diagnostics/report 0755 bin bin
+f intf $MENU/diagnostics/report/Form.report 0644 bin bin
+f intf $MENU/diagnostics/report/Text.report1 0644 bin bin
+f intf $MENU/diagnostics/report/Text.report2 0644 bin bin
+f intf $MENU/diagnostics/Help 0644 bin bin
+f intf $MENU/diagnostics/repair/Help 0644 bin bin
+f intf $MENU/diagnostics/report/Help 0644 bin bin
+

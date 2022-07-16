@@ -1,0 +1,6 @@
+#ident	"@(#)osadmin:shell/drivename	1.1"
+#	Derive a device name from its path name.
+
+#!	chmod +x ${file}
+
+echo `basename ${1:?}` drive

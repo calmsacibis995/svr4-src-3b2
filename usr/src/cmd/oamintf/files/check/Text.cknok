@@ -1,0 +1,17 @@
+#ident	"@(#)filemgmt:check/Text.cknok	1.5"
+Title="File System Check"
+close=`/usr/bin/rm /tmp/check.err 2>/dev/null`CLOSE
+
+`readfile $INTFBASE/display.msg | message -p`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp cknokhelp
+
+begrow=distinct
+begcol=distinct
+rows=12
+columns=65
+
+text="   Checking filesystem(s) for device $ARG1 - 
+   Errors have occurred.
+
+`readfile /tmp/check.err`"

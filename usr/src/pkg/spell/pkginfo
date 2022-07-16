@@ -1,0 +1,13 @@
+#ident	"@(#)pkg.spell:pkginfo	1.5"
+
+#
+# "must" parameters
+#
+
+PKG="spell"
+VERSION=""
+ARCH="3B2"
+NAME="SPELL Utilities"
+CLASSES="none"
+CATEGORY=system
+PREDEPEND="spell"

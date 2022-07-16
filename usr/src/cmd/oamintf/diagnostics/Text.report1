@@ -1,0 +1,30 @@
+#ident	"@(#)oamintf:diagnostics/Text.report1	1.4"
+
+################################################################################
+#	Module Name: Text.report1
+################################################################################
+title="Report Disk Errors"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+text="
+WARNING:  This report is provided to advise you if your machine
+needs the built-in disks repaired.  Only qualified repair people
+should attempt to do the repair.
+
+NOTE:  If disk errors are reported it probably means that files
+and/or data have been damaged.  It may be necessary to restore the
+repaired disk from backup copies."
+
+rows=11
+columns=75
+
+altslks
+
+name=CONT
+button=11
+action=`set -l DSKRPT=/tmp/${VPID}dskrpt`OPEN FORM $OBJ_DIR/Form.report
+
+name=CANCEL
+button=14
+action=CLEANUP

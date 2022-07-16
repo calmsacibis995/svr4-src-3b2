@@ -1,0 +1,30 @@
+#ident	"@(#)filemgmt:identify/help	1.2"
+ABSTRACT:
+	Identify is a heuristic task that will try to determine the
+	type of any unmounted file system without damaging the data 
+	or the medium of the file system. 
+	
+	Serious data damage can occur if an attempt is made to mount
+	or repair a file system with the wrong type designated.
+
+	The heuristics may take several moments before the file 
+	system type is determined.
+TITLE:Identify the type of Unmounted File Systems
+Form.identify:F1:Device name of the file system to be identified:
+	Devices that contain file systems are usually partitions on
+	the hard disk. For example the partition /dev/dsk/c1d0s2 is
+	the second partition on the zeroeth hard disk.  Partitions 
+	are created on hard disks by using the "Partition" task.
+ 	Among other devices which can contain file systems floppy 
+	diskette drives are the most common. 
+	
+	Devices can be accessed via either of block or character
+	interfaces. The block interface to the device causes data
+	on the device to be accessed in a buffered manner. The 
+	character interface provides character input/output to the 
+	device. For example buffered I/O can be performed on a floppy 
+	device by specifying the block interface "/dev/diskette"
+	and character I/O can be performed by specifying "/dev/rdiskette"
+	which is the character interface to this device.
+
+identifytask:

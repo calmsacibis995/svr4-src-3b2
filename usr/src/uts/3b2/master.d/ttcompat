@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/ttcompat	1.1"
+*
+* BSD/XENIX/V7 tty compatibility STREAMS module - ttcompat
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	ttco	-	-	-
+$$

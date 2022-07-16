@@ -1,0 +1,44 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+#ident	"@(#)sdb:libexp/m32/DEPEND	1.9"
+Call.o:	Call.C
+	$(CPLUS_CMD) -c Call.C
+
+Call2.o:	Call2.C
+	$(CPLUS_CMD) -c Call2.C
+
+fetch.o:	fetch.c
+	$(CC_CMD) -c fetch.c
+
+Expr.o:	../common/Expr.C
+	$(CPLUS_CMD) -c ../common/Expr.C
+
+Label.o:	../common/Label.C
+	$(CPLUS_CMD) -c ../common/Label.C
+
+Place.o:	../common/Place.C
+	$(CPLUS_CMD) -c ../common/Place.C
+
+Rvalue.o:	../common/Rvalue.C
+	$(CPLUS_CMD) -c ../common/Rvalue.C
+
+SDBinfo.o:	../common/SDBinfo.C
+	$(CPLUS_CMD) -c ../common/SDBinfo.C
+
+format.o:	../common/format.C
+	$(CPLUS_CMD) -c ../common/format.C
+
+OBJECTS	=  \
+	Call.o \
+	Call2.o \
+	fetch.o \
+	Expr.o \
+	Label.o \
+	Place.o \
+	Rvalue.o \
+	SDBinfo.o \
+	format.o

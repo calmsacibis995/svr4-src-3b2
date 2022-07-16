@@ -1,0 +1,267 @@
+#ident	"@(#)pkg.nlp:lp/ifiles/preinstall	1.10"
+##########
+#
+# Make sure that there is a group named "lp".  If this is
+# missing, create it.
+#
+##########
+
+PATH=$PATH:/usr/sadm/bin
+export PATH
+
+echo "\nVerifying \"lp\" group ID."
+if valgid lp					# MR we88-11028
+then
+	entry=`grep '^lp:' /etc/group`
+	gid=`expr "$entry" : "^lp:[^:]*:\([^:]*\):"`
+	echo "The group \"lp\" exists and the group ID is ${gid}"
+else
+	gid=7
+	until groupadd -g ${gid} lp > /dev/null 2>&1
+	do
+		gid=`expr ${gid} + 1`
+	done
+	echo "The group \"lp\" has been created, the group ID is ${gid}"
+fi
+
+##########
+# Make sure the login "lp" exists.  If it does not, create it.
+# if it does, make sure it has the appropriate group-id.
+##########
+
+echo "\nVerifying \"lp\" user ID."
+
+if valuid lp
+then
+	entry=`grep '^lp:' /etc/passwd`
+	cgid=`expr "${entry}" : "lp:[^:]*:[^:]*:\([^:]*\):"`
+	if [ $cgid -ne $gid ]
+	then
+		echo "The login \"lp\" exists, but has the wrong group ID."
+		echo "Changing group ID from ${cgid} to ${gid}"
+		usermod -g $gid lp
+	else
+		echo "The login \"lp\" exists and looks fine."
+	fi
+else
+	uid=7
+	until useradd -g ${gid} -u ${uid} lp > /dev/null 2>&1
+	do
+		uid=`expr ${uid} + 1`
+	done
+	echo "The login \"lp\" has been added, the user ID is ${uid}"
+fi
+
+shutdown () {
+	if [ -x /usr/lib/lpshut ]
+	then
+		/usr/lib/lpshut >/dev/null 2>&1
+	else
+	    if [ -x /usr/lib/lp/lpshut ]
+	    then
+		    /usr/lib/lp/lpshut >/dev/null 2>&1
+	    fi
+	fi
+	return 0
+}
+
+echo "\nExamining your system to see if you have the old LP Spooler Utilities."
+
+if [ ! -d "/usr/spool/lp" ]
+then
+
+	echo \
+"You have neither old nor new version. Installation continues."
+
+	shutdown	# just in case
+
+
+elif [ -d "/usr/spool/lp/admins" -a -d "/etc/lp/model" ]
+then
+
+	echo \
+"You already have a new version; that is okay. Installation continues."
+
+	shutdown
+
+
+elif [  -d "/usr/spool/lp/admins" -a -d "/var/spool/lp/admins/lp" ]
+then
+	echo \
+"You have the 3.2 version installed; that is okay.  The  current  print
+service  configuration will be set aside now,  to let the installation
+proceed. Afterwards, the configuration will be automatically converted
+to the new form."
+	shutdown
+	mkdir /var/apool/lp/.$PKGINST.3.2.conf
+	(
+	    cd /var/spool/lp
+	    find * -print -depth | cpio -pdumv /var/spool/lp/${BACKUP} > /dev/null 2>&1
+	    rm -rf * > /dev/null 2>&1
+	)
+elif [ ! -s "/var/spool/lp/pstatus" ]
+then
+
+	echo \
+"You appear to have had the old or new version installed at  one  time,
+but  there's no configuration information present now. Installation is
+continuing."
+
+	shutdown	# just in case
+	rm -rf /var/spool/lp
+
+
+elif [ ! -s "/var/spool/lp/qstatus" -o ! -d "/var/spool/lp/interface" ]
+then
+
+	echo "
+The existing print service configuration looks odd.  Installation  can
+continue, but there may be problems in saving the configuration.
+"
+
+	if ${CHECKYN} ${flags} -f -Dn -H "
+        If you answer \"n\" (or \"no\") installation will stop  to  give
+        you  a  chance  to examine the existing configuration in the
+        directory /var/spool/lp, and preserve by hand  any  existing
+        configuration  information.  If  you  answer  \"y\" (or \"yes\")
+        installation  will  proceed  but it may fail to preserve the
+        existing configuration." \
+		"Should installation continue?"
+	then
+		shutdown
+	else
+		exit 1
+	fi
+
+else
+
+	echo \
+"You have the old version installed; that is okay.  The  current  print
+service  configuration will be set aside now,  to let the installation
+proceed. Afterwards, the configuration will be automatically converted
+to the new form."
+
+
+	##########
+	#
+	# Check to see if there are any requests still queued.
+	##########
+	if ls /var/spool/lp/request/*/* 1>/dev/null 2>&1
+	then
+		echo "
+There are still some print requests queued for printing.  Installation
+of the new Spooler over the old configuration will DESTROY them.
+"
+
+		if ${CHECKYN} ${flags} -f -Dn -H "
+        If you answer \"n\" (or \"no\") installation will stop to   give
+        a  chance  for the queued print requests to be printed.  (If
+        you suspect  that  there  really  are  no   requests   still
+        queued,  look  for  strange  files in the directories  under
+        /var/spool/lp/request.)  If  you  answer   \"y\"   (or  \"yes\")
+        installation  will  proceed  WITHOUT  SAVING  any  currently
+        queued jobs." \
+			"Should installation continue?"
+		then
+			:
+		else
+			exit 1
+		fi
+	fi
+
+
+	if [ -f /var/spool/lp/model/standard ]
+	then
+		echo "
+The existing print service configuration has a  printer  model  called
+\"standard\".   If installation continues it will be LOST.
+"
+
+		if ${CHECKYN} ${flags} -f -Dn -H "
+        If you answer \"n\" (or \"no\") installation will stop  to  give
+        you  a  chance  to  save the model \"standard\" in a different
+        place or under a different  name.  You'll  find  it  in  the
+        directory  /var/spool/lp/model. If you answer \"y\" (or \"yes\")
+        installation will proceed  and  will  DESTROY  the  existing
+        model  called  \"standard\".  All  other  models  will be left
+        alone." \
+			"Should installation continue?"
+		then
+			rm -f /var/spool/lp/model/standard
+		else
+			exit 1
+		fi
+	fi
+
+
+	shutdown
+
+
+	export safe_class safe_model
+	safe_class=
+	safe_model=
+
+	if [ -d "/var/spool/lp/class" ]
+	then
+		safe_class=/var/spool/lp/.$PKGINST.class
+		rm -rf "${safe_class}"
+		mv /var/spool/lp/class ${safe_class}
+	fi
+
+	if [ -d "/var/spool/lp/model" ]
+	then
+		safe_model=/var/spool/lp/.$PKGINST.model
+		rm -rf "${safe_model}"
+		mv /var/spool/lp/model ${safe_model}
+	fi
+
+	trap   'if [ -n "${safe_class}" ]
+		then
+			mv ${safe_class} /var/spool/lp/class
+		fi
+		if [ -n "${safe_model}" ]
+		then
+			mv ${safe_model} /var/spool/lp/model
+		fi
+		trap "" 0 1 2 3 15
+		exit 1' 0 1 2 3 15
+
+
+	echo "
+The old configuration has been saved. Installation continues."
+
+fi
+
+echo "\nVerifying that lp can use crontab\n"
+
+CRONALLOW=/etc/cron.d/cron.allow
+CRONDENY=/etc/cron.d/cron.deny
+CRONDIR=/var/spool/cron/crontabs
+
+if [ -f "${CRONDENY}" ] && \
+	grep "^lp[ 	]*$" ${CRONDENY} 1>/dev/null 2>&1
+then
+	#
+	# If lp is being denied, fix it.
+	#
+	sed 's/^lp$//' ${CRONDENY} > xyzzy && \
+	mv xyzzy ${CRONDENY}
+	echo '
+NOTE:	The login ID "lp" has been removed from the list of IDs
+	denied access to the cron service.
+	'
+fi
+
+if [ -f "${CRONALLOW}" ]
+then
+	if grep "^lp[ 	]*$" ${CRONALLOW} 1>/dev/null 2>&1
+	then
+		:
+	else
+	    echo "lp" >>${CRONALLOW}
+	    echo '
+NOTE:	The login ID "lp" has been added to the list of IDs
+	allowed to use the cron service.
+'
+	fi
+fi

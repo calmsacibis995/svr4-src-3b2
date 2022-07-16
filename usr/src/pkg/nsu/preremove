@@ -1,0 +1,117 @@
+#ident	"@(#)pkg.nsu:preremove	1.11.2.3"
+#
+#	preremove script for nsu package
+#
+# error function - put out a slightly more descriptive error message
+#	arg 1 is message #
+#	arg 2 is optional argument for message
+#
+error() {
+	errflag=1
+	case $1 in
+	1)
+		echo ERROR: drvinstall on $2 failed
+		;;
+	2)
+		echo ERROR: mkboot on KERNEL failed
+		;;
+	*)
+		echo ERROR: undefined error
+		;;
+	esac
+	}
+#
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+#	uninstall each supplied driver
+#
+for DRIVER in CLONE SOCKMOD TIMOD TIRDWR KMACCT TICLTS TICOTS TICOTSORD
+do
+	driver=`echo $DRIVER | tr [A-Z] [a-z]`
+	/etc/drvinstall -u -m $MASTER/$driver -s $SYSTEM -o $BOOT \
+		-v 1.0 >/dev/null || error 1 $DRIVER
+	echo "$DRIVER driver uninstalled."
+done
+#
+#	these may not have been installed
+#
+for DRIVER in PTEM PTM PTS PCKT CONNLD
+do
+	driver=`echo $DRIVER | tr [A-Z] [a-z]`
+	/etc/drvinstall -u -m $MASTER/$driver -s $SYSTEM -o $BOOT \
+		-v 1.0 >/dev/null 2>&1
+	echo "$DRIVER driver uninstalled."
+done
+#
+# remove the listener id
+#
+/usr/bin/passmgmt -d listen >/dev/null 2>&1
+#
+# remove listen-type port monitors and any symbolic links that might
+# be lying arount
+#
+sacadm -L -t listen 2>/dev/null | cut -f1 -d: >/tmp/listeners
+for i in `cat /tmp/listeners`
+do
+	sacadm -r -p $i >/dev/null 2>&1
+done
+#
+# symlinks and links
+#
+LHOME=$BASEDIR/usr/net/nls
+if [ -f $LHOME/listen ]
+then
+	rm $LHOME/listen
+fi
+if [ -f $LHOME/dbfconv ]
+then
+	rm $LHOME/dbfconv
+fi
+if [ -f $LHOME/nlps_server ]
+then
+	rm $LHOME/nlps_server
+fi
+if [ -f /usr/bin/nlsadmin ]
+then
+	rm /usr/bin/nlsadmin
+fi
+rm /tmp/listeners
+
+#
+#	Remove entries from /etc/netconfig
+#
+
+grep -v '[ 	]loopback[ 	][ 	]*-[ 	][ 	]*/dev/ticlts[ 	]' /etc/netconfig 2>/dev/null >/tmp/$$.1
+grep -v '[ 	]loopback[ 	][ 	]*-[ 	][ 	]*/dev/ticotsord[ 	]' /tmp/$$.1 2>/dev/null >/tmp/$$.2
+grep -v '[ 	]loopback[ 	][ 	]*-[ 	][ 	]*/dev/ticots[ 	]' /tmp/$$.2 2>/dev/null >/etc/netconfig
+
+rm -f /rmp/$$.1 /tmp/$$.2
+
+#
+#	Remove entries from OAM scripts...
+#
+
+fgrep -v 'name_to_address^Machine and Service Address Management^name_to_addr/map.menu' /usr/sadm/sysadm/menu/netservices/netserve.menu 2>/dev/null >/tmp/$$.3
+mv /tmp/$$.3 /usr/sadm/sysadm/menu/netservices/netserve.menu
+
+#
+#
+#	re-make the kernel
+#
+FREE=`expr "\`df / 2>/dev/null\`" : '.*: *\([0-9]*\)'`
+NEED=`du -s $BOOT/KERNEL | cut -f1`
+if [ "$NEED" -gt "$FREE" ]
+    then
+	echo "postinstall: ERROR: not enough space for mkboot"
+	echo "	TOFIX: free space and then reinstall package."
+	exit 1
+fi
+/etc/mkboot -m $MASTER -d $BOOT -k $BOOT/KERNEL || error 2
+#
+#	reboot required to get changes
+#
+errflag=`expr 0$errflag + 10`
+exit $errflag

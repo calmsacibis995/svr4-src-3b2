@@ -1,0 +1,10 @@
+#ident	"@(#)pkg.terminf:terminf/pkginfo	1.3"
+
+PKG="terminf"
+CLASSES="none"
+NAME="Terminal Information Utilities"
+VERSION="4.0"
+VENDOR="AT&T"
+CATEGORY="system,essential"
+PREDEPEND="terminf"
+INTONLY="y"

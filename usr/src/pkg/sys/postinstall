@@ -1,0 +1,2 @@
+#ident	"@(#)pkg.sys:postinstall	1.1.1.1"
+installf -f $PKGINST

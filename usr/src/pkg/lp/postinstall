@@ -1,0 +1,316 @@
+#ident	"@(#)pkg.nlp:lp/ifiles/postinstall	1.10"
+
+##########
+#
+# Patch the main menu file to use the correct FML object
+#
+##########
+
+OAMBASE=${OAMBASE:-/var/sadm/sysadm}
+INTFBASE=${INTFBASE:-${OAMBASE}/menu}
+
+cp ${INTFBASE}/main.menu ${INTFBASE}/main.backup
+sed 's/printers\/printers/printers/'  ${INTFBASE}/main.menu > ${INTFBASE}/tmp.menu
+mv ${INTFBASE}/tmp.menu ${INTFBASE}/main.menu
+
+if [ -s "/usr/spool/lp/pstatus" ]
+then
+
+	echo "
+Setting up the new LP Print Service configuration to look like the old
+configuration.
+
+This may take a few minutes."
+
+
+	rm -fr \
+		/usr/spool/lp/log \
+		/usr/spool/lp/logs/* \
+		/usr/spool/lp/oldlog \
+		/usr/spool/lp/outputq \
+		/usr/spool/lp/request
+
+
+	##########
+	#
+	# Restore the print job sequence number.
+	##########
+	if [ -r "/usr/spool/lp/seqfile" ]
+	then
+		curseq=`line </usr/spool/lp/seqfile`
+	else
+		curseq=1
+	fi
+	echo "1:9999:1:${curseq}" >/var/spool/lp/tmp/.SEQF
+	rm -f /usr/spool/lp/seqfile
+
+	##########
+	#
+	# Restore the printer/class configuration.
+	##########
+
+	dump=`/usr/sbin/dumpolp`
+
+	##########
+	#
+	# Printers (Pass 1):
+	##########
+	plist=
+	for p in `ls /usr/spool/lp/interface 2>/dev/null`
+	do
+
+		v=`line 2>/dev/null </usr/spool/lp/member/${p}` || continue
+		i=/etc/lp/interfaces/${p}
+		mv /usr/spool/lp/interface/${p} ${i}
+		chown lp ${i}
+		chgrp bin ${i}
+		chmod 0755 ${i}
+
+		/usr/lib/lp/lpadmin -p ${p} -v ${v} -i ${i} 2>/dev/null || {
+
+			echo \
+"Could not restore the configuration for the printer \"${p}\"."
+			rm -f ${i}
+			continue
+
+		}
+
+		plist="${plist} ${p}"
+
+	done
+
+	##########
+	#
+	# Classes (Pass1):
+	##########
+	clist=
+	if [ -n "${safe_class}" ]
+	then
+	    for c in `ls ${safe_class}`
+	    do
+
+		for p in `cat ${safe_class}/${c}`
+		do
+			/usr/lib/lp/lpadmin -p ${p} -c ${c} 2>/dev/null || {
+				echo \
+"Could not restore the printer \"${p}\" to the class \"${c}\"."
+
+			}
+		done
+
+		clist="${clist} ${c}"
+
+	    done
+	fi
+
+	##########
+	#
+	# Start the Spooler/Scheduler so the rest of
+	# the configuration can be set.
+	##########
+	cd /
+	/usr/lib/lp/lpsched >/dev/null 2>&1
+
+	##########
+	#
+	# Printers (Pass 2):
+	##########
+	if [ -n "${plist}" ]
+	then
+	    for p in ${plist}
+	    do
+
+		estate=`echo "${dump}" | grep "PRTR  *${p}"` || continue
+		astate=`echo "${dump}" | grep "DEST  *${p}"` || continue
+
+		##########
+		#
+		# Enable and accept the printer, even if we'll just
+		# turn around and disable or reject it. Otherwise
+		# the attempt to disable or reject with the original
+		# reasons will fail.
+		##########
+		/usr/lib/lp/accept ${p} >/dev/null 2>&1
+		/usr/bin/enable ${p} >/dev/null 2>&1
+
+		echo ${estate} | grep "${p} E " >/dev/null 2>&1 || {
+			reason="`echo \"${estate}\" | cut -c23-`"
+			/usr/bin/disable -r "${reason}" ${p} >/dev/null 2>&1
+		}
+
+		echo ${astate} | grep "${p} A " >/dev/null 2>&1 || {
+			reason="`echo \"${astate}\" | cut -c23-`"
+			/usr/lib/lp/reject -r "${reason}" ${p} >/dev/null 2>&1
+		}
+
+	    done
+	fi
+
+	##########
+	#
+	# Odd interface support programs:
+	##########
+	cd /usr/spool/lp/interface && {
+		find . -print \
+		| cpio -dumpl /etc/lp/interfaces \
+			>/dev/null 2>&1
+	}
+	cd /
+	rm -fr /usr/spool/lp/interface 
+
+	##########
+	#
+	# Classes (Pass2):
+	##########
+	if [ -n "${clist}" ]
+	then
+	    for c in ${clist}
+	    do
+
+		astate=`echo "${dump}" | grep "DEST  *${c}"` || continue
+
+		##########
+		#
+		# Accept the class, even if we'll just turn around and
+		# reject it. Otherwise the attempt to reject with the
+		# original reason will fail.
+		##########
+		/usr/lib/lp/accept ${c} >/dev/null 2>&1
+
+		echo ${astate} | grep "${c} A " >/dev/null 2>&1 || {
+			reason="`echo \"${astate}\" | cut -c23-`"
+			/usr/lib/lp/reject -r "${reason}" ${c} >/dev/null 2>&1
+		}
+
+	    done
+	fi
+
+
+	##########
+	#
+	# Default destination stays the same.
+	##########
+
+
+	##########
+	#
+	# Restore the original models (minus any "standard"
+	# we've already taken out.)
+	##########
+	if [ -n "${safe_model}" ] && ls ${safe_model}/* >/dev/null 2>&1
+	then
+		cd ${safe_model}
+		find . -print \
+		| cpio -dump /etc/model 2>/dev/null 1>&2
+		cd /
+	fi
+
+
+	rm -fr \
+		/usr/spool/lp/member \
+		/usr/spool/lp/pstatus \
+		/usr/spool/lp/qstatus \
+		${safe_class} \
+		${safe_model}
+
+	trap 0 1 2 3 15
+
+
+	echo "
+The LP Print Service configuration looks like this:
+"
+	lpstat -s
+
+
+	echo "
+Continuing with the balance of the installation."
+
+
+elif [ -d /var/spool/lp/.$PKGINSG.3.2.conf ]
+then
+	cd /var/spool/lp/.$PKGINSG.3.2.conf
+	rm -f model/standard
+	find model -print | cpio -pdumv /etc/lp > /dev/null 2>&1
+	find requests system temp -print | \
+	    cpio -pdumv /var/spool/lp > /dev/null 2>&1
+	rm -f	bin/alert.proto \
+		bin/drain.output \
+		bin/lp.cat \
+		bin/lp.page \
+		bin/lp.set \
+		bin/lp.tell \
+		bin/slow.filter
+	find bin -print | cpio -pdumv /usr/lib/lp/bin > /dev/null 2>&1
+	cd admins
+	cat lp/filter.table >> /etc/lp/filter.table 2> /dev/null
+	rm -f	lp/filter.table \
+		lp/filter.table.i
+	find lp -print | cpio -pdumv /etc > /dev/null 2>&1
+	cd /var/spool/lp/.$PKGINSG.3.2.conf
+	rm -rf	admins \
+		bin \
+		fifos \
+		model \
+		requests \
+		system \
+		temp
+	find . -print | cpio -pdumv /var/spool/lp > /dev/null 2>&1
+	cd /
+	rm -rf /var/spool/lp/.$PKGINSG.3.2.conf
+
+	/usr/lib/lp/lpsched >/dev/null 2>&1
+
+The LP Print Service configuration looks like this:
+"
+	lpstat -s
+
+
+	echo "
+Continuing with the balance of the installation."
+
+
+else
+
+	cd /
+	/usr/lib/lp/lpsched >/dev/null 2>&1
+"
+fi
+
+if [ "$ALLOW" = y ]
+then
+	# allow users to enable/disable printers
+	installf $PKGINST /usr/bin/enable f 4555 lp other || exit 1
+	installf $PKGINST /usr/bin/disable=/usr/bin/enable l || exit 1
+	installf -f $PKGINST || exit 1
+fi
+
+# Get rid of any old startup/shutdown scripts.
+rm -f /etc/rc.d/lp /etc/shutdown.d/lp 2>/dev/null
+
+##########
+#
+# We no longer need the program that dumps old LP Spooler
+# status files. It was added in this installation procedure
+# only so we could use it to convert from old to new.
+##########
+rm -f /usr/lib/lp/dumpolp
+removef $PKGINST /usr/sbin/dumpolp
+
+echo "
+Finished setting up the new LP Print Service configuration.
+
+
+To change the LP Print Service configuration, or to examine it  again,
+enter the following command:
+
+
+		sysadm printers
+
+
+"
+
+# Create /usr/options/lp.name file for upward compatability
+
+installf -f $PKGINST
+
+exit 0

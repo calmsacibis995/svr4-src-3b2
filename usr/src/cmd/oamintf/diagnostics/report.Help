@@ -1,0 +1,23 @@
+#ident	"@(#)oamintf:diagnostics/report.Help	1.1"
+ABSTRACT:
+	The "diskreport" task shows you if the system has collected any
+	information indicating that errors occurred while reading the
+	built-in disks.  You can request either a summary or a full report.
+	
+	NOTE:  If disk errors are reported, it probably means that files
+	have been lost or data damaged.  It will be necessary to restore the
+	repaired disk from backup copies.
+
+Form.report:diskrpt:Report Type
+	Enter the type of report you want, either "full" or "summary".  The
+	"full" report displays additional detail for the expert repair
+	person troubleshooting complicated problems.
+	
+	The "summary" option provides sufficient information about disk
+	errors to determine if repair should be attempted.  If the report
+	contains the message:
+	
+	                "no errors logged"
+	
+	then there is most likely no damage.  If errors are reported, then
+	there is damage and you should call your service representative.

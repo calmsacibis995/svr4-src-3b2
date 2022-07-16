@@ -1,0 +1,55 @@
+#ident	"@(#)pkg.bnu:i.need	1.1.2.3"
+#
+#	'need' CLASS installation script
+#
+#	input:	src  - pathname on installation medium (i.e. .../System)
+#		dest - pathname on target system (i.e. .../System)
+#
+#	if 'dest' file is already there and
+#	    user wants old System files, do nothing
+#	    user does not want old files, move them to OlD and install new
+#	if 'dest' file does not exist
+#	    install new file regardless.
+#
+error() {
+	errflg=1
+}
+#
+errflg=0
+#
+#	make /etc/uucp/OlD directotry if it does not exist
+#
+mkdir $BASEDIR/etc/uucp/OlD >/dev/null 2>&1
+#
+while read src dest
+do
+	if [ "$src" = "/dev/null" ]
+	then
+		continue
+	fi
+
+	olddest="$BASEDIR/usr/lib/uucp/`basename $dest`"
+	oldsave="$BASEDIR/etc/uucp/OlD/`basename $dest`"
+
+	if [ "$OLDSYS" = "n" ]
+	then
+		# old file(s) may not exist if new/corrupt system
+		mv $dest $oldsave >/dev/null 2>&1
+		cp $src  $dest || error
+	elif [ ! -f $dest ]
+	then
+		# if file is in /usr/lib/uucp, copy that one
+		if [ -f $olddest ]
+		then
+			cp $olddest $dest
+		else
+			cp $src $dest || error
+		fi
+	fi
+done
+#
+#	remove /etc/uucp/OlD if it is empty
+#
+rmdir $BASEDIR/etc/uucp/OlD >/dev/null 2>&1
+#
+exit $errflg

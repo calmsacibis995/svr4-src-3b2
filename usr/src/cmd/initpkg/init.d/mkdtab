@@ -1,0 +1,12 @@
+#ident	"@(#)initpkg:init.d/mkdtab	1.1.1.1"
+
+#
+# Update device.tab and dgroup.tab files to reflect configuration.
+# Script runs once at installation time and then removes itself.
+#
+
+if [ -x /usr/sadm/sysadm/bin/mkdtab ]
+then
+	/usr/sadm/sysadm/bin/mkdtab
+	rm -f /etc/rc2.d/S15mkdtab
+fi

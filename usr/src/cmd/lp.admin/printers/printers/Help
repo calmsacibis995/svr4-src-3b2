@@ -1,0 +1,551 @@
+#ident	"@(#)lp.admin:printers/printers/Help	1.1"
+ABSTRACT:
+	[GENERAL]
+	The "configure" menu gives you several tasks: for adding
+	new printers to the print service; for changing the printer
+	configurations; adjusting the alerting schedule for printers
+	in trouble; and for examining the printer configuration.
+	
+add.help:ABSTRACT:
+add.help:	[GENERAL]
+add.help:	You use "add" task to add a new printer to the print service.
+add.help:	Minimally you'll need to know:
+add.help:	
+add.help:	* which interface program should be used to print files on the printer
+add.help:	(the default is a standard program supplied with the Line Printer Service).
+add.help:	
+add.help:	* which port the printer is connected to OR how the printer is to
+add.help:	be reached using the Basic Networking Utilities.
+add.help:	
+add.help:	Better service will be provided to you and the users if you also specify:
+add.help:	
+add.help:	* the type of printer (as listed in the Terminfo database--see the System
+add.help:	Administrator's Guide for help on this);
+add.help:	
+add.help:	* the default page size and print spacing that should be in effect;
+add.help:	
+add.help:	* how you are to be alerted when a problem occurs with the printer;
+add.help:	
+add.help:	* what print wheels, font cartridges, or character sets are available
+add.help:	on the printer;
+add.help:	
+add.help:	* what forms can be used on the printer;
+add.help:	
+add.help:	
+add.help:	[Name of the new printer ...]
+add.help:	You are expected to enter the name of the printer. Names
+add.help:	must be made up of letters, digits, and underscores.
+add.help:	
+add.help:	[If this printer is similar to one already added, enter the name ]
+add.help:	You are expected to enter the name of a printer that already
+add.help:	has been added. The printer's configuration will be used as
+add.help:	a guide for answering the rest of the questions.
+add.help:	
+add.help:	[Class to add it to ...]
+add.help:	You are expected to enter the name of a class of printers to which this
+add.help:	printer should belong. Classes are used to group similar printers under
+add.help:	a single name, so that users can pick a class as the destination for
+add.help:	their print request. This helps when you want to control to some extent
+add.help:	the printing load on the printers in the class: The printers are
+add.help:	selected from the class in the order they have been added. Thus the
+add.help:	first printers in the class will generally be the busiest, and the last
+add.help:	printers in the class will be the least used.
+add.help:	
+add.help:	You don't need to group printers by manufacturer or by similar type
+add.help:	as the Line Printer Service automatically does that. When user's specify
+add.help:	the type of files they want to print but don't select a particular
+add.help:	printer, any printer that will handle the type will be used.
+add.help:	
+add.help:	[Enter one line that describes the printer for your users ...]
+add.help:	You are expected to enter a single line of text that will be
+add.help:	displayed to people whenever they ask for a description of
+add.help:	the printer. It's a good idea to keep it short so that it
+add.help:	will fit across the screen.
+add.help:	
+add.help:	[Type of printer ...]
+add.help:	You are expected to identify the type of printer this is.
+add.help:	You must give a name that's known in the Terminfo database;
+add.help:	you'll be told if it isn't.
+add.help:	
+add.help:	The printer type is needed if the Line Printer Service is to:
+add.help:	screen print requests that ask for certain page sizes, print
+add.help:	spacing, and character sets; verify the default page sizes,
+add.help:	print spacing, and list of available character sets you give
+add.help:	later; and properly initialize the printer before printing a
+add.help:	user's files. You do not have to give a printer type,
+add.help:	though.
+add.help:	
+add.help:	[Types of files printable without filtering ...]
+add.help:	You are expected to identify the types of files the printer
+add.help:	can handle directly, without filtering. If the name of the
+add.help:	printer type is enough here, then you don't have to
+add.help:	enter anything. However, some printers can accept several
+add.help:	types because they convert them automatically into a common
+add.help:	type or in some other way understand the different control
+add.help:	sequences in each type. You should list all the types the
+add.help:	printer can handle.
+add.help:	
+add.help:	An important type on UNIX systems is identified by the word
+add.help:	"simple"; this is a file type often found on UNIX systems
+add.help:	because the files contain only linefeeds and perhaps tabs
+add.help:	and backspaces. If the printer can accept "simple" files,
+add.help:	give that name here.
+add.help:	
+add.help:	Separate several names with commas.
+add.help:	
+add.help:	[Printer interface to use ...]
+add.help:	You are expected to identify the interface program that
+add.help:	should be used with this printer. The interface program is
+add.help:	responsible, before each print request, for: setting up the
+add.help:	port to which the printer is attached (but not dialing a
+add.help:	modem or connecting to a network); initializing the printer
+add.help:	and setting the correct page size, printing pitch, and
+add.help:	character set; printing a banner page; and controlling the
+add.help:	number of copies printed.
+add.help:	
+add.help:	You can enter one of four values: the word "standard" if
+add.help:	the standard interface program is to be used; the name of
+add.help:	another model that should be used as the basis for the
+add.help:	interface program (not recommended unless you have added
+add.help:	your own models); the name of another printer to specify the
+add.help:	same interface program used with it; or the FULL path name
+add.help:	of a program you have provided as an interface program.
+add.help:	
+add.help:	[Can a user skip the banner page? ...]
+add.help:	Enter "yes" if a user can skip the printing of a
+add.help:	banner page before his or her request, or "no" if
+add.help:	not. It is generally a good idea to require the printing of
+add.help:	banner pages, because it will help the people who have to
+add.help:	separate output into individual print-outs for each user,
+add.help:	unless you have some other means of doing this. There are
+add.help:	cases, such as the printing of checks, where being able to
+add.help:	turn off the banner page is important.
+add.help:	
+add.help:	[Use the default page size and printing pitch? ...]
+add.help:	Enter "yes" if you will accept the default pitch
+add.help:	and size or don't want to change them. Enter "no"
+add.help:	if you want to specify the line or character spacing
+add.help:	(printing pitch) or page size that should be in effect when
+add.help:	users' files are printed. Note that any defaults you give
+add.help:	here will be used only if a user does not print on a form or
+add.help:	does not specify an alternate page size or print spacing.
+add.help:	
+add.help:	If you do not specify the defaults, the defaults will be
+add.help:	those provided by the printer after it has been initialized.
+add.help:	Typically this is 10 characters per inch, 6 lines per inch,
+add.help:	and 80 or 132 columns by 66 lines, but this is NOT
+add.help:	guaranteed. If you aren't sure that the defaults will be
+add.help:	adequate, enter "yes" and specify them.
+add.help:	
+add.help:	[Enter a command to run to alert you when the printer faults ...]
+add.help:	You are expected to enter the type of alert that should be
+add.help:	issued when the printer has a problem. Enter leave this field blank if you
+add.help:	don't want to be alerted, otherwise: enter "mail" if you
+add.help:	want mail sent to you; enter "write" if you want a message
+add.help:	written to your terminal; or enter a shell command to be
+add.help:	run each time an alert is to be made.
+add.help:	
+add.help:	[How often should you be alerted ...]
+add.help:	You are expected to enter the number of minutes that should
+add.help:	elapse between repeated alerts. To keep you informed that a
+add.help:	problem still exists, the Line Printer Service will keep issuing
+add.help:	alerts until the problem has been fixed. Entering ONCE will
+add.help:	mean you want to be alerted just once.
+add.help:	
+add.help:	[How should printing restart after you fix a printer fault? ...]
+add.help:	You are expected to specify how the Line Printer Service should
+add.help:	recover after a printer problem has been fixed. Enter
+add.help:	"continue" if the printer is to continue printing at the top
+add.help:	of the page where printing stopped. Enter "beginning" if it
+add.help:	is to start at the beginning again. Enter "wait" if it is
+add.help:	to leave the printer disabled and wait for someone to enable
+add.help:	the printer again.
+add.help:	
+add.help:	WARNING:
+add.help:	The Line Printer Service requires the use of a filter to provide the ability
+add.help:	to continue where printing stopped. If a filter capable of this is not
+add.help:	being used when a printer stops with a problem, then you will be told in the
+add.help:	alert message printing won't continue where it left off if you had wanted it
+add.help:	to.
+add.help:	
+add.help:	[If the printer is directly connected, enter the port to use.]
+add.help:	If this printer is directly connected, you must identify
+add.help:	which port is used. The names are typically like
+add.help:	"/dev/contty," "/dev/tty23," etc., but will depend on the
+add.help:	configuration of your system.
+add.help:	
+add.help:	If this printer is connected through a network, you must
+add.help:	specify the dialing instructions to use to connect to the
+add.help:	printer. The Basic Networking Utilities will be used for
+add.help:	all network connections. Enter the same argument (a phone
+add.help:	number or system name) you would give with the "cu" shell
+add.help:	command to reach the printer. (Don't give any of the "cu"
+add.help:	options.) You will have to set up the Basic Networking
+add.help:	configuration for this to work.
+add.help:	
+add.help:	[Is the printer directly connected? ...]
+add.help:	Enter "yes" if this printer directly connected to this system.  Enter
+add.help:	"no" if this printer is connected through a network.
+add.help:	
+add.help:	[Is the printer also a login terminal? ...]
+add.help:	Enter "yes" if this printer is also used as a
+add.help:	login terminal by someone, or enter "no"
+add.help:	otherwise.
+add.help:	
+add.help:	[List the print wheels you have available for this printer ...]
+add.help:	You are expected to enter the list of print wheels or font
+add.help:	cartridges that are available for this printer. You can
+add.help:	choose whatever names you want, as long as they are composed
+add.help:	of letters, digits, and underscores and are 14 characters
+add.help:	long or less. However, you should use names consistently:
+add.help:	If another printer has a print wheel or cartridge that is
+add.help:	similar enough that users won't care about the difference,
+add.help:	name them the same.
+add.help:	
+add.help:	If you don't list the print wheels or cartridges available
+add.help:	for this printer, the Line Printer Service will assume that none
+add.help:	can be used on it. Print requests for a print wheel or
+add.help:	cartridge not listed here will be refused UNLESS you first
+add.help:	mount it on the printer. (Giving a list here will not
+add.help:	restrict you from mounting other print wheels or cartridges
+add.help:	on the printer.)
+add.help:	
+add.help:	[Map these names into aliases ...]
+add.help:	You are expected to list aliases for the character sets defined for this
+add.help:	printer, mapping each one to a name defined in the Terminfo database for
+add.help:	this type of printer. You don't have to give a list here, because the Line Printer Service will use the list given in the Terminfo database, or will
+add.help:	use the names "cs0", "cs1", "cs2", etc., as alternatives to real names.
+add.help:	However, the names given in the Terminfo database may not be consistent
+add.help:	across all printers, and the names "cs0", etc. are not descriptive, so
+add.help:	users may be confused.
+add.help:	
+add.help:	You can help avoid this confusion by listing the names you would like
+add.help:	people to use on your system. If you have a mix of printers of different
+add.help:	styles, some that take print wheels, some that take font cartridges, and
+add.help:	some that have selectable character sets, you can give the same names for
+add.help:	the print wheels, cartridges, and character sets that print sufficiently
+add.help:	similar.
+add.help:	
+add.help:	If you enter a list, separate names with commas.
+add.help:	
+add.help:	[List the users who are denied access to this printer...]
+add.help:	You are expected to list the users who are NOT allowed to
+add.help:	use this printer. Please give the login names or user-ID's of the users,
+add.help:	not their proper names. Separate several names with commas.
+add.help:	
+add.help:	If it is easier to specify access
+add.help:	restrictions by listing just those who ARE allowed to use
+add.help:	the printer, leave this field blank and fill in the next.
+add.help:	
+add.help:	You can deny EVERYBODY by entering the word "all."
+add.help:	
+add.help:	[List the users who are allowed access to this printer ...]
+add.help:	You are expected to list the users who ARE allowed to use
+add.help:	this form. Please give the login names or user-ID's of the users, not
+add.help:	their proper names. Separate several names with commas.
+add.help:	
+add.help:	You can allow EVERYBODY by
+add.help:	entering the word "all."
+add.help:	
+add.help:	[List the forms that can't be used with this printer ...]
+add.help:	You are expected to list the forms that are NOT allowed to
+add.help:	be used with this printer. Separate several names with
+add.help:	commas.
+add.help:	
+add.help:	If it is easier to specify access restrictions by listing
+add.help:	just those forms that ARE allowed with the printer,
+add.help:	leave this field blank and fill in the next.
+add.help:	
+add.help:	You can deny ALL forms by entering the word "all."
+add.help:	
+add.help:	[List the forms that can be used with this printer ...]
+add.help:	You are expected to list the forms that are allowed to
+add.help:	be used with this printer. Separate several names with commas.
+add.help:	
+add.help:	You can allow ALL forms by entering the word "all."
+display.help:ABSTRACT:
+display.help:	[GENERAL]
+display.help:	You use the "display" task to examine the complete
+display.help:	configuration of one or more printers. You may want to do
+display.help:	this, for instance, if you suspect a configuration mistake
+display.help:	is causing a problem. If you just want a quick status check
+display.help:	to see what printers are available, use the "status" task, instead.
+display.help:	
+display.help:	If you are trying to add a new printer and want to use an
+display.help:	existing printer as a basis for defining a similar
+display.help:	configuration, you can use the "display" task to examine it,
+display.help:	or better yet, just start adding the printer--you will be
+display.help:	able to specify the name of the similar printer and the Line Printer Service will use it as a configuration template.
+display.help:	
+display.help:	[Enter the names of the printers ...]
+display.help:	You are expected to enter the name of the printer you want
+display.help:	to examine. You can give several names if you
+display.help:	separate them with commas.
+menu.help:ABSTRACT:
+menu.help:	[GENERAL]
+menu.help:	The "configure" menu gives you several tasks: for adding
+menu.help:	new printers to the print service; for changing the printer
+menu.help:	configurations; adjusting the alerting schedule for printers
+menu.help:	in trouble; and for examining the printer configuration.
+menu.help:	
+modify.help:ABSTRACT:
+modify.help:	[GENERAL]
+modify.help:	You use the "modify" task to modify the configuration of
+modify.help:	a printer. The same information you gave when you added the
+modify.help:	printer will provide the defaults for each item you are
+modify.help:	asked to respecify, so you can quickly step through the
+modify.help:	configuration to find the item you want to modify.
+modify.help:	
+modify.help:	[Enter the name of the printer ...]
+modify.help:	You are expected to enter the name of the printer. Names
+modify.help:	must be made up of letters, digits, and underscores.
+modify.help:	
+modify.help:	[Class to add it to ...]
+modify.help:	You are expected to enter the name of a class of printers to which this
+modify.help:	printer should belong. Classes are used to group similar printers under
+modify.help:	a single name, so that users can pick a class as the destination for
+modify.help:	their print request. This helps when you want to control to some extent
+modify.help:	the printing load on the printers in the class: The printers are
+modify.help:	selected from the class in the order they have been added. Thus the
+modify.help:	first printers in the class will generally be the busiest, and the last
+modify.help:	printers in the class will be the least used.
+modify.help:	
+modify.help:	You don't need to group printers by manufacturer or by similar type
+modify.help:	as the Line Printer Service automatically does that. When user's specify
+modify.help:	the type of files they want to print but don't select a particular
+modify.help:	printer, any printer that will handle the type will be used.
+modify.help:	
+modify.help:	[Enter one line that describes the printer for your users ...]
+modify.help:	You are expected to enter a single line of text that will be
+modify.help:	displayed to people whenever they ask for a description of
+modify.help:	the printer. It's a good idea to keep it short so that it
+modify.help:	will fit across the screen.
+modify.help:	
+modify.help:	[Type of printer ...]
+modify.help:	You are expected to identify the type of printer this is.
+modify.help:	You must give a name that's known in the Terminfo database;
+modify.help:	you'll be told if it isn't.
+modify.help:	
+modify.help:	The printer type is needed if the Line Printer Service is to:
+modify.help:	screen print requests that ask for certain page sizes, print
+modify.help:	spacing, and character sets; verify the default page sizes,
+modify.help:	print spacing, and list of available character sets you give
+modify.help:	later; and properly initialize the printer before printing a
+modify.help:	user's files. You do not have to give a printer type,
+modify.help:	though.
+modify.help:	
+modify.help:	[Types of files printable without filtering ...]
+modify.help:	You are expected to identify the types of files the printer
+modify.help:	can handle directly, without filtering. If the name of the
+modify.help:	printer type is sufficient here, then you don't have to
+modify.help:	enter anything. However, some printers can accept several
+modify.help:	types because they convert them automatically into a common
+modify.help:	type or in some other way understand the different control
+modify.help:	sequences in each type. You should list all the types the
+modify.help:	printer can handle.
+modify.help:	
+modify.help:	An important type on UNIX systems is identified by the word
+modify.help:	"simple"; this is a file type often found on UNIX systems
+modify.help:	because the files contain only linefeeds and perhaps tabs
+modify.help:	and backspaces. If the printer can accept "simple" files,
+modify.help:	give that name here.
+modify.help:	
+modify.help:	Separate several names with commas.
+modify.help:	
+modify.help:	[Printer interface to use ...]
+modify.help:	You are expected to identify the interface program that
+modify.help:	should be used with this printer. The interface program is
+modify.help:	responsible, before each print request, for: setting up the
+modify.help:	port to which the printer is attached (but not dialing a
+modify.help:	modem or connecting to a network); initializing the printer
+modify.help:	and setting the correct page size, printing pitch, and
+modify.help:	character set; printing a banner page; and controlling the
+modify.help:	number of copies printed.
+modify.help:	
+modify.help:	You can enter one of four values: the word "standard" if
+modify.help:	the standard interface program is to be used; the name of
+modify.help:	another model that should be used as the basis for the
+modify.help:	interface program (not recommended unless you have added
+modify.help:	your own models); the name of another printer to specify the
+modify.help:	same interface program used with it; or the FULL path name
+modify.help:	of a program you have provided as an interface program.
+modify.help:	
+modify.help:	[Can a user skip the banner page? ...]
+modify.help:	Enter "yes" if a user can skip the printing of a
+modify.help:	banner page before his or her request, or "no" if
+modify.help:	not. It is generally a good idea to require the printing of
+modify.help:	banner pages, because it will help the people who have to
+modify.help:	separate output into individual print-outs for each user,
+modify.help:	unless you have some other means of doing this. There are
+modify.help:	cases, such as the printing of checks, where being able to
+modify.help:	turn off the banner page is important.
+modify.help:	
+modify.help:	[Use the default page size and printing pitch? ...]
+modify.help:	Enter "yes" if you will accept the default pitch
+modify.help:	and size or don't want to change them. Enter "no"
+modify.help:	if you want to specify the line or character spacing
+modify.help:	(printing pitch) or page size that should be in effect when
+modify.help:	users' files are printed. Note that any defaults you give
+modify.help:	here will be used only if a user does not print on a form or
+modify.help:	does not specify an alternate page size or print spacing.
+modify.help:	
+modify.help:	If you do not specify the defaults, the defaults will be
+modify.help:	those provided by the printer after it has been initialized.
+modify.help:	Typically this is 10 characters per inch, 6 lines per inch,
+modify.help:	and 80 or 132 columns by 66 lines, but this is NOT
+modify.help:	guaranteed. If you aren't sure that the defaults will be
+modify.help:	adequate, enter "yes" and specify them.
+modify.help:	
+modify.help:	[Enter a command to run to alert you when the printer faults ...]
+modify.help:	You are expected to enter the type of alert that should be
+modify.help:	issued when the printer has a problem. Enter leave this field blank if you
+modify.help:	don't want to be alerted, otherwise: enter "mail" if you
+modify.help:	want mail sent to you; enter "write" if you want a message
+modify.help:	written to your terminal; or enter a shell command to be
+modify.help:	run each time an alert is to be made.
+modify.help:	
+modify.help:	[How often should you be alerted ...]
+modify.help:	You are expected to enter the number of minutes that should
+modify.help:	elapse between repeated alerts. To keep you informed that a
+modify.help:	problem still exists, the Line Printer Service will keep issuing
+modify.help:	alerts until the problem has been fixed. Entering ONCE will
+modify.help:	mean you want to be alerted just once.
+modify.help:	
+modify.help:	[How should printing restart after you fix a printer fault? ...]
+modify.help:	You are expected to specify how the Line Printer Service should
+modify.help:	recover after a printer problem has been fixed. Enter
+modify.help:	"continue" if the printer is to continue printing at the top
+modify.help:	of the page where printing stopped. Enter "beginning" if it
+modify.help:	is to start at the beginning again. Enter "wait" if it is
+modify.help:	to leave the printer disabled and wait for someone to enable
+modify.help:	the printer again.
+modify.help:	
+modify.help:	WARNING
+modify.help:	The Line Printer Service requires the use of a filter to provide the ability
+modify.help:	to continue where printing stopped. If a filter capable of this is not
+modify.help:	being used when a printer stops with a problem, then you will be told in the
+modify.help:	alert message printing won't continue where it left off if you had wanted it
+modify.help:	to.
+modify.help:	
+modify.help:	[If the printer is directly connected, enter the port to use.]
+modify.help:	If this printer is directly connected, you must identify
+modify.help:	which port is used. The names are typically like
+modify.help:	"/dev/contty," "/dev/tty23," etc., but will depend on the
+modify.help:	configuration of your system.
+modify.help:	
+modify.help:	If this printer is connected through a network, you must
+modify.help:	specify the dialing instructions to use to connect to the
+modify.help:	printer. The Basic Networking Utilities will be used for
+modify.help:	all network connections. Enter the same argument (a phone
+modify.help:	number or system name) you would give with the "cu" shell
+modify.help:	command to reach the printer. (Don't give any of the "cu"
+modify.help:	options.) You will have to set up the Basic Networking
+modify.help:	configuration for this to work.
+modify.help:	
+modify.help:	[Is the printer directly connected? ...]
+modify.help:	Enter "yes" if this printer directly connected to this system.  Enter
+modify.help:	"no" if this printer is connected through a network.
+modify.help:	
+modify.help:	[Is the printer also a login terminal? ...]
+modify.help:	Enter "yes" if this printer is also used as a
+modify.help:	login terminal by someone, or enter "no"
+modify.help:	
+modify.help:	[List the print wheels you have available for this printer:...]
+modify.help:	You are expected to enter the list of print wheels or font
+modify.help:	cartridges that are available for this printer. You can
+modify.help:	choose whatever names you want, as long as they are composed
+modify.help:	of letters, digits, and underscores and are 14 characters
+modify.help:	long or less. However, you should use names consistently:
+modify.help:	If another printer has a print wheel or cartridge that is
+modify.help:	similar enough that users won't care about the difference,
+modify.help:	name them the same.
+modify.help:	
+modify.help:	If you don't list the print wheels or cartridges available
+modify.help:	for this printer, the Line Printer Service will assume that none
+modify.help:	can be used on it. Print requests for a print wheel or
+modify.help:	cartridge not listed here will be refused UNLESS you first
+modify.help:	mount it on the printer. (Giving a list here will not
+modify.help:	restrict you from mounting other print wheels or cartridges
+modify.help:	on the printer.)
+modify.help:	
+modify.help:	[Map these names into aliases ...]
+modify.help:	You are expected to list aliases for the character sets defined for this
+modify.help:	printer, mapping each one to a name defined in the Terminfo database for
+modify.help:	this type of printer. You don't have to give a list here, because the Line Printer Service will use the list given in the Terminfo database, or will
+modify.help:	use the names "cs0", "cs1", "cs2", etc., as alternatives to real names.
+modify.help:	However, the names given in the Terminfo database may not be consistent
+modify.help:	across all printers, and the names "cs0", etc. are not descriptive, so
+modify.help:	users may be confused.
+modify.help:	
+modify.help:	You can help avoid this confusion by listing the names you would like
+modify.help:	people to use on your system. If you have a mix of printers of different
+modify.help:	styles, some that take print wheels, some that take font cartridges, and
+modify.help:	some that have selectable character sets, you can give the same names for
+modify.help:	the print wheels, cartridges, and character sets that print sufficiently
+modify.help:	similar.
+modify.help:	
+modify.help:	If you enter a list, separate names with commas.
+modify.help:	
+modify.help:	[List the users who are denied access to this printer...]
+modify.help:	You are expected to list the users who are NOT allowed to
+modify.help:	use this printer. Please give the login names or user-ID's of the users,
+modify.help:	not their proper names. Separate several names with commas.
+modify.help:	
+modify.help:	If you've already given a list of users, any names you give
+modify.help:	now will be ADDED to the list; if you want to allow someone
+modify.help:	who's already been denied, leave this field blank and enter their name
+modify.help:	in the next. If it is easier to specify access
+modify.help:	restrictions by listing just those who ARE allowed to use
+modify.help:	the printer, leave this field blank and fill in the next.
+modify.help:	
+modify.help:	You can deny EVERYBODY by entering the word "all."
+modify.help:	
+modify.help:	[List the users who are allowed access to this printer ...]
+modify.help:	You are expected to list the users who ARE allowed to use
+modify.help:	this form. Please give the login names or user-ID's of the users, not
+modify.help:	their proper names. Separate several names with commas.
+modify.help:	
+modify.help:	If you've already given a list of users, any names you give
+modify.help:	now will be ADDED to the list; if you want to deny someone
+modify.help:	who's already been allowed, enter their name in the previous field.
+modify.help:	
+modify.help:	You can allow EVERYBODY by entering the word "all."
+modify.help:	
+modify.help:	[List the forms that can't be used with this printer ...]
+modify.help:	You are expected to list the forms that are NOT allowed to
+modify.help:	be used with this printer. Separate several names with
+modify.help:	commas.
+modify.help:	
+modify.help:	If you've already given a list of forms, any names you give
+modify.help:	now will be ADDED to the list; if you want to allow a form
+modify.help:	that's already been denied, enter it's name in the next.
+modify.help:	If it is easier to specify access restrictions by listing
+modify.help:	just those forms that ARE allowed with the printer,
+modify.help:	leave this field blank and fill in the next.
+modify.help:	
+modify.help:	You can deny ALL forms by entering the word "all."
+modify.help:	
+modify.help:	[List the forms that can be used with this printer ...]
+modify.help:	You are expected to list the forms that are allowed to
+modify.help:	be used with this printer. Separate several names with commas.
+modify.help:	
+modify.help:	If you've already given a list of forms, any names you give
+modify.help:	now will be ADDED to the list; if you want to deny a form
+modify.help:	that's already been allowed,  enter it's name in the previous field.
+modify.help:	You can allow ALL forms by entering the word "all."
+remove.help:ABSTRACT:
+remove.help:	[GENERAL]
+remove.help:	You use the "remove" task to remove a printer from the
+remove.help:	print service. No more print requests will be accepted for
+remove.help:	it, no more files will be printed on it, and the
+remove.help:	configuration information will be destroyed. However, if
+remove.help:	there are print requests currently queued for the printer,
+remove.help:	you cannot remove it.
+remove.help:	
+remove.help:	[Enter the name of the printer ...]
+remove.help:	You are expected to enter the name of the printer you want
+remove.help:	to remove. You CANNOT remove a printer that
+remove.help:	currently has print requests queued. These will have to be
+remove.help:	allowed to finish printing.
+remove.help:	Use the "reject" task in the "operations" menu to reject
+remove.help:	further print requests for this printer.

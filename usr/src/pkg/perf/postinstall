@@ -1,0 +1,20 @@
+#ident	"@(#)pkg.perf:perf/postinstall	1.5"
+#
+# Install profiler driver and create the node for it
+#
+MASTER=/etc/master.d
+BOOT=/boot
+
+installf $PKGINST $BOOT/PRF f || exit 2
+installf $PKGINST $MASTER/prf f || exit 2
+
+MAJOR=`/usr/sbin/drvinstall -m $MASTER/prf -d $BOOT/PRF -v 1.0` || exit 2
+
+installf $PKGINST /dev/prf c $MAJOR 0 644 root sys || exit 2
+
+# Create /usr/options file for upward comparatability
+
+
+installf -f $PKGINST || exit 2
+
+exit 0

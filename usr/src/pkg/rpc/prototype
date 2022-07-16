@@ -1,0 +1,79 @@
+#ident	"@(#)pkg.rpc:prototype	1.29"
+
+# packaging files
+i pkginfo
+i depend
+i postinstall
+i preremove
+
+# directory references
+!default		775	root	sys
+d none	/boot		?	?	?
+d none	/etc		?	?	?
+d none	/etc/net	755	root	sys
+d none	/etc/net/ticots	755	root	sys
+d none	/etc/net/ticotsord	755	root	sys
+d none	/etc/net/ticlts	755	root	sys
+d none	/etc/master.d	?	?	?
+d none	/usr		?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/sbin	?	?	?
+d none	/usr/lib	?	?	?
+
+!default 555 bin bin
+e none	/boot/KRPC=/usr/src/uts/3b2/rpc/KRPC
+e none	/boot/KTLI=/usr/src/uts/3b2/ktli/KTLI
+e none	/boot/IDES=/usr/src/uts/3b2/des/IDES
+
+! default 444 root root
+e none	/etc/master.d/krpc=/usr/src/uts/3b2/master.d/krpc
+e none	/etc/master.d/ktli=/usr/src/uts/3b2/master.d/ktli
+e none	/etc/master.d/ides=/usr/src/uts/3b2/master.d/ides
+
+!default 444 root sys
+f none  /etc/init.d/rpc
+l none  /etc/rc0.d/K50rpc=/etc/init.d/rpc
+l none  /etc/rc1.d/K50rpc=/etc/init.d/rpc
+l none  /etc/rc2.d/S75rpc=/etc/init.d/rpc
+
+#administrative files for yp and loopback drivers
+!default	0644	root	sys
+f	none	/etc/publickey
+f	none	/etc/netid
+f	none	/etc/rpc 
+f	none	/etc/slaves 
+f	none	/etc/masters 
+
+!default	0555	root	sys
+
+# package objects:
+!default 555 bin bin
+f none	/usr/sbin/rpcbind
+f none	/usr/lib/librpcsvc.a
+f none	/usr/bin/rpcgen
+f none	/usr/bin/rpcinfo
+f none	/usr/lib/netsvc/rwall/rpc.rwalld
+f none	/usr/lib/netsvc/rusers/rpc.rusersd
+f none	/usr/lib/netsvc/spray/rpc.sprayd
+f none	/usr/sbin/keyenvoy 04555 root sys
+f none	/usr/sbin/rwall
+f none	/usr/bin/rusers
+f none	/usr/sbin/spray
+f none	/usr/sbin/keyprop
+f none	/usr/bin/chkey
+f none	/usr/sbin/newkey 0555 root sys
+f none	/usr/bin/domainname
+f none	/usr/bin/keylogin
+f none	/usr/sbin/keyserv 0555 root sys
+
+#	header files
+#
+!default 0444 bin bin
+f none	/usr/include/rpcsvc/mount.h=/usr/src/head/rpcsvc/mount.h
+f none	/usr/include/rpcsvc/rusers.h=/usr/src/head/rpcsvc/rusers.h
+f none	/usr/include/rpcsvc/rwall.h=/usr/src/head/rpcsvc/rwall.h
+f none	/usr/include/rpcsvc/spray.h=/usr/src/head/rpcsvc/spray.h
+f none	/usr/include/rpcsvc/yp_prot.h=/usr/src/head/rpcsvc/yp_prot.h
+f none	/usr/include/rpcsvc/ypclnt.h=/usr/src/head/rpcsvc/ypclnt.h
+f none	/usr/include/rpcsvc/ypupd.h=/usr/src/head/rpcsvc/ypupd.h
+f none	/usr/include/rpcsvc/dbm.h=/usr/src/head/rpcsvc/dbm.h

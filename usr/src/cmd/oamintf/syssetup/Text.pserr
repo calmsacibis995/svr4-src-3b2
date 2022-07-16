@@ -1,0 +1,29 @@
+#ident	"@(#)oamintf:syssetup/Text.pserr	1.1"
+################################################################################
+#	Module Name: Text.pserr	FROM user:add:apswdnok
+################################################################################
+Title="Errors Defining User Password Information"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+lifetime=shortterm
+
+close=`rm /tmp/pswdchk`
+
+rows=6
+columns=75
+
+text="	
+An error occurred attempting to define password:
+
+   `readfile /tmp/pswdchk`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=OPEN TEXT $OBJ_DIR/Text.setup2

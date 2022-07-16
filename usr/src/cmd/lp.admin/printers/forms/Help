@@ -1,0 +1,397 @@
+#ident	"@(#)lp.admin:printers/forms/Help	1.2"
+ABSTRACT:
+	[GENERAL]
+	The "forms" menu gives you several tasks: for adding new
+	preprinted forms to the print service; for changing form
+	definitions; for mounting forms on printers; for adjusting
+	the alerting schedule for unmounted forms; and for examining
+	the forms recognized by the print service.
+	
+	Preprinted forms, by the way, include the various kinds of
+	paper stock you may want to use in your printers. The Line Printer Service lets you define enough of the form so that the
+	print service can prescreen users' requests, route users'
+	print requests to the proper destination, caution against
+	using a form with the wrong printer, and remind you that it
+	is time to mount a new form.
+	
+add.help:ABSTRACT:
+add.help:	[GENERAL]
+add.help:	You use the "add" task to add a new
+add.help:	preprinted form to the Line Printer Service. A preprinted
+add.help:	form is the special paper you want to print on such as blank
+add.help:	checks, blank vouchers, labels, company letter-head, etc.
+add.help:	By telling the Line Printer Service a few details about the
+add.help:	forms you'll be using, the service will keep track of them
+add.help:	and will: alert you when a form needs to be mounted, verify
+add.help:	that a printer can handle a form, and initialize a printer
+add.help:	to print correctly on the form.
+add.help:	
+add.help:	[Name of form:]
+add.help:	You are expected to enter the name of the new form. You
+add.help:	should choose any name that makes sense to you and will be
+add.help:	understood by your users, as long as you limit it to 14
+add.help:	characters or less, and use only letters, digits, and
+add.help:	underscores. You must name every form you add to the print
+add.help:	service.
+add.help:	
+add.help:	[Page length:]
+add.help:	You are expected to enter a number, possibly followed by a
+add.help:	"i" or "c", that specifies the length of the page on which
+add.help:	to print. A trailing "i" would scale the number to inches,
+add.help:	a trailing "c" would scale it to centimeters; leaving out
+add.help:	either letter means the value is the number of lines.
+add.help:	
+add.help:	[Page width:]
+add.help:	You are expected to enter a number, possibly followed by a
+add.help:	"i" or "c", that specifies the width of the page on which
+add.help:	to print. A trailing "i" would scale the number to inches,
+add.help:	a trailing "c" would scale it to centimeters; leaving out
+add.help:	either letter means the value is the number of columns.
+add.help:	
+add.help:	[Lines Per Inch:]
+add.help:	You are expected to enter a number, possibly followed by a
+add.help:	"i" or "c", that specifies the line spacing (line pitch) to
+add.help:	be used to print your files. A trailing "i" would scale the
+add.help:	number to lines per inch, a trailing "c" would scale it to
+add.help:	lines per centimeter; leaving out either letter also scales
+add.help:	it to lines per inch.
+add.help:	
+add.help:	[Characters Per Inch:]
+add.help:	You are expected to enter a number, possibly followed by a
+add.help:	"i" or "c", that specifies the column spacing (character
+add.help:	pitch) to be used to print your files. A trailing "i" would
+add.help:	scale the number to columns per inch, a trailing "c" would
+add.help:	scale it to columns per centimeter; leaving out either
+add.help:	letter also scales it to columns per inch.
+add.help:	
+add.help:	[Number of pages in the form:]
+add.help:	You are expected to enter a single number that gives the
+add.help:	length of the form in pages. This information is only used
+add.help:	to truncate alignment patterns to fit on a single form.
+add.help:	
+add.help:	[Character set to use with the form:]
+add.help:	If a particular character set, print wheel, or font
+add.help:	cartridge should be used when printing files on this form,
+add.help:	enter its name here. You define the ones available when you
+add.help:	add printers. This name will be used to automatically
+add.help:	select a character set when the form is used on a printer
+add.help:	that has selectable character sets, or will be used in a
+add.help:	message to you when the Line Printer Service reminds you to
+add.help:	mount the form.
+add.help:	
+add.help:	If you leave this field blank, it will be assumed that any font may be
+add.help:	used with this form.
+add.help:	
+add.help:	[Mandatory or optional character set:]
+add.help:	If you enter "mandatory" the character set you named in
+add.help:	the previous field will be required when the form is used.
+add.help:	Otherwise, enter "optional" and the character set will be
+add.help:	recommended only. The difference is that if the set is
+add.help:	mandatory, a user cannot override the choice; if it is not
+add.help:	mandatory, the character set named will be used by default,
+add.help:	but a user can pick a different one to print his or her
+add.help:	files.
+add.help:	
+add.help:	[Ribbon color to use with the form:]
+add.help:	You should enter the color of ribbon that should be used
+add.help:	when printing on this form. This is informational only; it
+add.help:	will be shown when you are reminded to mount a form. Please
+add.help:	limit the name of the color to 14 letters, digits, and
+add.help:	underscores.
+add.help:	
+add.help:	[Enter a one-line description of this form for your users:]
+add.help:	You are expected to enter a single line of text that will be
+add.help:	displayed to people whenever they ask for a description of
+add.help:	the form. It's a good idea to keep it short so that it will
+add.help:	fit across the screen.
+add.help:	
+add.help:	[Enter the name of a file containing an alignment pattern:]
+add.help:	You are expected to enter the name of a file that contains a
+add.help:	sample print-out that can be used to help you align the form
+add.help:	in a printer. When you mount the form later, you can ask to
+add.help:	get this file printed repeatedly, with a pause between
+add.help:	forms, so that you can adjust the printer until the print-
+add.help:	out looks correct on the form.
+add.help:	
+add.help:	WARNING
+add.help:	The file you give will be printed as an alignment pattern EXACTLY as it
+add.help:	looks now. You should prepare the file so that no sensitive data is shown.
+add.help:	A copy of the file will be stored safely on disk so no other user can see
+add.help:	it, but sensitive data or real data that is printed as an alignment pattern
+add.help:	may be a problem.
+add.help:	
+add.help:	Just leave this field blank if you don't want an alignment pattern.
+add.help:	
+add.help:	[What type of file is this?:]
+add.help:	So that the alignment pattern in the file you just gave can
+add.help:	be properly printed, you should enter its type. The type
+add.help:	name you give will be used to ensure that the alignment
+add.help:	pattern will be reproduced correctly on the printer where
+add.help:	the form is mounted. The Line Printer Service will use a filter
+add.help:	to do this if necessary and one is available.
+add.help:	
+add.help:	Your choice of type here should conform to the type of
+add.help:	printer, types of files acceptable by the printers, or types
+add.help:	acceptable to the filters, that you have on your system.
+add.help:	
+add.help:	[Enter a command to run to alert you when the form needs mounting:]
+add.help:	You are expected to enter: the word "mail" if you want a
+add.help:	message mailed to you when the form needs to be mounted; the
+add.help:	word "write" if you want the message sent to whatever
+add.help:	terminal you are logged in to; or leave this field blank if you
+add.help:	don't want to be reminded. You can also give a shell
+add.help:	command if you want to be reminded but not by mail or a
+add.help:	written message, or if you want someone else notified.
+add.help:	
+add.help:	For instance, if you want a message written to the user
+add.help:	"pat" enter the following:
+add.help:	
+add.help:	write pat
+add.help:	
+add.help:	[How many print requests should be waiting before you are alerted?:]
+add.help:	You are expected to enter a single number that gives the
+add.help:	size the queue for this form should reach before you are
+add.help:	reminded to mount the form. Enter a "1" if you want to be
+add.help:	reminded as soon as someone submits a print request for this
+add.help:	form.
+add.help:	
+add.help:	[How frequently should you be alerted?:]
+add.help:	You are expected to enter the number of minutes that should
+add.help:	elapse between repeated reminders. To keep you informed
+add.help:	that a form still needs to be mounted, the Line Printer Service
+add.help:	will keep issuing reminders until the form is mounted (or
+add.help:	enough print requests needing the form have been canceled or
+add.help:	changed to use a different form). Entering ONCE will mean you
+add.help:	want to reminded just once.
+add.help:	
+add.help:	[List the users who are denied access to this form:]
+add.help:	You are expected to list the users who are NOT allowed to
+add.help:	use this form. Please give the login names or user-ID's of the users,
+add.help:	not their proper names. Separate several names with commas.
+add.help:	
+add.help:	If it is easier to specify access
+add.help:	restrictions by listing just those who ARE allowed to use
+add.help:	the form, leave this field blank and fill in the next.
+add.help:	
+add.help:	You can deny EVERYBODY by entering the word "all."
+add.help:	
+add.help:	[List the only users who are allowed access to this form:]
+add.help:	You are expected to list the users who ARE allowed to use
+add.help:	this form. Please give the login names or user-ID's of the users, not
+add.help:	their proper names. Separate several names with commas.
+add.help:	
+add.help:	You can allow EVERYBODY by entering the word "all."
+display.help:ABSTRACT:
+display.help:	[GENERAL]
+display.help:	You use the "display" task to see
+display.help:	the definitions of one or more forms. You can examine a
+display.help:	particular form, or can see all the forms on the system.
+display.help:	
+display.help:	[Enter form names:]
+display.help:	You are expected to enter the name of the form you'd like to
+display.help:	examine. You can enter the names of several forms by separating the
+display.help:	names with commas.
+menu.help:ABSTRACT:
+menu.help:	[GENERAL]
+menu.help:	The "forms" menu gives you several tasks: for adding new
+menu.help:	preprinted forms to the print service; for changing form
+menu.help:	definitions; for mounting forms on printers; for adjusting
+menu.help:	the alerting schedule for unmounted forms; and for examining
+menu.help:	the forms recognized by the print service.
+menu.help:	
+menu.help:	Preprinted forms, by the way, include the various kinds of
+menu.help:	paper stock you may want to use in your printers. The Line Printer Service lets you define enough of the form so that the
+menu.help:	print service can prescreen users' requests, route users'
+menu.help:	print requests to the proper destination, caution against
+menu.help:	using a form with the wrong printer, and remind you that it
+menu.help:	is time to mount a new form.
+menu.help:	
+modify.help:ABSTRACT:
+modify.help:	[GENERAL]
+modify.help:	You use the "modify" task to modify the definition of a
+modify.help:	form. The same information you gave when you added the form
+modify.help:	will provide the defaults for each item you are asked to
+modify.help:	respecify, so you can quickly step through the definition to
+modify.help:	find the item you want to modify.
+modify.help:	
+modify.help:	[Name of form:]
+modify.help:	You are expected to enter the name of the form you want to
+modify.help:	modify. If you don't know the name, press CHOICES for a
+modify.help:	list of known forms.
+modify.help:	
+modify.help:	[Page length:]
+modify.help:	You are expected to enter a number, possibly followed by a
+modify.help:	"i" or "c", that specifies the length of the page on which
+modify.help:	to print. A trailing "i" would scale the number to inches,
+modify.help:	a trailing "c" would scale it to centimeters; leaving out
+modify.help:	either letter means the value is the number of lines.
+modify.help:	
+modify.help:	[Page width:]
+modify.help:	You are expected to enter a number, possibly followed by a
+modify.help:	"i" or "c", that specifies the width of the page on which
+modify.help:	to print. A trailing "i" would scale the number to inches,
+modify.help:	a trailing "c" would scale it to centimeters; leaving out
+modify.help:	either letter means the value is the number of columns.
+modify.help:	
+modify.help:	[Lines Per Inch:]
+modify.help:	You are expected to enter a number, possibly followed by a
+modify.help:	"i" or "c", that specifies the line spacing (line pitch) to
+modify.help:	be used to print your files. A trailing "i" would scale the
+modify.help:	number to lines per inch, a trailing "c" would scale it to
+modify.help:	lines per centimeter; leaving out either letter also scales
+modify.help:	it to lines per inch.
+modify.help:	
+modify.help:	[Characters Per Inch:]
+modify.help:	You are expected to enter a number, possibly followed by a
+modify.help:	"i" or "c", that specifies the column spacing (character
+modify.help:	pitch) to be used to print your files. A trailing "i" would
+modify.help:	scale the number to columns per inch, a trailing "c" would
+modify.help:	scale it to columns per centimeter; leaving out either
+modify.help:	letter also scales it to columns per inch.
+modify.help:	
+modify.help:	[Number of pages in the form:]
+modify.help:	You are expected to enter a single number that gives the
+modify.help:	length of the form in pages. This information is only used
+modify.help:	to truncate alignment patterns to fit on a single form.
+modify.help:	
+modify.help:	[Character set to use with the form:]
+modify.help:	If a particular character set, print wheel, or font
+modify.help:	cartridge should be used when printing files on this form,
+modify.help:	enter its name here. You define the ones available when you
+modify.help:	add printers. This name will be used to automatically
+modify.help:	select a character set when the form is used on a printer
+modify.help:	that has selectable character sets, or will be used in a
+modify.help:	message to you when the Line Printer Service reminds you to
+modify.help:	mount the form.
+modify.help:	
+modify.help:	If you leave this field blank, it will be assumed that any font may be
+modify.help:	used with this form.
+modify.help:	
+modify.help:	[Mandatory or optional character set:]
+modify.help:	If you enter "mandatory" the character set you named in
+modify.help:	the previous field will be required when the form is used.
+modify.help:	Otherwise, enter "optional" and the character set will be
+modify.help:	recommended only. The difference is that if the set is
+modify.help:	mandatory, a user cannot override the choice; if it is not
+modify.help:	mandatory, the character set named will be used by default,
+modify.help:	but a user can pick a different one to print his or her
+modify.help:	files.
+modify.help:	
+modify.help:	[Ribbon color to use with the form:]
+modify.help:	You should enter the color of ribbon that should be used
+modify.help:	when printing on this form. This is informational only; it
+modify.help:	will be shown when you are reminded to mount a form. Please
+modify.help:	limit the name of the color to 14 letters, digits, and
+modify.help:	underscores.
+modify.help:	
+modify.help:	[Enter a one-line description of this form for your users:]
+modify.help:	You are expected to enter a single line of text that will be
+modify.help:	displayed to people whenever they ask for a description of
+modify.help:	the form. It's a good idea to keep it short so that it will
+modify.help:	fit across the screen.
+modify.help:	
+modify.help:	[Enter the name of a file containing an alignment pattern:]
+modify.help:	You are expected to enter the name of a file that contains a
+modify.help:	sample print-out that can be used to help you align the form
+modify.help:	in a printer. When you mount the form later, you can ask to
+modify.help:	get this file printed repeatedly, with a pause between
+modify.help:	forms, so that you can adjust the printer until the print-
+modify.help:	out looks correct on the form.
+modify.help:	
+modify.help:	WARNING
+modify.help:	The file you give will be printed as an alignment pattern EXACTLY as it
+modify.help:	looks now. You should prepare the file so that no sensitive data is shown.
+modify.help:	A copy of the file will be stored safely on disk so no other user can see
+modify.help:	it, but sensitive data or real data that is printed as an alignment pattern
+modify.help:	may be a problem.
+modify.help:	
+modify.help:	Just leave this field blank if you don't want an alignment pattern.
+modify.help:	
+modify.help:	[Type of file containing:]
+modify.help:	So that the alignment pattern in the file you just gave can
+modify.help:	be properly printed, you should enter its type. The type
+modify.help:	name you give will be used to ensure that the alignment
+modify.help:	pattern will be reproduced correctly on the printer where
+modify.help:	the form is mounted. The Line Printer Service will use a filter
+modify.help:	to do this if necessary and one is available.
+modify.help:	
+modify.help:	Your choice of type here should conform to the type of
+modify.help:	printer, types of files acceptable by the printers, or types
+modify.help:	acceptable to the filters, that you have on your system.
+modify.help:	
+modify.help:	[Enter a command to run to alert you when the form needs mounting:]
+modify.help:	You are expected to enter: the word "mail" if you want a
+modify.help:	message mailed to you when the form needs to be mounted; the
+modify.help:	word "write" if you want the message sent to whatever
+modify.help:	terminal you are logged in to; or leave this field blank if you
+modify.help:	don't want to be reminded. You can also give a shell
+modify.help:	command if you want to be reminded but not by mail or a
+modify.help:	written message, or if you want someone else notified.
+modify.help:	
+modify.help:	For instance, if you want a message written to the user
+modify.help:	"pat" enter the following:
+modify.help:	
+modify.help:	write pat
+modify.help:	
+modify.help:	[How many print requests should be waiting before you are alerted?:]
+modify.help:	You are expected to enter a single number that gives the
+modify.help:	size the queue for this form should reach before you are
+modify.help:	reminded to mount the form. Enter a "1" if you want to be
+modify.help:	reminded as soon as someone submits a print request for this
+modify.help:	form.
+modify.help:	
+modify.help:	[Frequency of alerts:]
+modify.help:	You are expected to enter the number of minutes that should
+modify.help:	elapse between repeated reminders. To keep you informed
+modify.help:	that a form still needs to be mounted, the Line Printer Service
+modify.help:	will keep issuing reminders until the form is mounted (or
+modify.help:	enough print requests needing the form have been canceled or
+modify.help:	changed to use a different form). Entering ONCE will mean you
+modify.help:	want to reminded just once.
+modify.help:	
+modify.help:	[List the users who are denied access to this form:]
+modify.help:	You are expected to list the users who are NOT allowed to
+modify.help:	use this form. Please give the login names or user-ID's of the users,
+modify.help:	not their proper names. Separate several names with commas.
+modify.help:	
+modify.help:	If you've already given a list of users, any names you give
+modify.help:	now will be ADDED to the list; if you want to allow someone
+modify.help:	who's already been denied, leave this field blank and enter their name
+modify.help:	in the next. If it is easier to specify access
+modify.help:	restrictions by listing just those who ARE allowed to use
+modify.help:	the form, leave this field blank and fill in the next.
+modify.help:	
+modify.help:	You can deny EVERYBODY by entering the word "all."
+modify.help:	
+modify.help:	[List the only users who are allowed access to this form:]
+modify.help:	You are expected to list the users who ARE allowed to use
+modify.help:	this form. Please give the login names or user-ID's of the users, not
+modify.help:	their proper names. Separate several names with commas.
+modify.help:	
+modify.help:	If you've already given a list of users, any names you give
+modify.help:	now will be ADDED to the list. You can allow EVERYBODY by
+modify.help:	entering the word "all."
+remove.help:ABSTRACT:
+remove.help:	[GENERAL]
+remove.help:	You use the "remove" task to remove a form from the print
+remove.help:	service. No more print requests will be accepted for it
+remove.help:	and the form definition will be destroyed. Any print
+remove.help:	requests currently queued to print on this form will be
+remove.help:	CANCELED.
+remove.help:	
+remove.help:	
+remove.help:	[Enter the names of the forms to remove:]
+remove.help:	You are expected to enter the name of the form you want to
+remove.help:	remove. You can give a list of forms to remove by
+remove.help:	separating the names with commas. If you don't
+remove.help:	know a form name, press CHOICES, to get a list of known forms.
+remove.help:	
+remove.help:	NOTE
+remove.help:	If any print requests are currently queued to print on the form(s), you will
+remove.help:	not be able to remove them.
+status.help:ABSTRACT:
+status.help:	[GENERAL]
+status.help:	You use the "forms" task to get a
+status.help:	list of all forms you have defined in the print service.
+status.help:	The report will include an indication of which printers the
+status.help:	forms are currently mounted on.

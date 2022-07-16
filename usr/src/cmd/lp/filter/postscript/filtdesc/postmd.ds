@@ -1,0 +1,6 @@
+Input types: matrix
+Output types: postscript
+Printer types: postscript
+Filter type: slow
+Command: /usr/lib/lp/postscript/postmd
+Options: PAGES * = -o*, COPIES * = -c*, LENGTH * = -l*, MODES portrait = -pp, MODES landscape = -pl, MODES group\= * = -n*, MODES x\= * = -x*, MODES y\= * = -y*, MODES magnify\= * = -m*, MODES dimen\= * = -d*, MODES interval\= * = -i*

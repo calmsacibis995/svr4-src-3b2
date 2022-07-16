@@ -1,0 +1,46 @@
+#ident	"@(#)oamintf:syssetup/Form.setup1	1.1"
+
+# Form.setup1 will ask for y/n on set up of time/date
+
+Form=Sets Up Machine Identification and Security
+
+`set -l setup=1`
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $OBJ_DIR/HELP/setup.help "the Setup Task"
+
+begrow=1
+begcol=1 
+
+done=`regex -v "$F3"
+	'y' 'OPEN FORM $OBJ_DIR/Form.datetime'
+	'n' 'OPEN FORM $OBJ_DIR/Form.setup2'`
+
+name="The first step is to set the timezone, date and time of the system."
+nrow=1
+ncol=1
+
+
+name="Current time and zone is: `date`"
+nrow=3
+ncol=1
+
+
+name="Do you want to change the time and zone? :"
+nrow=5
+ncol=1
+frow=5
+fcol=48
+rows=1
+columns=1
+value=n
+invalidmsg=const `erryorn`
+choicemsg=const `helpyorn`
+valid=`valyorn $F3`
+
+name=QUIT
+button=9
+action=`set -l setup=0`CLEANUP
+
+name=RESET
+button=10
+action=UPDATE

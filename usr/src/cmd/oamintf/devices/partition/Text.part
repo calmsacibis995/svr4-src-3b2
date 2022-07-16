@@ -1,0 +1,26 @@
+#ident	"@(#)oamintf:devices/partition/Text.part	1.2"
+
+################################################################################
+#	Module Name: Text.part
+################################################################################
+title="Disk Partitioning"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+rows=14
+columns=75
+
+text="
+The current partitioning of $ARG1:
+
+`prtvtoc -s $DEV`"
+
+altslks
+
+name=CONT
+button=11
+action=OPEN FORM $OBJ_DIR/Form.part $ARG1
+
+name=CANCEL
+button=14
+action=CLEANUP

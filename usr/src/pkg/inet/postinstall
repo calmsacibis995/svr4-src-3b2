@@ -1,0 +1,349 @@
+#ident	"@(#)pkg.inet:postinstall	1.24"
+#
+# Initialize FAILURE to 1 (fatal error)
+#
+FAILURE=1
+
+#
+# Install INET drivers
+# This takes awhile, so provide muzak via "echo"
+#
+BOOT=/boot
+MASTER=/etc/master.d
+SYSTEM=/etc/system
+CMAJOR=`/etc/drvinstall -d $BOOT/CLONE -v 1.0 -nb` || exit $FAILURE
+
+#
+# Create inet device subdir
+#
+if [ ! -d /dev/inet ]
+then
+	mkdir /dev/inet || exit $FAILURE
+fi
+
+echo "Installing APP module"
+installf $PKGINST $BOOT/APP f || exit $FAILURE
+installf $PKGINST $MASTER/app f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/APP -v 1.0` || exit $FAILURE
+
+echo "Installing ARP module"
+installf $PKGINST $BOOT/ARP f || exit $FAILURE
+installf $PKGINST $MASTER/arp f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/ARP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/arp c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+installf $PKGINST /dev/inet/arp c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+
+echo "Installing ICMP module"
+installf $PKGINST $BOOT/ICMP f || exit $FAILURE
+installf $PKGINST $MASTER/icmp f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/ICMP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/icmp c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+installf $PKGINST /dev/inet/icmp c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+
+echo "Installing IP module"
+installf $PKGINST $BOOT/IP f || exit $FAILURE
+installf $PKGINST $MASTER/ip f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/IP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/ip c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+installf $PKGINST /dev/inet/ip c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+
+echo "Installing LLCLOOP driver"
+installf $PKGINST $BOOT/LLCLOOP f || exit $FAILURE
+installf $PKGINST $MASTER/llcloop f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/LLCLOOP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/loop c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+installf $PKGINST /dev/inet/loop c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+
+echo "Installing RAWIP module"
+installf $PKGINST $BOOT/RAWIP f || exit $FAILURE
+installf $PKGINST $MASTER/rawip f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/RAWIP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/rawip c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+installf $PKGINST /dev/inet/rawip c $CMAJOR $MAJOR 0600 root other || exit $FAILURE
+
+echo "Installing TCP module"
+installf $PKGINST $BOOT/TCP f || exit $FAILURE
+installf $PKGINST $MASTER/tcp f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/TCP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/tcp c $CMAJOR $MAJOR 0666 root other || exit $FAILURE
+installf $PKGINST /dev/inet/tcp c $CMAJOR $MAJOR 0666 root other || exit $FAILURE
+#
+#	create explicit tcp sub-devices -- needed by uucp
+#
+for MINOR in 000 001 002 003 004 005 006 007 010 011 012 013 014 015 016 017 \
+ 020 021 022 023 024 025 026 027 030 031 032 033 034 035 036 037
+do
+	installf $PKGINST /dev/inet/tcp${MINOR} c $MAJOR $MINOR \
+		0666 root other || exit $FAILURE
+done
+
+echo "Installing UDP module"
+installf $PKGINST $BOOT/UDP f || exit $FAILURE
+installf $PKGINST $MASTER/udp f || exit $FAILURE
+MAJOR=`/etc/drvinstall -d $BOOT/UDP -v 1.0` || exit $FAILURE
+installf $PKGINST /dev/udp c $CMAJOR $MAJOR 0666 root other || exit $FAILURE
+installf $PKGINST /dev/inet/udp c $CMAJOR $MAJOR 0666 root other || exit $FAILURE
+
+
+
+#
+#	install tty compatibility module
+#
+echo "Installing TTCOMPAT module"
+installf $PKGINST $BOOT/TTCOMPAT f || exit $FAILURE
+installf $PKGINST $MASTER/ttcompat f || exit $FAILURE
+/etc/drvinstall -d $BOOT/TTCOMPAT -v 1.0 || exit $FAILURE
+
+
+#
+#	check for pseudo-terminals (need 'em for rlogin, etc)
+#
+if [ ! -c /dev/pts/0 -a -f /boot/PTEM -a -f /boot/PTM -a -f /boot/PTS ]
+then
+	#
+	# boot files are in place, but haven't installed devices.
+	# try to install 'em, but don't exit on failure
+	#
+	echo "Installing psuedo-terminals"
+
+	#
+	#	(re-)configure pseudo-terminal master device
+	#
+	PTNUM=8
+	MMAJOR=`/etc/drvinstall -m $MASTER/ptm -s $SYSTEM -o $BOOT \
+		-v 1.0 -c $PTNUM` &&
+	SMAJOR=`/etc/drvinstall -m $MASTER/pts -s $SYSTEM -o $BOOT \
+		-v 1.0`	&&
+	/etc/drvinstall -m $MASTER/ptem -s $SYSTEM -o $BOOT \
+		-v 1.0 -c $PTNUM >/dev/null &&
+	installf $PKGINST /dev/ptmx c $CMAJOR $MMAJOR \
+		0666 root other 
+
+	if [ $? -eq 0 ]
+	then
+		#
+		#	configure pseudo-terminal slave devices
+		#
+		TEMP=0
+		installf $PKGINST /dev/pts d 775 root sys &&
+		until [ "$TEMP" -eq "$PTNUM" ]
+		do
+	   		echo /dev/pts/$TEMP c $SMAJOR $TEMP \
+				0620 root tty
+	    		echo /dev/pts$TEMP=/dev/pts/$TEMP
+	    		TEMP=`expr $TEMP + 1`
+		done | installf $PKGINST -
+	fi
+fi
+
+
+if [ ! -c /dev/pts/0 ]
+then
+	echo "
+WARNING: pseudo-terminals have not been installed on this machine.
+Internet commands such as rlogin and rsh require psuedo-terminals.
+Psuedo-terminals are part of the Networking Support Utilities package;
+please re-install that package."
+
+fi
+
+
+#
+#	put the correct major # in the slink configuration script
+#	don't error out if this fails -- they can recover
+#
+if [ -f /etc/emd[0-9].addr ]
+then
+	# there might be multiple emd boards -- just set up the first one
+	# multiple board setup is too complicated to do here
+	for i in /etc/emd[0-9].addr
+	do
+		EMDMAJOR="`echo $i | sed -e 's%/etc/emd%%;s%.addr%%'`"
+		if [ ! -z "$EMDMAJOR" -a -c /dev/emd${EMDMAJOR} ]
+		then
+			echo "g/ emd 0/s// emd ${EMDMAJOR}/\nw\nq" >/tmp/.inet.eddd
+			ed -s /etc/inet/strcf </tmp/.inet.eddd
+			rm -f /tmp/.inet.eddd
+			break
+		fi
+	done
+else
+	echo "
+**WARNING** could not get the device number for emd.
+Before starting the TCP/IP network, edit /etc/inet/strcf and change
+the zero on this line:\n"
+	grep '/dev/emd emd 0' /etc/inet/strcf
+	echo "
+to the device (slot) number of your ethernet board.  After you've built
+a new kernel containing the ethernet driver, you may get this number by
+executing the command \"/etc/getmajor EMD\"\n"
+fi
+
+#
+#	add the appropriate entries to /etc/netconfig
+#
+
+if grep '[ 	]inet[ 	][ 	]*tcp[ 	][ 	]*/dev/tcp[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "tcp	tpi_cots_ord	v	inet	tcp	/dev/tcp	/usr/lib/tcpip.so,/usr/lib/resolv.so" >>/etc/netconfig
+fi
+
+if grep '[ 	]inet[ 	][ 	]*udp[ 	][ 	]*/dev/udp[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "udp	tpi_clts  	v	inet	udp	/dev/udp	/usr/lib/tcpip.so,/usr/lib/resolv.so" >>/etc/netconfig
+fi
+
+if grep '[ 	]inet[ 	][ 	]*icmp[ 	][ 	]*/dev/icmp[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "icmp	tpi_raw  	-	inet	icmp	/dev/icmp	/usr/lib/tcpip.so,/usr/lib/resolv.so" >>/etc/netconfig
+fi
+
+if grep '[ 	]inet[ 	][ 	]*-[ 	][ 	]*/dev/rawip[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "rawip	tpi_raw  	-	inet	-	/dev/rawip	/usr/lib/tcpip.so,/usr/lib/resolv.so" >>/etc/netconfig
+fi
+
+#
+#	Update the OAM Scripts to know about us...
+#
+
+if grep 'inet^Internet Protocols (TCP and UDP)^inet/Menu.inet' /usr/sadm/sysadm/menu/netservices/name_to_addr/map.menu >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "inet^Internet Protocols (TCP and UDP)^inet/Menu.inet" >>/usr/sadm/sysadm/menu/netservices/name_to_addr/map.menu
+fi
+
+
+#
+#	if the admin knows the ip address, put it in /etc/hosts
+#
+NODENAME=`uname -n`
+if [ ! -z "${NODENAME}" ]
+then
+	echo "
+Do you want to initialize the IP address for host ${NODENAME}? (y,n,?)  \c"
+	read ans
+	if [ "${ans}" = '?' ]
+	then
+		echo "
+The IP address is the address by which host ${NODENAME} will be known on the 
+Internet.
+These addresses must be administered by a central authority on your network.
+IP addresses are written as four decimal integers, separated by decimal points
+(e.g., 128.10.2.70).
+
+Do you want to initialize the IP address for host ${NODENAME}? (y,n)  \c"
+
+		read ans
+	fi
+	if [ "${ans}" = "y" ]
+	then
+		echo "
+Enter the IP address for host ${NODENAME}:  \c"
+		read ipaddr
+		# syntax checking too difficult here
+		if [ ! -z "${ipaddr}" ]
+		then
+			echo "${ipaddr}\t${NODENAME}" >>/etc/hosts
+			echo "
+Added \"${ipaddr}\t${NODENAME}\" to /etc/hosts"
+		fi
+	fi
+fi
+
+#
+#	if the admin knows the domain name, put it in /etc/named.boot
+#
+echo "
+Do you want to initialize the Internet domain name for host ${NODENAME}? (y,n,?)  \c"
+read ans
+if [ "${ans}" = '?' ]
+then
+	echo "
+The domain name is the complete name for host ${NODENAME} in the Internet
+domain name system.  For example, for a host 'frodo' in the computer
+science department at Perdue University, the domain name would be
+frodo.cs.purdue.edu.
+
+Do you want to initialize the Internet domain name for host ${NODENAME}? (y,n)  \c"
+	read ans
+fi
+if [ "${ans}" = "y" ]
+then
+	echo "
+Enter the Internet domain name for ${NODENAME}:  \c"
+	read dname
+	if [ ! -z "${dname}" ]
+	then
+		echo "domain\t${dname}" >>/etc/named.boot
+		echo "
+Added \"domain\t${dname}\" to /etc/named.boot"
+	fi
+fi
+
+
+#
+#	Add /dev/inet to /etc/ttysrch to speed up ttyname
+#
+echo "/dev/inet	MF" >>/etc/ttysrch
+
+#
+#	Create /etc/passwd and /etc/group entry for UID_NOBODY
+#	so in.fingerd can run
+#
+UID_NOBODY="`grep '^nobody:' /etc/passwd | cut -d: -f3`"
+GID_NOBODY="`grep '^nobody:' /etc/group | cut -d: -f3`"
+if [ -z "$UID_NOBODY" ]
+then
+	if [ -z "$GID_NOBODY" ]
+	then
+		passmgmt -a -c 'unprivileged user' -h /nonexistent \
+			-s /noshell nobody
+	else
+		# already have a group nobody -- use it
+		passmgmt -a -c 'unprivileged user' -h /nonexistent \
+			-s /noshell -g ${GID_NOBODY} nobody
+	fi
+	UID_NOBODY="`grep '^nobody:' /etc/passwd | cut -d: -f3`"
+fi
+if [ -z "$GID_NOBODY" -a ! -z "$UID_NOBODY" ]
+then
+	if cut -d: -f3 </etc/group | grep "^${UID_NOBODY}\$" >/dev/null
+	then
+		# already have group using nobody's uid
+		GID_NOBODY="`grep '^nobody:' /etc/passwd | cut -d: -f4`"
+	else
+		GID_NOBODY=$UID_NOBODY
+	fi
+	echo "nobody::${GID_NOBODY}:" >>/etc/group
+	passmgmt -m -g ${GID_NOBODY} nobody
+fi
+
+#
+#	Add root to list of users denied ftp access
+#
+echo "root" >>/etc/inet/ftpusers
+ln -s /etc/inet/ftpusers /etc/ftpusers
+
+#
+#	Create inetd as a port monitor.  Version doesn't matter
+#	since inetd doesn't usr _pmtab.
+#
+
+sacadm -a -p inetd -t inetd -c /usr/sbin/inetd -v 1 -y "internet daemon"
+
+#
+#	wrap up with installf -f  and exit message (required reboot)
+#
+
+installf -f $PKGINST
+exit 	10

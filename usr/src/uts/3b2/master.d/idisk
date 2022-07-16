@@ -1,0 +1,10 @@
+*#ident	"@(#)kernel:master.d/idisk	1.4"
+*
+* IDISK
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+rsbcn11	1	sd	17	1	11	
+						idiskmaj	( %i )	={ #M }
+						iddefect[IDDEFSZ] (%0x800)
+$$$
+IDDEFSZ =	2

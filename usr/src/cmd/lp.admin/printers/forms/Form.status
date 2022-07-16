@@ -1,0 +1,14 @@
+#ident	"@(#)lp.admin:printers/forms/Form.status	1.1"
+
+#######################################################
+#
+#       Module Name: printer_service/forms/Form.status
+#       Author: David C. Miller
+#       Date: July 1988
+#
+#######################################################
+
+form=Display Status of Forms
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $PRINTSERV/HELP/forms/status.help "Display Status of Forms"
+

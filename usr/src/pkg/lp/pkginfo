@@ -1,0 +1,20 @@
+#ident	"@(#)pkg.nlp:lp/ifiles/pkginfo	1.9"
+ARCH="3B2"
+# BASEDIR="/"
+CATEGORY="system"
+CLASSES="none bsd post cron OAMadmin OAMmif"
+# DESC=
+# EMAIL=
+# HOTLINE=
+# ISTATES=
+MAXINST=1
+NAME="Line Printer Utilities"
+# ORDER=
+PKG="lp"
+PREDEPEND="lp"
+# PSTAMP=
+# RSTATES=
+# ULIMIT=
+# VENDOR=
+# VERSION=
+# VSTOCK=

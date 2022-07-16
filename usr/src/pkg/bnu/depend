@@ -1,0 +1,5 @@
+#ident	"@(#)pkg.bnu:depend	1.1"
+#
+#	dependency file for Basic Networking Utilities
+#
+P usrenv User Environment Utilities

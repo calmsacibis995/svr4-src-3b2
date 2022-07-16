@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/ticots	1.2"
+* ticots TPI loopback transport provider
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fs	-	tco	-	-	-
+$$

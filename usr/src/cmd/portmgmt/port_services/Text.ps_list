@@ -1,0 +1,11 @@
+#ident	"@(#)portmgmt:port_services/Text.ps_list	1.3"
+
+title=List Port Services
+lifetime=shortterm
+text="`readfile $ARG1`
+
+   Press [CANCEL] to return to the port services list."
+columns=60
+rows=18
+#wrap=true
+`message "Press [CANCEL] to return to the port services list."`

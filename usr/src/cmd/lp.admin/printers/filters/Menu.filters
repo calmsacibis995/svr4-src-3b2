@@ -1,0 +1,33 @@
+#ident	"@(#)lp.admin:printers/filters/Menu.filters	1.2"
+menu=Manage Filters for Special Processing
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $!LININFO 
+
+
+name=add
+description=Add New Filters
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/filters/add \"Add New Filters\"" add
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/filters Form.add
+
+
+name=list
+description=Display Filter Information
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/filters \"Display Filter Information\"" list
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/filters Form.list
+
+
+name=modify
+description=Modify a Filter
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/filters \"Modify a Filter\"" modify
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/filters Form.modify
+
+
+name=remove
+description=Remove Filters
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/filters \"Remove Filters\"" remove
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/filters Form.remove
+
+name=restore
+description=Restore Filters to Factory Settings
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/filters \"Restore Filters\"" restore
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/filters Form.restore

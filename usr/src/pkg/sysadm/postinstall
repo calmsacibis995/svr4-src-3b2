@@ -1,0 +1,10 @@
+#ident	"@(#)pkg.sysadm:postinstall	1.7"
+cp /sbin/fsdb /usr/sbin/fsdb
+rm -f /etc/fsdb
+ln -s /usr/sbin/fsdb /etc/fsdb
+cp /etc/fs/s5/fsdb /usr/lib/fs/s5/fsdb
+cd /usr/lib/locale/C
+montbl montbl_C
+colltbl colltbl_C
+chrtbl chrtbl_C
+installf -f $PKGINST

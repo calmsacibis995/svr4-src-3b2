@@ -1,0 +1,3 @@
+#ident	"@(#)pkg.ipc:space	1.1"
+# need to reserve space for drvinstall
+/boot	100	4

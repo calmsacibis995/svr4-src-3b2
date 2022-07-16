@@ -1,0 +1,17 @@
+#ident	"@(#)pkg.lp:lp/r.filter	1.1"
+
+while read src dest
+do
+    [ "${src}" = "/dev/null" ] && continue
+
+    filter=`basename ${dest}`
+
+    lpfilter -x ${filter}
+
+    if [ $? -ne 0 ]
+    then
+	exit 2
+    fi
+done
+
+exit 0

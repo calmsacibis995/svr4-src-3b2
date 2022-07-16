@@ -1,0 +1,12 @@
+#ident	"@(#)oamintf:machinemgmt/machine.menu	1.4"
+#menu#Machine Configuration Display and Powerdown
+#life#permanent
+
+boot defaults^Assigns Boot Device Program^boot/Text.boot
+configuration^System Configuration Display^configmgmt/cfgmgmt.menu
+firmware^Stop All Running Programs and Enters Firmware Mode^firm/Text.firm
+floppy key^Creates a "Floppy Key" Removable Diskette^flpky/Text.flpky1
+monitor^Message Monitoring^placeholder^monitor/Text.monitor
+powerdown^Stops All Running Programs and Turns Off Machine^power/Text.power
+reboot^Stops All Running Programs and Reboots Machine^reboot/Text.reboot
+whos on^Displays List of Users Logged onto Machine^whoson/Text.whoson

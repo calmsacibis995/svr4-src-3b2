@@ -1,0 +1,14 @@
+*#ident	"@(#)emd:master.d/emd	1.5"
+*
+* EMD  3b2 streams driver
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fa 	1	emd	-	10	12
+						emd_nbds (%i) = {#C}
+						emd_maxdev (%i) = {#D}
+						inetstats (%i) = {INETSTATS}
+						emd_emd[#D] (%l%l%l%s%s%s%s)
+						emd_bd[#C] (%0x388)
+$$$
+*  provide stats for internet 'netstat' cmd if INETSTATS is set
+INETSTATS = 0

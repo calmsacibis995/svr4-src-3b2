@@ -1,0 +1,15 @@
+#ident	"@(#)pkg.inet:pkginfo	1.1"
+#
+# 	INET pkginfo
+#
+PKG="inet"
+NAME="internet utilities"
+ARCH="3B2"
+VERSION="1.0"
+CATEGORY="system,utilities"
+BASEDIR=""
+CLASSES="none build"
+PREDEPEND="inet"
+MAXINST="1"
+ISTATES="2"
+RSTATES="2"

@@ -1,0 +1,179 @@
+#ident	"@(#)bkrs:bkintf.d/backups/prototype	1.9"
+# Prototype file created by edsysadm on Wed Sep 21 08:45:51 MDT 1988
+!PKGSAV=/var/sadm/pkg/sysadm/save
+!PKGINST=sysadm
+!default 0644 root sys
+x OAMadmin $OAMBASE/add-ons ? ? ?
+x OAMadmin $OAMBASE/add-ons/$PKGINST 0755 root sys
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Form.backup
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/respond 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/respond/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/respond/Form.bkoper
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/respond/Text.bjpok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/respond/Text.bjpnok
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Form.full
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Form.oldfile
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Text.full
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Text.bkherr
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/full/Text.bkhok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Form.select
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Form.oldfile
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Text.select
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Text.bkherr
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/selective/Text.bkhok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/limit 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/limit/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/limit/Form.limit
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/limit/Text.limok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/limit/Text.limnok
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/add 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/add/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/add/Form.add
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/add/Text.addok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/add/Text.addnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Form.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Form.values
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Text.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Text.modok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/modify/Text.modnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/display 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/display/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/display/Text.display
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove/Text.remove
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove/Text.remok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove/Text.remnok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/reminder/remove/Form.remove
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/add 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/add/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/add/Form.add
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/add/Text.addok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/add/Text.addnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Form.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Form.values
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Text.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Text.modok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/modify/Text.modnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/display 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/display/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/display/Text.display
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove/Text.remove
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove/Text.remok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove/Text.remnok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/schedule/remove/Form.remove
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/Help
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/add 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/add/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/add/Form.add
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/add/Text.addok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/add/Text.addnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/display 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/display/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/display/Form.display
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/display/Text.display
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/display/Text.errs
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/remove 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/remove/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/remove/Form.remove
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/exception_list/remove/Text.remove
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Form.add
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Form.add2
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Menu.methods
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Text.addok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/add/Text.addnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Form.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Form.values
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Menu.methods
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Text.modok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/modify/Text.modnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/full 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/full/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/full/Form.full
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/full/Text.full
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/full/Text.errs
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove/Form.remove
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove/Form.values
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove/Text.remok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/remove/Text.remnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation/Form.rotate
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation/Form.values
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation/Text.rotok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/rotation/Text.rotnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/summary 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/summary/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/summary/Form.summary
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/summary/Text.summary
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/setup/summary/Text.errs
+#
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify/Form.modify
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify/Form.control
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify/Text.modok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/modify/Text.modnok
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/full 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/full/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/full/Text.full
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective/Menu.states
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective/Form.select
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective/Text.select
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/selective/Text.errs
+x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/limit 0755 root sys
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/limit/Help
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/limit/Form.limit
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/limit/Text.limok
+f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/status/limit/Text.limnok
+#
+d OAMmif $PKGSAV/intf_install 0644 root sys
+#
+f OAMmif $PKGSAV/intf_install/bkup.mi 0644 root sys

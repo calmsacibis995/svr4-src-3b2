@@ -1,0 +1,99 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+
+#ident	"@(#)mk::mksyshead	1.24"
+#
+#	Install UNIX System 'sys' header files
+#
+SRCDIR=${SRC:-$ROOT/usr/src}/uts
+TARGDIR=$ROOT/usr/include
+
+Chmod(){
+	DIRECTORY=$1
+	DIRS=`find $DIRECTORY -type d -print`
+	
+	for MODE in $DIRS
+	do	chmod 755 $MODE
+	done
+	
+	FILES=`find $DIRECTORY -type f -print`
+	
+	for MODE in $FILES
+	do	chmod 664 $MODE
+	done
+	
+	#	If native build then set owner and group
+	if [ "$ROOT" = "" ]
+	then
+		for OWN_GRP in $FILES $DIRS
+		do	chown bin $OWN_GRP
+			chgrp bin $OWN_GRP
+		done
+	fi
+}
+
+if vax
+then
+	MACH=vax
+elif pdp11
+then
+	MACH=pdp11
+elif u3b
+then
+	MACH=3b
+elif u3b2
+then
+	MACH=3b2
+elif u3b15
+then
+	MACH=3b15
+fi
+#
+for DIR in sys	$MACH/sys \
+		$MACH/vm \
+		$MACH/net \
+		$MACH/netinet \
+		$MACH/nfs \
+		$MACH/rpc \
+		$MACH/des \
+		$MACH/fs \
+		$MACH/klm
+do
+        TARGETBASE=`basename $DIR`
+	if [ -d $SRCDIR/$DIR ]
+	then 
+        	# Only remove headers from the specific target directory once!
+        	eval "
+		case $TARGETBASE in
+                	${PATTERN:-"NULL_PATTERN"})
+				# Already found, do not remove the target dir!
+                        	;;
+                	*)	
+				# First time found. Add base directory to the
+				# PATTERN variable so that it can be skipped
+				# if found again.
+                        	PATTERN=${PATTERN:+\"${PATTERN}|\"}${TARGETBASE}
+				if [ -d $TARGDIR/${TARGETBASE} ]
+				then
+					rm -fr $TARGDIR/${TARGETBASE}/[a-m]*
+					rm -fr $TARGDIR/${TARGETBASE}/*
+				else
+					mkdir $TARGDIR/$TARGETBASE
+				fi
+                        	;;
+        	esac
+		"
+		cd $SRCDIR/$DIR
+		echo "Installing the following files from $SRCDIR/$DIR:"; 
+		find ./ -type f -name "*.h" -print | cpio -pduv $TARGDIR/$TARGETBASE
+		# Set file and directory permissions
+		Chmod $TARGDIR/$TARGETBASE
+	fi
+done
+
+exit 0

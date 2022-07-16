@@ -1,0 +1,14 @@
+#ident	"@(#)pkg.ufs:ufs/postinstall	1.2"
+FAILURE=1		# exit code if anything goes wrong
+BOOT=/boot		# home of driver object modules
+MASTER=/etc/master.d
+
+installf $PKGINST $BOOT/UFS f || exit $FAILURE
+installf $PKGINST $MASTER/ufs f || exit $FAILURE
+
+PREDEPEND=ufs
+
+/etc/drvinstall -d $BOOT/UFS -v 1.0 || exit $FAILURE
+
+installf -f $PKGINST || exit $FAILURE
+exit 10			# indicates that the system should be rebooted

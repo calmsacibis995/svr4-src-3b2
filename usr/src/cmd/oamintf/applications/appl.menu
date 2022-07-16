@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:applications/appl.menu	1.2"
+#menu#Administration for Available Applications
+#help#appl.help^Application Management
+#life#permanent

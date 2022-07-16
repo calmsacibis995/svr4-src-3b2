@@ -1,0 +1,41 @@
+#ident	"@(#)pkg.rpc:postinstall	1.5.1.3"
+
+#------install drivers
+
+FAILURE=1		# exit code if anything goes wrong
+BOOT=/boot		# home of driver object modules
+MASTER=/etc/master.d
+
+/etc/drvinstall -d $BOOT/KRPC -v 1.0 || exit $FAILURE
+/etc/drvinstall -d $BOOT/KTLI -v 1.0 || exit $FAILURE
+/etc/drvinstall -d $BOOT/IDES  -v 1.0 || exit $FAILURE
+
+#-------update /etc/system
+
+
+ETCSYSTEM=/etc/system
+DES='INCLUDE:DES'
+IDES='INCLUDE:IDES'
+COMMENTOUT='*INCLUDE:IDES'
+
+if [ -f $ETCSYSTEM ]; then
+	if grep "$DES" $ETCSYSTEM >/dev/null 2>&1
+	then
+		if grep "$IDES" $ETCSYSTEM >/dev/null 2>&1
+		then
+		ed $ETCSYSTEM <<-!  >/dev/null 2>&1
+			g/$IDES/d
+			w
+			q
+		!
+		echo "$COMMENTOUT" >>$ETCSYSTEM 2>/dev/null 
+    		fi
+	fi
+	else
+		echo "**WARNING** ${PKGNAME} cannot install IDES entry in /etc/system."
+		echo "The entry will have to be added manually at a later time."
+	fi
+
+
+
+exit 10			# indicates that the system should be rebooted

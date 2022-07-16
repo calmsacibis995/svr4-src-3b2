@@ -1,0 +1,14 @@
+*#ident	"@(#)kernel:master.d/ufs	1.5"
+*
+* UFS
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+oxj	-	ufs	-	-	-
+						ufsname(%15c)= {NAMEUFS}
+						ufs_ninode(%l) = {UFSNINODE}
+						ndquot(%l) = {NDQUOT}
+$$$
+
+NAMEUFS = "ufs"
+UFSNINODE = 100
+NDQUOT = 200

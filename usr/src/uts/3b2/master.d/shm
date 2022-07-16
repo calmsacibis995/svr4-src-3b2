@@ -1,0 +1,27 @@
+*#ident	"@(#)kernel:master.d/shm	1.3"
+*
+* SHM
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ox	-	shm	-	-	-	ipc
+						shmsys(){nosys}
+						shmexec(){}
+						shmexit(){}
+						shmfork(){}
+						shmslp(){true}
+						shmtext(){}
+						shmem[SHMMNI] (%0x70)
+						shmmap[SHMMNI/2+2] (%l%l)
+						shminfo(%i%i%i%i)
+						      ={SHMMAX,
+							SHMMIN,
+							SHMMNI,
+							SHMSEG}
+						
+
+$$$
+
+SHMMAX	= 131072
+SHMMIN	= 1
+SHMMNI	= 100
+SHMSEG	= 6

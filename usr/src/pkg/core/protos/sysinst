@@ -1,0 +1,9 @@
+#ident	"@(#)pkgcore:protos/sysinst	1.2"
+
+d sysinst /inst 0775 root sys
+d sysinst /inst/final 0775 root sys
+f sysinst /inst/final/dgmon=/init/dgmon 0500 root root
+d sysinst /inst/final/etc 0775 root sys
+f sysinst /inst/final/etc/inittab=/etc/inittab 0664 bin bin
+f sysinst /inst/final/etc/system=/etc/system 0644 root sys
+f sysinst /inst/final/etc/mini_system=/etc/mini_system 0644 root sys

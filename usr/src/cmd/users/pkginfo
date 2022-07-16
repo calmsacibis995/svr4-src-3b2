@@ -1,0 +1,10 @@
+# ident	"@(#)users:pkginfo	1.2"
+#
+# This is the package info file for
+# the user command "users" in the user administration display facility.
+#
+#
+PKG="cfg"
+NAME="Configuration Display"
+VERSION="0.0"
+CATEGORY="system"

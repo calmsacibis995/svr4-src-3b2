@@ -1,0 +1,10 @@
+# ident	"@(#)logins:pkginfo	1.1"
+#
+# This is the package info file for
+# the user command "logins" in the user administration display facility.
+#
+#
+PKG="cfg"
+NAME="Configuration Display"
+VERSION="0.0"
+CATEGORY="system"

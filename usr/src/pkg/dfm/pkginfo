@@ -1,0 +1,23 @@
+#ident	"@(#)pkg.dfm:pkginfo	1.2"
+#
+# "must" parameters
+#
+
+PKG="dfm"
+PREDEPEND="dfm"
+ARCH="3B2"
+VERSION=""
+NAME="directory and file management utilities"
+CATEGORY="system"
+CLASSES="none"
+#if null, it should reset in the "request" file
+MAXINST="1"
+ISTATES="S 2"
+RSTATES="S 2"
+
+# "optional" parameters
+
+
+
+
+

@@ -1,0 +1,139 @@
+#ident	"@(#)cmd-3b2:inst/etc/instht	1.2"
+#
+# instht
+#
+# Create the unix which includes the driver for SCSI or CTC
+# (while booted from the hard disk).
+#
+
+. /inst/etc/define
+
+echo "\nChecking the hard disk file systems." >&2
+/etc/fs/s5/fsck -y -D -b ${ROOT_0}
+
+fstab < /etc/vfstab | while read dev rdev dir junk
+do
+	if [ ${dev} != ${STAND_0} ]
+	then
+		ignore /etc/fs/s5/fsck -y -D ${dev}
+		if fsinfo -s ${dev}
+		then
+			/etc/fs/s5/mount ${dev} ${dir}
+		else
+			echo "The ${dev} (${dir}) file system is corrupt." >&2
+			if [ "'${dir}'" = "'/usr'" ]
+			then
+				fstabmnt -u < /etc/vfstab
+				exit 1
+			else
+				continue
+			fi
+		fi
+	else
+		/etc/fs/bfs/fsck ${dev}
+		>/etc/mnttab
+		/etc/fs/bfs/mount ${dev} ${dir}
+	fi
+done
+
+ignore	rm -f /usr/admin/menu/usermgmt/modgroup  2> /dev/null
+
+cd /inst/final
+FILES="`find . -print`"
+echo "${FILES}" | cpio -pdmu /
+cd /
+
+mv /etc/system /stand
+mv /etc/mini_system /stand
+cd /stand
+for i in `echo *`
+do
+	if [ $i = system -o $i = mini_system ]
+	then
+		/usr/bin/ln -s /stand/$i /etc/$i
+	else
+		ignore rm -f /$i
+		/usr/bin/ln -s /stand/$i /$i
+	fi
+	cd /
+done
+sync
+
+cd /
+sync;sync;sync
+rm -f /etc/rc.d/setup < /dev/null
+
+#
+# Remove /dev/sad and remake 
+#
+
+rm -rf /dev/sad
+MAJOR=`/usr/sbin/drvinstall -d /boot/SAD -v 1.0`
+/usr/bin/mkdir /dev/sad
+/usr/bin/chmod 555 /dev/sad
+/sbin/mknod /dev/sad/admin c $MAJOR 1
+/usr/bin/chmod 600 /dev/sad/admin
+/sbin/mknod /dev/sad/user c $MAJOR 0
+/usr/bin/chmod 666 /dev/sad/user
+
+#
+# Remove /dev/log and remake
+#
+
+rm -rf /dev/log
+rm -rf /dev/conslog
+MAJOR=`/usr/sbin/drvinstall -d /boot/LOG -v 1.0`
+/sbin/mknod /dev/conslog c $MAJOR 0
+/usr/bin/chmod 620 /dev/conslog
+/sbin/mknod /dev/log c $MAJOR 5
+/usr/bin/chmod 640 /dev/log
+
+if [ -f /boot/DISP ]
+then
+	rm -f /boot/DISP
+fi
+
+#
+# update the /etc/boot_tab used by cunix
+#
+
+fstab < /etc/vfstab | while read dev rdev dir fstype fsckpass automnt flags
+do
+	if [ "'${dir}'" = "'/usr'" ]
+	then
+		echo "${dev} ${rdev} ${dir} ${fstype} ${fsckpass} ${automnt} ${flags}\n"
+	fi
+done	> /etc/boot_tab
+
+if [ ! -s /etc/boot_tab ]
+then
+	echo " '/usr' has to be mounted before cunix \n"
+	exit 1
+fi
+
+#
+# Creating a new unix which includes either CTC or SCSI driver
+#
+echo "\nCreating unix.\n\n"
+/usr/sbin/cunix -f /stand/mini_system -o /stand/unix -x
+
+chmod 755 /stand/unix
+chmod 755 /stand
+ignore rm /filledt /dgmon
+	
+# prepare for instt to take over.
+cp /inst/etc/inittabt /etc/inittab
+
+echo "\
+The system is restarting itself from the hard disk. This should
+take no more than five minutes. The installation procedure will
+then continue automatically." >&2
+
+#unmount all except /usr
+fstabmnt -u -s /usr < /etc/vfstab
+sync;sync;sync
+
+umount /usr > /dev/null 2>&1
+sync;sync;sync;
+
+exec uadmin 2 1

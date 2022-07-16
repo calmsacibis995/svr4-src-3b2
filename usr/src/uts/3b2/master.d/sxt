@@ -1,0 +1,8 @@
+*#ident	"@(#)kernel:master.d/sxt	1.3"
+*
+* STREAMS-SXT
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fs	-	nsxt	-	6
+						nsxt_cnt(%i) ={#D}
+

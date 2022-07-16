@@ -1,0 +1,27 @@
+/*#ident	"@(#)newoptim:tables/cpu.ops.int	1.4"*/
+
+G_ADD3
+G_ALS3
+G_AND3
+G_ARS3
+G_BIT
+G_CMP
+G_DIV3
+G_EXTF
+G_INSF
+G_LLS3
+G_LRS3
+G_MCOM
+G_MNEG
+G_MOD3
+G_MOV
+G_MOVA
+G_MUL3
+G_OR3
+G_POP
+G_PUSH
+G_PUSHA
+G_ROT
+G_SUB3
+G_SWAPI
+G_XOR3

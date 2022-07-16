@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/kmem	1.2"
+*
+* KMA - Kernel Memory Allocator module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ox	-	kma	-	-	-
+$$

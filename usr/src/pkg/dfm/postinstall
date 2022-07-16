@@ -1,0 +1,4 @@
+#ident	"@(#)pkg.dfm:postinstall	1.3"
+
+installf -f $PKGINST
+

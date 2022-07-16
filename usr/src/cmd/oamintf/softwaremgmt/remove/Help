@@ -1,0 +1,21 @@
+#ident	"@(#)oamintf:softwaremgmt/remove/Help	1.1"
+
+ABSTRACT:
+	This task removes software packages from the system or spooled
+	on a device.
+
+pkgloc: Software Location
+	Enter the word "installed" to indicate that you want to remove 
+	software which is currently installed on your system.  To remove 
+	software which is spooled, enter the device on which the software 
+	resides (e.g., "diskette1" or "9track1".)  To indicate the default 
+	spool directory, enter "spool".
+
+pkgid: Package Selection
+	Enter the word "all" to remove all packages.  If you wish to remove
+	a specific package, enter the package instance identifier (e.g., 
+	"spell" or "rfs").  You may enter multiple package identifiers by 
+	separating each one with a comma (e.g., "spell,rfs,windowing".)  To 
+	remove all instances of a particular package, use a wildcard format 
+	such as "dbase.*".
+

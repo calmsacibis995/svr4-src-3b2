@@ -1,0 +1,26 @@
+#ident	"@(#)bkrs:bkintf.d/backups/bksetup/summary/Help	1.2"
+
+ABSTRACT: Summary Report of Backup Table
+	The "summary" task displays a summary report of a backup table.  This
+	report displays the rotation period, current week, originating
+	device, tag, weeks, days, method, method options, priority and
+	destination device information from the backup table you specify.
+
+TITLE: Summary Report of Backup Table
+
+F1:
+	"Table:"  Enter the name of the backup table whose entries you want
+	to display.  You must enter a path to an existing file.
+
+F2:
+	"Week(s):"  Enter a list of week ranges  or the keyword "demand" or
+	the keyword "all".  This value will be used to filter the display.
+	Only entries with weeks values included in this field will be
+	displayed.
+
+F3:
+	"Day(s):"  Enter a list of day ranges or the keyword "all".  This
+	value will be used with the Weeks value to filter the display.  Only
+	those entries with days values included in this field will be
+	displayed.  Note that if the value "demand" is entered in the Weeks
+	field, no value may be entered in this field.

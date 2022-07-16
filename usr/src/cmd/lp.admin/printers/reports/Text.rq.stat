@@ -1,0 +1,42 @@
+#ident	"@(#)lp.admin:printers/reports/Text.rq.stat	1.2"
+
+#	Module Name: Text.rq.stat 
+
+title="Status of Print Requests" 
+`indicator -w;
+	set -l list="/tmp/lp.stq$VPID";
+	`
+close=`/usr/bin/rm $list;
+	unset -l list;
+	`
+
+begrow=36
+begrow=1
+rows=18
+columns=74
+scroll=true
+`
+	shell " 
+if [ "$ARG1" != 'all' -a -n "$ARG1" ];
+	then
+	lpstat -l -o$ARG1 > $list;
+	fi;
+if [ $ARG1 = 'all' -a $ARG2 != 'all' -a $ARG3 = 'all' ];
+	then
+	lpstat -o$ARG2  > $list;
+	fi;
+if [ $ARG1 = 'all' -a $ARG2 = 'all' -a $ARG3 != 'all' ];
+	then
+	lpstat -u$ARG3 > $list;
+	fi;
+if [ $ARG1 = 'all' -a $ARG2 != 'all' -a $ARG3 != 'all' ];
+	then
+	lpstat -o$ARG2 -u$ARG3 > $list;
+	fi;
+if [ $ARG1 = 'all' -a $ARG2 = 'all' -a $ARG3 = 'all' ];
+	then
+	lpstat -oall -l > $list;
+	fi;
+	"
+`
+text="`readfile $list`"

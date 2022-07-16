@@ -1,0 +1,16 @@
+#ident	"@(#)pkgcore:prototype	1.3"
+
+i pkginfo=ifiles/pkginfo
+i preinstall=ifiles/preinstall
+i postinstall=ifiles/postinstall
+
+!include protos/sysdir
+!include protos/sysinst
+!include protos/sysutil
+!include protos/kernel
+!include protos/term
+!include protos/inst
+!include protos/vtool
+!include protos/intrfc
+!include protos/config
+!include protos/oamadmin

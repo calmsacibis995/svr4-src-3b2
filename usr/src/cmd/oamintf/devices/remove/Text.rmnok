@@ -1,0 +1,25 @@
+#ident	"@(#)oamintf:devices/remove/Text.rmnok	1.1"
+################################################################################
+#	Module Name: Text.rmdisknok
+################################################################################
+Title="Errors Removing Disk"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+rows=6
+columns=75
+
+text="	
+An error occurred while attempting to remove $ARG1 from
+the system:
+	`readfile $ERR`"
+
+altslks
+
+name=CONT
+button=11
+action=CLOSE
+
+name=CANCEL
+button=14
+action=CLEANUP

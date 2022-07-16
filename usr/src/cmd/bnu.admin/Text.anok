@@ -1,0 +1,26 @@
+#ident	"@(#)bnu.admin:Text.anok	1.3"
+################################################################################
+#	Module Name: Text.anok
+################################################################################
+
+title="Add an Entry"
+
+altslks=TRUE
+
+`readfile $INTFBASE/display.msg | message -s`
+
+row=15
+columns=75
+
+begrow=current
+begcol=current
+
+text="
+
+   Entry was not added to the system."
+
+
+
+name=CANCEL
+button=14
+action=`unset -l BNU_NEWLN; unset -l BNU0; unset -l BNU1; unset -l BNU2; unset -l BNU3; unset -l BNU4; unset -l BNU5`CLOSE `getfrm` $ARG1

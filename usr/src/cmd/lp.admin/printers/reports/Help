@@ -1,0 +1,90 @@
+#ident	"@(#)lp.admin:printers/reports/Help	1.1"
+ABSTRACT:
+	[GENERAL]
+	The "status" menu gives you tasks for examining various
+	aspects of the print service. You can see what print wheels
+	and character sets are available, what forms are mounted,
+	what printers are active, and what print requests are
+	pending.
+fonts.help:ABSTRACT:
+fonts.help:	[GENERAL]
+fonts.help:	You use the "fonts" task to get a
+fonts.help:	list of print wheels, character sets, and loadable font
+fonts.help:	cartridges that you have defined on your system. This will
+fonts.help:	be a summary report made by examining all the printers for
+fonts.help:	which you've defined these. The report will include an
+fonts.help:	indication of which printers the print wheels or font
+fonts.help:	cartridges are currently mounted on.
+forms.help:ABSTRACT:
+forms.help:	[GENERAL]
+forms.help:	You use the "forms" task to get a
+forms.help:	list of all forms you have defined in the print service.
+forms.help:	The report will include an indication of which printers the
+forms.help:	forms are currently mounted on.
+menu.help:ABSTRACT:
+menu.help:	[GENERAL]
+menu.help:	The "status" menu gives you tasks for examining various
+menu.help:	aspects of the print service. You can see what print wheels
+menu.help:	and character sets are available, what forms are mounted,
+menu.help:	what printers are active, and what print requests are
+menu.help:	pending.
+printers.help:ABSTRACT:
+printers.help:	[GENERAL]
+printers.help:	You use the "status" task to get a quick list of the
+printers.help:	printers available, and to check whether they are
+printers.help:	currently printing a request, or are disabled or are
+printers.help:	rejecting requests.
+printers.help:	
+printers.help:	If you want to get a listing of the complete configuration
+printers.help:	of a printer, use the "display" task in the "configure" menu.
+printers.help:	
+requests.help:ABSTRACT:
+requests.help:	[GENERAL]
+requests.help:	Use the "requests" task to get a list of print requests
+requests.help:	currently in the queue. This is a good way to find out the
+requests.help:	IDs needed to cancel, hold, resume, or modify a print
+requests.help:	request. The status listed will show when the print request
+requests.help:	was submitted, how big it is (the number of bytes in the
+requests.help:	files), and whether it is printing.
+requests.help:	
+requests.help:	If you have the IDs of the requests, you can get the status
+requests.help:	on just them. If you don't know the IDs, you can get the
+requests.help:	status on all requests submitted by a particular user or for
+requests.help:	a particular printer or class of printers.
+requests.help:	
+requests.help:	[IDs of the print requests ...]
+requests.help:	You are expected to enter a print request ID.
+requests.help:	You can enter a list of
+requests.help:	IDs by separating them with a comma. You
+requests.help:	will be shown the status of the requests you identify,
+requests.help:	including the request IDs, total file sizes (in bytes), when
+requests.help:	submitted, and whether printing.
+requests.help:	
+requests.help:	[Names of printers ...]
+requests.help:	You are expected to enter a printer.
+requests.help:	You can enter a list of
+requests.help:	names by separating them with a comma. You
+requests.help:	will be shown the status of the requests you identify,
+requests.help:	including the request IDs, total file sizes (in bytes), when
+requests.help:	submitted, and whether printing.
+requests.help:	
+requests.help:	[Names of printer classes ...]
+requests.help:	You are expected to enter a class of printers.
+requests.help:	You can enter a list of
+requests.help:	names by separating them with a comma. You
+requests.help:	will be shown the status of the requests you identify,
+requests.help:	including the request IDs, total file sizes (in bytes), when
+requests.help:	submitted, and whether printing.
+requests.help:	
+requests.help:	[IDs of the print requests ...]
+requests.help:	You are expected to enter a user (his or
+requests.help:	her login name, not proper name). You can enter a list of
+requests.help:	names by separating them with a comma. You
+requests.help:	will be shown the status of the requests you identify,
+requests.help:	including the request IDs, total file sizes (in bytes), when
+requests.help:	submitted, and whether printing.
+service.help:ABSTRACT:
+service.help:	[GENERAL]
+service.help:	You use the "service" task to find
+service.help:	out if the Line Printer Services are currently running.
+service.help:	

@@ -1,0 +1,15 @@
+#ident	"@(#)cmd-3b2:inst/etc/define.min	1.1"
+
+#
+# define.min  
+#
+# Minimum defines necessary for asktype to get installation type from user and
+# attach the hard disk swap partition.
+#
+
+export TYPE EUDEBUG PATH
+PATH=/inst/etc:/inst/bin:/inst/final/usr/lbin:/sbin:/usr/sbin:/usr/bin
+RSIX_0=/dev/rdsk/c1d0s6
+OLDTM="3B2 Version 1" 
+TM="3B2 Release 4.0"
+p_root=0			#root paritition no.

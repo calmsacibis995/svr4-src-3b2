@@ -1,0 +1,50 @@
+#ident	"@(#)oamintf:devices/format/Text.diskette	1.5"
+
+################################################################################
+#	Module Name: Text.diskette
+################################################################################
+title="Format a Diskette"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+# need to check return code
+init=`devreserv ${VPID} $ARG2`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp Text.diskette:ABSTRACT
+
+close=`devfree ${VPID} $ARG2`
+
+lifetime=shortterm
+
+text="
+Insert a diskette in the $ARG2 drive."
+
+rows=4
+columns=65
+
+altslks
+
+name=CONT
+button=11
+action=`message -w "Formatting in progress.";
+
+	devattr $ARG2 cdevice | set -l DEV;
+
+	if [ "$ARG1" = "yes" ];
+	then
+	  fmtflop -v $DEV;
+	else
+	  fmtflop $DEV;
+	fi;
+
+	if [ $RET -eq 0 ];
+	then
+	  set -l CMD="OPEN TEXT $OBJ_DIR/Text.flopok $ARG1 $ARG2";
+	else
+	  set -l CMD="OPEN TEXT $OBJ_DIR/Text.fmterr $ARG2";
+	fi;
+	message ""`$CMD
+
+name=CANCEL
+button=14
+action=CLEANUP

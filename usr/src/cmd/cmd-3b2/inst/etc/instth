@@ -1,0 +1,504 @@
+#ident	"@(#)cmd-3b2:inst/etc/instth	1.41.4.1"
+
+
+#
+# instth  
+#
+# Continuation of ICD installation.  Reboots from hard disk at the end,
+# from where remainder of the Essential Utilities floppies are installed.
+#
+
+#
+# Continue installation.
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+
+ST_SZ=`prtvtoc -h ${RSIX_0} 2> /dev/null |
+while read par tag flag first count last mnt
+do
+	if [ "${par}" = "3" ]
+	then
+		echo ${count}
+		break
+	fi
+done`
+
+if [ -z "${ST_SZ}" ]
+then
+	ST_SZ=STAND_MIN
+fi
+
+case ${TYPE} in
+
+full | ctc)
+	rm -f /.profile /sbin/-sh
+	>/etc/mnttab
+	/etc/fs/bfs/mount ${STAND_0} /stand  2> /dev/null
+	mv /unix /stand
+	mv /filledt /stand
+	mv /dgmon /stand
+	sync;sync
+	/sbin/umount ${STAND_0}  2> /dev/null
+	FILES="`find / -print`"
+#
+# Finish disk partitioning.
+#
+	case ${USR_CHOICE} in
+
+	own)
+		while true
+		do
+			dlabelit ${ROOT_0} root ${REL} > /dev/null
+			/etc/fs/s5/mount ${ROOT_0} ${HARD} > /dev/null 2>&1
+			mklost+found ${HARD} ${ROOT_0}
+			(
+				umask 022
+				mkdir ${HARD}/etc
+				scat /inst/etc/vfstab > ${HARD}/etc/vfstab
+			)
+			fstab < ${HARD}/etc/vfstab |
+			while read dev rdev dir fstype junk
+			do
+				case "${fstype}" in
+				s5)
+					dlabelit ${dev} `ignore expr ${dir} : '.*/\(.*\)$' \| unk'` ${REL} > /dev/null
+					rmkdir ${HARD}/${dir}
+					>/etc/mnttab
+					/etc/fs/s5/mount ${dev}  ${HARD}/${dir} 2> /dev/null
+					mklost+found ${HARD}/${dir} ${dev}
+					;;
+				bfs)
+					rmkdir ${HARD}/${dir}
+					>/etc/mnttab
+					/etc/fs/bfs/mount ${dev} ${HARD}/${dir} 2> /dev/null
+					;;
+				esac
+			done
+			for drive in 0 ${DRIVEID_1:+1}
+			do
+				eval cylsize=\${CYLSIZE_${drive}}
+				eval rall=\${RALL_${drive}}
+				optpart -c ${cylsize} \
+				    -d `ignore expr ${drive} + 1` \
+				    -g ${REL} -r ${HARD} ${rall} \
+				    >> ${HARD}/etc/vfstab
+			done
+			echo "\nDisk${DRIVEID_1:+ 1} partitioning:" >&2
+			prtvtoc -s -t ${HARD}/etc/vfstab ${RSIX_0} 2> /dev/null
+			if [ -n "${DRIVEID_1:-}" ]
+			then
+				echo "\nDisk 2 partitioning:" >&2
+				prtvtoc -s -t ${HARD}/etc/vfstab ${RSIX_1} 2> /dev/null
+			fi
+		break
+		done
+		;;
+	default)
+		dlabelit ${ROOT_0} root ${REL} > /dev/null
+		/etc/fs/s5/mount ${ROOT_0}  ${HARD}  2> /dev/null
+		mklost+found ${HARD} ${ROOT_0}
+		(
+			umask 022
+			mkdir ${HARD}/etc
+			scat /inst/etc/vfstab > ${HARD}/etc/vfstab
+		)
+		fstab < ${HARD}/etc/vfstab |
+		while read dev rdev dir fstype junk
+		do
+			case "${fstype}" in
+			s5)
+				dlabelit ${dev} `ignore expr ${dir} : '.*/\(.*\)$' \| unk'` ${REL} > /dev/null
+				rmkdir ${HARD}/${dir}
+				>/etc/mnttab
+				/etc/fs/s5/mount ${dev}  ${HARD}/${dir} 2> /dev/null
+				mklost+found ${HARD}/${dir} ${dev}
+				;;
+			bfs)
+				rmkdir ${HARD}/${dir}
+				>/etc/mnttab
+				/etc/fs/bfs/mount ${dev} ${HARD}/${dir}  2> /dev/null
+				;;
+			esac
+		done
+		;;
+	esac
+	;;
+part)
+	rm -f /.profile /sbin/-sh
+	if [ ${EXIST_STAND_0} -eq 1 ]
+	then
+		>/etc/mnttab
+		/etc/fs/bfs/mount ${STAND_0} /stand  2> /dev/null
+		mv /unix /stand
+		mv /filledt /stand
+		mv /dgmon /stand
+		/sbin/umount ${STAND_0}  2> /dev/null
+	fi
+
+	FILES="`find / -print`"
+	/etc/fs/s5/mount ${ROOT_0}  ${HARD} 2> /dev/null
+	fstab < ${HARD}/etc/vfstab |
+	while read dev rdev dir junk
+	do
+		if [ ${dev} != ${STAND_0} ]
+		then
+			/etc/fs/s5/mount ${dev}  ${HARD}/${dir} 2> /dev/null
+		else
+			>/etc/mnttab
+			/etc/fs/bfs/mount ${STAND_0} /stand  2> /dev/null
+			>/etc/mnttab
+		fi
+	done
+	;;
+dual)
+	/etc/fs/s5/mount ${ROOT_0}  ${HARD} 2> /dev/null
+	upgrade -g ${REL} -r ${HARD}
+	FILES=`find /dev/dsk/c1d1s? /dev/rdsk/c1d1s? -print`
+	echo "${FILES}" | cpio -pdmu ${HARD}
+
+	# Link /dev entries of second integral disk for Simple Admin
+
+	#if one exists move it.
+	if [ -b ${HARD}/dev/SA/disk2 ]
+	then
+		dsk=2
+		while [ -b ${HARD}/dev/SA/disk$dsk ]
+		do
+			dsk=`expr $dsk + 1`
+		done
+
+		ignore mv ${HARD}/dev/SA/disk2 ${HARD}/dev/SA/disk$dsk
+		ignore mv ${HARD}/dev/rSA/disk2 ${HARD}/dev/rSA/disk$dsk
+
+		echo "\
+Your original /dev/SA/disk2 (and /dev/rSA/disk2) file is moved to /dev/SA/$dsk (and
+/dev/rSA/disk$dsk).  After installation /dev/SA/disk2 will be your second hard disk."
+	fi
+
+	ln ${HARD}/dev/dsk/c1d1s6 ${HARD}/dev/SA/disk2
+	ln ${HARD}/dev/rdsk/c1d1s6 ${HARD}/dev/rSA/disk2
+
+	cd /inst/final
+	FILES=`find usr/lbin -print`
+	echo "${FILES}" | cpio -pdmu ${HARD}
+	cd /
+
+	#run vfstab thro' toNfstab for final checking & set permission,owner,group
+	/inst/bin/toNfstab ${HARD}
+
+	#use chroot to acces ld.so & .so libraries to run elf dynamic cmds
+	chroot ${HARD}  /usr/bin/chmod 644  /etc/vfstab 
+	chroot ${HARD}  /usr/bin/chown root /etc/vfstab 
+	chroot ${HARD}  /usr/bin/chgrp root /etc/vfstab 
+
+	sync;sync;sync;
+	
+	if [ ${EXIST_STAND_0} -eq 1 ]
+	then
+		newboot -y ${HARD}/usr/lib/boot ${HARD}/usr/lib/mboot ${RBOOT_0}
+	fi
+
+	#unmount partitions
+	fstabmnt -u -r ${HARD} < ${HARD}/etc/vfstab
+
+	#unmount root partition
+	umount ${HARD} 2> /dev/null
+
+	echo "
+The \"Dual Disk Upgrade\" is complete. The system will now restart itself from
+the hard disk. It will be ready to use when you receive the \"Console Login\"
+prompt. This should take no more than five minutes. You may remove the
+floppy diskette." >&2
+
+	sync;sync;sync
+
+	exec uadmin 2 1
+	;;
+
+upgrade)
+	rm -f /.profile /sbin/-sh
+	if [ ${EXIST_STAND_0} -eq 1 ]
+	then
+		>/etc/mnttab
+
+# This is a temporary fix for BFS diectory bug and should be removed
+# after the BFS fix. 09/08/88 for k8 load
+
+		/etc/fs/bfs/mkfs ${STAND_0} ${ST_SZ} > /dev/null 2>&1
+# end of the fix
+		/etc/fs/bfs/mount ${STAND_0} /stand 2> /dev/null
+		mv /unix /stand
+		mv /filledt /stand
+		mv /dgmon /stand
+		/sbin/umount ${STAND_0} 2> /dev/null
+
+	else if [ ${FSIBT} -eq 1 ]
+	     then
+		/etc/fs/s5/mount ${ROOT_0}  ${HARD}  2> /dev/null
+		cd ${HARD}
+		rm -rf unix
+		rm -rf filledt
+		FILES="`find . -print`"
+		cd /
+		fstab < ${HARD}/etc/vfstab |
+		while read dev rdev dir junk
+		do
+			/etc/fs/s5/mount ${dev}  ${HARD}/${dir}   2> /dev/null
+		done
+		ignore rm -rf ${HARD}/usr/tmp/XX
+		mkdir ${HARD}/usr/tmp/XX
+		cd ${HARD}
+		echo "${FILES}" | cpio -pdmu ${HARD}/usr/tmp/XX
+		sync;sync
+		cd /
+		fstabmnt -u < ${HARD}/etc/vfstab
+		mv ${HARD}/etc/vfstab /etc/Tvfstab
+		/sbin/umount ${ROOT_0}   2> /dev/null
+
+		prtvtoc -h ${RROOT_0} 2> /dev/null |while read line
+		do
+			set -- ${line}
+			case "${1}" in
+			
+			${p_root})
+				N_RT_SZ=`ignore expr ${5} - ${ST_SZ}`
+				N_RT_END=`ignore expr ${6} - ${ST_SZ}`
+				ST_STRT=`ignore expr ${N_RT_END} + 1`
+				ST_END=${6}
+
+				fmthard -d ${1}:${2}:${3}:${4}:${N_RT_SZ}:${N_RT_END} ${RROOT_0}
+				fmthard -d 3:6:00:${ST_STRT}:${ST_SZ}:${ST_END} ${RROOT_0}
+				/etc/fs/s5/mkfs ${ROOT_0} ${N_RT_SZ} >/dev/null
+				/etc/fs/bfs/mkfs ${STAND_0} ${ST_SZ} > /dev/null 2>&1
+				echo "${STAND_0} ${RSTAND_0} /stand bfs 1 yes -" >>/etc/Tvfstab
+				break
+				;;
+			esac
+		done
+
+		>/etc/mnttab
+		/etc/fs/bfs/mount ${STAND_0} /stand    2> /dev/null
+		/etc/fs/s5/mount ${ROOT_0}  ${HARD}   2> /dev/null
+		fstab < /etc/Tvfstab |
+		while read dev rdev dir fstype junk
+		do
+			if [ ${dev} = ${STAND_0} ]
+			then :
+			else
+				mkdir ${HARD}/${dir}
+				/etc/fs/s5/mount ${dev}  ${HARD}/${dir}   2> /dev/null
+			fi
+		done
+		cd ${HARD}/usr/tmp/XX
+		find . -print|cpio -pdmu ${HARD}
+		sync;sync
+		cd /
+		ignore rm -rf ${HARD}/usr/tmp/XX
+		cp /etc/Tvfstab ${HARD}/etc/vfstab
+		fstabmnt -u < ${HARD}/etc/vfstab
+		/sbin/umount ${ROOT_0}   2> /dev/null
+		EXIST_STAND_0=1
+		
+	fi
+fi
+	
+	FILES="`find / -print`"
+	/etc/fs/s5/mount ${ROOT_0}  ${HARD}   2> /dev/null
+	fstab < ${HARD}/etc/vfstab |
+	while read dev rdev dir junk
+	do
+		if [ ${dev} = ${STAND_0} ]
+		then 
+			continue
+		else
+			/etc/fs/s5/mount ${dev}  ${HARD}/${dir}   2> /dev/null
+		fi
+	done
+	;;
+esac
+
+
+ignore rm -f ${HARD}/lib/lboot < /dev/null
+
+# Use $HARD/inst as a lock file;  if you are doing an upgrade or partial
+# and this directory is present, that means you were doing an upgrade
+# and it failed for some reason, so don't save the files again
+
+export i
+i=1
+if [ \( ${TYPE} = upgrade -o ${TYPE} = part \) -a ! -d ${HARD}/inst/LOCK ]
+then	
+	(
+	umask 022
+	echo "\nSaving system configuration files in /usr/old." >&2
+	ignore mkdir ${HARD}/usr/tmp 2>/dev/null
+	ignore mkdir ${HARD}/usr/old 2>/dev/null
+	cd ${HARD}
+	if [ ${TYPE} = part ]
+	then
+		while read file
+		do
+			if [ -f ${file} ]
+			then
+				echo ${file}
+			fi
+		done < /inst/bin/movefiles |cpio -pdum usr/old
+		ignore rm -f ${HARD}/dev/tty[0-9]? < /dev/null
+	else
+		while [ -d ${HARD}/usr/move$i -o -f ${HARD}/usr/move$i ]
+		do
+			i=`expr $i + 1`
+		done
+		ignore mkdir ${HARD}/usr/move$i 2> /dev/null
+		while read file
+		do
+			if [ -f ${file} ]
+			then
+				echo ${file}
+			fi
+		done < /inst/bin/movefiles |cpio -pdumL usr/move$i
+		echo "\nThe /etc/system file is saved in /usr/old/etc." >&2
+	fi
+
+	#  added option -L for cpio to copy across symbolic links(k9)
+	ignore cpio -pdumL usr/old	< /inst/bin/savefiles 2> /dev/null 1>&2
+
+	# copy all master.d files to usr/old
+	find etc/master.d -print|cpio -pdumv usr/old
+
+	# save all the init stuff 
+	find etc/init.d etc/rc*.d etc/shutdown.d -print 2> /dev/null | 
+		cpio -pdum usr/old	2> /dev/null
+	# ignore rm -rf etc/init.d etc/rc?.d  < /dev/null
+	cd /
+	# TTY driver renamed to GENTTY - remove old entries
+	ignore rm -f ${HARD}/etc/master.d/tty
+	ignore rm -f ${HARD}/boot/TTY
+	ignore rm -f ${HARD}/etc/master.d/sys
+	ignore rm -f ${HARD}/boot/SYS
+	ignore rm -f ${HARD}/boot/DU
+	ignore rm -f ${HARD}/boot/DUFST
+	)
+fi
+
+rm -f ${HARD}/etc/system < /dev/null
+
+sync;sync;sync
+# Make lock directory now.
+ignore mkdir ${HARD}/inst ${HARD}/inst/LOCK 2> /dev/null
+sync;sync;sync
+
+echo "${FILES}" | cpio -pdmu ${HARD}
+sync
+
+if [ ${TYPE} = upgrade -a ${FSIBT} -eq 1 -a ${EXIST_STAND_0} -eq 1 ]
+then
+	>/etc/mnttab
+	ignore /etc/fs/bfs/mount ${STAND_0} /stand    2> /dev/null
+	mv /unix /stand
+	mv /filledt /stand
+	mv /dgmon /stand
+fi
+sync
+
+ignore rm -f ${HARD}/dev/SA/diskette  ${HARD}/dev/rSA/diskette < /dev/null
+
+if [ -z "${DRIVEID_1:-}" ]
+then
+	cd ${HARD}/dev
+	ignore rm -f ridsk1? idsk1? < /dev/null	### Release 1.1 leftovers
+	#ignore rm rdsk/c1d1s? dsk/c1d1s? < /dev/null
+	cd /
+else
+	ignore rm -f ${HARD}/dev/rSA/disk2 ${HARD}/dev/SA/disk2 < /dev/null
+	ln ${HARD}/dev/dsk/c1d1s6 ${HARD}/dev/SA/disk2
+	ln ${HARD}/dev/rdsk/c1d1s6 ${HARD}/dev/rSA/disk2
+fi
+
+#put TYPE & floppy number to enable executing insth or instht from hard disk if necessary.
+echo "${TYPE}" > ${HARD}/inst/etc/type
+echo "1" > ${HARD}/inst/etc/last
+
+if [ ${TYPE} = upgrade ]
+then
+	echo "move$i" > ${HARD}/inst/etc/move-file
+
+	while read dev rdev dir junk
+	do
+		if [ "'${dir}'" = "'/usr'" ]
+		then
+			dlabelit ${dev} usr ${REL} > /dev/null
+			break
+		fi
+	done < ${HARD}/etc/vfstab
+fi
+
+#
+# Link telinit to init instead of keeping two copies of same file
+# (and take care of move init to /sbin here;  this should be done
+# somewhere else when the kernel knows to exec /sbin/init instead
+# on /etc/init)
+#
+
+rm -f ${HARD}/etc/telinit
+rm -f ${HARD}/sbin/telinit
+ln -s /sbin/init ${HARD}/etc/init
+ln -s /etc/init ${HARD}/etc/telinit
+
+ignore rm -rf ${HARD}/bin
+ln -s /usr/bin ${HARD}/bin
+cp ${HARD}/sbin/sh ${HARD}/usr/bin
+
+#
+# End of the fix
+#
+
+cd /
+
+ignore rm -rf ${HARD}/dev/icd0 ${HARD}/dev/icd1 ${HARD}/dev/swap
+ln ${HARD}/dev/dsk/c1d0s1 ${HARD}/dev/swap
+
+if [ ${EXIST_STAND_0} -eq 1 ]
+then
+	/usr/sbin/newboot -y /usr/lib/boot /usr/lib/mboot ${RBOOT_0}
+fi
+
+# prepare for insth or instl on hard disk to take over.
+if [ ${TYPE} = ctc ]
+then
+	cp /inst/etc/inittabl /inst/root/etc/inittab
+	echo "icd" > ${HARD}/inst/etc/bootdev
+	/usr/sbin/chroot ${HARD} /sbin/sh /inst/etc/instl
+else
+	cp /inst/etc/inittabh /inst/root/etc/inittab
+fi
+
+sync
+
+fstabmnt -u < ${HARD}/etc/vfstab
+
+if [ ${TYPE} = upgrade ]
+then
+	dlabelit ${ROOT_0} root ${REL} > /dev/null
+fi
+
+echo "\
+The system is restarting itself from the hard disk. This should
+take no more than five minutes. The installation procedure will
+then continue automatically." >&2
+
+sync;sync;sync
+
+
+#unmount root partition on hard disk now.
+/sbin/umount ${ROOT_0} > /dev/null 2>&1
+
+sync;sync;sync
+
+exec uadmin 2 1

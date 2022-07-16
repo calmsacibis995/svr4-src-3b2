@@ -1,0 +1,31 @@
+#ident	"@(#)lp.admin:printers/forms/Menu.forms	1.2"
+menu=Manage Pre-Printed Forms
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $!LININFO 
+
+
+
+
+name=add
+description=Add a New Form
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/forms \"Add a New Form\"" add
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/forms Form.add
+
+
+name=list
+description=List Form Attributes
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/forms \"List Form Attributes\"" list
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/forms Form.list
+
+
+name=modify
+description=Modify a Form
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/forms \"Modify a Form\"" modify
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/forms Form.modify
+
+
+name=remove
+description=Remove Forms
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/forms \"Remove Forms\"" remove
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/forms Form.remove
+

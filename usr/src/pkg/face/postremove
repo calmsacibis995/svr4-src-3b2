@@ -1,0 +1,31 @@
+#ident	"@(#)pkg.face:postremove	1.4"
+
+trap 'exit 3' 1 2 3 15
+
+err=0
+
+userdel vmsys
+
+if [ "$?" -ne "0" ]
+then
+	echo >&2 "WARNING: unable to remove login vmsys"
+	echo >&2 "         This login and its home directory"
+	echo >&2 "         /home/vmsys must be removed before"
+	echo >&2 "         FACE can be re-installed."
+	echo >&2 "         Package removal continues."
+	err=2
+fi
+
+userdel oasys
+
+if [ "$?" -ne "0" ]
+then
+	echo >&2 "WARNING: unable to remove login oasys"
+	echo >&2 "         This login and its home directory"
+	echo >&2 "         /home/oasys must be removed before"
+	echo >&2 "         FACE can be re-installed."
+	echo >&2 "         Package removal continues."
+	err=2
+fi
+
+exit $err

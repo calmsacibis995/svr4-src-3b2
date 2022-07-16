@@ -1,0 +1,10 @@
+*#ident	"@(#)kernel:master.d/log	1.6"
+*
+* LOG	Streams Log Driver
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orfsn	-	log	-	-	-
+						log_cnt(%i) = { NLOG+6 }
+						log_log[NLOG+6] (%i%l%l)
+$$$
+NLOG 	= 	16

@@ -1,0 +1,30 @@
+#ident	"@(#)oamintf:syssetup/Text.psok	1.1"
+################################################################################
+#	Module Name: Text.psok	FROM user:add:Text.apswdok
+################################################################################
+Title="Define User Password Information"
+
+#`set -l LIFE=longterm`
+#lifetime=$LIFE
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+lifetime=shortterm
+
+rows=6
+columns=75
+
+text="
+The password has been defined as follows: 
+
+   `passwd -s $ARG1`"
+
+altslks
+
+name=CONT
+button=11
+action=`set -l LIFE=shortterm`update $OBJ_DIR/Form.addusr true
+
+name=CANCEL
+button=14
+action=OPEN TEXT $OBJ_DIR/Text.setup2

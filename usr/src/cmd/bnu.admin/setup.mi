@@ -1,0 +1,2 @@
+#ident	"@(#)bnu.admin:setup.mi	1.4"
+main:network_services:basic_networking:setup:add^Adds Devices, Systems, and Polled Systems to Database^Menu.setup

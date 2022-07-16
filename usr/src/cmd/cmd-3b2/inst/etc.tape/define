@@ -1,0 +1,108 @@
+#ident	"@(#)cmd-3b2:inst/etc.tape/define	1.1.1.1"
+
+#
+# define
+#
+# Define common stuff for CTC and SCSI tape based installation.
+#
+
+trap '' 2 3
+set -ue
+umask 0
+homedir=/home
+
+export	PATH REL TM OLDTM VOL
+export FLOPPY RFLOPPY
+export DRIVEID_0 DRIVEID_1 CYLSIZE_0 CYLSIZE_1 NSECTOR_0 NSECTOR_1 EXIST_STAND_0
+export DEF_FS DEF_BLK HOME HARD TYPE ST_SZ USR_CHOICE ST_SZ FLPY_NUM
+export STAND_MIN  FSIBT EUDEBUG ICD_NFLPY
+export homedir
+export TAPE_NUM
+
+PATH=/inst/etc:/inst/bin:/inst/final/usr/lbin:/sbin:/usr/sbin:/usr/bin
+
+FLPY_NUM=3
+TAPE_NUM=2
+REL=4.0
+OLDTM="3B2 Version 1" 	# For upgrade messages
+TM="3B2 Release 4.0"
+VOL=4.0
+FSIBT=0		#file system independent boot.
+EUDEBUG=0	#to turn on trace option on all scripts
+
+# Define device entries for both disks
+DEF_FS=s5
+DEF_BLK=1024
+HOME=/
+HARD=/inst/root			# Hard disk root fs mountpoint
+
+#minimum stand size
+STAND_MIN=5000
+
+FLOPPY=/dev/dsk/c0d0s6
+RFLOPPY=/dev/rdsk/c0d0s6
+
+
+#**********************
+# "fmthard -a" prints several shell variable assignments:
+#	p_boot		v_boot		boot default partition and tag
+#	p_root		v_root		root default partition and tag
+#	p_swap		v_swap		swap default partition and tag
+#	p_backup	v_backup	full disk paritition and tag
+#	p_stand		v_stand		stand default partition and tag
+#	p_usr		v_usr		usr default partition and tag
+#	p_var		v_var		var default partition and tag
+#	p_home		v_home		home default partition and tag
+#	p_home2
+#**********************
+
+eval `fmthard -a /dev/rdsk/c1d0s6`
+
+export	p_boot  p_root p_swap p_usr p_stand p_backup p_var p_home p_home2 \
+	v_boot  v_root v_swap v_usr v_stand v_backup v_var v_home 
+
+#p_boot=7 p_root=0 p_swap=1 p_usr=2 p_stand=3 p_backup=6 p_var=9 p_home=a p_home2=8
+#v_boot=01 v_root=02 v_swap=03 v_backup=05 v_stand=06 v_usr=04 v_var=07 v_home=08
+
+for drive in 0 1
+do
+	export	ALL_${drive}	RALL_${drive}	BOOT_${drive}	RBOOT_${drive}   \
+		ROOT_${drive}	RROOT_${drive}	SWAP_${drive}	RSWAP_${drive}   \
+		USR_${drive}	RUSR_${drive}  	STAND_${drive}	RSTAND_${drive}  \
+		VAR_${drive}	RVAR_${drive}  	HOME_${drive}	RHOME_${drive}   \
+		HOME2_${drive}	RHOME2_${drive} FOUR_${drive}   RFOUR_${drive}   \
+		FIVE_${drive}	RFIVE_${drive}  SIX_${drive}	RSIX_${drive}    \
+		EIGHT_${drive}	REIGHT_${drive}
+
+	eval	ALL_${drive}=/dev/dsk/c1d${drive}s \
+		RALL_${drive}=/dev/rdsk/c1d${drive}s \
+		BOOT_${drive}=/dev/dsk/c1d${drive}s${p_boot} \
+		RBOOT_${drive}=/dev/rdsk/c1d${drive}s${p_boot} \
+		ROOT_${drive}=/dev/dsk/c1d${drive}s${p_root} \
+		RROOT_${drive}=/dev/rdsk/c1d${drive}s${p_root} \
+		SWAP_${drive}=/dev/dsk/c1d${drive}s${p_swap} \
+		RSWAP_${drive}=/dev/rdsk/c1d${drive}s${p_swap} \
+		USR_${drive}=/dev/dsk/c1d${drive}s${p_usr} \
+		RUSR_${drive}=/dev/rdsk/c1d${drive}s${p_usr} \
+		STAND_${drive}=/dev/dsk/c1d${drive}s${p_stand} \
+		RSTAND_${drive}=/dev/rdsk/c1d${drive}s${p_stand} \
+		VAR_${drive}=/dev/dsk/c1d${drive}s${p_var} \
+		RVAR_${drive}=/dev/rdsk/c1d${drive}s${p_var} \
+		HOME_${drive}=/dev/dsk/c1d${drive}s${p_home} \
+		RHOME_${drive}=/dev/rdsk/c1d${drive}s${p_home} \
+		HOME2_${drive}=/dev/dsk/c1d${drive}s${p_home2} \
+		RHOME2_${drive}=/dev/rdsk/c1d${drive}s${p_home2} \
+		FOUR_${drive}=/dev/dsk/c1d${drive}s4 \
+		RFOUR_${drive}=/dev/rdsk/c1d${drive}s4 \
+		FIVE_${drive}=/dev/dsk/c1d${drive}s5 \
+		RFIVE_${drive}=/dev/rdsk/c1d${drive}s5 \
+		SIX_${drive}=/dev/dsk/c1d${drive}s6 \
+		RSIX_${drive}=/dev/rdsk/c1d${drive}s6 \
+		EIGHT_${drive}=/dev/dsk/c1d${drive}s8 \
+		REIGHT_${drive}=/dev/rdsk/c1d${drive}s8
+done
+
+#
+# Set terminal erase "^h" and echoe
+#
+ttyset

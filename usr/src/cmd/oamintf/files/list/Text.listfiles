@@ -1,0 +1,20 @@
+#ident	"@(#)filemgmt:list/Text.listfiles	1.5"
+Title="Lists Mounted File Systems"
+
+`message "Please Wait"`
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp listtask
+
+begrow=distinct
+begcol=distinct
+rows=12
+columns=75
+
+
+text="`mount`
+
+   Press [CONT] to (re)set again or press [QUIT] to quit."
+
+name=CONT
+button=11
+action=CLEANUP

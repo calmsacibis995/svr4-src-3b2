@@ -1,0 +1,53 @@
+#ident	"@(#)oamintf:interface/oam.init	1.4"
+#Title="Operations, Administration & Maintenance"
+#columns=45
+#rows=7
+#text="
+#	UNIX System V
+#	Copyright (C) 1987 AT&T
+#	All Rights Reserved"
+
+
+#BANNER="UNIX System V Operations, Administration and Maintenance"
+#BANCOL=2
+
+#name=QUIT
+#button=9
+#action=CLEANUP
+
+toggle=2
+
+nobang=true
+
+#name=
+#button=4
+#action=nop
+
+#name=
+#button=5
+#action=nop
+
+name=
+button=8
+action=
+
+name=CONT
+button=11
+action=CLOSE
+
+name=PREVPAGE
+button=12
+action=PREVPAGE
+
+name=NEXTPAGE
+button=13
+action=NEXTPAGE
+
+name=CANCEL
+button=14
+action=CANCEL
+
+name=CMD-MENU
+button=15
+action=CMD-MENU
+

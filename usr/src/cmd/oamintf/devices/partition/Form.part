@@ -1,0 +1,1419 @@
+#ident	"@(#)oamintf:devices/partition/Form.part	1.2"
+
+################################################################################
+#	Module Name: Form.part
+################################################################################
+form="Partition Disks"
+
+framemsg=`readfile $INTFBASE/form.msg`
+
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $LININFO
+
+close=`rm -f $PARTFILE $NPFILE $ERR 2> /dev/null`
+
+done=`echo "6 5 01 0 $DCAP $DLAST" > $PARTFILE;
+	echo "7 1 01 0 162 161" >> $PARTFILE;
+	echo "$F5 $F6 $F7 $F8 $F9 $F10" >> $PARTFILE;
+	echo "$F11 $F12 $F13 $F14 $F15 $F16" >> $PARTFILE;
+	echo "$F17 $F18 $F19 $F20 $F21 $F22" >> $PARTFILE;
+	echo "$F23 $F24 $F25 $F26 $F27 $F28" >> $PARTFILE;
+	echo "$F29 $F30 $F31 $F32 $F33 $F34" >> $PARTFILE;
+	echo "$F35 $F36 $F37 $F38 $F39 $F40" >> $PARTFILE;
+	echo "$F41 $F42 $F43 $F44 $F45 $F46" >> $PARTFILE;
+	echo "$F47 $F48 $F49 $F50 $F51 $F52" >> $PARTFILE;
+	echo "$F53 $F54 $F55 $F56 $F57 $F58" >> $PARTFILE;
+	echo "$F59 $F60 $F61 $F62 $F63 $F64" >> $PARTFILE;
+	echo "$F65 $F66 $F67 $F68 $F69 $F70" >> $PARTFILE;
+	echo "$F71 $F72 $F73 $F74 $F75 $F76" >> $PARTFILE;
+	echo "$F77 $F78 $F79 $F80 $F81 $F82" >> $PARTFILE;
+	echo "$F83 $F84 $F85 $F86 $F87 $F89" >> $PARTFILE;
+	echo "$F89 $F90 $F91 $F92 $F93 $F94" >> $PARTFILE;
+	echo "$F95 $F96 $F97 $F98 $F99 $F100" >> $PARTFILE;
+
+	grep -v "     " $PARTFILE > $NPFILE;
+
+	prtvtoc $DEV > /dev/null 2> /dev/null;
+
+	if [ $RET -eq 0 ];
+	then
+		set -l CMD="OPEN TEXT $OBJ_DIR/Text.warn $ARG1";
+	else
+		message -w "Partitioning $ARG1 disk is in progress";
+
+        	/usr/sadm/sysadm/bin/part $ARG1 $DEV $NPFILE $ERR;
+
+		if [ $RET -eq 0 ];
+		then
+	   		set -l CMD="OPEN TEXT $OBJ_DIR/Text.partok $ARG1";
+		else
+	   		set -l CMD="OPEN TEXT $OBJ_DIR/Text.parterr";
+		fi;
+	fi`$CMD
+
+# $F1 Heading
+name="                          First     Sector     Last"
+nrow=1
+ncol=3
+frow=1
+fcol=3
+rows=1
+columns=14
+inactive
+
+# $F2 Heading
+name="Partition  Tag  Flags     Sector     Count     Sector"
+nrow=2
+ncol=3
+frow=1
+fcol=3
+rows=1
+columns=14
+inactive
+
+# $F3 Heading
+name="     6      5    01            0    $DCAP     $DLAST"
+nrow=3
+ncol=3
+frow=1
+fcol=3
+rows=1
+columns=14
+inactive
+
+# $F4 Heading
+name="     7      1    01            0       162        161"
+nrow=4
+ncol=3
+frow=1
+fcol=3
+rows=1
+columns=14
+inactive
+
+# F5 0 partition number
+name=""
+lininfo=Form.part:part
+nrow=5
+ncol=8
+frow=5
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F6 0 tag
+name=""
+lininfo=Form.part:tag
+nrow=5
+ncol=15
+frow=5
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F7 0 flag
+name=""
+lininfo=Form.part:flag
+nrow=5
+ncol=20
+frow=5
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F8 0 FS
+name=""
+lininfo=Form.part:fs
+nrow=5
+ncol=29
+frow=5
+fcol=29
+rows=1
+columns=6
+valid=`/usr/sadm/bin/valint $F8`
+
+invalidmsg=const `errint $F8`
+
+# F9 0 SC
+name=""
+lininfo=Form.part:sc
+nrow=5
+ncol=39
+frow=5
+fcol=39
+rows=1
+columns=6
+valid=`/usr/sadm/bin/valint $F9`
+
+invalidmsg=const `errint $F9`
+
+# F10 0 LS
+name=""
+lininfo=Form.part:ls
+nrow=5
+ncol=50
+frow=5
+fcol=50
+rows=1
+columns=6
+value=`expr $F8 + $F9 - 1`
+inactive
+
+# F11 1 partition number
+name=""
+lininfo=Form.part:part
+nrow=6
+ncol=8
+frow=6
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F12 1 tag
+name=""
+lininfo=Form.part:tag
+nrow=6
+ncol=15
+frow=6
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+
+invalidmsg=const "ERROR: invalid tag entered."
+# F13 1 flag
+name=""
+lininfo=Form.part:flag
+nrow=6
+ncol=20
+frow=6
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F14 1 FS
+name=""
+lininfo=Form.part:fs
+nrow=6
+ncol=29
+frow=6
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F14`
+
+invalidmsg=const `errint $F14`
+
+# F15 1 SC
+name=""
+lininfo=Form.part:sc
+nrow=6
+ncol=39
+frow=6
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F15`
+
+invalidmsg=const `errint $F15`
+
+# F16 1 LS
+name=""
+lininfo=Form.part:ls
+nrow=6
+ncol=50
+frow=6
+fcol=50
+rows=1
+columns=6
+value=`expr $F14 + $F15 - 1`
+inactive
+
+# F17 2 partition numbers
+name=""
+lininfo=Form.part:part
+nrow=7
+ncol=8
+frow=7
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F18 2 tag
+name=""
+lininfo=Form.part:tag
+nrow=7
+ncol=15
+frow=7
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F19 2 flag
+name=""
+lininfo=Form.part:flag
+nrow=7
+ncol=20
+frow=7
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F20 2 FS
+name=""
+lininfo=Form.part:fs
+nrow=7
+ncol=29
+frow=7
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F20`
+
+invalidmsg=const `errint $F20`
+
+# F21 2 SC
+name=""
+lininfo=Form.part:sc
+nrow=7
+ncol=39
+frow=7
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F21`
+
+invalidmsg=const `errint $F21`
+
+# F22 2 LS
+name=""
+lininfo=Form.part:ls
+nrow=7
+ncol=50
+frow=7
+fcol=50
+rows=1
+columns=6
+value=`expr $F20 + $F21 - 1`
+inactive
+
+# F23 3 partition numbers
+name=""
+lininfo=Form.part:part
+nrow=8
+ncol=8
+frow=8
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F24 3 tag
+name=""
+lininfo=Form.part:tag
+nrow=8
+ncol=15
+frow=8
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F25 3 flag
+name=""
+lininfo=Form.part:flag
+nrow=8
+ncol=20
+frow=8
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F26 3 FS
+name=""
+lininfo=Form.part:fs
+nrow=8
+ncol=29
+frow=8
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F26`
+
+invalidmsg=const `errint $F26`
+
+# F27 3 SC
+name=""
+lininfo=Form.part:sc
+nrow=8
+ncol=39
+frow=8
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F27`
+
+invalidmsg=const `errint $F27`
+
+# F28 3 LS
+name=""
+lininfo=Form.part:ls
+nrow=8
+ncol=50
+frow=8
+fcol=50
+rows=1
+columns=6
+value=`expr $F26 + $F27 - 1`
+inactive
+
+# F29 4 partition number
+name=""
+lininfo=Form.part:part
+nrow=9
+ncol=8
+frow=9
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F30 4 tag
+name=""
+lininfo=Form.part:tag
+nrow=9
+ncol=15
+frow=9
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F31 4 flag
+name=""
+lininfo=Form.part:flag
+nrow=9
+ncol=20
+frow=9
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F32 4 FS
+name=""
+lininfo=Form.part:fs
+nrow=9
+ncol=29
+frow=9
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F32`
+
+invalidmsg=const `errint $F32`
+
+# F33 4 SC
+name=""
+lininfo=Form.part:sc
+nrow=9
+ncol=39
+frow=9
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F33`
+
+invalidmsg=const `errint $F33`
+
+# F34 4 LS
+name=""
+lininfo=Form.part:ls
+nrow=9
+ncol=50
+frow=9
+fcol=50
+rows=1
+columns=6
+value=`expr $F32 + $F33 - 1`
+inactive
+
+# F35 5 partition number
+name=""
+lininfo=Form.part:part
+nrow=10
+ncol=8
+frow=10
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F36 5 tag
+name=""
+lininfo=Form.part:tag
+nrow=10
+ncol=15
+frow=10
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F37 5 flag
+name=""
+lininfo=Form.part:flag
+nrow=10
+ncol=20
+frow=10
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F38 5 FS
+name=""
+lininfo=Form.part:fs
+nrow=10
+ncol=29
+frow=10
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F38`
+
+invalidmsg=const `errint $F38`
+
+# F39 5 SC
+name=""
+lininfo=Form.part:sc
+nrow=10
+ncol=39
+frow=10
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F39`
+
+invalidmsg=const `errint $F39`
+
+# F40 5 LS
+name=""
+lininfo=Form.part:ls
+nrow=10
+ncol=50
+frow=10
+fcol=50
+rows=1
+columns=6
+value=`expr $F38 + $F39 - 1`
+inactive
+
+# F41 6 partition number
+name=""
+lininfo=Form.part:part
+nrow=11
+ncol=8
+frow=11
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F42 6 tag
+name=""
+lininfo=Form.part:tag
+nrow=11
+ncol=15
+frow=11
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F43 6 flag
+name=""
+lininfo=Form.part:flag
+nrow=11
+ncol=20
+frow=11
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F44 6 FS
+name=""
+lininfo=Form.part:fs
+nrow=11
+ncol=29
+frow=11
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F44`
+
+invalidmsg=const `errint $F44`
+
+# F45 6 SC
+name=""
+lininfo=Form.part:sc
+nrow=11
+ncol=39
+frow=11
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F45`
+
+invalidmsg=const `errint $F45`
+
+# F46 6 LS
+name=""
+lininfo=Form.part:ls
+nrow=11
+ncol=50
+frow=11
+fcol=50
+rows=1
+columns=6
+value=`expr $F44 + $F45 - 1`
+inactive
+
+# F47 7 partition number
+name=""
+lininfo=Form.part:part
+nrow=12
+ncol=8
+frow=12
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F48 7 tag
+name=""
+lininfo=Form.part:tag
+nrow=12
+ncol=15
+frow=12
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F49 7 flag
+name=""
+lininfo=Form.part:flag
+nrow=12
+ncol=20
+frow=12
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F50 7 FS
+name=""
+lininfo=Form.part:fs
+nrow=12
+ncol=29
+frow=12
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F50`
+
+invalidmsg=const `errint $F50`
+
+# F51 7 SC
+name=""
+lininfo=Form.part:sc
+nrow=12
+ncol=39
+frow=12
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F51`
+
+invalidmsg=const `errint $F51`
+
+# F52 7 LS
+name=""
+lininfo=Form.part:ls
+nrow=12
+ncol=50
+frow=12
+fcol=50
+rows=1
+columns=6
+value=`expr $F50 + $F51 - 1`
+inactive
+
+# F53 8 partition number
+name=""
+lininfo=Form.part:part
+nrow=13
+ncol=8
+frow=13
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F54 8 tag
+name=""
+lininfo=Form.part:tag
+nrow=13
+ncol=15
+frow=13
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F55 8 flag
+name=""
+lininfo=Form.part:flag
+nrow=13
+ncol=20
+frow=13
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F56 8 FS
+name=""
+lininfo=Form.part:fs
+nrow=13
+ncol=29
+frow=13
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F56`
+
+invalidmsg=const `errint $F56`
+
+# F57 8 SC
+name=""
+lininfo=Form.part:sc
+nrow=13
+ncol=39
+frow=13
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F57`
+
+invalidmsg=const `errint $F57`
+
+# F58 8 LS
+name=""
+lininfo=Form.part:ls
+nrow=13
+ncol=50
+frow=13
+fcol=50
+rows=1
+columns=6
+value=`expr $F56 + $F57 - 1`
+inactive
+
+# F59 9 partition number
+name=""
+lininfo=Form.part:part
+nrow=14
+ncol=8
+frow=14
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F60 9 tag
+name=""
+lininfo=Form.part:tag
+nrow=14
+ncol=15
+frow=14
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F61 9 flag
+name=""
+lininfo=Form.part:flag
+nrow=14
+ncol=20
+frow=14
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F62 9 FS
+name=""
+lininfo=Form.part:fs
+nrow=14
+ncol=29
+frow=14
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F62`
+
+invalidmsg=const `errint $F62`
+
+# F63 9 SC
+name=""
+lininfo=Form.part:sc
+nrow=14
+ncol=39
+frow=14
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F63`
+
+invalidmsg=const `errint $F63`
+
+# F64 9 LS
+name=""
+lininfo=Form.part:ls
+nrow=14
+ncol=50
+frow=14
+fcol=50
+rows=1
+columns=6
+value=`expr $F62 + $F63 - 1`
+inactive
+
+# F65 10 partition number
+name=""
+lininfo=Form.part:part
+nrow=15
+ncol=8
+frow=15
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F66 10 tag
+name=""
+lininfo=Form.part:tag
+nrow=15
+ncol=15
+frow=15
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F67 10 flag
+name=""
+lininfo=Form.part:flag
+nrow=15
+ncol=20
+frow=15
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F68 10 FS
+name=""
+lininfo=Form.part:fs
+nrow=15
+ncol=29
+frow=15
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F58`
+
+invalidmsg=const `errint $F58`
+
+# F69 10 SC
+name=""
+lininfo=Form.part:sc
+nrow=15
+ncol=39
+frow=15
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F69`
+
+invalidmsg=const `errint $F69`
+
+# F70 10 LS
+name=""
+lininfo=Form.part:ls
+nrow=15
+ncol=50
+frow=15
+fcol=50
+rows=1
+columns=6
+value=`expr $F68 + $F69 - 1`
+inactive
+
+# F71 11 partition number
+name=""
+lininfo=Form.part:part
+nrow=16
+ncol=8
+frow=16
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F72 11 tag
+name=""
+lininfo=Form.part:tag
+nrow=16
+ncol=15
+frow=16
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F73 11 flag
+name=""
+lininfo=Form.part:flag
+nrow=16
+ncol=24
+frow=16
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F74 11 FS
+name=""
+lininfo=Form.part:fs
+nrow=16
+ncol=29
+frow=16
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F74`
+
+invalidmsg=const `errint $F74`
+
+# F75 11 SC
+name=""
+lininfo=Form.part:sc
+nrow=16
+ncol=39
+frow=16
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F75`
+
+invalidmsg=const `errint $F75`
+
+# F76 11 LS
+name=""
+lininfo=Form.part:ls
+nrow=16
+ncol=50
+frow=16
+fcol=50
+rows=1
+columns=6
+value=`expr $F74 + $F75 - 1`
+inactive
+
+# F77 12 partition number
+name=""
+lininfo=Form.part:part
+nrow=15
+ncol=8
+frow=15
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+## F78 12 tag
+name=""
+lininfo=Form.part:tag
+nrow=15
+ncol=15
+frow=15
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F79 12 flag
+name=""
+lininfo=Form.part:flag
+nrow=15
+ncol=20
+frow=15
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# $F80 12 FS
+name=""
+lininfo=Form.part:fs
+nrow=15
+ncol=29
+frow=15
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F80`
+
+invalidmsg=const `errint $F80`
+
+# F81 12 SC
+name=""
+lininfo=Form.part:sc
+nrow=15
+ncol=39
+frow=15
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F81`
+
+invalidmsg=const `errint $F81`
+
+# F82 12 LS
+name=""
+ininfo=Form.part:ls
+nrow=15
+ncol=50
+frow=15
+fcol=50
+rows=1
+columns=6
+value=`expr $F80 + $F81 - 1`
+inactive
+
+# F83 13 partition number
+name=""
+lininfo=Form.part:part
+nrow=16
+ncol=8
+frow=16
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F84 13 tag
+name=""
+lininfo=Form.part:tag
+nrow=16
+ncol=15
+frow=16
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F85 13 flag
+name=""
+lininfo=Form.part:flag
+nrow=16
+ncol=20
+frow=16
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F86 13 FS
+name=""
+lininfo=Form.part:fs
+nrow=16
+ncol=29
+frow=16
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F86`
+
+invalidmsg=const `errint $F86`
+
+# F87 13 SC
+name=""
+lininfo=Form.part:sc
+nrow=16
+ncol=39
+frow=16
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F87`
+
+invalidmsg=const `errint $F87`
+
+# F88 13 LS
+name=""
+lininfo=Form.part:ls
+lininfo=devdr
+nrow=16
+ncol=50
+frow=16
+fcol=50
+rows=1
+columns=6
+value=`expr $F86 + $F87 - 1`
+inactive
+
+# F89 14 partition number
+name=""
+lininfo=Form.part:part
+nrow=17
+ncol=8
+frow=17
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F90 14 tag
+name=""
+lininfo=Form.part:tag
+nrow=17
+ncol=15
+frow=17
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F91 14 flag
+name=""
+lininfo=Form.part:flag
+nrow=17
+ncol=20
+frow=17
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F92 14 FS
+name=""
+lininfo=Form.part:fs
+nrow=17
+ncol=29
+frow=17
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F92`
+
+invalidmsg=const `errint $F92`
+
+# F93 14 SC
+name=""
+lininfo=Form.part:sc
+nrow=17
+ncol=39
+frow=17
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F93`
+
+invalidmsg=const `errint $F93`
+
+# F94 14 LS
+name=""
+lininfo=Form.part:ls
+nrow=17
+ncol=50
+frow=17
+fcol=50
+rows=1
+columns=6
+value=`expr $F92 + $F93 - 1`
+inactive
+
+# F95 15 partition number
+name=""
+lininfo=Form.part:part
+nrow=18
+ncol=8
+frow=18
+fcol=8
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 8 9 a b c d e f }
+menuonly=true
+
+# F96 15 tag
+name=""
+lininfo=Form.part:tag
+nrow=18
+ncol=15
+frow=18
+fcol=15
+rows=1
+columns=1
+
+rmenu={ "" 0 1 2 3 4 5 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid tag entered."
+
+# F97 15 flag
+name=""
+lininfo=Form.part:flag
+nrow=18
+ncol=20
+frow=18
+fcol=20
+rows=1
+columns=2
+
+rmenu={ "" 00 01 10 }
+menuonly=true
+
+invalidmsg=const "ERROR: invalid flag entered."
+
+# F98 15 FS
+name=""
+lininfo=Form.part:fs
+nrow=18
+ncol=29
+frow=18
+fcol=29
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F98`
+
+invalidmsg=const `errint $F98`
+
+# F99 15 SC
+name=""
+lininfo=Form.part:sc
+nrow=18
+ncol=39
+frow=18
+fcol=39
+rows=1
+columns=6
+
+valid=`/usr/sadm/bin/valint $F99`
+
+invalidmsg=const `errint $F99`
+
+# F100 15 LS
+name=""
+lininfo=Form.part:ls
+nrow=18
+ncol=50
+frow=18
+fcol=50
+rows=1
+columns=6
+value=`expr $F98 + $F99 - 1`
+inactive

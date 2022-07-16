@@ -1,0 +1,15 @@
+#ident	"@(#)pkg.rfs:pkginfo	1.1.4.1"
+#
+# 	RFS pkginfo
+#
+PKG="rfs"
+NAME="rfs utilities"
+ARCH="3B2"
+VERSION="2.0"
+CATEGORY="system,utilities"
+BASEDIR=""
+CLASSES="none build"
+PREDEPEND="rfs"
+MAXINST="1"
+ISTATES="2"
+RSTATES="2"

@@ -1,0 +1,34 @@
+#ident	"@(#)pkg.ipc:prototype	1.3"
+i pkginfo
+i postinstall
+i preremove
+i space
+
+d none	/boot			?	?	?
+d none	/etc			?	?	?
+d none	/etc/master.d		?	?	?
+d none	/usr			?	?	?
+d none	/usr/include		?	?	?
+d none	/usr/include/sys	?	?	?
+d none	/bin			?	?	?
+
+!default 555 bin bin
+f none	/boot/IPC=/usr/src/uts/3b2/os/IPC
+f none	/boot/MSG=/usr/src/uts/3b2/os/MSG
+f none	/boot/SEM=/usr/src/uts/3b2/os/SEM
+f none	/boot/SHM=/usr/src/uts/3b2/os/SHM
+
+! default 444 root root
+f none	/etc/master.d/ipc=/usr/src/uts/3b2/master.d/ipc
+f none	/etc/master.d/msg=/usr/src/uts/3b2/master.d/msg
+f none	/etc/master.d/sem=/usr/src/uts/3b2/master.d/sem
+f none	/etc/master.d/shm=/usr/src/uts/3b2/master.d/shm
+
+! default 444 bin bin
+f none	/usr/include/sys/ipc.h
+f none	/usr/include/sys/msg.h
+f none	/usr/include/sys/sem.h
+f none	/usr/include/sys/shm.h
+
+f none	/usr/bin/ipcrm		555	bin	bin
+f none	/usr/bin/ipcs		2555	bin	sys

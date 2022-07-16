@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/elf	1.2"
+*
+* ELF
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+eoxr	-     	  elf	-

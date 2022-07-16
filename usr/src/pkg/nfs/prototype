@@ -1,0 +1,142 @@
+#ident	"@(#)pkg.nfs:prototype	1.13"
+#
+# information files
+#
+
+i pkginfo
+i depend
+i preinstall
+i postinstall
+i preremove
+i copyright
+#
+# package object files and directories
+#
+!default	775	root	sys
+
+d	none	/boot	?	?	?
+d	none	/etc	?	?	?
+d	none	/etc/master.d	?	?	?
+d	none	/usr	?	?	?
+d	none	/usr/bin	?	?	?
+d	none	/usr/sbin	?	?	?
+d	none	/usr/lib	?	?	?
+d	none	/usr/lib/fs	?	?	?
+d	none	/usr/lib/fs/nfs
+d	none	/usr/lib/nfs
+d	none	/usr/include/nfs	0755	root	sys
+
+!default	444	root	root
+f	none	/boot/NFS=/usr/src/uts/3b2/fs/nfs/NFS
+f	none	/boot/KLM=/usr/src/uts/3b2/klm/KLM
+f	none	/etc/master.d/nfs=/usr/src/uts/3b2/master.d/nfs
+f	none	/etc/master.d/klm=/usr/src/uts/3b2/master.d/klm
+
+!default	555	bin	bin
+f	none	/usr/lib/fs/nfs/dfmounts
+f	none	/usr/lib/fs/nfs/dfshares
+f	none	/usr/lib/fs/nfs/mount
+f	none	/usr/lib/fs/nfs/umount
+f	none	/usr/lib/fs/nfs/share
+f	none	/usr/lib/fs/nfs/unshare
+f	none	/usr/lib/nfs/mountd
+f	none	/usr/lib/nfs/automount
+f	none	/usr/lib/nfs/nfsd
+f	none	/usr/lib/nfs/biod
+f	none	/usr/lib/nfs/exportfs
+f	none	/usr/lib/nfs/lockd
+f	none	/usr/lib/nfs/statd
+f	none	/usr/lib/nfs/bootparamd
+f	none	/usr/sbin/showmount
+#f	none	/usr/lib/nfs/rquotad		Not available yet
+
+!default 0444 bin bin
+f	none	/usr/include/nfs/export.h
+f	none	/usr/include/nfs/mount.h
+f	none	/usr/include/nfs/nfs.h
+f	none	/usr/include/nfs/nfs_clnt.h
+f	none	/usr/include/nfs/nfssys.h
+f	none	/usr/include/nfs/rnode.h
+
+!default 0775 root sys
+s	none	/usr/include/sys/nfs=/usr/include/nfs
+
+!default	444	root	sys
+f       none    /etc/init.d/nfs
+l       none    /etc/rc0.d/K40nfs=/etc/init.d/nfs
+l       none    /etc/rc1.d/K40nfs=/etc/init.d/nfs
+l       none    /etc/rc2.d/K20nfs=/etc/init.d/nfs
+l       none    /etc/rc3.d/S22nfs=/etc/init.d/nfs
+#
+#	Simple admin. scripts
+#
+!default        755     root    sys
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/remote
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/other
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/other/nfs
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control/bin
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/setup
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/setup/nfs
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/local
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/local/nfs
+d       none    /usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin
+#
+#nfs admin shell scripts
+#
+!default	755	bin	bin
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control/bin/status
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/a_att
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/auto_attr
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/auto_mod
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/imm_attr
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/ls_resource
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/new_nflist
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/nf_list
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/nf_share
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/nf_unshare
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/bin/valid_client
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/auto_attr
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/auto_mod
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/auto_unmount
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/curr_attr
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/curr_mod
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/ls_remote
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/ls_resource
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/bin/remote_mount
+#
+#	fmli scripts for nfs admin
+#
+!default	644	bin	bin
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.list
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.modify
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.modify2
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.modify3
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.share
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.share2
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.unshar2
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.unshar3
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Form.unshare
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Text.list
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/nfs/Text.shmsg
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.list
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.modify
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.modify2
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.modify3
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.mount
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.unmnt2
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.unmnt3
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Form.unmount
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Text.generic
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/nfs/Text.list
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/Help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/Menu.nfs
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control/Help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control/Text.control
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/nfs/control/Menu.control
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/setup/nfs/Help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/setup/nfs/Menu.setup

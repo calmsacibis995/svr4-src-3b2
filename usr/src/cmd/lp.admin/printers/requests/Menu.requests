@@ -1,0 +1,28 @@
+#ident	"@(#)lp.admin:printers/requests/Menu.requests	1.2"
+menu=Manage Active Print Requests
+
+help=OPEN TEXT $INTFBASE/Text.oamhelp $!LININFO 
+
+name=cancel
+description=Cancel Print Requests
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/requests \"Cancel Print Requests\"" cancel
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/requests Form.cancel
+
+
+name=hold
+description=Place Pending Print Requests on Hold
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/requests \"Place Pending Print Requests on Hold\"" hold
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/requests Form.hold
+
+
+name=move
+description=Move Print Requests to a New Destination
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/requests \"Move Print Requests to a New Destination\"" move
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/requests Form.move
+
+
+name=release
+description=Release Held Print Requests
+lininfo="/usr/sadm/sysadm/add-ons/lp/printers/requests \"Release Held Print Requests\"" release
+action=OPEN FORM $INTFBASE/Form.interface /usr/sadm/sysadm/add-ons/lp/printers/requests Form.release
+

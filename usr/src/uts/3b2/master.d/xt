@@ -1,0 +1,8 @@
+*#ident	"@(#)kernel:master.d/xt	1.4"
+*
+* XT - STREAMS VERSION
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fs	-	nxt	-	2
+						nxt_count (%i) = {#D}
+						nxtctl [#D] (%0x4b4)

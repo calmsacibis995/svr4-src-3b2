@@ -1,0 +1,25 @@
+#ident	"@(#)oamintf:usermgmt/Text.rusrok	1.3"
+################################################################################
+#	Module Name: Text.rusrok
+################################################################################
+title="Conformation of Login Removal"
+
+lifetime=shortterm
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+rows=6
+columns=60
+
+text="
+User $ARG1 was removed from the system."
+
+altslks
+
+name=CONT
+button=11
+action=update $OBJ_DIR/Form.rmusr1 true
+
+name=CANCEL
+button=14
+action=CLEANUP

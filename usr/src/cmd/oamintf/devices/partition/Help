@@ -1,0 +1,48 @@
+#ident	"@(#)oamintf:devices/partition/Help	1.3"
+ABSTRACT:
+	The "partition" task interactively partitions a disk.  It supports
+	partitioning of a formatted, empty disk or repartitioning of a
+	disk that is not empty.
+
+	WARNING: Repartitioning will normally destroy the data on the disk.
+
+devgrp:Device Group
+	Enter the device group you will be working with.
+	Press CHOICES to see the available device groups.
+
+devdr:Device Drive
+	Enter the disk drive to be partitioned.
+	Press CHOICES to see available choices for this field.
+
+Form.part:part:Partition
+	Specifies the disk partition number.  Valid numbers are 0 - 5, 8, 9,
+	a, b, c, d, e, and f.
+
+Form.part:tag:Tag
+	The partition identification (TAG) is a number identifying the
+	use of the partition.  Reserve codes are as follows:
+	
+		0 - UNASSIGNED
+		1 - BOOT
+		2 - ROOT
+		3 - SWAP
+		4 - USR
+		5 - BACKUP
+		6 - STAND
+		7 - VAR
+		8 - HOME
+
+Form.part:flag:Flag
+	The partition identification is a number identifying the
+	partition as unmountable (UNMT) or read only (RONLY).
+	Reserved codes are as follows:
+
+		00 - MOUNTABLE, READ AND WRITE
+		01 - NOT MOUNTABLE
+		10 - MOUNTABLE, READ ONLY
+
+Form.part:fs:First Sector
+	Identifies the starting sector number of the partition.
+
+Form.part:sc:Sector Count
+	Identifies the number of sectors in the partition.

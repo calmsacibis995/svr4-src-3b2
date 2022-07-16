@@ -1,0 +1,155 @@
+#ident	"@(#)bnu:postinstall	1.26.4.15"
+
+#
+#	Postinstall for "Basic Networking Utilities"
+#
+error() {
+	errflag=$?
+	}
+#
+errflag=0
+
+#	Carefully install new local uucp information files if none exist or
+#	old style files exist.
+
+INSPATH=/install/new
+PKGNAME=$NAME
+
+CRONDIR=/var/spool/cron/crontabs
+CRONTAB=/var/spool/cron/crontabs/root
+TEMPCRON=/usr/tmp/cron.$$
+
+#### Make sure the spools have been converted to the new format
+
+/usr/lib/uucp/bnuconvert
+
+#### Setup initialization cleanup script for rc2
+
+installf $PKGINST /etc/rc2.d/S70uucp=/etc/init.d/uucp || error
+
+#### These are the default crontab entries
+
+CLEAN='45 23 * * * ulimit 5000; /usr/bin/su uucp -c "/usr/lib/uucp/uudemon.cleanup" > /dev/null 2>&1'
+HOUR='41,11 * * * * /usr/lib/uucp/uudemon.hour > /dev/null'
+POLL='1,30 * * * * /usr/lib/uucp/uudemon.poll > /dev/null'
+
+####		##########
+
+if [ -d $CRONDIR ]; then
+    if [ ! -f $CRONTAB ]; then
+	> $CRONTAB
+	chown root $CRONTAB 2>/dev/null
+	chmod 644 $CRONTAB 2>/dev/null
+    fi
+else
+	echo "**WARNING**   ${PKGNAME} cannot install crontab entries."
+	echo "Demons will not be running when installation is finished."
+	echo "They will have to be added later."
+fi
+
+#### Install crontab entries if crontab exists and entries do not exist
+if [ -f $CRONTAB ]; then
+
+    if grep "uudemon.hour" $CRONTAB >/dev/null 2>&1 ; then  :
+    else
+	crontab -l >$TEMPCRON 2>/dev/null
+	echo "$HOUR" >> $TEMPCRON 2>/dev/null
+	crontab $TEMPCRON 2>/dev/null
+    fi
+
+    if grep "uudemon.cleanup" $CRONTAB >/dev/null 2>&1 ; then :  
+    else
+	crontab -l >$TEMPCRON 2>/dev/null
+	echo "$CLEAN" >> $TEMPCRON 2>/dev/null
+	crontab $TEMPCRON 2>/dev/null
+    fi
+
+    if grep "uudemon.poll" $CRONTAB >/dev/null 2>&1 ; then :  
+    else
+	crontab -l >$TEMPCRON 2>/dev/null
+	echo "$POLL" >> $TEMPCRON 2>/dev/null
+	crontab $TEMPCRON 2>/dev/null
+    fi
+fi
+
+#########################################################################
+#									#
+#	If nlsadmin is installed and if starlan is installed,		#
+#	set up entries for ttysrv.  need this on two codes:		#
+#		1	used by 3b2's for cu and uucico			#
+#			and by 7300's for cu				#
+#		102	used by 7300's for uucico			#
+#									#
+#	cannot set up for other networks at this time because don't	#
+#	know whether they'll provide login service nor, if they do,	#
+#	what the login-server will be named				#
+#									#
+#	we do not remove these entries at uninstall, because 1) we	#
+#	have no way of knowing whether we created 'em or whether they	#
+#	were already there and 2) they don't hurt anything, anyway.	#
+#									#
+#########################################################################
+NLS=/usr/bin/nlsadmin
+ERRMSG="Failed to create listener database entries to allow $PKGNAME\nto use the STARLAN Network:\n\t$NLS exited with code"
+
+if [ -x $NLS ]
+then    #    listener is installed
+
+    if $NLS starlan >/dev/null 2>&1
+    then    #    starlan is installed
+
+        for code in 1 102
+        do
+            if [ "$code" -ge 1 -a "$code" -le 100 ]
+            then
+                cmd="$NLS -m"	# administrative codes from 1 to 100
+            else
+                cmd="$NLS"	# non-administrative codes otherwise
+            fi
+	    # see if service code exists, if it doesn't, create it
+	    $NLS -q -z $code starlan >/dev/null 2>&1
+	    rc=$?
+	    if [ $rc -gt 1 ]
+	    then
+                $cmd -a $code -c"/usr/slan/lib/ttysrv" \
+                    -y"login service" starlan >/dev/null 2>&1
+		rc=$?
+		if [ "$rc" -ne "0" ]
+		then
+		    echo $ERRMSG $rc
+                    echo "\tConsult the documentation for more information."
+                    break
+		fi
+            fi
+        done
+    fi
+fi
+
+
+#	Tell them about syadm uucpmgmt
+echo "
+
+You can use the installed $PKGNAME management menu by typing
+'sysadm' and then descending to the Network Services Management 
+menu.
+
+As part of the initial installation of $PKGNAME you
+should execute the following management commands within the 
+Basic Networking Setup menu.
+(SEE 'Basic Networking Utilities Guide' for more information).
+
+devices:	To provide the $PKGNAME package
+		with information about the devices it can
+		use for outgoing traffic.
+polling:	To initiate the polling of other systems
+		by this system, '`uname -n`'.
+setup:		To initialize the $PKGNAME Devices, Systems,
+		and Polling databases.
+systems:	To provide the $PKGNAME package
+		with the names of systems you want to contact."
+#
+#
+#
+installf -f $PKGINST || error
+#
+exit $errflag

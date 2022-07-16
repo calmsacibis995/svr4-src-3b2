@@ -1,0 +1,7 @@
+#ident	"@(#)pkg.perf:preremove	1.1"
+FAILURE=2		# exit code if anything goes wrong
+MASTER=/etc/master.d	# home of master.d files
+
+/usr/sbin/drvinstall -u -m $MASTER/prf -v 1.0	|| exit $FAILURE
+
+exit 10			# indicates that the system should be rebooted

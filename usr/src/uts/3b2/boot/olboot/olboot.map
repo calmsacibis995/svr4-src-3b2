@@ -1,0 +1,15 @@
+#ident	"@(#)boot:boot/olboot/olboot.map	1.2"
+
+#
+#	mapfile for olboot	(matches COFF's lbld)
+#
+
+olbcode		= LOAD ?RX V0x0217a800 P0x0217a800 L0x3000 A0x200;
+olbbss		= LOAD ?RW V0x02184c00 P0x02184c00 L0x5000 A0x200;
+olbstack	= LOAD ?RW V0x0217d800 P0x0217d800 L0x4000 A0x200;
+
+olbstack :	.stack;
+
+olbcode	:	$PROGBITS ?A;
+
+olbbss	:	$NOBITS ?A;

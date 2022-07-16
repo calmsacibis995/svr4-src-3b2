@@ -1,0 +1,8 @@
+#
+#ident	"@(#)boot:boot/filledt/dcp/filledt.map	1.2"
+#
+#	mapfile for ELF filledt	(matches COFF's ifile)
+#
+control = LOAD ?RX V0x2024000 P0x2024000 L0x9000;
+
+control	:	?A;

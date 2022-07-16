@@ -1,0 +1,12 @@
+*#ident	"@(#)kernel:master.d/prf	1.7"
+*
+* PRF
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ocsn	-	prf	-
+						prfintr(){}
+						maxprf(%i) = {PRFMAX}
+						prfctr[PRFMAX + 1] (%i)
+						prfsym[PRFMAX] (%i)
+$$$
+PRFMAX = 2048

@@ -1,0 +1,36 @@
+#ident	"@(#)pkg.rpc:preremove	1.4"
+
+#-----Remove administrative files
+
+rm -f /etc/publickey || exit 1
+rm -f /etc/netid || exit 1
+
+#-----Remove drivers
+FAILURE=2		# exit code if anything goes wrong
+MASTER=/etc/master.d	# home of master.d files
+
+/etc/drvinstall -u -m $MASTER/ktli -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/krpc -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/ides -v 1.0	|| exit $FAILURE
+
+
+#-----Remove /etc/system entries
+ETCSYSTEM=/etc/system
+COMMENTOUT="*INCLUDE:IDES"
+
+if [ -f $ETCSYSTEM ]; then
+	if grep "$COMMENTOUT" $ETCSYSTEM >/dev/null 2>&1
+	then
+	ed $ETCSYSTEM <<-!  >/dev/null 2>&1
+		g/$COMMENTOUT/d
+		w
+		q
+	!
+	fi
+else
+	echo "**WARNING** ${PKGNAME} cannot remove IDES entry in /etc/system."
+	echo "The entry will have to be deleted manually at a later time."
+fi
+
+
+exit 10			# indicates that the system should be rebooted

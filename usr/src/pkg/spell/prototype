@@ -1,0 +1,31 @@
+#ident	"@(#)pkg.spell:prototype	1.6"
+
+# packaging files
+i	pkginfo
+i	depend
+i	postinstall
+
+# directories
+d	none	/usr		?	?	?
+d	none	/var		?	?	?
+d	none	/var/adm	?	?	?
+d	none	/usr/bin	?	?	?
+d	none	/usr/lib	?	?	?
+d	none	/usr/share	?	?	?
+d	none	/usr/share/lib	?	?	?
+d	none	/usr/lib/spell	555	bin	bin
+d	none	/usr/share/lib/spell	555	bin	bin
+
+# package objects:
+!default 555 bin bin
+f	none	/usr/bin/spell
+f	none	/usr/bin/deroff
+f	none	/usr/share/lib/spell/compress
+f	none	/usr/lib/spell/hashcheck
+f	none	/usr/lib/spell/hashmake
+f	none	/usr/share/lib/spell/hlista		644	bin	bin
+f	none	/usr/share/lib/spell/hlistb		644	bin	bin
+f	none	/usr/share/lib/spell/hstop		644	bin	bin
+f	none	/var/adm/spellhist		666	bin	bin
+f	none	/usr/lib/spell/spellin
+f	none	/usr/lib/spell/spellprog

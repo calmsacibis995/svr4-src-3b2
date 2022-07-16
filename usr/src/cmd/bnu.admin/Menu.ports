@@ -1,0 +1,16 @@
+
+#ident	"@(#)bnu.admin:Menu.ports	1.5"
+
+################################################################################
+#
+#	Module Name:Menu.ports
+#
+#	Functional Description: This menu is a popup menu for ports selection.
+################################################################################
+menu="Port Selection"
+
+`readfile $INTFBASE/ssmenu.msg | message -s`
+
+`shell pmadm -L -t ttymon | cut -f9 -d":" | sed 's/\/dev\///' | regex '^(.*)$0' 
+'name="$m0"
+action=`set -l "Form_Choice=$m0"`CLOSE'`

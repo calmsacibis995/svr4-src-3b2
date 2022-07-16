@@ -1,0 +1,95 @@
+#ident	"@(#)pkg.rfs:postinstall	1.5.7.1"
+#
+# Initialize FAILURE to 1 (fatal error)
+#
+FAILURE=1
+#
+# Install RFS "drivers"
+#
+BOOT=/boot
+MASTER=/etc/master.d
+
+installf $PKGINST $BOOT/RFS f || exit $FAILURE
+installf $PKGINST $MASTER/rfs f || exit $FAILURE
+
+installf $PKGINST $BOOT/SP f || exit $FAILURE
+installf $PKGINST $MASTER/sp f || exit $FAILURE
+
+installf $PKGINST $BOOT/CLONE f || exit $FAILURE
+installf $PKGINST $MASTER/clone f || exit $FAILURE
+
+/etc/drvinstall -d $BOOT/RFS -v 1.0 || exit $FAILURE
+rm -f /etc/rfs/nspip
+
+MAJOR=`/etc/drvinstall -d $BOOT/SP -c 32 -v 1.0` || exit $FAILURE
+
+touch /etc/system
+
+M2=`/etc/drvinstall -d $BOOT/CLONE -nbv 1.0` || exit $FAILURE
+
+
+/etc/mkboot -k /boot/KERNEL || exit $FAILURE
+
+#
+#	rfuadmin have moved from /usr/bin to /etc/rfs
+#
+
+if [ -f /usr/bin/rfudaemon ]
+then
+	rm -f /usr/bin/rfudaemon
+fi
+
+if [ -f /usr/bin/rfuadmin ]
+then
+	mv /usr/bin/rfuadmin /etc/rfs/rfuadmin
+fi
+
+#
+#	Do the idload(1M) command if it needs to be done...
+#
+
+if [ -f /etc/rfs/auth.info/uid.rules -a ! -f /etc/rfs/auth.info/.\<uid.rules\> ]
+then
+	idload >/dev/null 2>&1
+fi
+
+
+#
+#	Initialize service codes for all installed transport providers
+#	but first remove any old, potentially obsolete entries (SVR3.X
+#	entries specify id listen - this should now be root).  Note:
+#	pmadm adds the entry to all currently defined listeners.
+#
+
+NLS=/usr/sbin/nlsadmin
+
+for n in `$NLS -x | sed 's/	.*$//'`
+do
+	$NLS -r 105 $n >/dev/null 2>&1
+done
+pmadm -a -t listen -s 105 -i root -v `$NLS -V` -y "RFS server" -m "`$NLS -c /usr/net/servers/rfs/rfsetup`" >/dev/null 2>&1
+
+#
+#	add entry in /etc/dfs/fstypes
+#
+if [ ! -d /etc/dfs ]
+then	mkdir /etc/dfs
+fi
+
+if [  -s /etc/dfs/fstypes ]
+then	if grep '^rfs' /etc/dfs/fstypes > /dev/null 2>&1
+	then :
+	else echo "rfs	rfs utilities: version 2.0" >> /etc/dfs/fstypes
+	fi
+else	echo "rfs	rfs utilities: version 2.0" > /etc/dfs/fstypes
+fi 
+
+#
+#	wrap up with installf -f  and exit message (required reboot)
+# 	Create /usr/options file for upward compatability
+#
+
+
+installf -f $PKGINST
+#
+exit 	10

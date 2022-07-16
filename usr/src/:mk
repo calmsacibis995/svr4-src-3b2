@@ -1,0 +1,51 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved 
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+#ident	"@(#)mk::mk	1.10.2.1"
+#
+#	Shell script for rebuilding the UNIX System
+#
+trap "exit 1" 1 2 3 15
+if [ "$ROOT" = "" ]
+then
+	PATH=/usr/ccs/bin:/sbin:/usr/sbin:/usr/bin:/etc ; export PATH
+fi
+
+UID_NAME=`id|sed 's/[()]/ /gp'|awk '{print $2}'`
+
+#	create target directories
+./:mktarget
+
+#	install /usr/include and /usr/include/sys header files
+./:mkhead
+./:mksyshead
+#	build and install the C library
+./:mklib libc
+#	build the C compilation tools
+if vax || pdp11
+then
+	./:mkcmd $* cc
+else
+	./:mkcmd sgs
+fi
+#	build the other libraries
+./:mklib \*
+#	build the system administration tools
+if [ "$ROOT" != "" ]
+then
+	./:mkcmd .adm
+fi
+#	build all the commands
+./:mkcmd $* \*
+#	build stand-alone system, if appropriate
+if vax || pdp11
+then
+	./:mkstand
+fi
+#	build the OS itself
+./:mkuts
+exit 0

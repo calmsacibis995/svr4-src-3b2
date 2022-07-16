@@ -1,0 +1,271 @@
+#ident	"@(#)oamintf:syssetup/setup.Help	1.4"
+TITLE: Sets Up Machine Identification and Security
+
+ABSTRACT:
+	This procedure allows you to set up the machine the first time
+	it is used.  It allows the you to define the first logins, set
+	the passwords on administrative logins, set system passwords,
+	set the node name, the date, time and time zone.
+
+	You will be asked to perform the following tasks: datetime,
+	nodename, admpassword and first login(s). These task are summarized 
+	as follows:
+
+	Datetime:
+	The "datetime" task sets the computer the date, time, time zone and 
+	whether your location observes Daylight Savings Time (DST).  The set 
+	task is normally run once when the machine is first set up. 
+	If you observe DST, the computer will automatically start to observe 
+	it in the spring and return to Standard Time in the fall.
+
+	When you execute the datetime task, all logins and processes
+	already running will continue to see the old time.  cron(1M)
+	will be restarted with the new time and time zone if it was
+	already running.
+
+	Nodename:
+	This procedure allows you to display and/or change the system name 
+	and the network node name of this machine.  The system name is used 
+	to identify this machine.  The node name is used by various 
+	communications networks to identify this machine.  Some system 
+	architectures require that the system name and the network node name 
+	be the same.  
+
+	Admpassword:
+	The "admpassword" task allows you to assign, remove or lock
+	an administrative or a system password.
+
+	If you choose "password" under "status", and press SAVE, the screen 
+	will clear and the prompt, "New password:" will appear.  Enter 
+	the new password.  You will then be asked to verify the new 
+	password.  Online help accessed through function keys is unavailable 
+	after the screen clears until you complete the task.  After the task
+	completes, you will be prompted to press <RETURN> to return
+	to the visual interface.
+
+	WARNING!  No one can log in using a login whose password status
+	          is "lock".  Anyone can log in using a login whose
+	          password status is "no password", merely by knowing the
+	          login.
+
+	First login(s):
+	This task uses the "add user" task. The "add user" task allows you
+	to define a new user on your system and the corresponding password
+	information for this user.
+
+	The "add user" task allows you to enter information that
+	defines a new user to your system.  A definition consists
+	of a user name (the name of the person who will be using
+	the login), a login, a numeric user ID, a primary group,
+	optional supplementary groups, a home directory and the
+	program that will be executed automatically when the user
+	logs in (typically the shell, /bin/sh).
+
+setup4:ABSTRACT:
+	Admpassword:
+	The "admpassword" task allows you to assign, remove or lock
+	an administrative or a system password.
+	
+	If you choose "password" under "status", and press SAVE, the screen 
+	will clear and the prompt, "New password:" will appear.  Enter 
+	the new password.  You will then be asked to verify the new 
+	password.  Online help accessed through function keys is unavailable 
+	after the screen clears until you complete the task.  After the task
+	completes, you will be prompted to press <RETURN> to return
+	to the visual interface.
+
+	WARNING!  No one can log in using a login whose password status
+	          is "lock".  Anyone can log in using a login whose
+	          password status is "no password", merely by knowing the
+	          login.
+
+setup3:ABSTRACT
+	First login(s):
+	This task uses the "add user" task. The "add user" task allows you to
+	define a new user on your system and the corresponding password 
+	information for this user.
+
+	The "add user" task allows you to enter information that
+	defines a new user to your system.  A definition consists
+	of a user name (the name of the person who will be using
+	the login), a login, a numeric user ID, a primary group,
+	optional supplementary groups, a home directory and the
+	program that will be executed automatically when the user
+	logs in (typically the shell, /bin/sh).
+
+
+Form.datetime:date:
+	"Date:"  This prompt has three separate fields:
+
+Form.datetime:month:
+	       Month: Enter a valid month.  Choices are Jan-Dec or
+	              January-December.  The default is the current month.
+Form.datetime:day:
+	       Day:   Enter the day of the month.  A valid day falls
+	              within the range 01-31 or 1-31.  The default is
+	              the current day of the month.
+Form.datetime:year:
+	       Year:  Enter the year.  The year must be greater than 1970
+	              and less than 2038.  The default is the current year.
+
+Form.datetime:time:
+	"Time:"  This prompt has two separate fields:
+Form.datetime:hour:
+	       Hour:    Enter the hour of the day.  A valid hour falls
+	                within the range 0-12.  The default is the
+	                current hour.
+Form.datetime:minute:
+	       Minute:  Enter the minute of the hour.  A valid minute
+	                falls within the range 0-59.  The default is the
+	                current minute.
+
+Form.datetime:meridian:
+	"AM/PM:"  Enter either AM or PM.  The default is the current
+	          setting.
+
+timezone:
+	Valid time zone choices for both Standard and Daylight Savings
+	Time are: Greenwich, Atlantic, Eastern, Central, Mountain, Pacific,
+	Yukon, Alaska, Bering, Hawaii and the current time zone. The default 
+	is the current time zone.
+
+Form.datetime:daylight:
+	"Is daylight savings time in effect?:"  Enter "yes" or "no" to 
+	indicate whether or not daylight savings time (DST) is used in your
+	location.  The default is the current setting.
+
+
+Form.nodename:sysname:
+	Enter the system name to call this machine.  The system name is used 
+	to identify this machine.  The name can be up to 8 alphanumeric 
+	characters - ( A through Z, a through z, 0 through 9 ) and can 
+	include a dash and an underbar.
+
+Form.nodename:nodename:
+	Enter the network node name. The node name is used by various 
+	communications networks to identify this machine.  The name can be 
+	up to 8 alphanumeric characters - ( A through Z, a through z, 0 
+	through 9 ) and can include a dash and an underbar.
+
+Form.syspasswd:admlogin:Administrative Login
+	Enter the administrative or system login for password changes.
+	Pressing CHOICES will give you the locked administrative and
+	system logins available on this system. (A login is initialized 
+	with a "locked" password status.)
+
+	WARNING!  No one can log in using a login whose password status
+	          is "lock".  Anyone can log in using a login whose
+	          password status is "no password", merely by knowing the
+	          login.
+
+Menu.syspasswd:admlogin:Administrative Logins
+	Pressing CHOICES will give you the locked administrative and
+	system logins available on this system. You may select any 
+	login and change it's password status to "no password" or
+	"password" or you may leave it "locked".
+
+
+Form.addpswd:pwstat:Password Status
+	Enter the password status for the login.  Pressing CHOICES will
+	give you the following choices:
+	         lock - locks the password so the login cannot be used.
+	         no password - assigns no password to the login
+	         password - assigns a new password to the login
+
+	If you choose "password" under "status", the screen will clear 
+	and the prompt, "New password:" will appear.  Please enter the 
+	new password.  You will then be asked to verify the new password.  
+	After the task completes, you should press <RETURN> to return to 
+	the interface.
+
+	WARNING!  The login is not usable with its status set to "lock",
+	and the login is not secure with its status set to "no password".
+
+Form.addpswd:maximum:Maximum Number of Days the Password is Valid
+	Specify aging information associated with the password.  This is
+	the maximum time the password will be valid.  If left blank,
+	"infinity" is assumed.
+
+Form.addpswd:minimum:Minimum Number of Days Allowed Between Password Changes
+	Specify the length of time that must elapse before the password may
+	be changed again.  If left blank, "0" is the default.
+
+Form.addpswd:warn:Number of Days for Warning Message
+	Enter the number of days for warning message to be displayed
+	prior to login's password expiration.  This number should be in
+	days.
+
+Form.addusr:comments:Comments
+	Enter the name of the new user.  This information will appear in
+	the comment field of the new user's login definition entry.  It
+	must be a character string that does not include (:).
+
+Form.addusr:login:Login
+	Enter the login to be assigned to the new user.  The login
+	is the id the user types to log in to the system.  It must be a
+	character string from 1 to 8 characters in length.  It may not
+	include a colon (:).  The login must be unique (that is, it may
+	not be the same as a login already in use on your system).
+
+Form.addusr:useid:User ID
+	Enter the numeric ID to be assigned to the new user.  The numeric
+	user ID is a number that uniquely identifies the new user on the
+	system.  It must be a number between 100 and the MAXUID value
+	defined for your system (commonly 60000).  The system automatically
+	chooses a default value for this field by picking the next available 
+	nonreserved uid.
+
+Form.addusr:prigrp:Primary Group
+	Enter the primary group the of new user.  The primary group is the
+	group assigned to the user upon login.  It gets associated with all
+	files the user creates unless the user has executed the newgrp(1M)
+	command.  The value entered in the primary group field may be either
+	a valid group name or numerical group id.
+
+Form.addusr:supgrp:Supplementary Group
+	Enter a list of groups for which the user will have supplementary
+	memberships.  For any of these groups, the user may execute the
+	newgrp(1M) command after login and become a member of that group
+	for the duration of that login session.  There is no default value
+	for this field, and you may leave this field blank.
+
+Form.addusr:homedir:Home Directory
+	Enter the path name of the new user's home directory.  It must be
+	a unique home directory i.e. it may not already be used).  The
+	default home directory is "default_base_home_dir/login", where
+	"default_base_home_dir" is "/home" unless you have changed
+	it with the "defaults" task, and "login" is the login of the
+	new user.
+
+Form.addusr:shell:Shell
+	Enter the full path name of an existing shell.  It must be an
+	existing executable file.  The shell is the program that gets
+	executed for the user upon login.
+
+Form.addusr:inact:Login Inactivity
+	Enter the number of days of login inactivity after which user cannot
+	login.
+
+Form.addusr:expire:Login Expiration Date
+	Enter the date beyond which a user cannot log in.  This date
+	must be a future date and can be in the following formats:
+	mm/dd/yy, ddd/yy, Month dd, yyyy.
+
+Text.datenok:ABSTRACT:
+	The system was unable to change the date and time as you
+	requested.  Verify that the system date and time are legitimate.
+	To see the current date and time, run the "date(1)" command.
+
+Text.dateok:ABSTRACT:
+	The "datetime" task has successfully changed the system date
+	and time information.  You may need to log out and log in again
+	to see any time zone changes.  The change will be reflected in all
+	new processes invoked after this time.
+
+Text.nodeokay:ABSTRACT:
+	The system name and node name for your machine have been set as you 
+	requested.  If the node name was set for the first time, simply 
+	provide it to others in your network that need to communicate with
+	your machine.  Otherwise, if the node name was reset, make sure
+	any references to the old node name within the network are changed 
+	as well.

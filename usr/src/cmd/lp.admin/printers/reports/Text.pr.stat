@@ -1,0 +1,14 @@
+#ident	"@(#)lp.admin:printers/reports/Text.pr.stat	1.1"
+
+#	Module Name: Text.wh.stat 
+
+title="Printer Status" 
+
+
+begrow=36
+begrow=1
+rows=18
+columns=72
+scroll=true
+text="`lpstat -p$ARG1`"
+

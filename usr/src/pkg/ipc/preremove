@@ -1,0 +1,10 @@
+#ident	"@(#)pkg.ipc:preremove	1.1"
+FAILURE=2		# exit code if anything goes wrong
+MASTER=/etc/master.d	# home of master.d files
+
+/etc/drvinstall -u -m $MASTER/msg -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/sem -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/shm -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -f -m $MASTER/ipc -v 1.0	|| exit $FAILURE
+
+exit 10			# indicates that the system should be rebooted

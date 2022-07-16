@@ -1,0 +1,162 @@
+#ident	"@(#)cmd-3b2:inst/etc.tape/instt	1.2.1.2"
+#
+# instt
+#
+# Install all the packages from tape.
+# (while booted from the hard disk).
+#
+
+. /inst/etc/define
+
+read TYPE < /inst/etc/type
+
+echo "\nChecking the hard disk file systems." >&2
+/etc/fs/s5/fsck -y -D -b ${ROOT_0}
+
+fstab < /etc/vfstab | while read dev rdev dir junk
+do
+	if [ ${dev} != ${STAND_0} ]
+	then
+		ignore /etc/fs/s5/fsck -y -D ${dev}
+		if fsinfo -s ${dev}
+		then
+			/etc/fs/s5/mount ${dev} ${dir}
+		else
+			echo "The ${dev} (${dir}) file system is corrupt." >&2
+			if [ "'${dir}'" = "'/usr'" ]
+			then
+				fstabmnt -u < /etc/vfstab
+				exit 1
+			else
+				continue
+			fi
+		fi
+	else
+		/etc/fs/bfs/fsck ${dev}
+		>/etc/mnttab
+		/etc/fs/bfs/mount ${dev} ${dir}
+	fi
+done
+sync;sync;sync
+
+# Install all the packages from tape
+
+export DEV_NAME
+case "${TYPE}" in
+ctc)
+	DEV_NAME=/dev/rSA/ctape1
+	/sbin/pump /dev/rSA/ctape1 /lib/pump/ctc
+	;;
+scsi)
+	DEV_NAME=/dev/rSA/qtape1
+	set +e
+	/sbin/pump /dev/rSA/qtape1 /lib/pump/scsi1
+	/sbin/pump /dev/rSA/qtape1 /lib/pump/scsi2
+	set -e
+	;;
+*)
+	echo "instt: Unknown choice ${TYPE}"
+	exit 1 ;;
+esac
+
+while true
+do
+	case `askx -H trace -m "\
+Please insert the UNIX SVR4.0 packages tape number 1.
+When it reaches the end of the medium, please type the device
+name \"${DEV_NAME}\" to continue." \
+	-q "Type \"go\" when ready" -h "\
+There are $TAPE_NUM tapes labelled \"UNIX SVR4.0 packages\". Please
+place the one identified as number 1 in the tape drive." \
+		-c go -c quit` in
+	go)
+		cpio -icdumI ${DEV_NAME}
+		break ;;
+	quit)
+		exit 0
+		;;
+	esac
+done
+
+
+mv /dgmon /stand/dgmon
+#
+# Give correct owner and group for sad and log
+#
+/usr/bin/chown root /dev/sad
+/usr/bin/chgrp sys /dev/sad
+/usr/bin/chown root /dev/sad/admin
+/usr/bin/chgrp sys /dev/sad/admin
+/usr/bin/chown root /dev/sad/user
+/usr/bin/chgrp sys /dev/sad/user
+/usr/bin/chown root /dev/conslog
+/usr/bin/chgrp sys /dev/conslog
+/usr/bin/chown root /dev/log
+/usr/bin/chgrp sys /dev/log
+
+#
+# Check for ld
+#
+
+if [ ! -f /usr/bin/ld ]
+then
+	mv /usr/bin/newld /usr/bin/ld
+else
+	rm -f /usr/bin/newld
+fi
+
+
+#
+# update the /etc/boot_tab used by cunix
+#
+
+fstab < /etc/vfstab | while read dev rdev dir fstype fsckpass automnt flags
+do
+	if [ "'${dir}'" = "'/usr'" ]
+	then
+		echo "${dev} ${rdev} ${dir} ${fstype} ${fsckpass} ${automnt} ${flags}\n"
+	fi
+done	> /etc/boot_tab
+
+if [ ! -s /etc/boot_tab ]
+then
+	echo " '/usr' has to be mounted before cunix \n"
+	exit 1
+fi
+
+mv /stand/unix /stand/mUNIX
+echo "\nCreating unix.\n\n"
+/usr/sbin/cunix -f /stand/system -v -o /stand/unix -x -d
+
+chmod 755 /stand/mUNIX
+chmod 755 /stand/unix
+
+if [ -f /usr/bin/strip ]
+then
+	ignore /usr/bin/strip /stand/mUNIX
+fi
+
+echo "
+This Release of UNIX System V contains software designed to enhance security.
+Two areas affected by this software are 1) the shell, and 2) the User Password
+Mechanism.
+
+Please refer to the Security Section of the UNIX System V Release 4.0 Release
+Notes for further information on how to determine the current security status
+and how to install or remove these security features on your system.
+
+Installation is now complete. The system is restarting itself from
+the hard disk. It will be ready to use when you receive the \"Console
+Login\" prompt." >&2
+
+#unmount all except /usr
+fstabmnt -u -s /usr < /etc/vfstab
+
+rm -rf /inst
+sync;sync;sync
+sleep 5
+
+umount /usr
+sync;sync;sync
+
+exec uadmin 2 1

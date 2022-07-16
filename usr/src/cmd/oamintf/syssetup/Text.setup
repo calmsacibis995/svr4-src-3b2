@@ -1,0 +1,53 @@
+#ident	"@(#)oamintf:syssetup/Text.setup	1.4"
+################################################################################
+#	Module Name: Text.setup
+#	Calling Sequence:
+#	Functional Description: This Text object displays a screen
+#				for the introduction of setup
+#	Functions Called: 
+################################################################################
+
+Title=Sets Up Machine Identification and Security
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp "ABSTRACT"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+begrow=1
+begcol=1
+rows=18
+columns=75
+
+text="
+                           Setup Procedure
+
+   Setup establishes this machine as yours and can make sure that no
+   one else uses it without your permission.  It is assumed that you 
+   have read about "initial setup" in the GETTING STARTED chapter of 
+   the Owner/Operator Manual.'
+   
+   This procedure serves to set up the machine the very first time
+   it is used.  It allows the user to define the first logins,
+   set the passwords on the other user-definable administration 
+   logins, set system passwords, set the node name, and set the date,
+   time and timezone.
+   "
+
+#	(This is for confirmation, warning and repetition text screens
+
+altslks
+
+name=CONT
+button=11
+action=`if [ -f /etc/rc2.d/S00firstcheck ];
+	then
+		mv /etc/rc2.d/S00firstcheck /etc/rc2.d/.S00firstcheck;
+	fi;
+	if [ -f /etc/rc.d/setup ];
+	then
+		mv /etc/rc.d/setup /etc/rc.d/.setup;
+	fi`OPEN FORM $OBJ_DIR/Form.datetime
+
+name=CANCEL
+button=14
+action=CLEANUP

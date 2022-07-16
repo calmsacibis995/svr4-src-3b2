@@ -1,0 +1,44 @@
+#ident	"@(#)lp.admin:printers/printers/add/Form.pwheel	1.2"
+
+form='Removeable Print Wheel Naming Subtask'
+
+help=OPEN MENU $INTFBASE/Text.itemhelp $LININFO
+
+done=`
+	set -e toclose="$toclose $OAMBASE/add-ons/lp/printers/printers/add/Form.pwheel";
+	message -w "Saving print wheel information, please wait.";
+	lpadmin -p $lp_printer -S "$F2" > /dev/null 2> $error; 	
+	if [ "$RET" != "0" -a -s $error ];
+	then
+		echo "OPEN TEXT $OAMBASE/add-ons/lp/printers/printers/add/Text.pwheel";
+	else
+		message -w "Print wheel information saved. Going to next subtask, please wait.";
+		echo "OPEN FORM $OAMBASE/add-ons/lp/printers/printers/add/Form.access";
+	fi;
+`
+
+name='Printer:'
+nrow=1
+ncol=1
+frow=1
+fcol=10
+rows=1
+columns=14
+value=$lp_printer
+inactive=TRUE
+
+name='Print wheel(s) available for this printer:'
+nrow=3
+ncol=1
+frow=3
+fcol=45
+rows=1
+columns=30
+lininfo='pwheel:F2'
+value=none
+scroll=TRUE
+valid=`
+	regex -v "$F2"
+	'[_a-zA-Z0-9]{1,14}(,[_a-zA-Z0-9]{1,14})*'
+`
+fieldmsg="Enter the list of print wheels or font cartridges that are available."

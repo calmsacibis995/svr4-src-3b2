@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/clone	1.6"
+* CLONE - streams clone device interface
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ofsn	-	cln	63	1	-
+

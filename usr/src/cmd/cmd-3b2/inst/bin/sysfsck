@@ -1,0 +1,129 @@
+#ident	"@(#)cmd-3b2:inst/bin/sysfsck	1.7.5.1"
+
+#
+# sysfsck
+#
+# Check integral file systems as specified by arguments
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+set -ue
+myname=${0}
+args="${*:-}"
+mountflag=n
+uflag=n
+
+NO_FSTABMSG="\
+There is no /etc/fstab in your root file system. This is a required file.
+The installation cannot be performed without it." 
+
+REPAIRED_ROOT="\
+The root (\"${ROOT_0}\") file system has been repaired."
+
+DAMAGED_ROOT="\
+The root (\"${ROOT_0}\") file system is significantly damaged."
+
+while [ $# -ne 0 ]
+do
+	case "${1}" in
+	-m)
+		mountflag=y ; shift ;;
+	-r)
+		HARD=${2} ; shift 2 ;;
+	-u)
+		uflag=y ; shift ;;
+	-*)
+		echo "${myname}: \"${1}\": Unknown option" >&2 ; exit 1 ;;
+	esac
+done 
+
+if [ -z "${HARD:-}" ]
+then
+	echo "\
+Usage:	${myname} [ -m -u ] -r (root directory)" >&2
+	exit 1
+fi
+
+echo "\nChecking the hard disk file systems." >&2
+if /etc/fs/s5/fsck -y -D ${ROOT_0}
+then
+	:
+elif /etc/fs/s5/fsck -n -D ${ROOT_0}
+then
+	echo "${REPAIRED_ROOT}" >&2
+else
+	echo "${DAMAGED_ROOT}" >&2
+	exit 1
+fi
+
+#mount root file system
+/etc/fs/s5/mount ${ROOT_0} ${HARD}  2>/dev/null
+
+#check for existence of vfstab or create one from fstab, if any.
+if [ -f ${HARD}/etc/vfstab ] 
+then
+	:
+elif [ -f ${HARD}/etc/fstab ]
+then
+	/inst/bin/toNfstab ${HARD}
+else
+	echo "\n${NO_FSTABMSG}\n" >&2
+	/sbin/umount ${ROOT_0} 2>/dev/null
+	exit 1
+fi
+
+#create a scratch file for fsck - it will be removed by fsck
+> ${HARD}/scratch.fsck
+
+
+fstab < ${HARD}/etc/vfstab | while read dev rdev dir fstype fsckpass junk
+do
+	if [ ${dev} = ${STAND_0} -o "${fsckpass}" = "-" ]
+	then
+		continue
+	fi
+
+	ignore /etc/fs/s5/fsck -y -t${HARD}/scratch.fsck -D ${dev}
+
+	if fsinfo -s ${dev}
+	then
+		if [ "${mountflag}" = y ]
+		then
+			/etc/fs/s5/mount ${dev} ${HARD}/${dir} 2>/dev/null
+		fi
+	else 
+		echo "
+The ${dir} (\"${dev}\") file system is significantly damaged." >&2
+
+		if [ "${uflag}" = y ]
+		then
+			if [ "'${dir}'" = "'/usr'" -o  "'${dir}'" = "'/var'" ]
+			then
+				# unmount all mounted file systems
+				fstabmnt -u < ${HARD}/etc/vfstab
+				/sbin/umount ${ROOT_0} 2>/dev/null
+				exit 1
+			else
+				continue
+			fi
+		fi
+	fi
+done
+
+#do check for any wrong specification of reserved partitions in vfstab.
+if /inst/etc/p_check
+then
+	:
+else
+	# unmount all mounted file systems
+	fstabmnt -u < ${HARD}/etc/vfstab
+	/sbin/umount ${ROOT_0} 2>/dev/null
+	exit 1
+fi
+
+exit 0

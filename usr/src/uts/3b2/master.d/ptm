@@ -1,0 +1,8 @@
+*#ident	"@(#)kernel:master.d/ptm	1.2"
+* PTM   master pseudo terminal
+*
+*FLAG   #VEC    PREFIX  SOFT    #DEV    IPL     DEPENDENCIES/VARIABLES
+fs	-	ptm	-        	
+						ptms_tty[#C] (%i%l%l%l%l)
+						pt_cnt (%i) ={#C}
+

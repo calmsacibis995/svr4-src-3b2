@@ -1,0 +1,11 @@
+*#ident	"@(#)kernel:master.d/fifofs	1.3"
+*
+* FIFOFS - Master File For The STREAMS-based Pipe and FIFO File System Type.
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+orxj	-	fifo       -	-
+						fifoname(%15c)= { NAMEFIFO }
+
+$$$
+
+NAMEFIFO = "fifofs"

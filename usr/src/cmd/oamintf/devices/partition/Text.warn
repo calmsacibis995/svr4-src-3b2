@@ -1,0 +1,33 @@
+#ident	"@(#)oamintf:devices/partition/Text.warn	1.2"
+
+################################################################################
+#	Module Name: Text.warn
+################################################################################
+title="Disk Partitioning"
+
+framemsg=`readfile $INTFBASE/conf.msg`
+
+rows=5
+columns=75
+
+text="
+WARNING: Partitioning may destroy the contents of the disk"
+
+altslks
+
+name=CONT
+button=11
+action=`message -w "Partitioning $ARG1 is in progress";
+
+        part $ARG1 $DEV $NPFILE $ERR;
+
+	if [ $RET -eq 0 ];
+	then
+	   set -l CMD="OPEN TEXT $OBJ_DIR/Text.partok $ARG1";
+	else
+	   set -l CMD="OPEN TEXT $OBJ_DIR/Text.parterr";
+	fi`$CMD
+
+name=CANCEL
+button=14
+action=CLEANUP

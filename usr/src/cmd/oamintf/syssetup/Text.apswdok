@@ -1,0 +1,30 @@
+#ident	"@(#)oamintf:syssetup/Text.apswdok	1.1"
+################################################################################
+#	Module Name: Text.apswdok
+################################################################################
+Title="Defining Administrative and System Login(s) Password Information"
+
+#`set -l LIFE=longterm`
+#lifetime=$LIFE
+
+lifetime=shortterm
+
+framemsg=`readfile $INTFBASE/trept.msg`
+
+rows=6
+columns=75
+
+text="
+The password has been defined as follows: 
+
+   `passwd -s $ARG1`"
+
+altslks
+
+name=CONT
+button=11
+action=`set -l LIFE=shortterm`update $OBJ_DIR/Form.syspasswd true
+
+name=CANCEL
+button=14
+action=CLEANUP

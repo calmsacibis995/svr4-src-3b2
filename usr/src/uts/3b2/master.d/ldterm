@@ -1,0 +1,7 @@
+*#ident	"@(#)kernel:master.d/ldterm	1.2"
+*
+* LDTERM Terminal Line Discipline  Module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	ldtr
+$$

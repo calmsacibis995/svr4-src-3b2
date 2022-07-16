@@ -1,0 +1,313 @@
+#ident	"@(#)lp.admin:printers/printers/modify/Form.conf.rmt	1.2"
+
+form="Configure Printer, \"${lp_printer}\" - Remote Printer Subtask"
+
+help=OPEN TEXT $INTFBASE/Text.itemhelp $LININFO
+
+`indicator -w; set -l name_2="/tmp/lp.n2$VPID";`
+
+done=`
+	message -w "Modifying printer, please wait.";
+ 	if [ "$F1" = "none" -o "$F1" = "" ];
+	then
+		set -f$datafile description="";
+	else
+		set -f$datafile description="-D\"$F1\"";
+	fi;
+
+ 	if [ "$F2" = "" -o "$F2" = "unknown" ];
+	then
+		set -f$datafile Prtype="";
+	else
+		set -f$datafile Prtype="-T$F2";
+	fi;
+	if tput -T $F2 daisy > /dev/null 2>/dev/null;
+	then
+		set -l has_chset=FALSE -l has_pw=TRUE;
+	else
+		tput -T $F2 csnm 0 | set -l tmp;
+		if [ -n "$tmp" ];
+		then
+			set -l has_chset=TRUE -l has_pw=FALSE;
+		else
+			set -l has_chset=FALSE -l has_pw=FALSE;
+		fi;
+	fi;
+	set -e lp_prtype=$F2;
+
+ 	if [ "$F3" = "" -o "$F3" = "none" ];
+	then
+		set -f$datafile Content="";
+	else
+		set -f$datafile Content="-I$F3";
+	fi;
+ 
+	if [ "$F4" = 'yes' -o "$F4" = 'Yes' -o "$F4" = 'YES' ];
+	then
+		set -f$datafile banner="-onobanner";
+	else
+		set -f$datafile banner="-obanner";
+	fi;
+
+ 	if [ "$F5" = "Use printer defaults" ];
+	then
+		set -f$datafile cpi="";
+	else
+	    	set -f$datafile cpi="-o cpi=$F5";
+	fi;
+
+ 	if [ "$F6" = "Use printer defaults" ];
+	then
+		set -f$datafile lpi="";
+	else
+		set -f$datafile lpi="-o lpi=$F6";
+	fi;
+
+ 	if [ "$F7" = "Use printer defaults" ];
+	then
+		set -f$datafile width="";
+	else
+   		set -f$datafile width="-o width=$F7";
+	fi;
+
+ 	if [ "$F8" = "Use printer defaults" ];
+	then
+		set -f$datafile length="";
+	else
+		set -f$datafile length="-o length=$F8";
+	fi;
+
+	shell "LD_BIND_NOW=1 lpadmin -p $lp_printer ${($datafile)description} ${($datafile)Prtype} ${($datafile)Content} ${($datafile)banner} ${($datafile)cpi} ${($datafile)lpi} ${($datafile)width} ${($datafile)length} > /dev/null 2> $error;";
+	if [ "$RET" != "0" -a -s $error ];
+	then
+		echo "OPEN TEXT $OAMBASE/add-ons/lp/printers/printers/modify/Text.error";
+	else
+		echo "OPEN TEXT $OAMBASE/add-ons/lp/printers/printers/modify/Text.confirm";
+	fi;
+`
+
+close=`
+	rm -f $name_2;
+	codestroy -R printers.add.lpcf lpdata;
+	unset	-l lp_errtmp
+		-f$datafile classes
+		-f$datafile description
+		-f$datafile Content
+		-f$datafile banner
+		-f$datafile cpi
+		-f$datafile lpi
+		-f$datafile width
+		-f$datafile length;
+		echo "close $OAMBASE/add-ons/lp/printers/printers/modify/Form.conf.rmt";
+`
+
+#F1
+name='Description of the printer:'
+nrow=1
+ncol=1
+frow=1
+fcol=29
+rows=1
+columns=46
+scroll=true
+value=${($datafile)Description:-none}
+fieldmsg="You may enter a single line of text that will be displayed when requested."
+
+#F2
+name='Printer type:'
+nrow=2
+ncol=1
+frow=2
+fcol=15
+rows=1
+columns=14
+value=${($datafile)prtype:-unknown}
+valid=`
+	inicator -w;
+	if tput -T $F2 longname > /dev/null 2> /dev/null;
+	then
+		echo true;
+	else
+		echo false;
+	fi;
+`
+fieldmsg="Enter a type of printer that is known in the Terminfo database."
+invalidmsg="Invalid entry: Entry must be defined in the Terminfo database."
+
+#F3
+name='File types printable without filtering:'
+nrow=3
+ncol=1
+frow=3
+fcol=41
+rows=1
+columns=14
+value=${($datafile)content:-simple}
+valid=`
+	indicator -w;
+	regex -v "$F3" 
+	'^0$'			'false'
+	'^[_a-zA-Z0-9]{1,30}$'	'true'
+	'^.*$'			'false'`
+invalidmsg="Invalid Entry: File types must be letters, numbers and underscores."
+
+
+#F4
+name='Can a user skip the banner page?'
+nrow=4
+ncol=1
+frow=4
+fcol=34
+rows=1
+columns=3
+rmenu={ yes no }
+menuonly=true
+value=`
+	set -l banneron=${($datafile)Always:Yes};
+	if [ "$banneron" = "" ];
+	then
+		echo no;
+	elif [ "$banneron" = "Yes" ];
+	then
+		echo no;
+	else
+		echo yes;
+	fi
+`
+fieldmsg='Enter "yes" or "no".'
+invalidmsg='Invalid entry:  value must be "yes" or "no".'
+
+#F5
+name='Default character pitch:'
+nrow=5
+ncol=1
+frow=5
+fcol=26
+rows=1
+columns=20
+value=${($datafile)CPI:-Use printer defaults}
+valid=`
+	indicator -w;
+ 	if [ "$F5" = "Use printer defaults" ];
+	then
+	    	echo true;
+	else
+		regex -v "$F5"
+		'^0$'			'fail'
+		'^[0-9]+[ci]$'	'ok'
+		'^[0-9]+$'			'ok'
+		'^.*$'				'fail'
+		| set -l lp_errtmp;
+
+		if [ "$lp_errtmp" = 'ok' ];
+		then
+	    		echo true;
+		else
+	    		echo false;
+		fi;
+	fi;
+`
+invalidmsg='Invalid: value must be a positive integer and can be followed by "c" or "i".'
+fieldmsg='Enter \"Use printer defaults\" or an integer to define characters per interval.'
+
+
+#F6
+name='Default line pitch:'
+nrow=6
+ncol=1
+frow=6
+fcol=21
+rows=1
+columns=20
+value=${($datafile)LPI:-Use printer defaults}
+valid=`
+	indicator -w;
+ 	if [ "$F6" = "Use printer defaults" ];
+	then
+	    	echo true;
+	else
+		regex -v "$F6"
+		'^0$'			'fail'
+		'^[0-9]+[ci]$'	'ok'
+		'^[0-9]+$'			'ok'
+		'^.*$'				'fail'
+		| set -l lp_errtmp;
+
+		if [ "$lp_errtmp" = 'ok' ];
+		then
+	    		echo true;
+		else
+	    		echo false;
+		fi;
+	fi;
+`
+invalidmsg='Invalid: value must be a positive integer and can be followed by "c" or "i".'
+fieldmsg='Enter \"Use printer defaults\" or an integer to define lines per interval.'
+
+#F7
+name='Default page width:'
+nrow=7
+ncol=1
+frow=7
+fcol=21
+rows=1
+columns=20
+value=${($datafile)Width:-Use printer defaults}
+valid=`
+	indicator -w;
+ 	if [ "$F7" = "Use printer defaults" ];
+	then
+	    	echo true;
+	else
+		regex -v "$F7"
+		'^0$'			'fail'
+		'^[0-9]+[ci]$'	'ok'
+		'^[0-9]+$'			'ok'
+		'^.*$'				'fail'
+		| set -l lp_errtmp;
+
+		if [ "$lp_errtmp" = 'ok' ];
+		then
+	    		echo true;
+		else
+	    		echo false;
+		fi;
+	fi;
+`
+invalidmsg='Invalid: value must be a positive integer and can be followed by "c" or "i".'
+fieldmsg='Enter \"Use printer defaults\" or an integer to define page width.'
+
+#F8
+name='Default page length:'
+nrow=8
+ncol=1
+frow=8
+fcol=22
+rows=1
+columns=14
+columns=20
+value=${($datafile)Length:-Use printer defaults}
+valid=`
+	indicator -w;
+ 	if [ "$F8" = "Use printer defaults" ];
+	then
+	    	echo true;
+	else
+		regex -v "$F8"
+		'^0$'			'fail'
+		'^[0-9]+[ci]$'	'ok'
+		'^[0-9]+$'			'ok'
+		'^.*$'				'fail'
+		| set -l lp_errtmp;
+
+		if [ "$lp_errtmp" = 'ok' ];
+		then
+	    		echo true;
+		else
+	    		echo false;
+		fi;
+	fi;
+`
+invalidmsg='Invalid: value must be a positive integer and can be followed by "c" or "i".'
+fieldmsg='Enter \"Use printer defaults\" or an integer to define page length.'
+

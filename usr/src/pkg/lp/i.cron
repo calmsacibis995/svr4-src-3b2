@@ -1,0 +1,14 @@
+#ident	"@(#)pkg.lp:lp/i.cron	1.4"
+
+while read src dest
+do
+    [ "${src}" = "/dev/null" ] && continue
+
+    su lp -c crontab < ${src}
+    if [ $? -ne 0 ]
+    then
+	exit 2
+    fi
+done
+
+exit 0

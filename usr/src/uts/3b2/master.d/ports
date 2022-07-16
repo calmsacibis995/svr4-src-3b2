@@ -1,0 +1,21 @@
+*#ident	"@(#)kernel:master.d/ports	1.3"
+*	< PORTS BOARD master file entry -- STREAMS version >
+*
+* PORTS
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+af	1       npp	-	 5      10  
+						npp_tty[#C*#D] (%0x50)
+						nppcbid[#C*#D] (%s)
+						nppcpid[#C*#D] (%s)
+						npp_cnt(%i) ={#C*#D}
+						npp_board[#C] (%0x7e0)
+						npp_bnbr(%i) ={#C}
+						nsavee[#C*SAVEXP] (%0xc)
+						nmaxsavexp(%i) ={SAVEXP}
+						ncsbit[#C] (%i)
+						nsv_expq_load[#C] (%i)
+						nsv_expq_unload[#C] (%i)
+$$$
+
+SAVEXP =	125

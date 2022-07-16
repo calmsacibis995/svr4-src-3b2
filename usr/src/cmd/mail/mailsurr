@@ -1,0 +1,51 @@
+#ident	"@(#)mail:mail/mailsurr	1.4"
+# @(#)mailsurr	2.8 'attmail mail(1) command'
+#
+# /etc/mail/mailsurr MUST exist in order to send remote mail.
+#
+# Entries are of the form:
+# 'Originator RE' 'Recipient RE' 'Command Field'
+# See mailsurr(4) for details.
+##################################################################
+
+# Prevent all shell meta-characters
+#
+'.+'	'.*[`;&|^<>()].*'	'Deny'
+
+# Map all names of the form local-machine!user -> user
+#
+'.+'	'%L!(.+)'		'Translate R=\\1'
+
+# Map all names of the form uname!user -> user
+# This must be turned on when using mail in a cluster environment.
+#
+#'.+'	'%U!(.+)'		'Translate R=\\1'
+
+# Map all names of the form user@host -> host!user
+#
+'.+'	'([^!@]+)@(.+)'		'Translate R=\\2!\\1'
+
+# Map all names of the form host.uucp!user -> host!user
+#
+'.+'	'([^!@]+)\\.uucp!(.+)'	'Translate R=\\1!\\2'
+
+# Map all names of the form host.local-domain!user -> host!user
+# DOMAIN= within /etc/mail/mailcnfg will override getdomainame(3).
+#
+'.+'	'([^!@]+)%D!(.+)'	'Translate R=\\1!\\2'
+
+# Run all local names through the mail alias processor
+#
+'.+'	'[^!@]+'		'Translate R=|/usr/bin/mailalias %n'
+
+# For remote mail via uucp
+#
+'.+'	'([^!@.]+)!(.+)'	'< /usr/bin/uux - \\1!rmail (\\2)'
+
+# For remote mail via smtp
+#'.+'	'([^!@]+)!(.+)'		'< /usr/lib/mail/surrcmd/smtpqer %R \\1 \\2'
+
+# If none of the above work, then ship remote mail off to a smarter host.
+# Make certain that SMARTERHOST= is defined within /etc/mail/mailcnfg.
+#
+#'.+'	'.*[!@].*'		'Translate R=%X!%n'

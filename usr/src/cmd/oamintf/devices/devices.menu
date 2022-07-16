@@ -1,0 +1,12 @@
+#ident	"@(#)oamintf:devices/devices.menu	1.9"
+#menu#Storage Device Operations and Definitions
+#life#permanent
+
+copy^Makes Duplicate Copies of Storage Volumes^copy/copy.menu
+descriptions^Device Alias and Attribute Management^devices/devices.menu
+display^Displays Information About Storage Devices^display/display.menu
+erase^Erases the Contents of Storage Volumes^erase/erase.menu
+format^Formats Removable Volumes^format/format.menu
+groups^Device Group Management^groups/groups.menu
+partition^Partitions Disks^partition/part.menu
+remove^Removes Storage Devices from the System^remove/remove.menu

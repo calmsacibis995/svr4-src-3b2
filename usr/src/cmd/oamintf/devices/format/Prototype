@@ -1,0 +1,11 @@
+#ident	"@(#)oamintf:devices/format/Prototype	1.2"
+!MENU=/usr/sadm/sysadm/menu
+!INTFBIN=/usr/sadm/sysadm/bin
+
+d intf $MENU/devices/format 0755 bin bin
+v intf $MENU/devices/format/format.menu 0644 bin bin
+f intf $MENU/devices/format/Form.diskette 0644 bin bin
+f intf $MENU/devices/format/Text.fmterr  0644 bin bin
+f intf $MENU/devices/format/Text.diskette 0644 bin bin
+f intf $MENU/devices/format/Text.flopok 0644 bin bin
+f intf $MENU/devices/format/Help 0644 bin bin

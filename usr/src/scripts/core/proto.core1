@@ -1,0 +1,263 @@
+/dev/null
+3226 416
+d--755 0 3
+	unix		---500 0 0	../COREunix
+	dgmon		---500 0 0	../init/fwnull
+	filledt		---500 0 0	../filledt
+	dgn		d--775 0 0
+		edt_data	---400 0 0	../dgn/edt_data
+		.edt_swapp	---400 0 0	../dgn/.edt_swapp
+	$
+	dev		d--775 0 3
+		SA	d--775 0 0
+		$
+		rSA	d--775 0 0
+		$
+		term	d--775 0 0
+		$
+		pts	d--775 0 0
+		$
+		boot		b--400 0 3	17 135
+		console		c--622 0 3	0 0
+		systty		c--622 0 3	0 0
+		syscon		c--622 0 3	0 0
+		contty		c--622 0 3	0 1
+		icd0		b--666 0 3	31 0
+		icd1		b--666 0 3	31 1
+		swap		b--666 0 3	31 1
+		sad	d--555 0 3
+			admin	        c--600 0 3      30 1	
+			user	        c--666 0 3      30 0	
+		$
+		dsk	d--775 0 0
+			c0d0s0		b--600 0 3	17 128
+			c0d0s1		b--600 0 3	17 129
+			c0d0s2		b--600 0 3	17 130
+			c0d0s3		b--600 0 3	17 131
+			c0d0s4		b--600 0 3	17 132
+			c0d0s5		b--600 0 3	17 133
+			c0d0s6		b--600 0 3	17 134
+			c0d0s7		b--600 0 3	17 135
+			c1d0s0		b--600 0 3	17 0
+			c1d0s1		b--600 0 3	17 1
+			c1d0s2		b--600 0 3	17 2
+			c1d0s3		b--600 0 3	17 3
+			c1d0s4		b--600 0 3	17 4
+			c1d0s5		b--600 0 3	17 5
+			c1d0s6		b--600 0 3	17 6
+			c1d0s7		b--600 0 3	17 7
+			c1d0s8		b--600 0 3	17 8
+			c1d0s9		b--600 0 3	17 9
+			c1d0sa		b--600 0 3	17 10
+			c1d0sb		b--600 0 3	17 11
+			c1d0sc		b--600 0 3	17 12
+			c1d0sd		b--600 0 3	17 13
+			c1d0se		b--600 0 3	17 14
+			c1d0sf		b--600 0 3	17 15
+	 		c1d1s0		b--600 0 3  	17 16
+ 			c1d1s1		b--600 0 3  	17 17
+ 			c1d1s2		b--600 0 3  	17 18
+ 			c1d1s3		b--600 0 3  	17 19
+ 			c1d1s4		b--600 0 3  	17 20
+ 			c1d1s5		b--600 0 3  	17 21
+ 			c1d1s6		b--600 0 3  	17 22
+ 			c1d1s7		b--600 0 3  	17 23
+			c1d1s8		b--600 0 3	17 24
+			c1d1s9		b--600 0 3	17 25
+			c1d1sa		b--600 0 3	17 26
+			c1d1sb		b--600 0 3	17 27
+			c1d1sc		b--600 0 3	17 28
+			c1d1sd		b--600 0 3	17 29
+			c1d1se		b--600 0 3	17 30
+			c1d1sf		b--600 0 3	17 31
+		$
+		hdelog		c--600 0 3	16 0
+		kmem		c--440 3 3	19 1
+		mem		c--440 3 3	19 0
+		null		c--666 0 3	19 2
+		zero		c--666 0 3	19 3
+		rdsk	d--775 0 0
+			c0d0s0		c--600 0 3	17 128
+			c0d0s1		c--600 0 3	17 129
+			c0d0s2		c--600 0 3	17 130
+			c0d0s3		c--600 0 3	17 131
+			c0d0s4		c--600 0 3	17 132
+			c0d0s5		c--600 0 3	17 133
+			c0d0s6		c--600 0 3	17 134
+			c0d0s7		c--600 0 3	17 135
+			c1d0s0		c--600 0 3	17 0
+			c1d0s1		c--600 0 3	17 1
+			c1d0s2		c--600 0 3	17 2
+			c1d0s3		c--600 0 3	17 3
+			c1d0s4		c--600 0 3	17 4
+			c1d0s5		c--600 0 3	17 5
+			c1d0s6		c--600 0 3	17 6
+			c1d0s7		c--600 0 3	17 7
+			c1d0s8		c--600 0 3	17 8
+			c1d0s9		c--600 0 3	17 9
+			c1d0sa		c--600 0 3	17 10
+			c1d0sb		c--600 0 3	17 11
+			c1d0sc		c--600 0 3	17 12
+			c1d0sd		c--600 0 3	17 13
+			c1d0se		c--600 0 3	17 14
+			c1d0sf		c--600 0 3	17 15
+	 		c1d1s0		c--600 0 3  	17 16
+ 			c1d1s1		c--600 0 3  	17 17
+ 			c1d1s2		c--600 0 3  	17 18
+ 			c1d1s3		c--600 0 3  	17 19
+ 			c1d1s4		c--600 0 3  	17 20
+ 			c1d1s5		c--600 0 3  	17 21
+ 			c1d1s6		c--600 0 3  	17 22
+ 			c1d1s7		c--600 0 3  	17 23
+			c1d1s8		c--600 0 3	17 24
+			c1d1s9		c--600 0 3	17 25
+			c1d1sa		c--600 0 3	17 26
+			c1d1sb		c--600 0 3	17 27
+			c1d1sc		c--600 0 3	17 28
+			c1d1sd		c--600 0 3	17 29
+			c1d1se		c--600 0 3	17 30
+			c1d1sf		c--600 0 3	17 31
+		$
+		rroot		c--600 0 3	17 0
+		root		b--600 0 3	17 0
+		tty		c--666 0 3	20 0
+		fd		d--555 0 0
+		$
+	$
+	tmp	d--777 4 4
+		$
+	etc	d--775 0 3
+		TIMEZONE	---444 0 3	../etc/TIMEZONE
+		inittab		---664 0 3	inst/etc/inittabf
+		iu.ap		---644 0 3	../etc/iu.ap
+		mnttab		---644 0 2	/dev/null
+		group		---644 0 3	../etc/group
+		passwd		---644 0 3	../etc/passwd
+		shadow		---600 0 3	../etc/shadow
+		fs	d--775 0 3
+			bfs	d--775 0 3
+				fsck	---555 2 2	../etc/fs/bfs/fsck
+				mkfs	---555 2 2 	../etc/fs/bfs/mkfs
+				mount	---555 2 2 	../etc/fs/bfs/mount
+			$
+			s5	d--775 0 3
+				fsck	---555 2 2	../etc/fs/s5/fsck
+				mkfs	---555 2 2	../etc/fs/s5/mkfs
+				mount	---555 2 2	../etc/fs/s5/mount
+			$
+			fd	d--775 0 3
+				mount	---555 2 2	../etc/fs/fd/mount
+			$
+		$
+	$
+	inst	d--775 0 3
+		bin	d--775 0 3
+			ckdf		---555 2 2	inst/bin/ckdf
+			fstabmnt	---555 2 2	inst/bin/fstabmnt
+			fsys		---550 0 0	inst/bin/fsys
+			partition	---555 2 2	inst/bin/partition
+			pdinfo		---555 2 2	inst/bin/pdinfo
+			dswap		---555 2 2	inst/bin/dswap
+			sysfsck		---555 2 2	inst/bin/sysfsck
+			ttyset		---555 2 2	inst/bin/ttyset
+			pnewboot	---555 2 2	inst/bin/pnewboot
+			fstab		---555 2 2	inst/bin/fstab
+			scat		---555 2 2	inst/bin/scat
+			dlabelit	---555 2 2	inst/bin/dlabelit
+			movefiles	---444 2 2	inst/bin/movefiles
+			optpart		---555 2 2 	inst/bin/optpart
+			savefiles	---444 2 2	inst/bin/savefiles
+			toNfstab	---555 2 2	inst/bin/toNfstab
+			upgrade		---555 2 2	inst/bin/upgrade
+		$
+		etc	d--775 0 3
+			define		---444 2 2	inst/etc/define
+			define.min	---444 2 2	inst/etc/define.min
+			do_setup	---444 2 2	inst/etc/do_setup
+			inittabh	---444 2 2	inst/etc/inittabh
+			inittabl	---444 2 2	inst/etc/inittabl
+			inittabt	---444 2 2	inst/etc/inittabt
+			inittabht	---444 2 2	inst/etc/inittabht
+			instf		---555 2 2	inst/etc/instf
+			asktype		---555 2 2	inst/etc/asktype
+			instl		---555 2 2	inst/etc/instl
+			instt		---555 2 2	inst/etc/instt
+			instth		---555 2 2	inst/etc/instth
+			instht		---555 2 2	inst/etc/instht
+			insth		---555 2 2	inst/etc/insth
+			p_check		---555 2 2	inst/etc/p_check
+		$
+		final	d--775 0 3
+			usr	d--775 0 3
+				lbin	d--775	2 2
+					askx		---555 2 2	../usr/lbin/askx
+					fsinfo		---555 2 2	../usr/lbin/fsinfo
+					ignore		---555 2 2	../usr/lbin/ignore
+					vmkfs		---555 2 2	../usr/lbin/vmkfs
+					mklost+found	---555 2 2	../usr/lbin/mklost+found
+					rmkdir		---555 2 2	../usr/lbin/rmkdir
+					rrmdir		---555 2 2	../usr/lbin/rrmdir
+				$
+			$
+		$
+		root	d--775 0 3
+		$
+	$
+	sbin	d--775 0 3
+		init		---555 0 2	../sbin/init
+		fmthard		---555 0 0	../sbin/fmthard
+		uadmin		---555 0 3	../sbin/uadmin
+		sh		---555 2 0	../sbin/sh
+		sync		---555 2 2	../sbin/sync
+		autopush	---555 0 3	../sbin/autopush
+		umount		---555 2 2	../sbin/umount
+	$
+	usr	d--775 0 3
+		bin	d--775 0 2
+			expr		---555 2 2	../usr/bin/expr
+			false		---555 2 2	../usr/bin/false
+			ln		---555 2 2	../usr/bin/ln
+			rm		---555 2 2	../usr/bin/rm
+			true		---555 2 2	../usr/bin/true
+			cpio		---555 2 2	../usr/bin/cpio
+			find		---555 2 2	../usr/bin/find
+			mkdir		---555 2 2	../usr/bin/mkdir
+			rmdir		---555 2 2	../usr/bin/rmdir
+			chmod		---555 2 2	../usr/bin/chmod
+		$
+		sbin	d--775 0 2
+			chroot		---555 2 2	../usr/sbin/chroot
+			newboot		---555 2 2	../usr/sbin/newboot
+			prtvtoc		---555 0 3	../usr/sbin/prtvtoc
+		$
+		lib	d--775 0 2
+			mboot		---555 0 0	../usr/lib/mboot
+			boot		---555 0 0	../usr/lib/boot
+			fs	d--775 0 2
+				s5	d--775 0 2
+					df	---555 2 2	../usr/lib/fs/s5/df
+				$
+				bfs	d--775 0 2
+				$
+				proc	d--775 0 2
+				$
+				events	d--775 0 2
+				$
+			$
+		$
+	$
+	var	d--775 0 3
+		adm	d--775 0 3
+			utmp		---644 0 2	/dev/null
+		$
+	$
+	install d--775 0 3
+	$
+	stand 	d--775 0 3
+	$
+	lib 	d--775 0 3
+	$
+	bin 	d--775 0 3
+	$
+$
+:#ident	"@(#)core:proto.core1	1.15.4.6"

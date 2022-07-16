@@ -1,0 +1,163 @@
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any
+#	actual or intended publication of such source code.
+
+
+#ident	"@(#)mk:target.dirs	1.2.2.8"
+# The format of this file is:
+#	DIRECTORY	[MODE	OWNER	GROUP	OLD-DIRECTORY-NAME[s]]
+# The MODE/OWNER/GROUP may be left blank or else 
+# dashes may be used as place holders.
+/	755	root	sys
+/bck	775	root	sys
+/boot	775	root	sys
+/config	775	root	bin
+/dev	775	root	sys
+/dev/term	775	root	root
+/dgn	775	root	root
+/etc	775	root	sys
+/etc/cron.d	755	root	sys	/usr/lib/cron
+/etc/default	775	root	sys
+/etc/dfs	775	root	sys
+/etc/fs	775	root	sys
+/etc/fs/bfs	775	root	sys
+/etc/fs/proc	775	root	sys
+/etc/fs/rfs	775	root	sys
+/etc/fs/s5	775	root	sys
+/etc/init.d	775	root	sys
+/etc/mail	775	bin	mail
+/etc/master.d	775	root	sys
+/etc/rc.d	775	root	sys
+/etc/rc0.d	775	root	sys
+/etc/rc1.d	775	root	sys
+/etc/rc2.d	775	root	sys
+/etc/rc3.d	775	root	sys
+/etc/rfs	775	root	sys
+/etc/saf	755	bin	bin
+/etc/save.d	775	root	sys
+/etc/shutdown.d	775	root	sys
+/etc/tm	775	root	sys
+/etc/vtoc	775	root	sys
+/export	775	root	sys
+/home	775	root	sys
+/mnt	775	root	sys
+/opt	775	root	sys
+/proc	755	root	sys
+/save	775	root	sys
+/sbin	775	root	sys
+/stand	755	root	sys
+/tmp	1777	sys	sys
+/usr	775	root	sys
+/usr/admin	755	root	sys
+/usr/admin/checkfsys.d	755	root	sys
+/usr/admin/makefsys.d	755	root	sys
+/usr/admin/menu	755	root	sys
+/usr/admin/menu/diagnostics	755	root	sys
+/usr/admin/menu/diskmgmt	755	root	sys
+/usr/admin/menu/diskmgmt/checkfsys.d	755	root	sys
+/usr/admin/menu/diskmgmt/cpdisk.d	755	root	sys
+/usr/admin/menu/diskmgmt/erase.d	755	root	sys
+/usr/admin/menu/diskmgmt/format.d	755	root	sys
+/usr/admin/menu/diskmgmt/harddisk	755	root	sys
+/usr/admin/menu/diskmgmt/harddisk/display.d	755	root	sys
+/usr/admin/menu/diskmgmt/harddisk/partitioning.d	755	root	sys
+/usr/admin/menu/diskmgmt/harddisk/rmdisk.d	755	root	sys
+/usr/admin/menu/diskmgmt/makefsys.d	755	root	sys
+/usr/admin/menu/diskmgmt/mountfsys.d	755	root	sys
+/usr/admin/menu/diskmgmt/umountfsys.d	755	root	sys
+/usr/admin/menu/filemgmt	755	root	sys
+/usr/admin/menu/filemgmt/backup.d	755	root	sys
+/usr/admin/menu/filemgmt/bupsched	755	root	sys
+/usr/admin/menu/filemgmt/restore.d	755	root	sys
+/usr/admin/menu/filemgmt/store.d	755	root	sys
+/usr/admin/menu/machinemgmt	755	root	sys
+/usr/admin/menu/packagemgmt	755	root	sys
+/usr/admin/menu/softwaremgmt	755	root	sys
+/usr/admin/menu/softwaremgmt/installpkg.d	755	root	sys
+/usr/admin/menu/softwaremgmt/removepkg.d	755	root	sys
+/usr/admin/menu/softwaremgmt/runpkg.d	755	root	sys
+/usr/admin/menu/syssetup	755	root	sys
+/usr/admin/menu/ttymgmt	755	root	sys
+/usr/admin/menu/usermgmt	755	root	sys
+/usr/admin/menu/usermgmt/modgroup	755	root	sys
+/usr/admin/menu/usermgmt/moduser	755	root	sys
+/usr/admin/mountfsys.d	755	root	sys
+/usr/admin/umountfsys.d	755	root	sys
+/usr/bin	775	root	bin	/bin
+/usr/ccs	755	bin	bin
+/usr/ccs/bin	755	bin	bin
+/usr/ccs/lib	755	bin	bin
+/usr/ccs/lib/fp	755	bin	bin
+/usr/ccs/lib/fp/libp	755	bin	bin
+/usr/ccs/lib/minabi	755	bin	bin
+/usr/ccs/lib/minabi/libp	755	bin	bin
+/usr/include	775	root	bin
+/usr/lbin	775	bin	bin
+/usr/lib	775	root	bin	/lib	/shlib
+/usr/lib	775	root	bin
+/usr/lib/cftime	775	bin	bin
+/usr/lib/chrclass	775	bin	bin
+/usr/lib/chrtbl	775	bin	bin
+/usr/lib/class	775	root	bin
+/usr/lib/class/RT	775	root	bin
+/usr/lib/class/TS	775	root	bin
+/usr/lib/config	775	bin	bin
+/usr/lib/font	775	bin	bin
+/usr/lib/fs	775	root	sys	
+/usr/lib/fs/bfs	775	root	sys
+/usr/lib/fs/proc	775	root	sys
+/usr/lib/fs/rfs	775	root	sys
+/usr/lib/fs/s5	775	root	sys
+/usr/lib/lex	775	bin	bin
+/usr/lib/libp	775	bin	bin
+/usr/lib/macros	775	bin	bin
+/usr/lib/mail	775	bin	mail
+/usr/lib/mail/surrcmd	775	bin	mail
+/usr/lib/mailx	775	root	sys
+/usr/lib/pump	775	bin	bin
+/usr/lib/rfs	775	root	sys
+/usr/lib/sa	775	adm	bin
+/usr/lib/saf	775	root	bin
+/usr/lib/tabset	775	bin	bin
+/usr/lib/term	775	bin	bin
+/usr/lib/tmac	775	bin	bin
+/usr/lib/trouble	775	bin	bin
+/usr/net	775	root	sys
+/usr/net/servers	775	root	sys
+/usr/net/servers/rfs	775	root	sys
+/usr/sadm	555	bin	bin
+/usr/sadm/sysadm	555	bin	bin
+/usr/sadm/sysadm/add-ons	555	bin	bin
+/usr/sbin	775	root	bin
+/usr/share	755	root	sys
+/usr/share/lib	755	root	sys	/usr/pub
+/usr/share/man	755	root	sys
+/usr/src	775	bin	bin
+/usr/ucb	775	root	bin
+/var	775	root	sys
+/var/adm	775	root	sys	/usr/adm
+/var/adm/log	775	adm	adm	/etc/log
+/var/adm/passwd	775	adm	adm
+/var/adm/sa	775	adm	sys
+/var/cron	755	root	sys
+/var/mail	775	root	mail	/usr/mail
+/var/mail/:saved	775	root	mail
+/var/news	777	bin	bin	/usr/news
+/var/options	775	root	sys	/usr/options
+/var/preserve	777	bin	bin	/usr/preserve
+/var/sadm	755	root	sys
+/var/saf	755	bin	bin
+/var/spool	775	root	bin	/usr/spool
+/var/spool/cron	0700	root	sys
+/var/spool/cron/atjobs	755	root	sys
+/var/spool/cron/crontabs	755	root	sys
+/var/spool/lp	755	lp	tty
+/var/spool/pkg	777	bin	bin
+/var/spool/smtpq	775	root	mail
+/var/spool/uucp	755	uucp	uucp
+/var/spool/uucppublic	777	uucp	uucp
+/var/tmp	1777	sys	sys	/usr/tmp
+/var/uucp	755	uucp	uucp

@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:networks/networks.menu	1.2"
+#menu#Network Administration
+#help#networks.help^Network Management
+#life#permanent

@@ -1,0 +1,9 @@
+#ident	"@(#)pkg.sysadm:preremove	1.2"
+
+#
+# Remove all the files that were copied by postinstall. 
+#
+
+rm -f /usr/sbin/fsdb
+rm -f /etc/fsdb
+rm -f /usr/lib/fs/s5/fsdb

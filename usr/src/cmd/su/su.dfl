@@ -1,0 +1,3 @@
+#ident	"@(#)su:su.dfl	1.2"
+SULOG=/var/adm/sulog
+#CONSOLE=/dev/console

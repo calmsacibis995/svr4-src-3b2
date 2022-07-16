@@ -1,0 +1,6 @@
+#ident	"@(#)oamintf:diagnostics/diag.menu	1.4"
+#menu#Diagnosing System Errors
+#life#permanent
+
+diskrepair^Advises about Disk Error Repairs^repair/Text.repair1
+diskreport^Reports Disk Errors^report/Text.report1

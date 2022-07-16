@@ -1,0 +1,21 @@
+#ident	"@(#)bnu:preinstall	1.13.5.7"
+#
+#	Pre installation procedure for "Basic Networking Utilities"
+#	This will be changing radically with SAF and QFT feature changes
+#	in SVR4.0, hence the failure to use OAM techniques in most places.
+
+# uugetty may be around from last release, remove it so administrators
+#	don't find it an expect it to work.
+rm -rf  $BASEDIR/usr/lib/uucp/uugetty
+
+#	If user wants to change nodename, do it here...
+
+if [ "`uname -n`" != "$NODENAME" -a "$NODENAME" != "" ]
+    then
+	uname -S ${NODENAME}
+	date +"#	Node name changed %D %T.
+if test -z \"\`uname -n\`\"
+then
+uname -S ${NODENAME}
+fi" >/etc/rc.d/nodename
+fi

@@ -1,0 +1,411 @@
+#ident	"@(#)cmd-3b2:inst/etc/instf	1.22.7.2"
+
+#
+# instf  
+#
+# Installs a basic UNIX system on the hard disk from a booted
+# floppy. The resultant hard disk system will install the remainder
+# of the Essential Utilities floppies.
+#
+
+#get installation type from user and attach hard disk swap partition
+. /inst/etc/define.min		#minimum defines necessary 
+. /inst/etc/asktype		#TYPE variable set to installation type
+
+. /inst/etc/define
+. /inst/etc/do_setup
+
+#assign: DRIVEID_0 DRIVEID_1 CYLSIZE_0 CYLSIZE_1 NSECTOR_0 NSECTOR_1 EXIST_STAND_0
+eval `pdinfo /dev/rdsk/c1d1s6 /dev/rdsk/c1d0s${p_root}`
+
+#
+# Check for a dual-disk system
+#
+if [ -n "${DRIVEID_1:-}" ]
+then
+	PARTN2_MSG="\
+The hard disks are divided into several logical partitions.  Those named 
+\"root\", \"swap\" and \"usr\" are needed by the system.  Default partitioning
+will place \"root\" and \"swap\" on disk 1 and \"usr\" on disk 2.  Their sizes 
+cannot be adjusted once the system is active.  Additional partitions may 
+also be created at your discretion.  See the \"3B2 Computer System Admin-
+istration  Utilities  Guide\"   for more information regarding hard disk
+partitioning."
+	LEAVE_DISK2_MSG="\
+You have two hard disks connected.  You can choose to leave your second disk alone
+and do installation on 1st disk only.  If your first disk is less than 
+72MB, installation will be aborted."
+
+fi
+
+PARTN1_MSG="\
+The hard disk is divided into  several logical  partitions.  Those named 
+\"root\", \"swap\" and \"usr\" are needed by the system. Their sizes cannot be 
+adjusted once the  system is active.  Additional  partitions may also be 
+created at your discretion.  See the \"3B2 Computer System Administration
+Utilities Guide\" for more information about hard disk partitioning."
+
+
+HELPMEDIA="\
+If the SVR4.0 packages you got are entirely on floppy diskettes,
+you should choose the \"Full Restore From Floppies\".
+If the packages is a combination of 6 floppies and 2 cartridge 
+tapes, please select the \"Full Restore From CTC Tapes\"".
+
+SPACE_PROB="\
+WARNING: The free space on your existing \"usr\" file system
+is not sufficient for conversion to the new filesystem independent
+booting method.  If you choose to continue, you will still be
+able to boot the standard System V filesystem, but will not be
+able to change the filesystem type of your root."
+
+#vtoc used when second disk is 32mB size - to put user on 1st disk
+S1_VTOC="\
+    0		2	00		14256		18144
+    1		3	01		100		14156
+    2		4	00		37908		96066
+    3		6	00		32400		5508
+    6		5	01		0		149526
+    7		1	01		0		100
+    9		8	00		133974		15552"
+
+S2_VTOC="\
+    6		5	01		0		62550
+    7		1	01		0		162
+    8		7	00		162		10044
+    10		0	00		10206		52344"
+
+
+#vfstab for full restore - one disk -default partitioning
+DFL1_FSTAB="\
+${STAND_0}	${RSTAND_0}	/stand	bfs		1	yes	-
+${HOME_0}	${RHOME_0}	/home	${DEF_FS}	1	yes	-
+${USR_0}	${RUSR_0}	/usr	${DEF_FS}	1	yes	-
+${VAR_0}	${RVAR_0}	/var	${DEF_FS}	1	yes	-
+/dev/fd		-		/dev/fd	fd		-	no	-"
+
+#vfstab for full restore - two disk -default partitioning
+DFL2_FSTAB="\
+${STAND_0}	${RSTAND_0}	/stand	bfs		1	yes	-
+${HOME_0}	${RHOME_0}	/home	${DEF_FS}	1	yes	-
+${USR_1}	${RUSR_1}	/usr	${DEF_FS}	1	yes	-
+${VAR_1}	${RVAR_1}	/var	${DEF_FS}	1	yes	-
+${HOME2_1}	${RHOME2_1}	/home2	${DEF_FS}	1	yes	-
+/dev/fd		-		/dev/fd	fd		-	no	-"
+
+#vfstab for full restore - two disk - when 2nd disk is 32MB, usr goes on first disk.
+DFL3_FSTAB="\
+${STAND_0}	${RSTAND_0}	/stand	bfs		1	yes	-
+${HOME_0}	${RHOME_0}	/home	${DEF_FS}	1	yes	-
+${USR_0}	${RUSR_0}	/usr	${DEF_FS}	1	yes	-
+${VAR_1}	${RVAR_1}	/var	${DEF_FS}	1	yes	-
+${HOME2_1}	${RHOME2_1}	/home2	${DEF_FS}	1	yes	-
+/dev/fd		-		/dev/fd	fd		-	no	-"
+
+while :
+do
+	case "${TYPE}" in
+
+	full)
+		case `askx -H shell -m "
+	1)  Full Restore From Floppies
+	2)  Full Restore From CTC Tapes"\
+		-h "\
+
+${HELPMEDIA}" \
+		-c 1 -c 2 -c quit -q "Selection?"` in
+		1)
+			;;
+		2)
+			TYPE=ctc;;
+		quit)
+			exit 0;;
+		shell)
+			/sbin/sh   
+			continue ;;
+		esac
+
+		if [ -n "${DRIVEID_1:-}" ]
+		then
+			case `askx  -H shell -c y -c n -m "
+-- Full Restore --
+
+${LEAVE_DISK2_MSG}" \
+		    -q "Do you want to use your second disk?"  ` in
+			y)
+				PARTN_MSG=$PARTN2_MSG
+				;;
+			n)
+				PARTN_MSG=$PARTN1_MSG
+				DRIVEID_1= 
+				;;
+			shell)
+				/sbin/sh
+				continue ;;
+			esac
+		else
+			PARTN_MSG=$PARTN1_MSG
+			
+		fi
+
+
+		rm -f /.profile /sbin/-sh
+
+
+		xx=`askx -c y -c n -c quit \
+			-q "Use the default hard disk partitioning?" \
+			-h "${PARTN_MSG}"` 
+
+		case ${xx} in
+
+		n)
+			while true
+			do
+				FSTAB="`partition`" 
+				echo "${FSTAB}">/inst/etc/vfstab
+
+
+				USR_CHOICE=own
+
+				case `askx -m "\
+This completes the interactive partitioning of your disk${DRIVEID_1:+s}. Enter
+\"go\" if you are ready to proceed. Enter \"again\" to specify
+different partitioning${DRIVEID_1:+ for both disks}." \
+				    -q "\
+Type \"go\" to proceed, \"again\" to start over" \
+				    -c go -c again -c quit` in
+				go)
+					break ;;
+				again)
+					;;
+				quit)
+					exit 1 ;;
+				esac
+			done
+			;;
+		y)
+			echo "
+Setting up the initial system with default partition sizes; this should
+take no more than twenty-five minutes." >&2
+
+			USR_CHOICE=default
+
+			if [ -n "${DRIVEID_1:-}" ]
+			then
+				#get second disk size
+				eval `eval fmthard -p -c2 \\\${RSIX_1}`
+
+				#if second disk is 32MB /usr goes on first
+				if  [ ${disksize_1} -gt ${SIZE_32} ]
+				then
+					fmthard -c1 ${RSIX_0} > /dev/null
+					fmthard -c2 ${RSIX_1} > /dev/null
+
+					#make filesystems mostly read with gapsize 4
+					vmkfs -f ${DEF_FS} -b "${DEF_BLK}" \
+					-g ${RD_GAP} ${RROOT_0} ${RUSR_1} > /dev/null
+
+					FSTAB="${DFL2_FSTAB}"
+
+				else
+					echo "${S1_VTOC}" > /spl_vtoc
+					fmthard -s /spl_vtoc ${RSIX_0} >/dev/null
+
+					echo "${S2_VTOC}" > /spl_vtoc
+					fmthard -s /spl_vtoc ${RSIX_1} >/dev/null
+
+					rm /spl_vtoc
+
+					#gapsize 4 (performance) and /usr on 1st disk
+					vmkfs -f ${DEF_FS} -b "${DEF_BLK}" \
+					-g ${RD_GAP} ${RROOT_0} ${RUSR_0} > /dev/null
+
+					FSTAB="${DFL3_FSTAB}"
+				fi
+
+				vmkfs -f ${DEF_FS} -b "${DEF_BLK}" \
+				 ${RHOME_0} ${RVAR_1} ${RHOME2_1}   > /dev/null
+
+			else
+				fmthard -c0 ${RSIX_0} > /dev/null
+
+				#gapsize 4 (performance reasons)
+				vmkfs -f ${DEF_FS} -b "${DEF_BLK}" -g ${RD_GAP}  \
+				      ${RROOT_0} ${RUSR_0}  > /dev/null
+
+				vmkfs -f ${DEF_FS} -b "${DEF_BLK}" 	\
+				      ${RHOME_0} ${RVAR_0} > /dev/null
+
+				FSTAB="${DFL1_FSTAB}"
+			fi
+
+			#make  stand partition
+			vmkfs -f bfs ${RSTAND_0} > /dev/null
+
+			#write appropriate vfstab
+			echo "${FSTAB}">/inst/etc/vfstab
+
+			;;
+		quit)
+			exit 0 ;;
+		esac
+		;;
+	part)
+		sysfsck -m -r ${HARD}
+		ckdf ${HARD}
+
+		fstabmnt -u < ${HARD}/etc/vfstab
+		/sbin/umount ${ROOT_0} 2> /dev/null
+		;;
+
+	dual)
+		sysfsck -u -r ${HARD}
+
+		usr=
+		var=
+
+		eval `fstab < ${HARD}/etc/vfstab | while read dev rdev dir junk
+		do
+			case "${dev}" in
+			${ALL_1}*)
+				echo "
+Your system is already configured with the ${dir} partition on disk 2
+(\"${dev}\")." >&2
+				exit 1 ;;
+			esac
+
+			if [ "'${dir}'" = "'/usr'" ]
+			then
+				echo usr="\"${dev}\""
+			fi
+
+			if [ "'${dir}'" = "'/var'" ]
+			then
+				echo var="\"${dev}\""
+			fi
+
+		done`
+
+		if [ "'${usr}'" = "''" ]
+		then
+			echo "
+There is no \"usr\" file system in your /etc/vfstab. This is a required 
+file system. The \"Dual Disk Upgrade\" cannot be performed without it." >&2
+			exit 1
+		fi
+
+		if [ "'${var}'" = "''" ]
+		then
+			echo "
+There is no \"var\" file system in your /etc/vfstab. This is a required 
+file system. The \"Dual Disk Upgrade\" cannot be performed without it." >&2
+			exit 1
+		fi
+
+		fstabmnt -u < ${HARD}/etc/vfstab
+		/sbin/umount ${ROOT_0} 2> /dev/null
+		;;
+
+	upgrade)
+
+		sysfsck -m -u -r ${HARD}
+		ckdf ${HARD}
+
+		fstabmnt -u < ${HARD}/etc/vfstab
+		/sbin/umount ${ROOT_0}  2> /dev/null
+		;;
+	esac
+
+	break
+done
+
+#mount hard disk root partition
+/etc/fs/s5/mount ${ROOT_0} ${HARD}  2> /dev/null
+
+#echo "${TYPE}" > /inst/etc/type
+
+if [ ${TYPE} = upgrade -a ${EXIST_STAND_0} -ne 1 ]
+then
+	R_SZ=`fsinfo -f /dev/dsk/c1d0s${p_root}`
+
+	DEV_TMP	=`fstab < ${HARD}/etc/vfstab |
+
+	while read line
+	do
+        	set -- ${line}
+
+		case ${3} in
+		/usr)
+			echo ${1}
+			break
+			;;
+		*)
+			;;
+		esac
+	done`
+
+	if [ -z ${DEV_TMP} ]
+	then
+		echo "usr partition is required to run UNIX \n"
+		exit 1
+	else
+		UU_SZ=`fsinfo -f ${DEV_TMP}`
+	fi
+
+	case ${DEV_TMP} in
+      	/dev/dsk/c1d0s*)
+		prtvtoc -h /dev/rdsk/c1d0s6 > XX 2>/dev/null
+		;;
+	/dev/dsk/c1d1s*)
+		prtvtoc -h /dev/rdsk/c1d1s6 > XX 2>/dev/null
+		;;
+	esac
+
+	U_SZ=`(scat XX |while read line
+	do
+		set -- ${line}
+		case "${1}" in
+		2)
+			echo "${5}"
+			exit
+			;;
+		[0-1] | [3-9] | [a-f] )
+			continue ;;
+		esac
+	done)`
+
+	ignore rm -rf XX
+
+	echo "${U_SZ}"
+	FR_U_SZ=`ignore expr ${U_SZ} - ${UU_SZ}`
+
+	if [ ${R_SZ} -gt ${FR_U_SZ} ]
+	then
+		echo "${SPACE_PROB}"
+
+  		case `askx -H trace -m \
+"Type \"go\" to continue without the new boot, or \"quit\" to exit and
+attempt to free space in /usr." \
+		-c go -c quit -q "Type \"go\" to proceed or \"quit\" to
+quit"` in
+		go)
+			FSIBT=0
+			;;
+		quit)
+			exit 1 ;;
+		trace)
+			EUDEBUG=1
+			set -x ;;
+		esac
+	else
+		FSIBT=1
+	fi
+fi
+
+sync;sync;sync
+
+#unmount root file system (this will be remounted when necessary in instth)
+/sbin/umount ${HARD}  2> /dev/null
+
+#call instth script
+. /inst/etc/instth

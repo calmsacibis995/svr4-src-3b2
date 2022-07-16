@@ -1,0 +1,9 @@
+*#ident	"@(#)kernel:master.d/sockmod	1.4"
+*
+* SOCKMOD  Socket module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+m	-	sock
+						so_so[#C] (%0xb8)
+						so_cnt (%i) = { #C }
+$$

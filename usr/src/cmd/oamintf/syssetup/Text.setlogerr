@@ -1,0 +1,38 @@
+#ident	"@(#)oamintf:syssetup/Text.setlogerr	1.1"
+
+################################################################################
+#	Module Name: Text.setlogerr	FROM syssetup:password:Text.nologins
+#	Calling Sequence:
+#	Functional Description: This Text object displays a screen
+#				of no locked logins  for the 'setup' 
+#				password command.
+#	How:
+#	Inputs:
+#	Functions Called:
+################################################################################
+
+Title="Error Defining Administrative and System Login(s) Passwords"
+
+lifetime=shortterm
+
+#begrow=1
+#begcol=1
+rows=18
+columns=75
+
+text="
+An error occured while attempting to create the administrative and
+system login ids.
+`readfile /tmp/passwd.err`"
+
+#	(This is for confirmation, warning and repetition text screens
+
+altslks
+
+name=CONT
+button=11
+action=OPEN TEXT $OBJ_DIR/Form.setup3
+
+name=CANCEL
+button=14
+action=CLEANUP

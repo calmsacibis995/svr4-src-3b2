@@ -1,0 +1,58 @@
+/dev/null
+1422 96
+d--775 0 3
+	boot	d--775 0 3
+		GATE		---444 0 0	../usr/src/uts/3b2/GATE
+		START		---444 0 0	../usr/src/uts/3b2/START
+		S5		---444 0 0	../usr/src/uts/3b2/fs/s5/S5
+		BFS		---444 0 0	../usr/src/uts/3b2/fs/bfs/BFS
+		PROC		---444 0 0	../usr/src/uts/3b2/fs/proc/PROC
+		COFF		---444 0 0	../usr/src/uts/3b2/exec/coff/COFF
+		ELF		---444 0 0	../usr/src/uts/3b2/exec/elf/ELF
+		STUBS		---444 0 0	../usr/src/uts/3b2/io/STUBS
+		MAU		---444 0 0	../usr/src/uts/3b2/io/MAU
+		LOG		---444 0 0	../usr/src/uts/3b2/io/LOG
+		CLONE		---444 0 0	../usr/src/uts/3b2/io/CLONE
+	$
+	etc	d--775 0 3
+		master.d	d--775 0 3
+			sad	---444	0 0	../usr/src/uts/3b2/master.d/sad
+			log	---444	0 0	../usr/src/uts/3b2/master.d/log
+		$
+	$
+	inst	d--775 0 3
+		final	d--775 0 3
+			etc	d--775 0 3
+				system		---644 0 3	../etc/system
+				mini_system	---644 0 3	../etc/mini_system
+			$
+		$
+	$
+	usr	d--775 0 3
+		ccs	d--755 2 2
+			bin	d--755 2 2
+				ld           ---555 2 2      ../usr/ccs/bin/ld
+			$
+		$
+		bin		d--775 0 2
+			touch		---555 2 2	../usr/bin/touch
+			pwd		---555 2 2	../usr/bin/pwd
+		$
+		sbin		d--775 0 2
+			cunix		---555 0 0	../usr/sbin/cunix
+			getmajor	---555	2 2	../usr/sbin/getmajor
+			drvinstall	---755	2 2	../usr/sbin/drvinstall
+			edittbl		---755	2 2	../usr/sbin/edittbl
+			mkboot		---555	0 0	../usr/sbin/mkboot
+		$
+	$
+	sbin		d--775 0 2
+		mknod		---555	2 2	../sbin/mknod
+		pump		---544	0 3	../sbin/pump
+	$
+	config	d--775 0 2
+		ifile4.0	---444 2 2	../config/ifile4.0
+		mapfile4.0	---444 2 2	../config/mapfile4.0
+	$
+$
+:#ident	"@(#)core.tape:proto.core3	1.5"

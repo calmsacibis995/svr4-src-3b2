@@ -1,0 +1,27 @@
+*#ident	"@(#)fs:master.d/rfs	1.9"
+*
+* RFS
+*
+*FLAG   #VEC    PREFIX  SOFT    #DEV    IPL     DEPENDENCIES/VARIABLES
+oxj     -       rf_      -       -       -      
+                                                rf_name(%12c)= {NAMERFS}
+						nsrmount (%i) ={ NSRMOUNT }
+						nrcvd (%i) ={ NRCVD }
+						nsndd (%i) ={ NSNDD }
+						maxgdp (%i) = { MAXGDP }
+						minserve (%i) ={ MINSERVE }
+						maxserve (%i) ={ MAXSERVE }
+						nrduser (%i) ={ NRDUSER }
+						rc_time (%i) ={ RCACHETIME }
+
+$$$
+
+NAMERFS = "RFS"
+NSRMOUNT	= 20
+MAXGDP		= 24
+NRCVD		= 150
+NRDUSER		= 250
+NSNDD		= 150
+MINSERVE	= 3
+MAXSERVE	= 6
+RCACHETIME	= 10

@@ -1,0 +1,85 @@
+#ident	"@(#)pkg.windowing:postinstall	1.7"
+#
+#	postinstall script for windowing package
+#
+error() {
+	# can't rely on exit codes from procs
+	errflag=1
+	}
+#
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+#	configure driver and note major numbers
+#
+installf $PKGINST $BOOT/XT f || error
+installf $PKGINST $MASTER/xt f || error
+
+#
+#
+# Change the number of devices in $MASTER/xt
+# Note the string for #D must match.
+# Substitute #D (value 2) with no. of windowing terminals $WTNUM.
+#
+sed -e "s/xt	-	2/xt	-	$WTNUM/" <$MASTER/xt >/tmp/xt.$$
+cp /tmp/xt.$$ $MASTER/xt
+rm -rf /tmp/xt.$$
+
+MAJOR=`/etc/drvinstall -m $MASTER/xt -s $SYSTEM -o $BOOT -v 1.0` || error
+#
+#	configure windowing terminal devices
+#
+TEMP=0
+MINOR=0
+# remove all xt devices, just incase they are still hanging around
+rm -rf /dev/xt*
+installf $PKGINST /dev/xt d 775 root sys || exit 2
+until [ "$TEMP" -eq "$WTNUM" ]
+do
+    if [ "$TEMP" -lt "10" ]
+	then
+	    TEMP="0$TEMP"
+    fi
+    for i in 0 1 2 3 4 5 6 7
+    do
+	WTNAME=$BASEDIR/dev/xt/$TEMP$i
+#	installf $PKGINST $WTNAME c $MAJOR $MINOR 0644 root other || error
+# performance hack, read from standard input
+	echo $WTNAME c $MAJOR $MINOR 0620 root tty || error
+
+# No more linking required
+#	installf $PKGINST $BASEDIR/dev/xt$TEMP$i=$WTNAME || error
+	MINOR=`expr $MINOR + 1`
+    done
+    TEMP=`expr $TEMP + 1`
+done | installf $PKGINST - || error
+#
+#	For  backward compatibility...set up /usr/options/<pkg>.name file
+#
+installf $PKGINST /usr/options/$PKG.name || error
+echo "$NAME" >/usr/options/$PKG.name || error
+#
+#	finished installing files: tell OAM
+#
+installf -f $PKGINST || error
+#
+#	make a new UNIX(R)
+#
+touch $BASEDIR/etc/system
+FREE=`expr "\`df / 2>/dev/null\`" : '.*: *\([0-9]*\)'`
+NEED=`du -s $BOOT/KERNEL | cut -f1`
+if [ "$NEED" -gt "$FREE" ]
+    then
+	echo "postinstall: ERROR: not enough space for mkboot"
+	echo "	TOFIX: free space and then reinstall this package."
+	errflag=2
+    else
+	/etc/mkboot -m $MASTER -d $BOOT -k $BOOT/KERNEL || error
+fi
+#
+#	reboot required to get changes
+#
+errflag=`expr 0$errflag + 10`
+exit $errflag

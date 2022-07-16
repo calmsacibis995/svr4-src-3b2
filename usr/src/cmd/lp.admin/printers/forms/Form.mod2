@@ -1,0 +1,529 @@
+#ident	"@(#)lp.admin:printers/forms/Form.mod2	1.2"
+
+#######################################################
+#
+#       Module Name: Form.modify
+#
+#######################################################
+
+form=Add/Modify Form $ARG2
+
+#help=OPEN TEXT $INTFBASE/Text.oamhelp $PRINTSERV/HELP/forms/modify.help "Modify a Form"
+
+init=`indicator -w;
+	set -l attributes="/tmp/lp.fm$VPID";
+		`
+`if [ $ARG1 = "default_form" ];
+then
+	set -l form_dir="/etc/lp/oam_defaults/forms/default_form";
+else 
+	set -l form_dir="/etc/lp/forms/$ARG1";
+fi;
+	`
+
+`message -w "loading form $ARG1";
+fmlgrep -i 'page length:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l length;
+fmlgrep -i 'page width:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l width;
+fmlgrep -i 'number of pages:' $form_dir/describe | fmlcut -f4 -d' ' - 
+	| set -l pages;
+fmlgrep -i 'line pitch:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l lpitch;
+fmlgrep -i 'character pitch:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l cpitch;
+fmlgrep -i 'character set choice:' $form_dir/describe | fmlcut -f2 -d',' - 
+	| set -l cmand;
+if [ $cmand != "mandatory" ]; 
+	then 
+		set -l cmand="optional"; 
+fmlgrep -i 'character set choice:' $form_dir/describe | fmlcut -f4 -d' ' - 
+	| set -l cset;
+fi;
+if [ $cmand = "mandatory" ]; 
+then
+fmlgrep -i 'character set choice:' $form_dir/describe | fmlcut -f4 -d' ' - 
+	| fmlcut -f1 -d',' - 
+	| set -l cset;
+fi;
+fmlgrep -i 'ribbon color:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l ribbon;
+
+if [ -s $form_dir/align_ptrn ];
+	then	
+	set -l align_ptrn_file="$form_dir/align_ptrn";
+	readfile $form_dir/align_ptrn | set -l align_ptrn;
+	fmlgrep -i 'alignment pattern:' $form_dir/describe | fmlcut -f3 -d' ' - 
+	| set -l align_type;
+fi;
+
+readfile $form_dir/comment | set -l comment;
+
+fmlgrep -i '^mail ' $form_dir/alert.sh | fmlcut -f1 -d' ' - 
+	| set -l alert;
+if [ -z $alert ];
+then
+fmlgrep -i '^write ' $form_dir/alert.sh | fmlcut -f1 -d' ' - 
+	| set -l alert;
+fi;
+if [ -z $alert ];
+then
+fmlgrep -i '^/' $form_dir/alert.sh | fmlcut -f1 -d' ' - 
+	| set -l alert;
+fi;
+fmlgrep -n '[0123456789]' $form_dir/alert.vars | fmlgrep '1:' 
+	| fmlcut -f2 -d':' - 
+	| set -l requests;
+fmlgrep -n '[0123456789]' $form_dir/alert.vars | fmlgrep '2:' 
+	| fmlcut -f2 -d':' - 
+	| set -l falert;
+readfile $form_dir/allow | tr "\012" " " | set -l allow;
+readfile $form_dir/deny | tr "\012" " " | set -l deny;
+	`
+	
+
+close=`
+	/usr/bin/rm  $attributes;
+	unset -l attributes;
+	unset -l form_dir;
+	unset -l length;
+	unset -l width;
+	unset -l pages;
+	unset -l lpitch;
+	unset -l cpitch;
+	unset -l cset;
+	unset -l cmand;
+	unset -l ribbon;
+	unset -l align_ptrn;
+	unset -l align_ptrn_file;
+	unset -l align_type;
+	unset -l alert;
+	unset -l requests;
+	unset -l falert;
+	unset -l comment;
+	`
+
+done=`message -w;
+
+if [ $ARG1 = $ARG2 ];
+	then
+	message "Updating form $ARG2";
+fi;
+if [ $ARG1 != $ARG2 ];
+	then
+	message "Adding form $ARG2";
+fi;
+	
+if [ -n $F1 ];
+then
+echo 'page length:'$F1 >> $attributes; 
+fi;
+if [ -n $F2 ];
+then
+echo 'page width:'$F2 >> $attributes; 
+fi;
+if [ -n $F3 ];
+then
+echo 'line pitch:'$F3 >> $attributes; 
+fi;
+if [ -n $F4 ];
+then
+echo 'character pitch:'$F4 >> $attributes; 
+fi;
+if [ -n $F5 ];
+then
+echo 'number of pages:'$F5 >> $attributes; 
+fi;
+message "$F7 charset $F6";
+if [ "$F7" != 'mandatory' -a -n $F6 ]; 
+	then 
+echo 'character set choice:'$F6 >> $attributes; 
+fi;
+if [ "$F7" = 'mandatory' -a -n $F6 ]; 
+	then 
+echo 'character set choice:'$F6',mandatory' >> $attributes; 
+fi;
+if [ -n $F8 ];
+then
+echo 'ribbon color:'$F8 >> $attributes; 
+fi;
+if [ -n $F9 ];
+then
+	echo 'comment:' >> $attributes;
+	echo $F9 >> $attributes;
+fi;
+if [ -n $F10 ];
+	then
+echo 'alignment pattern:'$F11 >> $attributes; 
+cat $F10 >> $attributes; 
+fi;
+shell "
+lpforms -f$ARG2 -F $attributes" > /dev/null 2> $error;
+message "ERROR $error";
+if [ -s $error ];
+then echo "OPEN TEXT $OBJ_DIR/Text.error $error";
+fi;
+
+if [ $F12 = 'none' ];
+	then
+	lpforms -f$ARG2 -A$F12;
+else
+if [ -n $F12 -o -n $F13 -o $F14 ];
+then
+	lpforms -f$ARG2 -A$F12 -Q$F13 -W$F14;
+fi;
+fi;
+if [ -n $F15 -a $F16 != 'all' ];
+then
+	lpforms -f$ARG2 -u deny:$F15;
+fi;
+if [ -n $F16 -a $F15 != 'all' ];
+then
+	lpforms -f$ARG2 -u allow:$F16;
+fi;
+	message"";
+
+	`close
+
+name=Page length:
+nrow=1
+ncol=1
+frow=1
+fcol=14
+rows=1
+columns=5
+value=$length
+
+valid=`regex -v "$F1" '[0-9]{1,3}' '[0-9][0-9]*.[0-9][0-9]*[ic]'`
+# \fILegal scaled-decimal-number\fR [SDN], mandatory.
+
+choicemsg=
+invalidmsg="Example formats: 66, 11i, or 30c"
+fieldmsg="Enter form page length in lines, inches(i) or centimeters(c)"
+
+
+name=Page width:
+nrow=1
+ncol=26
+frow=1
+fcol=44
+rows=1
+columns=5
+value=$width
+choicemsg=
+invalidmsg="Example formats: 80, 8.5i, or 20c"
+fieldmsg="Enter form page width in columns, inches(i) or centimeters(c)"
+
+valid=`regex -v "$F2" '[0-9]{1,3}' '[0-9][0-9]*.[0-9][0-9]*[ic]'`
+# \fILegal scaled-decimal-number\fR [SDN], mandatory.
+
+
+
+name=Line Pitch:
+nrow=2
+ncol=1
+frow=2
+fcol=14
+rows=1
+columns=4
+value=$lpitch
+# default=Current value.
+choicemsg=
+invalidmsg=
+fieldmsg="Enter the line pitch"
+
+valid=`regex -v "$F3" '[0-9]{1,3}' '[0-9][0-9]*.[0-9][0-9]*[ic]'`
+# \fILegal scaled-decimal-number\fR [SDN], mandatory.
+
+
+
+name=Character Pitch:
+nrow=2
+ncol=26
+frow=2
+fcol=44
+rows=1
+columns=5
+value=$cpitch
+choicemsg=
+invalidmsg=
+fieldmsg="Enter the character pitch"
+
+
+valid=`regex -v "$F4" '[0-9]{1,3}' '[0-9][0-9]*.[0-9][0-9]*[ic]'`
+# \fILegal scaled-decimal-number\fR [SDN], mandatory.
+
+
+
+name="Number of pages:" 
+nrow=3
+ncol=1
+frow=3
+fcol=18
+rows=1
+columns=4
+value=$pages
+choicemsg=
+invalidmsg="Enter a positive integer"
+fieldmsg="Enter number of pages in the form"
+
+valid=`regex -v "$F5" '^[0123456789]+$' ''  `
+# positive integer, mandatory.
+
+
+
+name=Character set choice: 
+nrow=4
+ncol=1
+frow=4
+fcol=22
+rows=1
+columns=14
+value=$cset
+choicemsg=
+#"list of known fonts (must be supported on printer(s) below)"
+invalidmsg=
+fieldmsg="Enter character set to use with the form"
+
+valid=`regex -v "$F6" '[_a-zA-Z0-9]{0,14}'  '.*'`
+# \fIKnown charset\fR [CHARSETS], optional.
+
+
+
+name=Mandatory?
+nrow=4
+ncol=37
+frow=4
+fcol=47
+rows=1
+columns=12
+show=`
+    if [ "$F6" = 'any' -o -z $F6 ];
+    then
+	false;
+    else
+	true;
+    fi;
+`
+value=$cmand
+menuonly=true
+rmenu={ "mandatory" "optional" }
+fieldmsg="Is character set/printwheel mandatory or optional?"
+invalidmsg="Character sets must be optional or mandatory."
+
+
+name=Ribbon color: 
+nrow=5
+ncol=1
+frow=5
+fcol=15
+rows=1
+columns=14
+value=$ribbon
+choicemsg=
+invalidmsg=
+fieldmsg="Enter ribbon color to use with the form"
+
+
+valid=`regex -v "$F8" '[a-zA-Z0-9_]{1,14}' '' '.*'`
+# \fILegal ribbon-color\fR [COLORS], optional.
+
+
+
+name=Comment:
+nrow=6
+ncol=1
+frow=7
+fcol=2
+rows=1
+columns=40
+scroll=true
+value=$comment
+choicemsg=
+invalidmsg=
+fieldmsg="Enter a one-line description of this form for form users"
+
+valid=`regex -v "$F9" 'unknown pattern' '' '.*'`
+# optional.
+
+
+name=Alignment pattern file:
+nrow=9
+ncol=1
+frow=10
+fcol=2
+rows=1
+columns=40
+scroll=true
+value=$align_ptrn_file
+choicemsg=
+fieldmsg='Enter the pathname of the file containing the alignment pattern'
+
+valid=`
+	if [ -z $F10 -o -r $F10 ];
+	then
+		true;
+	else
+		set -l badval="$F10 is not a pathname to a readable file";
+		false;
+	fi;
+	`
+invalidmsg="$badval"
+
+name=Alignment content-type:
+nrow=11
+ncol=1
+frow=11
+fcol=26
+rows=1
+columns=14
+show=`if [ -n $F10 ];
+	then true;
+	else false;
+	fi;`
+value=$align_type
+choicemsg=
+invalidmsg=
+fieldmsg="Enter content-type of file containing alignment pattern"
+
+valid=`regex -v "$F11" '[a-zA-Z0-9-]{1,14}' '' `
+# \fILegal type\fR [TYPES] or NONE, mandatory.
+
+
+
+name=Alert Command:
+nrow=13
+ncol=1
+frow=13
+fcol=15
+rows=1
+columns=26
+scroll=true
+value=$alert
+choicemsg=""mail," "write," shell-command or "none""
+invalidmsg="Enter \"mail\", \"write\", or pathname to shell-command"
+fieldmsg="Enter command to run to alert you when the form needs mounting"
+
+
+valid=`
+	regex -v "$F12"
+	    '^[Mm][Aa][Ii][Ll]$'		'ok'
+	    '^[Nn][Oo][Nn][Ee]$'		'ok'
+	    '^[Ww][Rr][Ii][Tt][Ee]$'		'ok'
+	    '.*'                                'command'
+	| set -l badval;
+	if [ $badval = "command" -a -x $F12 ];
+	then true;
+	else false;
+	fi;
+	if [ $badval = 'ok' ];
+	then true;
+	fi;
+	if [ -z $F12 ];
+	then true;
+	fi;
+	`
+
+name=Number of Requests:
+nrow=14
+ncol=1
+frow=14
+fcol=22
+rows=1
+columns=5
+show=`if [ -n $F12 -o $F12 = 'none' ];
+	then true;
+	else false;
+	fi;`
+value=$requests
+choicemsg=
+invalidmsg="Enter a positive integer"
+fieldmsg="How many print requests should be waiting before you are alerted?"
+
+valid=`regex -v "$F13" '^[0123456789]+$' ''  `
+# A positive integer, mandatory.
+
+
+name=Frequency of alerts:
+nrow=15
+ncol=1
+frow=15
+fcol=22
+rows=1
+columns=5
+show=`if [ -n $F12 -o $F12 = 'none' ];
+	then true;
+	else false;
+	fi;`
+value=$falert
+valid=`regex -v "$F14" '^[0123456789]+$' ''  `
+choicemsg=
+invalidmsg="Enter a positive integer"
+fieldmsg="Enter frequency of alerts in minutes"
+# A positive integer or ONCE, mandatory.
+
+
+name=Users denied:
+nrow=17
+ncol=1
+frow=17
+fcol=15
+rows=1
+columns=30
+show=`if [ $F16 = 'all' -o $F16 = 'any' ];
+	then false;
+	else true;
+	fi;`
+scroll=true
+value=$deny
+fieldmsg="Enter the users who are denied access to this form"
+# \fILegal user-list\fR [USERS], ALL, or NONE, optional.
+invalidmsg="Invalid user name $badval - please reenter"
+choicemsg=
+
+valid=`indicator -w;
+	if -z $F15 ];
+	then true;
+	else
+	echo "$F15" | tr -d ', _![a-z][0-9][A-Z]' | fmlcut -c1 - 
+	| set -l badchar;
+	if [ -n $badchar ];
+	then echo "$F15" | tr " ,"  "[\012]" | grep "$badchar"
+	| set -l badval;
+	false;
+	else true;
+	fi;
+	fi;
+	`
+
+name=Users allowed:
+nrow=18
+ncol=1
+frow=18
+fcol=15
+rows=1
+columns=30
+show=`if [ $F15 = 'all' -o $F15 = 'any' ];
+	then false;
+	else true;
+	fi;`
+scroll=true
+value=$allow
+fieldmsg="Enter the users who are allowed access to this form"
+invalidmsg="Invalid user name $badval - please reenter"
+choicemsg=
+
+valid=`indicator -w;
+	if -z $F16 ];
+	then true;
+	else
+	echo "$F16" | tr -d ', _![a-z][0-9][A-Z]' | fmlcut -c1 - 
+	| set -l badchar;
+	if [ -n $badchar ];
+	then echo "$F15" | tr " ," "[\012*]" | grep "$badchar"
+	| set -l badval;
+	false;
+	else true;
+	fi;
+	fi;
+	`

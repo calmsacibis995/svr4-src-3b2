@@ -1,0 +1,9 @@
+#ident	"@(#)oamintf:diagnostics/Help	1.1"
+ABSTRACT:
+	The items in the "diagnostics" menu allow you to search for
+	and possibly correct problems in the system.  "Diskreport"
+	issues reports that allow you to identify detectable problems.
+	"Diskrepair" should be used by maintenance personnel only.
+	
+	WARNING: using "diskrepair" without understanding what you are
+	doing is DANGEROUS!

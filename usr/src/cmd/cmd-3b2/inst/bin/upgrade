@@ -1,0 +1,547 @@
+#ident	"@(#)cmd-3b2:inst/bin/upgrade	1.6.3.6"
+
+#
+# upgrade
+#
+# Upgrade a single-disk system to a dual-disk one.
+#
+
+if [ "${EUDEBUG:-}" -eq 1 ]
+then
+	echo "\n** running $0 script  **\n"  >&2
+	set -x
+fi
+
+set -ue
+myname="${0}"
+args="${*:-}"
+rel=unk
+root=/
+
+while [ $# -ne 0 ]
+do
+	case "${1}" in
+	-g)
+		rel="${2}" ; shift 2 ;;
+	-r)
+		root="${2}" ; shift 2 ;;
+	*)
+		echo "Usage: ${myname} [ -g rel ] [ -r rootdir ]" >&2 ; exit 1 ;;
+	esac
+done
+
+etc="${DBUGETC:-${root}/etc}"
+inst="${DBUGINST:-/inst}"
+
+getpartn()
+{
+	#"prtvtoc -f" returns shell assigments
+	# for FREE_PART FREE_START FREE_SIZE FREE_COUNT
+	eval `prtvtoc -f ${RSIX_0}`
+	
+	if [ $FREE_COUNT -eq 0 ]
+	then
+		echo "No free space"
+		return 1
+	fi
+
+	FREE_PART=`ignore expr "${FREE_PART}" : '[0-9]*\(.*\)'`
+
+	use_have=`ignore expr "${FREE_PART}" : '.*'`
+	
+	if [ $use_have -eq 0 ]
+	then
+		echo "No partitions avaiable for use"
+		return 1
+	fi
+
+	use_part=`ignore expr "${FREE_PART}" : '\(.\)'`
+	return 0
+}
+
+eval `fmthard -i -c2 ${RSIX_1} | \
+while read vt_part vt_tag vt_flag vt_start vt_size junk
+do
+	case ${vt_part:-'*'} in
+	\**)
+		continue ;;
+	esac
+
+	if [ ${vt_size} -eq 0 ]
+	then
+		continue
+	fi
+
+	case "${vt_tag}" in
+
+	"${v_usr}")
+		echo dflt_usrsiz=${vt_size}
+		;;
+
+	"${v_var}")
+		echo dflt_varsiz=${vt_size}
+		;;
+
+	"${v_backup}")
+		echo dsk1size=${vt_size} \
+		vargdisk="\"${vt_part} ${vt_tag} ${vt_flag} ${vt_start} ${vt_size}\""
+		;;
+
+	"${v_boot}")
+		echo bootsize=${vt_size} \
+		vargboot="\"${vt_part} ${vt_tag} ${vt_flag} ${vt_start} ${vt_size}\""
+		;;
+	esac
+done`
+
+if [ -z "${dflt_usrsiz:-}" -o -z "${dflt_varsiz:-}" -o \
+     -z "${dsk1size:-}"    -o -z "${bootsize:-}" ]
+then
+	echo "${myname}: disk 1 data obtained from fmthard command: Incomplete" >&2
+	exit 1
+fi
+
+remain=`ignore expr ${dsk1size} - ${bootsize}`
+
+default=`askx -q "\
+Use the default dual-disk layout?" \
+	-h "\
+By default, the \"usr\" partition and the \"var\" partitions are moved to disk 2 
+(the new hard disk).  This typically improves system performance. The space freed 
+from the old \"usr\" and \"var\" partitions (on disk 1) are made into new
+home{seq} partitions." \
+	-H y-trace -H n-trace -c y -c n -c quit`
+
+if [ ${default} = quit ]
+then
+	exit 1
+elif [ ${default} = y-trace ]
+then
+	set -x
+	default=y
+elif [ ${default} = n-trace ]
+then
+	set -x
+	default=n
+fi
+
+#initialize usr and var parameters required for placing them on disk 2
+usrsize=0
+varsize=0
+
+eval usrneeds=\`ignore expr `fsinfo -f ${USR_0}` + 2000\`
+eval varneeds=\`ignore expr `fsinfo -f ${VAR_0}` + 2000\`
+
+#get usr and  var file system types from first disk.
+while read dev rdev dir fstype fsckpass automnt flags
+do
+	case "${dir}" in
+	"/usr")
+		dflt_usrtype=$fstype
+		;;
+	"/var")
+		dflt_vartype=$fstype
+		;;
+	*)
+		continue
+	esac
+
+done < ${etc}/vfstab
+
+
+
+if [ ${usrneeds} -gt ${remain} ]
+then
+	usrmove=n
+
+elif [ ${default} = y ]
+then
+	usrmove=y
+else
+	usrmove=`askx -q "\
+Move the \"usr\" partition to disk 2?" \
+		-h "\
+To improve system performance, the \"usr\" partition may be moved from
+disk 1 to disk 2. This partition contains many heavily-used files and
+most optional packages. the system). Answer \"y\" to move the partition, 
+\"n\" to leave it alone, \"again\" to begin again or \"quit\" to abort." \
+		-c y -c n -c again -c quit -d y`
+	if [ ${usrmove} = again ]
+	then
+		exec ${myname} ${args}
+	elif [ ${usrmove} = quit ]
+	then
+		exit 1
+	fi
+fi
+
+if [ ${usrmove} = y ]
+then
+	if [ ${default} = y ]
+	then
+		usrsize=${dflt_usrsiz}
+	else
+		usrsize=`askx -s -q "\
+Allocate how many blocks for the \"usr\" partition on disk 2?" \
+			-h "\
+There are ${remain} blocks available on disk 2. At least ${usrneeds} of them
+are necessary for the \"usr\" partition. The default configuration
+would use ${dflt_usrsiz} blocks. Please enter the number of blocks to
+be allocated to the \"usr\" partition, \"again\" to begin again or
+\"quit\" to abort.  NOTE: partition sizes are always rounded up to 
+cylinder ( ${CYLSIZE_1} block ) boundaries." \
+			-n ${usrneeds}:${remain} -c again -c quit \
+			-d ${dflt_usrsiz}`
+
+		if [ ${usrsize} = again ]
+		then
+			exec ${myname} ${args}
+		elif [ ${usrsize} = quit ]
+		then
+			exit 1
+		fi
+	fi
+	usrsize=`ignore expr \( ${usrsize} + ${CYLSIZE_1} - 1 \) \
+			           / ${CYLSIZE_1} \* ${CYLSIZE_1}`
+
+	if [ ${usrsize} -gt ${remain} ]
+	then
+		usrsize=${remain}
+	fi
+
+	#get filesystem type for usr partition
+	case `askx -q "\
+What file system type for the \"usr\" partition?" \
+		-m "\
+The file system types available for the \"usr\" partition are:
+	
+		1) System V 1K
+		2) System V 2K " \
+		-s -d 1 -c 1 -c 2 -c quit -c again` in
+
+		quit)
+			exit 1 
+			;;
+		again)
+			exec ${myname} ${args}  
+			;;
+		1)
+			usrtype=s5
+			usrblksz=1024
+			;;
+		2)
+			usrtype=s5
+			usrblksz=2048
+			;;
+	esac
+
+
+fi
+
+remain=`ignore expr ${dsk1size} - ${bootsize} - ${usrsize}`
+
+if [ ${varneeds} -gt ${remain} ]
+then
+	varmove=n
+elif [ ${default} = y ]
+then
+	varmove=y
+else
+	varmove=`askx -q "\
+Move the \"var\" partition to disk 2?" \
+		-h "\
+To improve system performance, the \"var\" partition may be moved from
+disk 1 to disk 2.   It contains \'var\'ying files on Unix system such
+as logfiles, spoolfiles etc.  Answer \"y\" to move the partition, \"n\" 
+to leave it alone, \"again\" to begin again or \"quit\" to abort." \
+		-c y -c n -c again -c quit -d y`
+
+	if [ ${varmove} = again ]
+	then
+		exec ${myname} ${args}
+
+	elif [ ${varmove} = quit ]
+	then
+		exit 1
+	fi
+fi
+
+
+if [ ${varmove} = y ]
+then
+	if [ ${default} = y ]
+	then
+		varsize=${dflt_varsiz}
+	else
+		varsize=`askx -s -q "\
+Allocate how many blocks for the \"var\" partition on disk 2?" \
+			-h "\
+There are ${remain} blocks available on disk 2. At least ${varneeds} of them
+are necessary for the \"var\" partition. The default configuration
+would use ${dflt_varsiz} blocks. Please enter the number of blocks to
+be allocated to the \"var\" partition, \"again\" to begin again or
+\"quit\" to abort.  NOTE: partition sizes are always rounded up to 
+cylinder ( ${CYLSIZE_1} block ) boundaries." \
+			-n ${varneeds}:${remain} -c again -c quit \
+			-d ${dflt_varsiz}`
+
+		if [ ${varsize} = again ]
+		then
+			exec ${myname} ${args}
+		elif [ ${varsize} = quit ]
+		then
+			exit 1
+		fi
+	fi
+
+	varsize=`ignore expr \( ${varsize} + ${CYLSIZE_1} - 1 \) \
+			      / ${CYLSIZE_1} \* ${CYLSIZE_1}`
+
+	if [ ${varsize} -gt ${remain} ]
+	then
+		varsize=${remain}
+	fi
+
+	#get filesystem type for var partition
+	case `askx -q "\
+What file system type for the \"var\" partition?" \
+		-m "\
+The file system types available for the \"var\" partition are:
+	
+		1) System V 1K
+		2) System V 2K " \
+		-s -d 1 -c 1 -c 2 -c quit -c again` in
+
+		quit)
+			exit 1 
+			;;
+		again)
+			exec ${myname} ${args}
+			;;
+		1)
+			vartype=s5
+			varblksz=1024
+			;;
+		2)
+			vartype=s5
+			varblksz=2048
+			;;
+	esac
+
+
+fi
+
+remain=`ignore expr ${dsk1size} - ${bootsize} - ${usrsize} - ${varsize}`
+
+bootbase=0
+usrbase=`ignore expr $bootbase + $bootsize`
+varbase=`ignore expr $usrbase + $usrsize`
+
+if [ $default = y ]
+then
+	home2base=`ignore expr $varbase + $varsize`
+	home2size=$remain
+else
+	home2base=0
+	home2size=0
+fi
+
+echo "*
+${p_usr} 	${v_usr} 	00	${usrbase}	${usrsize}
+${p_var} 	${v_var}	00	${varbase}	${varsize}
+${p_backup}	${v_backup} 	01	0		${dsk1size}
+${p_boot} 	${v_boot} 	01	${bootbase}	${bootsize}
+${p_home2} 	0	 	00	${home2base}	${home2size}" \
+		| fmthard -s - ${RSIX_1} > /dev/null
+
+if [ $usrmove = y ]
+then
+	echo "
+Moving the \"usr\" partition to disk 2. This typically takes about fifteen
+minutes; a large file system may require as much as forty-five minutes." >&2
+
+	vmkfs -f $usrtype -b $usrblksz ${RUSR_1} > /dev/null
+	dlabelit ${USR_1} usr ${rel} > /dev/null
+	/etc/fs/s5/mount ${USR_1} ${root}/usr  2>/dev/null
+	mklost+found ${root}/usr ${USR_1}
+	ignore mkdir ${root}/mnt 2>/dev/null
+	/etc/fs/s5/mount -r ${USR_0} ${root}/mnt  2>/dev/null
+	cd ${root}/mnt
+	find . -print | cpio -pdmu ../usr
+	cd /
+	/sbin/umount ${USR_0} 2>/dev/null
+	/sbin/umount ${USR_1} 2>/dev/null
+	echo "${USR_1}\t${RUSR_1}\t/usr\t${usrtype}\t1\tyes\t-" > ${etc}/Nvfstab
+
+	while read dev rdev dir fstype fsckpass automnt flags
+	do
+		case "${dir}" in
+		"/usr")
+			continue
+			;;
+		esac
+
+		echo "${dev}" "${rdev}" "${dir}" "${fstype}" \
+		     "${fsckpass}" "${automnt}" "${flags}"
+
+	done < ${etc}/vfstab >> ${etc}/Nvfstab
+
+	cp ${etc}/Nvfstab ${etc}/vfstab < /dev/null
+	rm ${etc}/Nvfstab < /dev/null
+
+	if [ ${default} = n ]
+	then 
+		fmthard -d $p_usr:0:1:0:0 ${RSIX_0} > /dev/null
+	else
+		eval `prtvtoc -h ${RSIX_0} 2> /dev/null |
+			while read part tag flag base size junk
+			do
+				if [ ${tag} -eq ${v_usr} ]
+				then
+					echo base=${base} size=${size}
+					break
+				fi
+			done`
+
+		fmthard -d $p_usr:0:1:0:0 ${RSIX_0} > /dev/null
+
+		#getpartn(function) assigns use_have the next available free partn.
+		if getpartn
+		then
+			fmthard -d $use_part:0:0:${base}:${size} ${RSIX_0} > /dev/null
+			NEWP_0=/dev/dsk/c1d0s$use_part
+			RNEWP_0=/dev/rdsk/c1d0s$use_part
+
+			vmkfs -f ${DEF_FS} -b ${DEF_BLK} ${RNEWP_0} > /dev/null
+			seq=2
+
+			while [ -r ${root}/$homedir${seq} ]
+			do
+				seq=`ignore expr ${seq} + 1`
+			done
+
+			(umask 022; exec mkdir ${root}/$homedir${seq} )
+			dlabelit ${NEWP_0} $homedir${seq} ${rel} > /dev/null
+			/etc/fs/s5/mount ${NEWP_0} ${root}/$homedir${seq}  2>/dev/null
+			mklost+found ${root}/$homedir${seq} ${NEWP_0}
+			/sbin/umount ${NEWP_0} 2>/dev/null
+
+		echo "${NEWP_0}\t${RNEWP_0}\t/$homedir${seq}\t${DEF_FS}\t1\tyes\t-" \
+				>> ${etc}/vfstab
+
+			echo "
+The space from the old \"usr\" partition has been reclaimed. It is now
+called /$homedir${seq} (\"${NEWP_0}\"). It may be used for any purpose.
+You may wish to place new user logins there." >&2
+
+		else
+			echo "
+The space from the old \"usr\" partition cannot be reclaimed.  After
+system is booted  from hard disk, reduce the  number of  partitions 
+and create a new bigger partition." 
+		fi
+	fi
+fi
+
+if [ $varmove = y ]
+then 
+	echo "
+Moving the \"var\" partition to disk 2. This typically takes about fifteen
+minutes; a large file system may require as much as forty-five minutes." >&2
+	vmkfs -f $vartype -b $varblksz ${RVAR_1} > /dev/null
+	dlabelit ${VAR_1} var ${rel} > /dev/null
+	/etc/fs/s5/mount ${VAR_1} ${root}/var  2>/dev/null
+	mklost+found ${root}/var ${VAR_1}
+	ignore mkdir ${root}/mnt 2>/dev/null
+	/etc/fs/s5/mount -r ${VAR_0} ${root}/mnt  2>/dev/null
+	cd ${root}/mnt
+	find . -print | cpio -pdmu ../var
+	cd /
+
+	/sbin/umount ${VAR_0} 2>/dev/null
+	/sbin/umount ${VAR_1} 2>/dev/null
+
+	echo "${VAR_1}\t${RVAR_1}\t/var\t${vartype}\t1\tyes\t-" > ${etc}/Nvfstab
+
+	while read dev rdev dir fstype fsckpass automnt flags
+	do
+		case "${dir}" in
+		"/var")
+			continue
+			;;
+		esac
+
+		echo "${dev}" "${rdev}" "${dir}" "${fstype}"  "${fsckpass}" \
+		     "${automnt}" "${flags}" 
+
+	done < ${etc}/vfstab >> ${etc}/Nvfstab
+
+	cp ${etc}/Nvfstab ${etc}/vfstab < /dev/null
+	rm ${etc}/Nvfstab < /dev/null
+
+	if [ ${default} = n ]
+	then 
+		fmthard -d $p_var:0:1:0:0 ${RSIX_0} > /dev/null
+	else
+		eval `prtvtoc -h ${RSIX_0} 2> /dev/null |
+
+			while read part tag flag base size junk
+			do
+				if [ ${tag} -eq ${v_var} ]
+				then
+					echo base=${base} size=${size}
+					break
+				fi
+			done`
+
+		fmthard -d $p_var:0:1:0:0 ${RSIX_0} > /dev/null
+
+		#getpartn(function) assignes use_have the next available free partn.
+		if getpartn
+		then
+			fmthard -d $use_part:0:0:${base}:${size} ${RSIX_0} > /dev/null
+			NEWP_0=/dev/dsk/c1d0s$use_part
+			RNEWP_0=/dev/rdsk/c1d0s$use_part
+
+			vmkfs -f ${DEF_FS} -b ${DEF_BLK} ${RNEWP_0} > /dev/null
+			seq=2
+
+			while [ -r ${root}/$homedir${seq} ]
+			do
+				seq=`ignore expr ${seq} + 1`
+			done
+
+			(umask 022; exec mkdir ${root}/$homedir${seq} )
+			dlabelit ${NEWP_0} $homedir${seq} ${rel} > /dev/null
+			/etc/fs/s5/mount ${NEWP_0} ${root}/$homedir${seq}  2>/dev/null
+			mklost+found ${root}/$homedir${seq} ${NEWP_0}
+			/sbin/umount ${NEWP_0} 2>/dev/null
+
+		echo "${NEWP_0}\t${RNEWP_0}\t/$homedir${seq}\t${DEF_FS}\t1\tyes\t-" \
+				>> ${etc}/vfstab
+
+			echo "
+The space from the old \"var\" partition has been reclaimed. It is now
+called /$homedir${seq} (\"${NEWP_0}\"). It may be used for any purpose.
+You may wish to place new user logins there." >&2
+
+		else
+			echo "
+The space from the old \"var\" partition cannot be reclaimed.  After
+system is booted  from hard disk, reduce the  number of  partitions 
+and create a new bigger partition" 
+		fi
+	fi
+fi
+
+fstabmnt -r ${root} < ${etc}/vfstab
+
+if [ ${default} = n ]
+then
+	for drive in 0 1
+	do
+		eval cylsize=\${CYLSIZE_${drive}} rall=\${RALL_${drive}}
+		optpart -c ${cylsize} -d `ignore expr ${drive} + 1` \
+		    -g ${rel} -r ${root} ${rall}
+	done >> ${etc}/vfstab
+fi

@@ -1,0 +1,659 @@
+#ident	"@(#)lp.admin:printers/filters/Help	1.1"
+ABSTRACT:
+	[GENERAL]
+	The "filters" menu gives you several tasks: for adding
+	new filters; modifying the description of a filter; and
+	examining the filters available.
+	
+	Filters, by the way, are used by the Line Printer Service to
+	handle several aspects of preparing users' files for
+	printing. The printing of a subset of pages; the automatic
+	restarting of printing where it left off; the handling of
+	special modes like one or two-sided, landscape or portrait,
+	draft vs letter-quality; are all handled by filters.
+	Filters also provide automatic conversion from one type of
+	file to another, so that files produced by various
+	application programs can be printed properly.
+	
+add.1.help:ABSTRACT:
+add.1.help:	[GENERAL]
+add.1.help:	You use the "add" task to add a new
+add.1.help:	filter to the print service. Filters are used:
+add.1.help:	
+add.1.help:	* when a file needs to be printed on a printer, but the
+add.1.help:	printer can't handle the file type; the filter converts
+add.1.help:	the file into a type that the printer can handle.
+add.1.help:	
+add.1.help:	* when a file is to be printed with special modes, such as
+add.1.help:	portrait or landscape orientation, two-sided printing,
+add.1.help:	draft or letter quality, etc.; only filters can provide
+add.1.help:	these special modes.
+add.1.help:	
+add.1.help:	* when only a few pages of a file are to be printed; only
+add.1.help:	a filter can correctly break a file into pages.
+add.1.help:	
+add.1.help:	* when more sophisticated print fault handling is needed,
+add.1.help:	such as automatic resumption of printing on the page
+add.1.help:	where printing stopped; only a filter can know about ALL
+add.1.help:	the peculiarities of a printer.
+add.1.help:	
+add.1.help:	[Filter name ]
+add.1.help:	You are expected to enter the name you would like to give to
+add.1.help:	the filter. This name is only used to reference this filter
+add.1.help:	again later, when you want to modify its definition, or
+add.1.help:	examine it, or remove it. You are free to choose any name
+add.1.help:	as long as it is 14 characters or less and contains only
+add.1.help:	letters, digits, and underscores.
+add.1.help:	
+add.1.help:	[Input types it can convert ]
+add.1.help:	You are expected to give the list of file types this filter
+add.1.help:	can recognize and convert. Simple filters probably only
+add.1.help:	recognize one type. But if your filter can
+add.1.help:	handle several types, enter their names separated by commas. Choose
+add.1.help:	the names freely, but remember that the
+add.1.help:	users of the print service will be using these names to
+add.1.help:	describe the types of files they will be printing. Therefore,
+add.1.help:	the names must be made up
+add.1.help:	of only letters, digits, and DASHES (not underscores).
+add.1.help:	
+add.1.help:	If you leave this field blank, it will be assumed that the filter will
+add.1.help:	accept any input type.
+add.1.help:	
+add.1.help:	[Output types it can produce ]
+add.1.help:	You are expected to enter the list of file types this filter
+add.1.help:	can GENERATE. Most simple filters can probably generate
+add.1.help:	just one file type. But if your filter can
+add.1.help:	handle several types, enter their names separated by
+add.1.help:	commas. Choose the names freely, but remember that these
+add.1.help:	names must match up with the names of the file types your
+add.1.help:	printers can accept, or file types other filters can accept.
+add.1.help:	The names must be
+add.1.help:	made up of only letters, digits, and DASHES (not
+add.1.help:	underscores).
+add.1.help:	
+add.1.help:	In the next field you can enter the printer types this
+add.1.help:	filter is restricted to. If that's the only type this
+add.1.help:	filter can generate then just enter that name here and in
+add.1.help:	the next field. If the printer types can accept several
+add.1.help:	file types, enter all those file types here.
+add.1.help:	
+add.1.help:	If you leave this field blank, it will be assumed that the filter is
+add.1.help:	able to generate any output type.
+add.1.help:	
+add.1.help:	[Printer types it is restricted to ]
+add.1.help:	You are expected to enter the printer types this filter will
+add.1.help:	work with. It's hard to say whether it matters or not if
+add.1.help:	your filter is restricted to a few printer types. If the
+add.1.help:	filter is a general one that manipulates the file in a
+add.1.help:	simple fashion (like reverses the pages or adds a left
+add.1.help:	margin), then it will probably work with most printers. If
+add.1.help:	the filter produces printer-specific control sequences, then
+add.1.help:	it is likely to work with only a few printer types.
+add.1.help:	
+add.1.help:	If you leave this field blank, it will be assumed that the filter does
+add.1.help:	not generate any printer specific code and may be used with any
+add.1.help:	printer type.
+add.1.help:	
+add.1.help:	[Printers it is restricted to ]
+add.1.help:	You are expected to enter the names of the printers that are
+add.1.help:	the only ones this filter should be used with. Generally
+add.1.help:	limiting the filter to certain printer types in the previous
+add.1.help:	prompt should be adequate. However, if some printers of the
+add.1.help:	same type won't work adequately (maybe they're an older
+add.1.help:	model or don't have enough memory capacity, etc.) or if use
+add.1.help:	of this filter on a printer will slow down the through-put
+add.1.help:	and you don't want this to happen for some printers, or if
+add.1.help:	for any other reason you don't want this filter used with
+add.1.help:	some printers, enter their names here. (The printers don't
+add.1.help:	have to exist yet in the print service configuration.)
+add.1.help:	
+add.1.help:	If you leave this field blank, it will be assumed that the filter may
+add.1.help:	be used with any printer having the appropriate printer type and
+add.1.help:	content type (if applicable).
+add.1.help:	
+add.1.help:	[Fast or slow filter]
+add.1.help:	Enter "slow" if this filter MUST be run separately
+add.1.help:	from the printer, or enter "fast" if this filter MUST
+add.1.help:	NOT be run separately from the printer. The Line Printer
+add.1.help:	Service will run slow filters in the background without
+add.1.help:	tying up a printer, to allow print requests that don't need
+add.1.help:	filtering to print. However, some filters must be run while
+add.1.help:	connected to the printer because they need to control the
+add.1.help:	printer or check for responses from the printer.
+add.1.help:	
+add.1.help:	[Enter the filter command and any fixed options ]
+add.1.help:	You are expected to enter the command to run to invoke the
+add.1.help:	filter. You can include command line options, but enter
+add.1.help:	only fixed options that are always needed to run this filter
+add.1.help:	correctly. In the next fields you can enter those options
+add.1.help:	that should be in effect only under certain printing
+add.1.help:	conditions. Use full path names for all commands.
+add.1.help:	
+add.2.help:ABSTRACT:
+add.2.help:	[GENERAL]
+add.2.help:	You use the "add" task to add a new
+add.2.help:	filter to the print service. Filters are used:
+add.2.help:	
+add.2.help:	* when a file needs to be printed on a printer, but the
+add.2.help:	printer can't handle the file type; the filter converts
+add.2.help:	the file into a type that the printer can handle.
+add.2.help:	
+add.2.help:	* when a file is to be printed with special modes, such as
+add.2.help:	portrait or landscape orientation, two-sided printing,
+add.2.help:	draft or letter quality, etc.; only filters can provide
+add.2.help:	these special modes.
+add.2.help:	
+add.2.help:	* when only a few pages of a file are to be printed; only
+add.2.help:	a filter can correctly break a file into pages.
+add.2.help:	
+add.2.help:	* when more sophisticated print fault handling is needed,
+add.2.help:	such as automatic resumption of printing on the page
+add.2.help:	where printing stopped; only a filter can know about ALL
+add.2.help:	the peculiarities of a printer.
+add.2.help:	
+add.2.help:	[INPUT]
+add.2.help:	For this field enter the string to be passed for the input type.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+add.2.help:	with the input type.
+add.2.help:	
+add.2.help:	[OUTPUT]
+add.2.help:	For this field enter the string to be passed for the output type.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.2.help:	with the output type.
+add.2.help:	
+add.2.help:	[TERM]
+add.2.help:	For this field enter the string to be passed for the printer type.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+add.2.help:	with the printer type.
+add.2.help:	
+add.2.help:	[CPI]
+add.2.help:	For this field enter the string to be passed for the characters per
+add.2.help:	inch.  If the string contains any spaces, it must be enclosed in
+add.2.help:	double quotes. If the string contains an asterisk (*), the asterisk
+add.2.help:	will be replaced with the characters per inch.
+add.2.help:	
+add.2.help:	[LPI]
+add.2.help:	For this field enter the string to be passed for the lines per inch.
+add.2.help:	If the string contains any spaces, it must be enclosed in double
+add.2.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.2.help:	replaced with the lines per inch.
+add.2.help:	
+add.2.help:	[LENGTH]
+add.2.help:	For this field enter the string to be passed for the page length.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.2.help:	with the page length.
+add.2.help:	
+add.2.help:	[WIDTH]
+add.2.help:	For this field enter the string to be passed for the page width.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.2.help:	with the page width.
+add.2.help:	
+add.2.help:	[PAGES]
+add.2.help:	For this field enter the string to be passed for the number of pages.
+add.2.help:	If the string contains any spaces, it must be enclosed in double
+add.2.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.2.help:	replaced with the number of pages.
+add.2.help:	
+add.2.help:	[CHARSET]
+add.2.help:	For this field enter the string to be passed for the character set.
+add.2.help:	If the string contains any spaces, it must be enclosed in double
+add.2.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.2.help:	replaced with the character set.
+add.2.help:	
+add.2.help:	[FORM]
+add.2.help:	For this field enter the string to be passed for the form name.  If
+add.2.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.2.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.2.help:	with the form name.
+add.2.help:	
+add.2.help:	[COPIES]
+add.2.help:	For this field enter the string to be passed for the number of copies.
+add.2.help:	If the string contains any spaces, it must be enclosed in double
+add.2.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.2.help:	replaced with the number of copies.
+add.2.help:	
+add.2.help:	[MODES (first part of field)]
+add.2.help:	Enter the name of the mode that the user will pass to lp(1) with the
+add.2.help:	"-y" option.  This name should probably be something obvious and
+add.2.help:	preferably eight characters or less.
+add.2.help:	
+add.2.help:	For example, if you have a filter that will convert a document to
+add.2.help:	landscape mode, you might enter "landscape" or "land."  You could of
+add.2.help:	course enter just "l," but it is not obvious what mode "l" will do.
+add.2.help:	If you entered "land," the user would request landscape mode by
+add.2.help:	entering "lp -y land file."
+add.2.help:	
+add.2.help:	[MODES (Second part of field)]
+add.2.help:	Enter the string to be passed to the filter for the mode you just
+add.2.help:	specified.  When the mode you entered in the previous field is
+add.2.help:	matched, the contents of this field will be passed to the filter as a
+add.2.help:	command line argument.
+add.help:ABSTRACT:
+add.help:	[GENERAL]
+add.help:	You use the "add" task to add a new
+add.help:	filter to the print service. Filters are used:
+add.help:	
+add.help:	* when a file needs to be printed on a printer, but the
+add.help:	printer can't handle the file type; the filter converts
+add.help:	the file into a type that the printer can handle.
+add.help:	
+add.help:	* when a file is to be printed with special modes, such as
+add.help:	portrait or landscape orientation, two-sided printing,
+add.help:	draft or letter quality, etc.; only filters can provide
+add.help:	these special modes.
+add.help:	
+add.help:	* when only a few pages of a file are to be printed; only
+add.help:	a filter can correctly break a file into pages.
+add.help:	
+add.help:	* when more sophisticated print fault handling is needed,
+add.help:	such as automatic resumption of printing on the page
+add.help:	where printing stopped; only a filter can know about ALL
+add.help:	the peculiarities of a printer.
+add.help:	
+add.help:	[Filter name ...]
+add.help:	You are expected to enter the name you would like to give to
+add.help:	the filter. This name is only used to reference this filter
+add.help:	again later, when you want to modify its definition, or
+add.help:	examine it, or remove it. You are free to choose any name
+add.help:	as long as it is 14 characters or less and contains only
+add.help:	letters, digits, and underscores.
+add.help:	
+add.help:	[Input types it can convert ...]
+add.help:	You are expected to give the list of file types this filter
+add.help:	can recognize and convert. Simple filters probably only
+add.help:	recognize one type. But if your filter can
+add.help:	handle several types, enter their names separated by commas. Choose
+add.help:	the names freely, but remember that the
+add.help:	users of the print service will be using these names to
+add.help:	describe the types of files they will be printing. Therefore,
+add.help:	the names must be made up
+add.help:	of only letters, digits, and DASHES (not underscores).
+add.help:	
+add.help:	If you leave this field blank, it will be assumed that the filter will
+add.help:	accept any input type.
+add.help:	
+add.help:	[Output types it can produce ...]
+add.help:	You are expected to enter the list of file types this filter
+add.help:	can GENERATE. Most simple filters can probably generate
+add.help:	just one file type. But if your filter can
+add.help:	handle several types, enter their names separated by
+add.help:	commas. Choose the names freely, but remember that these
+add.help:	names must match up with the names of the file types your
+add.help:	printers can accept, or file types other filters can accept.
+add.help:	The names must be
+add.help:	made up of only letters, digits, and DASHES (not
+add.help:	underscores).
+add.help:	
+add.help:	In the next field you can enter the printer types this
+add.help:	filter is restricted to. If that's the only type this
+add.help:	filter can generate then just enter that name here and in
+add.help:	the next field. If the printer types can accept several
+add.help:	file types, enter all those file types here.
+add.help:	
+add.help:	If you leave this field blank, it will be assumed that the filter is
+add.help:	able to generate any output type.
+add.help:	
+add.help:	[Printer types it is restricted to ...]
+add.help:	You are expected to enter the printer types this filter will
+add.help:	work with. It's hard to say whether it matters or not if
+add.help:	your filter is restricted to a few printer types. If the
+add.help:	filter is a general one that manipulates the file in a
+add.help:	simple fashion (like reverses the pages or adds a left
+add.help:	margin), then it will probably work with most printers. If
+add.help:	the filter produces printer-specific control sequences, then
+add.help:	it is likely to work with only a few printer types.
+add.help:	
+add.help:	If you leave this field blank, it will be assumed that the filter does
+add.help:	not generate any printer specific code and may be used with any
+add.help:	printer type.
+add.help:	
+add.help:	[Printers it is restricted to ...]
+add.help:	You are expected to enter the names of the printers that are
+add.help:	the only ones this filter should be used with. Generally
+add.help:	limiting the filter to certain printer types in the previous
+add.help:	prompt should be adequate. However, if some printers of the
+add.help:	same type won't work adequately (maybe they're an older
+add.help:	model or don't have enough memory capacity, etc.) or if use
+add.help:	of this filter on a printer will slow down the through-put
+add.help:	and you don't want this to happen for some printers, or if
+add.help:	for any other reason you don't want this filter used with
+add.help:	some printers, enter their names here. (The printers don't
+add.help:	have to exist yet in the print service configuration.)
+add.help:	
+add.help:	If you leave this field blank, it will be assumed that the filter may
+add.help:	be used with any printer having the appropriate printer type and
+add.help:	content type (if applicable).
+add.help:	
+add.help:	[Fast or slow filter...]
+add.help:	Enter "slow" if this filter MUST be run separately
+add.help:	from the printer, or enter "fast" if this filter MUST
+add.help:	NOT be run separately from the printer. The Line Printer
+add.help:	Service will run slow filters in the background without
+add.help:	tying up a printer, to allow print requests that don't need
+add.help:	filtering to print. However, some filters must be run while
+add.help:	connected to the printer because they need to control the
+add.help:	printer or check for responses from the printer.
+add.help:	
+add.help:	[Enter the filter command and any fixed options ...]
+add.help:	You are expected to enter the command to run to invoke the
+add.help:	filter. You can include command line options, but enter
+add.help:	only fixed options that are always needed to run this filter
+add.help:	correctly. In the next fields you can enter those options
+add.help:	that should be in effect only under certain printing
+add.help:	conditions. Use full path names for all commands.
+add.help:	
+add.help:	[INPUT]
+add.help:	For this field enter the string to be passed for the input type.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+add.help:	with the input type.
+add.help:	
+add.help:	[OUTPUT]
+add.help:	For this field enter the string to be passed for the output type.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.help:	with the output type.
+add.help:	
+add.help:	[TERM]
+add.help:	For this field enter the string to be passed for the printer type.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+add.help:	with the printer type.
+add.help:	
+add.help:	[CPI]
+add.help:	For this field enter the string to be passed for the characters per
+add.help:	inch.  If the string contains any spaces, it must be enclosed in
+add.help:	double quotes. If the string contains an asterisk (*), the asterisk
+add.help:	will be replaced with the characters per inch.
+add.help:	
+add.help:	[LPI]
+add.help:	For this field enter the string to be passed for the lines per inch.
+add.help:	If the string contains any spaces, it must be enclosed in double
+add.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.help:	replaced with the lines per inch.
+add.help:	
+add.help:	[LENGTH]
+add.help:	For this field enter the string to be passed for the page length.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.help:	with the page length.
+add.help:	
+add.help:	[WIDTH]
+add.help:	For this field enter the string to be passed for the page width.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.help:	with the page width.
+add.help:	
+add.help:	[PAGES]
+add.help:	For this field enter the string to be passed for the number of pages.
+add.help:	If the string contains any spaces, it must be enclosed in double
+add.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.help:	replaced with the number of pages.
+add.help:	
+add.help:	[CHARSET]
+add.help:	For this field enter the string to be passed for the character set.
+add.help:	If the string contains any spaces, it must be enclosed in double
+add.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.help:	replaced with the character set.
+add.help:	
+add.help:	[FORM]
+add.help:	For this field enter the string to be passed for the form name.  If
+add.help:	the string contains any spaces, it must be enclosed in double quotes.
+add.help:	If the string contains an asterisk (*), the asterisk will be replaced
+add.help:	with the form name.
+add.help:	
+add.help:	[COPIES]
+add.help:	For this field enter the string to be passed for the number of copies.
+add.help:	If the string contains any spaces, it must be enclosed in double
+add.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+add.help:	replaced with the number of copies.
+add.help:	
+add.help:	[MODES(pattern)]
+add.help:	Enter the name of the mode that the user will pass to lp(1) with the
+add.help:	"-y" option.  This name should probably be something obvious and
+add.help:	preferably eight characters or less.
+add.help:	
+add.help:	For example, if you have a filter that will convert a document to
+add.help:	landscape mode, you might enter "landscape" or "land."  You could of
+add.help:	course enter just "l," but it is not obvious what mode "l" will do.
+add.help:	If you entered "land," the user would request landscape mode by
+add.help:	entering "lp -y land file."
+add.help:	
+add.help:	[MODES(replacement)]
+add.help:	Enter the string to be passed to the filter for the mode you just
+add.help:	specified.  When the mode you entered in the previous field is
+add.help:	matched, the contents of this field will be passed to the filter as a
+add.help:	command line argument.
+display.help:ABSTRACT:
+display.help:	[GENERAL]
+display.help:	You use the "display" task to see
+display.help:	the definitions of one or more filters. You can examine a
+display.help:	particular filter, or can see all the filters on the system.
+display.help:	
+display.help:	[Enter the names ...]
+display.help:	You are expected to enter the name of the filter you'd like
+display.help:	to examine. You can enter the names of several filters by
+display.help:	separating their names with commas.
+menu.help:ABSTRACT:
+menu.help:	[GENERAL]
+menu.help:	The "filters" menu gives you several tasks: for adding
+menu.help:	new filters; modifying the description of a filter; and
+menu.help:	examining the filters available.
+menu.help:	
+menu.help:	Filters, by the way, are used by the Line Printer Service to
+menu.help:	handle several aspects of preparing users' files for
+menu.help:	printing. The printing of a subset of pages; the automatic
+menu.help:	restarting of printing where it left off; the handling of
+menu.help:	special modes like one or two-sided, landscape or portrait,
+menu.help:	draft vs letter-quality; are all handled by filters.
+menu.help:	Filters also provide automatic conversion from one type of
+menu.help:	file to another, so that files produced by various
+menu.help:	application programs can be printed properly.
+menu.help:	
+modify.help:ABSTRACT:
+modify.help:	[GENERAL]
+modify.help:	You use the "modify" task to modify the definition of a
+modify.help:	filter. The same information you gave when you added the
+modify.help:	filter will provide the defaults for each item you are asked
+modify.help:	to respecify, so you can quickly step through the definition
+modify.help:	to find the item you want to modify.
+modify.help:	
+modify.help:	
+modify.help:	[Filter name ...]
+modify.help:	You are expected to enter the name of the filter you would
+modify.help:	like to modify.
+modify.help:	
+modify.help:	[Restore to factory settings? ...]
+modify.help:	Enter yes to restore the filter to its original,
+modify.help:	installed definition. Enter no if you want to
+modify.help:	step through the filter definition to modify parts of it.
+modify.help:	
+modify.help:	[Input types it can convert ...]
+modify.help:	You are expected to give the list of file types this filter
+modify.help:	can recognize and convert. Simple filters probably only
+modify.help:	recognize one type, which is fine. But if your filter can
+modify.help:	handle several types, enter their names separated by
+modify.help:	commas. Choose the names freely, but remember that the
+modify.help:	users of the print service will be using these names to
+modify.help:	describe the types of files they will be printing. Therefore,
+modify.help:	the names must be made up
+modify.help:	of only letters, digits, and DASHES (not underscores).
+modify.help:	
+modify.help:	If you leave this field blank, it will be assumed that the filter will
+modify.help:	accept any input type.
+modify.help:	
+modify.help:	[Output types it can produce ...]
+modify.help:	You are expected to enter the list of file types this filter
+modify.help:	can GENERATE. Most simple filters can probably generate
+modify.help:	just one file type which is fine. But if your filter can
+modify.help:	handle several types, enter their names separated by
+modify.help:	commas. Choose the names freely, but remember that these
+modify.help:	names must match up with the names of the file types your
+modify.help:	printers can accept, or file types other filters can accept.
+modify.help:	The names must be
+modify.help:	made up of only letters, digits, and DASHES (not
+modify.help:	underscores).
+modify.help:	
+modify.help:	In the next field you can enter the printer types this
+modify.help:	filter is restricted to. If that's the only type this
+modify.help:	filter can generate then just enter that name here and in
+modify.help:	the next field. If the printer types can accept several
+modify.help:	file types, enter all those file types here.
+modify.help:	
+modify.help:	If you leave this field blank, it will be assumed that the filter is
+modify.help:	able to generate any output type.
+modify.help:	
+modify.help:	[Printer types it is restricted to ...]
+modify.help:	You are expected to enter the printer types this filter will
+modify.help:	work with. It's hard to say whether it matters or not if
+modify.help:	your filter is restricted to a few printer types. If the
+modify.help:	filter is a general one that manipulates the file in a
+modify.help:	simple fashion (like reverses the pages or adds a left
+modify.help:	margin), then it will probably work with most printers. If
+modify.help:	the filter produces printer-specific control sequences, then
+modify.help:	it is likely to work with only a few printer types.
+modify.help:	If you leave this field blank, it will be assumed that the filter does
+modify.help:	not generate any printer specific code and may be used with any
+modify.help:	printer type.
+modify.help:	
+modify.help:	[Printers it is restricted to ...]
+modify.help:	You are expected to enter the names of the printers that are
+modify.help:	the only ones this filter should be used with. Generally
+modify.help:	limiting the filter to certain printer types in the previous
+modify.help:	prompt should be adequate. However, if some printers of the
+modify.help:	same type won't work adequately (maybe they're an older
+modify.help:	model or don't have enough memory capacity, etc.) or if use
+modify.help:	of this filter on a printer will slow down the through-put
+modify.help:	and you don't want this to happen for some printers, or if
+modify.help:	for any other reason you don't want this filter used with
+modify.help:	some printers, enter their names here. (The printers don't
+modify.help:	have to exist yet in the print service configuration.)
+modify.help:	
+modify.help:	If you leave this field blank, it will be assumed that the filter may
+modify.help:	be used with any printer having the appropriate printer type and
+modify.help:	content type (if applicable).
+modify.help:	
+modify.help:	[Fast or slow filter...]
+modify.help:	Enter "yes" if this filter MUST be run separately
+modify.help:	from the printer, or enter "no" if this filter MUST
+modify.help:	NOT be run separately from the printer. The Line Printer Service will run slow filters in the background without
+modify.help:	tying up a printer, to allow print requests that don't need
+modify.help:	filtering to print. However, some filters must be run while
+modify.help:	connected to the printer because they need to control the
+modify.help:	printer or check for responses from the printer.
+modify.help:	
+modify.help:	[Enter the filter command and any fixed options ...]
+modify.help:	You are expected to enter the command to run to invoke the
+modify.help:	filter. You can include command line options, but enter
+modify.help:	only fixed options that are always needed to run this filter
+modify.help:	correctly. In the next fields you can enter those options
+modify.help:	that should be in effect only under certain printing
+modify.help:	conditions. Use full path names for all commands.
+modify.help:	
+modify.help:	[INPUT]
+modify.help:	For this field enter the string to be passed for the input type.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+modify.help:	with the input type.
+modify.help:	
+modify.help:	[OUTPUT]
+modify.help:	For this field enter the string to be passed for the output type.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced
+modify.help:	with the output type.
+modify.help:	
+modify.help:	[TERM]
+modify.help:	For this field enter the string to be passed for the printer type.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced        
+modify.help:	with the printer type.
+modify.help:	
+modify.help:	[CPI]
+modify.help:	For this field enter the string to be passed for the characters per
+modify.help:	inch.  If the string contains any spaces, it must be enclosed in
+modify.help:	double quotes. If the string contains an asterisk (*), the asterisk
+modify.help:	will be replaced with the characters per inch.
+modify.help:	
+modify.help:	[LPI]
+modify.help:	For this field enter the string to be passed for the lines per inch.
+modify.help:	If the string contains any spaces, it must be enclosed in double
+modify.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+modify.help:	replaced with the lines per inch.
+modify.help:	
+modify.help:	[LENGTH]
+modify.help:	For this field enter the string to be passed for the page length.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced
+modify.help:	with the page length.
+modify.help:	
+modify.help:	[WIDTH]
+modify.help:	For this field enter the string to be passed for the page width.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced
+modify.help:	with the page width.
+modify.help:	
+modify.help:	[PAGES]
+modify.help:	For this field enter the string to be passed for the number of pages.
+modify.help:	If the string contains any spaces, it must be enclosed in double
+modify.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+modify.help:	replaced with the number of pages.
+modify.help:	
+modify.help:	[CHARSET]
+modify.help:	For this field enter the string to be passed for the character set.
+modify.help:	If the string contains any spaces, it must be enclosed in double
+modify.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+modify.help:	replaced with the character set.
+modify.help:	
+modify.help:	[FORM]
+modify.help:	For this field enter the string to be passed for the form name.  If
+modify.help:	the string contains any spaces, it must be enclosed in double quotes.
+modify.help:	If the string contains an asterisk (*), the asterisk will be replaced
+modify.help:	with the form name.
+modify.help:	
+modify.help:	[COPIES]
+modify.help:	For this field enter the string to be passed for the number of copies.
+modify.help:	If the string contains any spaces, it must be enclosed in double
+modify.help:	quotes. If the string contains an asterisk (*), the asterisk will be
+modify.help:	replaced with the number of copies.
+modify.help:	
+modify.help:	[MODES (pattern)]
+modify.help:	Enter the name of the mode that the user will pass to lp(1) with the
+modify.help:	"-y" option.  This name should probably be something obvious and
+modify.help:	preferably eight characters or less.
+modify.help:	
+modify.help:	For example, if you have a filter that will convert a document to
+modify.help:	landscape mode, you might enter "landscape" or "land."  You could of
+modify.help:	course enter just "l," but it is not obvious what mode "l" will do.
+modify.help:	If you entered "land," the user would request landscape mode by
+modify.help:	entering "lp -y land file."
+modify.help:	
+modify.help:	[MODES (replacement)]
+modify.help:	Enter the string to be passed to the filter for the mode you just
+modify.help:	specified.  When the mode you entered in the previous field is
+modify.help:	matched, the contents of this field will be passed to the filter as a
+modify.help:	command line argument.
+remove.help:ABSTRACT:
+remove.help:	[GENERAL]
+remove.help:	You use the "remove" task to remove a filter from the
+remove.help:	print service. No more print requests will be accepted for
+remove.help:	it and the filter definition will be destroyed. Any print
+remove.help:	requests currently queued that need this filter to print
+remove.help:	properly will be CANCELED if another filter cannot be found
+remove.help:	to take its place.
+remove.help:	
+remove.help:	[Enter the names of the filters to remove ...]
+remove.help:	You are expected to enter the name of the filter you want to
+remove.help:	remove. You can give a list of filters to remove by
+remove.help:	separating the names with commas. If you don't
+remove.help:	know a filter name, press the CHOICES key.
+remove.help:	
+remove.help:	WARNING
+remove.help:	Some print requests may be pending that require this filter to print
+remove.help:	adequately. If you remove the filter, the Line Printer Service will try to
+remove.help:	find another filter for them, but if it can't it will cancel the print
+remove.help:	requests.

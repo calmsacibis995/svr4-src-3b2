@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/ticlts	1.2"
+* ticlts TPI loopback transport provider
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fs	-	tcl	-	-	-
+$$

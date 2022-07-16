@@ -1,0 +1,73 @@
+#ident	"@(#)nsadmin:profile	1.3"
+#	The profile that all logins get before using their own .profile.
+
+trap ""  2 3
+export LOGNAME
+
+. /etc/TIMEZONE
+
+#	Login and -su shells get /etc/profile services.
+#	-rsh is given its environment in its .profile.
+case "$0" in
+-su )
+	export PATH
+
+#	Uncomment this script if you wish to use secure RPC facility
+#
+#	ps -e | grep rpcbind 1>/dev/null
+#	if [ $? = 0 ] 
+#	then
+#		ps -e | grep keyserv 1>/dev/null
+#		if [ $? = 0 ] 
+#		then
+#			echo "Please login to the network"
+#			/usr/bin/keylogin
+#		else
+#			echo `date`: "secure rpc nonfunctional; keyserv is down" >>/var/adm/log/rpc.log
+#		fi
+#	else
+#		echo `date`: "secure rpc nonfunctional; rpcbind is down" >>/var/adm/log/rpc.log
+#	fi
+#	
+	;;
+-sh )
+	export PATH
+
+	#	Allow the user to break the Message-Of-The-Day only.
+	trap "trap '' 2"  2
+	cat -s /etc/motd
+	trap "" 2
+
+	if mail -e
+	then
+		echo "you have mail"
+	fi
+
+	if [ "${LOGNAME}" != "root" ]
+	then
+		news -n
+	fi
+
+#	Uncomment this script if you wish to use secure RPC facility
+#
+#	ps -e | grep rpcbind 1>/dev/null
+#	if [ $? = 0 ] 
+#	then
+#		ps -e | grep keyserv 1>/dev/null
+#		if [ $? = 0 ] 
+#		then
+#			echo "Please login to the network"
+#			/usr/bin/keylogin
+#		else
+#			echo `date`: "secure rpc nonfunctional; keyserv is down" >>/var/adm/log/rpc.log
+#		fi
+#	else
+#		echo `date`: "secure rpc nonfunctional; rpcbind is down" >>/var/adm/log/rpc.log
+#	fi
+#	
+
+	;;
+esac
+
+umask 022
+trap  2 3

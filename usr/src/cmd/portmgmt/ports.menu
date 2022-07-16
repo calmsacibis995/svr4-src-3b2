@@ -1,0 +1,7 @@
+#ident	"@(#)portmgmt:ports.menu	1.2"
+#menu#Service Access Management
+#life#permanent
+
+port_monitors^Port Monitor Management^port_monitors/pm.menu
+port_services^Port Service Management^port_services/ps.menu
+tty_settings^Terminal Line Setting Management^tty_settings/tty.menu

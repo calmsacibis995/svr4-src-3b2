@@ -1,0 +1,4 @@
+#ident	"@(#)oamintf:restore_serv/restore.menu	1.1"
+#menu#Restore Service Management
+#help#rest.help^Restore Service Management
+#life#permanent

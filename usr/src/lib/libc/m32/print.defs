@@ -1,0 +1,172 @@
+#	Copyright (c) 1988 AT&T
+#	All Rights Reserved 
+#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
+#	The copyright notice above does not evidence any 
+#	actual or intended publication of such source code.
+
+.ident	"@(#)libc-m32:print.defs	1.6.1.11"
+#
+	.set	.Rcnt,6			# Number of registers to save on entry.
+#
+# Register definitions
+#
+_m4_define_(`fmt', %r8)#	Points to current pos. in printf format string.
+_m4_define_(`ptr', %r7)#	Next unused position in output buffer.
+_m4_define_(`bp', %r6)#		Ptr to first character of value to be printed.
+_m4_define_(`p', %r5)#		(1) Ptr to pos. beyond value or (2) Its length.
+_m4_define_(`flags', %r4)#	Bit-coded flags pertaining to format.
+
+# The significance of registers %r3, %r2, %r1, and %r0 varies locally.
+# In addition, the other registers may be used for other purposes than
+# those designated above:  when this is done, the registers are saved before
+# their alternate use and restored afterwards, except at ".return", where
+# such care is unnecessary.
+# For example, register %r5 is used in this way:
+
+_m4_define_(`iop', %r5)#	FILE structure pointer for printf, fprintf
+
+_m4_define_(`_NFILE', 20)#	Max number of open files without NOFILES feature
+
+_m4_define_(`BMAXARG', 120)#	default size of parofflst
+
+
+#
+# bit positions for flags used in doprnt flagword (register "flags")
+#
+	.set	DOTSEEN,1	# dot appeared in format specification
+	.set	WIDTH,2		# minimum width was specified in format.
+	.set	FMINUS,4	# '-' found between % and conversion character
+	.set	FPLUS,16	# '+' found between % and conversion character
+	.set	FBLANK,32	# ' ' found between % and conversion character
+	.set	FSHARP,64	# '#' found between % and conversion character
+	.set	CFSHARP,0xffffffbf	# complement of the FSHARP flag
+	.set	LZERO,8		# there will be leading zeroes in output
+	.set	RZERO,128	# there will be trailing zeroes in output
+	.set	SUFFIX,256	# a suffix is to appear in the output
+	.set	RPAD,512	# pad to the right of output
+	.set	PADZERO,1024	# padding zeroes requested via '0'
+	.set	CPADZERO,0xfffffbff	# complement of the PADZERO flag
+	.set	FLZERO,2048	# the value to convert is floating zero
+	.set	SHORT,4096	# 'h' found between % and conversion character
+
+#
+# Maximum number of pad characters (blanks or zeroes) which can be generated
+# in one move.
+#
+	.set	PADMAX,40
+
+#
+# Ascii constants
+#
+	.set	NEWLINE,10
+	.set	BLANK,32
+	.set	PERCENT,37
+	.set	PLUSSGN,43
+	.set	MINUSSGN,45
+	.set	DECPOINT,46
+	.set	ASCII_0,48
+	.set	UPPER_E,69
+	.set	LOWER_e,101
+
+#-----------------------------------------------------------------------#
+# #include file definitions.						#
+#-----------------------------------------------------------------------#
+
+#
+# Conversion constants -- from "print.h"
+#
+	.set	MAXDIGS,12	# Maximum length of any integer representation
+	.set	MAXECVT,17	# Maximum length of E format conversion
+	.set	MAXFCVT,60	# Maximum places after decimal in F format
+	.set	MAXFSIG,17	# Maximum significant places in floating rep.
+	.set	MAXESIZ,5	# Maximum number of chars in exponent
+	.set	MAXEXP,310	# Maximum (positive) exponent.
+
+#
+# Relevant bits of character type table entries -- from <ctype.h>
+#
+	.set	ISDIGIT,4	# This bit is set if character is digit
+
+#
+# Definition of fields in FILE struct -- from <stdio.h>
+#
+	.set	_cnt,0
+	.set	_ptr,4
+	.set	_base,8
+	.set	_flag,12
+	.set	_file,13
+
+#
+# Relevant bits in the "_flag" byte of the FILE struct -- from <stdio.h>
+#
+	.set	_IOWRT,02
+	.set	_IONBF,04
+	.set	_IOERR,040
+	.set	_IOLBF,0100
+	.set	_IORW,0200
+
+#
+# FILE structure pointer for standard output -- from <stdio.h>
+#
+_m4_define_(`stdoutoff', 16)
+
+#
+# EOF indicator and its two's complement -- EOF is defined in <stdio.h>
+#
+	.set	EOF,-1
+	.set	EOFN,1
+
+
+
+#-----------------------------------------------------------------------#
+# Local frame variables for doprnt					#
+#									#
+# Note that changes to the constants defined above may affect the 	#
+# amount of space needed for some of the buffers defined here.		#
+#-----------------------------------------------------------------------#
+
+	.set	bufend,0	# _bufend(iop), or, for calls to sprintf, -1.
+	.set	argp,4		# pointer to next argument
+	.set	wcount,8	# Count of output chars prior to most recent
+				# update of iop->_ptr (printf, fprintf only).
+	.set	outstart,8	# Start of output buffer (sprintf only).
+	.set	iophold,12	# iop save area.
+	.set	width,16	# Field width given after %, as in %width.prec
+	.set	prec,20		# Precision given after dot, as in %width.prec
+	.set	lpzero,24	# Number of padding zeroes required on left.
+	.set	rzero,28	# Number of padding zeroes required on right.
+	.set	prefix,32	# Pointer to sign, "0x", or "0X".
+	.set	suffix,36	# Pointer to exponent if any.
+	.set	prefixle,40	# Length of prefix (number of characters).
+	.set	suffixle,44	# Length of suffix (number of characters).
+	.set	rpad,48		# Number of padding blanks to right of value.
+	.set	tab,52		# Ptr to translate table for octal/hex digits.
+	.set	letter_e,56	# The letter 'e' or 'E', for exponent.
+	.set	dval,60		# The value being converted, if real.
+	.set	dec_pt,68	# Decpt position from fcvt/ecvt.
+	.set	sign,72		# Sign from fcvt/ecvt.
+	.set	hold,76		# temporary hold for reg with multiple uses.
+
+	.set	aflag,80	# Flag used when checking for NaN and Infinity
+	.set	NaN,84		# If a NaN is seen, this flag is set to 5, the
+				# the length of the string ``NAN0X'' (``nan0x'')
+	.set	sbuf,88		# Integer values are developed in this buffer.
+	.set	expbuf,sbuf+MAXDIGS-MAXESIZ	# Buffer to create exponent.
+						# (Overlaps sbuf)
+	.set	buf,100		# Floating values are developed in this buffer.
+				# need 372 bytes for worst-case floating value.
+	.set	fpos,472	# Set to 1 if first positional parameter
+	.set	sformat,476	# Saves start of format
+	.set	sargs,480	# Saves start of argument list
+	.set	maxargno,484	# max. number of args for fast positional parameters
+	.set	starflg,488	# Set to 1 if * format specifier is seen
+	.set	parofflst,492	# List of offsets of arguments from start of arg list
+	.set	.locals,496
+
+#
+# Special macro for handling switch in doprnt for dynamic shared library
+_m4_ifdef_(`DSHLIB',
+`	_m4_define_(`SL',$1-.switch)
+',
+`	_m4_define_(`SL',$1)
+')

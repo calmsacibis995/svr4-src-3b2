@@ -1,0 +1,17 @@
+*#ident	"@(#)fs:master.d/xnamfs	1.4"
+*
+* SPECFS
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+oxj	-	xnam	-	-	-
+						xnamname(%15c)= { NAMEXNAM }
+
+						xsem[XSEMMAX] (%0xC)
+						nxsem(%i)={XSEMMAX}
+						xsd[XSDSEGS] (%0xC)
+						sdtab[XSDSEGS * XSDSLOTS] (%0x14)
+						nxsd(%i)={XSDSEGS}
+$$$
+
+NAMEXNAM = "xnamfs"
+XSEMMAX = 60

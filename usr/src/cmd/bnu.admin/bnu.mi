@@ -1,0 +1,5 @@
+#ident	"@(#)bnu.admin:bnu.mi	1.4"
+main:network_services:basic_networking:devices^Adding, Listing, and Removing Networking Devices^
+main:network_services:basic_networking:polling^Adding, Listing, and Removing Systems to Be Polled^
+main:network_services:basic_networking:setup^Initial Basic Networking Setup^
+main:network_services:basic_networking:systems^Adding, Listing, and Removing Remote Systems^

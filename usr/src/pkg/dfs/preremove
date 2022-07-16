@@ -1,0 +1,13 @@
+#ident	"@(#)pkg.dfs:dfs/preremove	1.1"
+#
+# Issue a warning message if RFS is running.
+#
+rfadmin >/dev/null 2>&1
+if [ $? -eq 0 ]
+then
+	echo "WARNING: RFS is still running."
+fi
+
+rm -f /usr/sbin/dfshares /usr/sbin/general /usr/sbin/share /usr/sbin/shareall /usr/sbin/unshareall
+
+exit 0

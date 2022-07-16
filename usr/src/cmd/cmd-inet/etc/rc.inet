@@ -1,0 +1,63 @@
+#ident	"@(#)cmd-inet:etc/inet/rc.inet	1.3"
+
+# Inet startup script run from /etc/init.d/inetinit
+
+exitcode=0
+
+# Enable software loopback driver.
+/usr/sbin/ifconfig lo0 localhost up
+if [ $? -ne 0 ]
+then
+	exitcode=1
+	echo "/etc/inet/rc.inet: /usr/sbin/ifconfig lo0 failed"
+fi
+
+# Default (single interface, not a gateway)
+EMDMAJOR=`getmajor EMD | cut -d\  -f1`
+/usr/sbin/ifconfig emd${EMDMAJOR} `uname -n` up
+if [ $? -ne 0 ]
+then
+	exitcode=1
+	echo "/etc/inet/rc.inet: /usr/sbin/ifconfig emd${EMDMAJOR} failed"
+fi
+
+# Hosts acting as gateways
+# To bring up your system as a gateway, you must:
+#	set IPFORWARDING to 1 in /etc/master.d/ip, mkboot /boot/IP,
+#		and build a new /unix
+#	edit /etc/inet/networks: add network names and number
+#	edit /etc/inet/hosts: create unique host name for each interface
+#	edit /etc/inet/strcf: call cenet to link internet modules/drivers
+#		above each interface
+#	edit /etc/inet/rc.inet (this file):
+#		comment out the default ifconfig entry above
+#		un-comment the ifconfig entries below, changing X, Y to emd
+#		  device (slot) numbers and nameX, nameY to your host names 
+#		  for each interface.
+#		un-comment the line that starts in.routed
+# See 'Expanding Your Network' in the Internet Administrator's Guide for
+# more info
+#
+#/usr/sbin/ifconfig emdX nameX up
+#if [ $? -ne 0 ]
+#then
+#	exitcode=1
+#	echo "/etc/inet/rc.inet: /usr/sbin/ifconfig emdX` failed"
+#fi
+#/usr/sbin/ifconfig emdY nameY up
+#if [ $? -ne 0 ]
+#then
+#	exitcode=1
+#	echo "/etc/inet/rc.inet: /usr/sbin/ifconfig emdY` failed"
+#fi
+#/usr/sbin/in.routed
+
+
+# Add lines here to set up routes to gateways, start other daemons, etc.
+# For example,
+#/usr/sbin/route add default your_nearest_gateway hops_to_gateway
+#/usr/sbin/in.named
+
+
+#return status to /etc/init.d/inetinit
+exit $exitcode

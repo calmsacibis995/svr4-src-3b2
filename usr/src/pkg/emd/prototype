@@ -1,0 +1,73 @@
+#ident	"@(#)pkg.emd:prototype	1.2"
+#
+#	All files/directories are defined as relocatable. Although
+#	BASENAME is not used at this time (i.e. defaults to /)
+#	doing this may facilitate future development.
+#
+#	installation files:
+#		'postinstall' installs drivers, etc
+#		'preremove' uninstalls drivers, etc
+#
+i pkginfo
+i preinstall
+i postinstall
+i preremove
+i depend
+#
+#	directories: default owner=root group=sys mode=0775
+#
+!default 775 root sys
+d none	/boot	?	?	?
+d none	/dev	?	?	?
+d none	/dgn	?	?	?
+d none	/etc	?	?	?
+d none	/etc/master.d	?	?	?
+d none	/etc/init.d	?	?	?
+d none	/etc/rc0.d	?	?	?
+d none	/etc/rc2.d	?	?	?
+d none	/lib	?	?	?
+d none	/lib/pump	?	?	?
+d none	/usr	?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/include	?	?	?
+d none	/usr/include/sys	?	?	?
+#
+#	driver object files: default owner=root group=root mode=0500
+#	use already mkboot-ed files for managability
+#
+!default 0500 root root
+e none	/boot/EMD=/usr/src/uts/3b2/io/EMD
+#
+#	configuration files: default owner=root group=root mode=0444
+#
+!default 0444 root root
+e none	/etc/master.d/emd=/usr/src/uts/3b2/master.d/emd
+#
+#	init scripts: default owner=root, group=sys, mode=444
+#
+!default 0444 root sys
+f none	/etc/init.d/emdinit=/usr/src/cmd/emd/emdinit
+l none	/etc/rc0.d/K70emd=/etc/init.d/emdinit
+l none	/etc/rc2.d/S69emd=/etc/init.d/emdinit
+#
+#	hardware files: default owner=root, group=sys, mode=444
+#
+!default 0500 root sys
+f none	/dgn/EMD
+f none	/dgn/X.EMD
+f none	/lib/pump/emd
+#
+#	commands: default owner=root, group=sys, mode=0500
+#
+!default 0500 root sys
+f none	/usr/bin/epump
+f none	/usr/bin/emdaddr
+f none	/usr/bin/emdreset
+f none	/usr/bin/eiasetup
+f none	/usr/bin/emdloop
+#
+#	header files: default owner=bin group=bin mode=0444
+#
+!default 0444 bin bin
+f none	/usr/include/sys/emd.h
+f none	/usr/include/sys/emduser.h

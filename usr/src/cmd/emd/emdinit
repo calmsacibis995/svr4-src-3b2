@@ -1,0 +1,61 @@
+#ident	"@(#)emd:cmd/emdinit	1.3"
+
+#	emd setup
+getmajor EMD >/dev/null
+if [ $? -ne 0 ]
+then
+	exit 1	# network not configured
+fi
+case $1 in
+'start')
+	set `who -r`
+	if [ $9 = "S" -o $9 = "1" ]
+	then
+		for i in `getmajor EMD`
+		do
+			if [ ! -x /usr/bin/emdaddr ]
+			then
+				exit 1
+			fi
+			if [ ! -x /usr/bin/epump ]
+			then
+				exit 1
+			fi
+			if [ -f /etc/emd$i.addr ]
+			then
+				CURRADDR=`emdaddr /dev/emd$i 2>/dev/null`
+				if [ "$CURRADDR" = "000000000000" ]
+				then
+				    /usr/bin/emdreset /dev/emd$i
+				    /usr/bin/emdaddr /dev/emd$i `cat /etc/emd$i.addr`
+				    if [ $? -ne 0 ]
+				    then
+					echo /etc/init.d/emdinit: /usr/bin/emdaddr failed for board $i
+					exit 1
+				    fi
+				fi
+				/usr/bin/epump -d /dev/emd$i >/dev/null
+				if [ $? -ne 0 ]
+				then
+					echo /etc/init.d/emdinit: /usr/bin/epump failed for board $i
+					exit 1
+				fi
+			fi
+		done
+	fi
+	;;
+
+'stop')
+	for i in `getmajor EMD`
+	do
+		if [ ! -x /usr/bin/emdreset ]
+		then
+			exit 1
+		fi
+		/usr/bin/emdreset /dev/emd$i
+	done
+	;;
+
+*)
+	exit 1
+esac

@@ -1,0 +1,37 @@
+#ident	"@(#)pkg.bnu:request	1.1.4.2"
+#
+#	request script for bnu package installation
+#
+#	Does user want his/her own System files, or ours?
+#
+HELPMSG="Enter 'y' to keep any existing administrative files intact, 
+	enter 'n' to install new ones. If you choose 'n', existing
+	administrative files (if any) will be renamed to OlD/<filename>."
+PROMPT="Do you want to keep existing $NAME administrative files?"
+
+OLDSYS=`ckyorn -d y -p "$PROMPT" -h "$HELPMSG"` || exit $?
+
+echo "OLDSYS=$OLDSYS" >$1 || exit 1
+
+#
+#	set up node name of machine as environment variable for preinstall,
+#	since ckstr needs /dev/tty, but uname -S needs root privileges.
+#
+uname=`uname -n`
+
+HELP="The 'node name' is used by various communications networks \
+	to identify this machine."
+PROMPT="This machine is currently called '${uname}'. Do you want to change it?"
+ans=`ckyorn -d n -h "$HELP" -p "$PROMPT"` || exit $?
+
+if [ "$ans" = "y" ]
+    then
+	HELP="Each system must have a name."
+	PROMPT="What name do you want to give it?"
+	name=`ckstr -r "[0-9a-zA-Z]" -l 8 -h "$HELP" -p "$PROMPT"` || exit $?
+	echo "NODENAME=$name" >> $1 || exit 1
+    else
+	echo "NODENAME=$uname" >> $1 || exit 1
+fi
+
+exit 0

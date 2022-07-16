@@ -1,0 +1,13 @@
+*#ident	"@(#)kernel:master.d/mau	1.1"
+*
+* MAU
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ox	-	mau	-	-	-
+						mau_init(){}
+						mau_fault(){}
+						mau_setup(){}
+						mau_save(){}
+						mau_restore(){}
+						mau_pfault(){}
+$$$

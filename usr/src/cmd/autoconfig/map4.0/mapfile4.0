@@ -1,0 +1,57 @@
+
+#ident	"@(#)autoconfig:map4.0/mapfile4.0	1.4"
+
+
+boot = LOAD ?RWX V0x02004000 P0x02004000 L0x80000;
+boot : ?A : *START;
+
+boot @ bootSIZE;
+
+gate = LOAD ?RWX V0x0 L0x1000;
+gate : .data : *GATE;
+gate : .data1 : *GATE;
+gate : .rodata : *GATE;
+gate : .rodata1 : *GATE;
+
+gate @ gateSIZE;
+
+text = LOAD ?RX V0x40000000 L0x160000;
+text:.text;
+
+text @ textSIZE;
+
+data = LOAD ?RWX V0x40160000 L0x80000;
+data:.data;
+data:.data1;
+data:.rodata;
+data:.rodata1;
+
+data @ dataSIZE;
+
+bss = LOAD ?RW V0x401e0000 L0x120000;
+bss:.bss;
+
+bss @ bssSIZE;
+
+
+kv_sysseg = LOAD ?RX V0x40300000 L0x200000;
+kv_sysseg:.kvsysseg;
+
+kv_windows = LOAD ?RX V0x40500000 L0x40000;
+kv_windows:.kvwindow;
+
+
+kv_segmap = LOAD ?RX V0x40540000 L0x400000;
+kv_segmap:.kvsegmap;
+
+kv_segu = LOAD ?RW V0x40940000 L0x200000;
+kv_segu:.kvsegu;
+
+kv_sbdint = LOAD ?RX V0x40000 L0x20000;
+kv_sbdint:.kvsdbint;
+
+uv_ublock = LOAD ?RWX V0xc0000000 L0x20000;
+uv_ublock:.uvblock;
+
+uv_stack = LOAD ?RWX V0xc0020000 L0xe0000;
+uv_stack:.uvstack;

@@ -1,0 +1,24 @@
+#ident	"@(#)pkgcore:ifiles/pkginfo	1.2"
+PKG=core
+NAME=UNIX Essential System Utilities
+CATEGORY=system
+VENDOR=AT&T Bell Laboratories
+CLASSES=sysdir kernel sysutil inst vtool intrfc config term sysinst oamadmin
+ORDER=sysdir kernel sysutil inst vtool intrfc config term sysinst oamadmin
+ORDER=
+MAXINST=1
+
+# parameter definitions used in prototype files
+PKGOLD=/usr/options
+PKGLOC=/var/sadm/pkg
+PKGADM=/var/sadm/install
+PKGBIN=/usr/sadm/install/bin
+PKGSCR=/usr/sadm/install/scripts
+
+MENU=/usr/sadm/sysadm/menu
+EDMENU=/usr/sadm/sysadm/edmenu
+EDBIN=/usr/sadm/sysadm/edbin
+INTFBIN=/usr/sadm/sysadm/bin
+
+TERMINFO=/usr/share/lib/terminfo
+CORETERM=/usr/share/lib/.COREterm

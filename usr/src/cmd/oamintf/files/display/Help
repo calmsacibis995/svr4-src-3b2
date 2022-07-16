@@ -1,0 +1,10 @@
+#ident	"@(#)filemgmt:display/help	1.2"
+ABSTRACT:
+	This task displays a list of the file system types 
+	installed on your system. This includes both add-on
+	file system types that have been installed by the 
+	administrator and the file system types that are
+	delivered in the System V core.
+TITLE:
+dispfstyptask:
+

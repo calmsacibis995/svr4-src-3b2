@@ -1,0 +1,378 @@
+#ident	"@(#)cmd-3b2:inst/etc.tape/instf	1.1.1.1"
+
+#
+# instf  
+#
+# Installs a basic UNIX system on the hard disk from a booted
+# In-Core Disk. The resultant hard disk system will install the remainder
+# of the Essential Utilities from tapes.
+#
+
+. /inst/etc/define
+. /inst/etc/do_setup
+
+HELPFULL="\
+The \"Full Restore\" replaces everything on the integral hard disk(s) with
+a ${TM} Essential Utilities  UNIX  system.  Nothing is assumed
+to  be  on the first hard disk and nothing is retained."
+
+PARTITIONMSG="\
+The hard disks are divided into several logical partitions.  Those named 
+\"root\", \"swap\" and \"usr\" are needed by the system.  Default partitioning
+will place \"root\" and \"swap\" on disk 1 and \"usr\" on disk 2.  Their sizes 
+cannot be adjusted once the system is active.  Additional partitions may 
+also be created at your discretion.  See the \"3B2 Computer System Admin-
+istration  Utilities  Guide\"   for more information regarding hard disk
+partitioning."
+
+FULLMSG="\
+The \"Full Restore\" will destroy EVERYTHING on the first hard disk and install a 
+${TM} Essential Utilities UNIX system." 
+
+#assign values: DRIVEID_0 DRIVEID_1 CYLSIZE_0 CYLSIZE_1 NSECTOR_0 
+#   	        NSECTOR_1 EXIST_STAND_0
+
+eval `pdinfo /dev/rdsk/c1d1s6 /dev/rdsk/c1d0s${p_root}`
+
+#vfstab for full restore - one disk -default partitioning
+DFL1_FSTAB="\
+${STAND_0}	${RSTAND_0}	/stand	bfs		1	yes	-
+${HOME_0}	${RHOME_0}	/home	${DEF_FS}	1	yes	-
+${USR_0}	${RUSR_0}	/usr	${DEF_FS}	1	yes	-
+${VAR_0}	${RVAR_0}	/var	${DEF_FS}	1	yes	-"
+
+SIZE_72=140000  # size of 72 mb hard disk
+
+eval `eval fmthard -p -c0 \\\${RSIX_0}`
+
+if [ ${disksize_0} -lt ${SIZE_72} ]
+then
+	echo "\n \"SVR4.0\" installation needs at least one 72MB Disk.
+	       **  INSTALLATION INCOMPLETE. ** " >&2
+
+	exit 0
+fi
+
+
+while true
+do
+	case `askx -m "
+${TM} Installation
+
+	1)  Full Restore From CTC Tape
+	2)  Enter Shell
+
+When responding to a question, you may use the \"backspace\" key
+to erase the last character  typed or the \"@\" key to erase the
+the entire line. Enter \"help\" for additional information." \
+	    -q "Selection?" -h "\
+
+${FULLMSG}" \
+	    -c 1 -c 2 -c quit` in
+	1)
+		TYPE=ctc
+		break ;;
+#	2)
+#		TYPE=scsi
+#		break ;;
+		
+	2)
+		trap ":" 2 3
+		rm -f /.profile /sbin/-sh
+		echo '
+			s5mount() {
+				/etc/fs/s5/mount $1  $2
+			}
+			bfsmount() {
+				/etc/fs/bfs/mount $1  $2
+			}
+			s5fsck() {
+				/etc/fs/s5/fsck $*
+			}
+			bfsfsck() {
+				/etc/fs/bfs/fsck $*
+			}
+			umount() {
+				/sbin/umount $1
+			}
+			cat() {
+				scat $*
+			}
+			labelit() {
+				dlabelit $*
+			}
+			ck() {
+				/etc/fs/s5/fsck $ROOT_0
+			}
+			mnt() {
+				/etc/fs/s5/mount $ROOT_0  $HARD 
+				PATH=$PATH:$HARD/sbin:$HARD/usr/sbin:$HARD/usr/bin
+			}
+			umnt() {
+				/sbin/umount $ROOT_0
+			}
+			chg() {
+				if [ -x $HARD/usr/sbin/chroot ]
+				then
+					$HARD/usr/sbin/chroot $HARD /sbin/sh
+				else
+					echo $ROOT_0 not mounted
+					echo or $HARD/usr/sbin/chroot does not exist
+				fi
+			}
+		' > /.profile
+		ln /sbin/sh /sbin/-sh
+		if /sbin/-sh
+		then :
+		else :
+		fi
+		trap '' 2 3
+		rm -f /.profile /sbin/-sh
+		continue
+		;;
+
+	quit)
+		exit 0
+		;;
+	esac
+done
+
+
+case `askx -H trace -c y -c n -m "
+
+${FULLMSG}" \
+    -q "Continue?" -h "${HELPFULL}" ` in
+y)
+	;;
+n)
+	exit 1 ;;
+trace)
+	EUDEBUG=1
+	set -x ;;
+esac
+
+#
+# Enable swapping with a minimal swap area. Assumes that
+# the base of the swap area is constant across drive IDs.
+# Fmthard -t writes a VTOC with the smallest supported
+# required partition sizes.
+#
+fmthard -t ${RSIX_0} > /dev/null
+dswap ${RSIX_0}
+
+rm -f /.profile /sbin/-sh
+
+
+xx=`askx -c y -c n -c quit \
+	-q "Use the default hard disk partitioning?" \
+	-h "${PARTITIONMSG}"` 
+
+case ${xx} in
+
+n)
+	while true
+	do
+		FSTAB="`partition`" 
+		echo "${FSTAB}">/inst/etc/vfstab
+
+
+		USR_CHOICE=own
+
+		case `askx -m "\
+This completes the interactive partitioning of your first hard disk.
+Enter \"go\" if you are ready to proceed. Enter \"again\" to specify
+different partitioning." \
+		    -q "\
+Type \"go\" to proceed, \"again\" to start over" \
+		    -c go -c again -c quit` in
+		go)
+			break ;;
+		again)
+			;;
+		quit)
+			exit 1 ;;
+		esac
+	done
+	;;
+y)
+	echo "
+Setting up the initial system with default partition sizes; this should
+take no more than twenty-five minutes." >&2
+
+	USR_CHOICE=default
+	fmthard -c0 ${RSIX_0} > /dev/null
+
+	vmkfs -f ${DEF_FS} -b "${DEF_BLK}" \
+	      ${RROOT_0} ${RHOME_0} ${RUSR_0}  ${RVAR_0} > /dev/null
+
+	vmkfs -f bfs ${RSTAND_0} > /dev/null
+
+	FSTAB="${DFL1_FSTAB}"
+	echo "${FSTAB}">/inst/etc/vfstab
+	;;
+quit)
+	exit 0 ;;
+esac
+
+ST_SZ=`prtvtoc -h ${RSIX_0} 2> /dev/null |
+while read par tag flag first count last mnt
+do
+	if [ "${par}" = "3" ]
+	then
+		echo ${count}
+		break
+	fi
+done`
+
+if [ -z "${ST_SZ}" ]
+then
+	ST_SZ=STAND_MIN
+fi
+
+rm -f /.profile /sbin/-sh
+>/etc/mnttab
+/etc/fs/bfs/mount ${STAND_0} /stand 
+mv /unix /stand
+mv /filledt /stand
+mv /dgmon /stand
+sync;sync
+/sbin/umount ${STAND_0} 
+FILES="`find / -print`"
+#
+# Finish disk partitioning.
+#
+case ${USR_CHOICE} in
+
+own)
+	while true
+	do
+		dlabelit ${ROOT_0} root ${REL} > /dev/null
+		/etc/fs/s5/mount ${ROOT_0} ${HARD} > /dev/null 2>&1
+		mklost+found ${HARD} ${ROOT_0}
+		(
+			umask 022
+			mkdir ${HARD}/etc
+			scat /inst/etc/vfstab > ${HARD}/etc/vfstab
+		)
+		fstab < ${HARD}/etc/vfstab |
+		while read dev rdev dir fstype junk
+		do
+			case "${fstype}" in
+			s5)
+				dlabelit ${dev} `ignore expr ${dir} : '.*/\(.*\)$' \| unk'` ${REL} > /dev/null
+				rmkdir ${HARD}/${dir}
+				>/etc/mnttab
+				/etc/fs/s5/mount ${dev}  ${HARD}/${dir}
+				mklost+found ${HARD}/${dir} ${dev}
+				;;
+			bfs)
+				rmkdir ${HARD}/${dir}
+				>/etc/mnttab
+				/etc/fs/bfs/mount ${dev} ${HARD}/${dir} 
+				;;
+			esac
+		done
+		for drive in 0
+		do
+			eval cylsize=\${CYLSIZE_${drive}}
+			eval rall=\${RALL_${drive}}
+			optpart -c ${cylsize} \
+			    -d `ignore expr ${drive} + 1` \
+			    -g ${REL} -r ${HARD} ${rall} \
+			    >> ${HARD}/etc/vfstab
+		done
+		echo "\nDisk partitioning:" >&2
+		prtvtoc -s -t ${HARD}/etc/vfstab ${RSIX_0} 2> /dev/null
+	break
+	done
+	;;
+default)
+	dlabelit ${ROOT_0} root ${REL} > /dev/null
+	/etc/fs/s5/mount ${ROOT_0}  ${HARD}
+	mklost+found ${HARD} ${ROOT_0}
+	(
+		umask 022
+		mkdir ${HARD}/etc
+		scat /inst/etc/vfstab > ${HARD}/etc/vfstab
+	)
+	fstab < ${HARD}/etc/vfstab |
+	while read dev rdev dir fstype junk
+	do
+		case "${fstype}" in
+		s5)
+			dlabelit ${dev} `ignore expr ${dir} : '.*/\(.*\)$' \| unk'` ${REL} > /dev/null
+			rmkdir ${HARD}/${dir}
+			>/etc/mnttab
+			/etc/fs/s5/mount ${dev}  ${HARD}/${dir}
+			mklost+found ${HARD}/${dir} ${dev}
+			;;
+		bfs)
+			rmkdir ${HARD}/${dir}
+			>/etc/mnttab
+			/etc/fs/bfs/mount ${dev} ${HARD}/${dir} 
+			;;
+		esac
+	done
+	;;
+esac
+
+
+ignore rm -f ${HARD}/lib/lboot < /dev/null
+
+rm -f ${HARD}/etc/system < /dev/null
+
+echo "${FILES}" | cpio -pdmu ${HARD}
+sync
+
+ignore rm -f ${HARD}/dev/SA/diskette  ${HARD}/dev/rSA/diskette < /dev/null
+
+cd ${HARD}/dev
+ignore rm -f ridsk1? idsk1? < /dev/null	### Release 1.1 leftovers
+ignore rm rdsk/c1d1s? dsk/c1d1s? < /dev/null
+cd /
+
+#
+# Link telinit to init instead of keeping two copies of same file
+#
+rm -f ${HARD}/etc/telinit
+ln ${HARD}/etc/init ${HARD}/etc/telinit
+cp ${HARD}/sbin/sh ${HARD}/usr/bin
+ln -s /usr/bin ${HARD}/bin
+
+# prepare for insth on hard disk to take over.
+echo "${TYPE}" > ${HARD}/inst/etc/type
+cp /inst/etc/inittabh /inst/root/etc/inittab
+ignore rm -rf ${HARD}/dev/icd0 ${HARD}/dev/icd1 ${HARD}/dev/swap
+ln ${HARD}/dev/dsk/c1d0s1 ${HARD}/dev/swap
+
+/usr/sbin/newboot -y /usr/lib/boot /usr/lib/mboot ${RBOOT_0}
+
+# Install bootable modules in COREunix, tape driver
+# for either SCSI or CTC, and cunix for creating the unix 
+# for tape installation
+
+echo "1" > ${HARD}/inst/etc/last
+
+/usr/sbin/chroot ${HARD} /sbin/sh /inst/etc/instl
+
+# End of installation of bootable modules
+
+echo "
+You may now remove the last Essential Utilities floppy." >&2
+
+sync; sync; sync;
+fstabmnt -u < ${HARD}/etc/vfstab
+
+echo "\
+The system is restarting itself from the hard disk. This should
+take no more than five minutes. The installation procedure will
+then continue automatically." >&2
+
+sync;sync;sync
+
+#unmount root partition on hard disk now.
+/sbin/umount ${ROOT_0} > /dev/null 2>&1
+
+sync;sync;sync
+
+exec uadmin 2 1

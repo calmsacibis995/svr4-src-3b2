@@ -1,0 +1,80 @@
+#ident	"@(#)cmd-3b2:inst/etc.tape/instl	1.1.1.1"
+#
+# instl
+#
+# Install all the floppies after the ICD floppies.
+# 
+
+. /inst/etc/define
+
+while true
+do
+	SKIP=0
+	read seq < /inst/etc/last
+	if [ "$seq" -gt "$FLPY_NUM" ]
+	then
+		break
+	fi
+	while true
+	do
+		case `askx -H trace -m "\
+Please insert the Essential System Utilities floppy number ${seq}." \
+			-q "Type \"go\" when ready" -h "\
+There are $FLPY_NUM floppy diskettes labelled \"Essential System Utilities\". 
+Please place the one identified as \"#${seq}\" in the floppy drive and close
+the door." \
+			-c go -c quit` in
+		go)
+			;;
+		quit)
+			exit 1
+			;;
+		trace)
+			set -x
+			SKIP=1
+			break
+			;;
+		esac
+		if fsys -s -f install \
+			-v ${VOL}/`expr ${seq} + 1` -m /install -r ${FLOPPY}
+		then
+			break
+		else
+			echo "
+Incorrect floppy" >&2
+			SKIP=1
+			break
+		fi
+	done
+	if [ "$SKIP" = 1 ]
+	then
+		continue
+	fi
+	echo "
+Installing additional Essential Utilities system files.
+This should take no more than ten minutes." >&2
+	cd /install
+	if [ "${seq}" -eq "${FLPY_NUM}" ]
+	then
+		case ${TYPE} in
+		ctc)
+			cd ctc
+			install/INSTALL
+			;;
+		scsi)
+			cd ha
+			install/INSTALL
+			cd ../st
+			install/INSTALL
+			;;
+		esac
+	else
+		FILES="`find . -print`"
+		echo "${FILES}" | cpio -pdmu /
+	fi
+	cd /
+	/sbin/umount ${FLOPPY} > /dev/null 2>&1
+	sync
+	seq=`expr $seq + 1`
+	echo "${seq}" > /inst/etc/last
+done
