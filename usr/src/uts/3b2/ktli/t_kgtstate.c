@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kgtstate.c	1.3"
+#ident	"@(#)ktli:ktli/t_kgtstate.c	1.2"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kgetstate.c 1.2 89/01/11 SMI"
 #endif
@@ -37,8 +37,7 @@ static char sccsid[] = "@(#)t_kgetstate.c 1.2 89/01/11 SMI"
  *	endpoint. 
  *
  *	Returns:
- *		0 on success and "state" is set to the current state,
- *		or a positive error code.
+ *		The state or -1 on failure.		
  *
  */
 
@@ -60,24 +59,18 @@ static char sccsid[] = "@(#)t_kgetstate.c 1.2 89/01/11 SMI"
 
 
 int
-t_kgetstate(tiptr, state)
-	register TIUSER		*tiptr;
-	register int		*state;
+t_kgetstate(tiptr)
+register TIUSER *tiptr;
 {
-	struct T_info_ack	inforeq;
-	struct strioctl		strioc;
-	int 			retval;
-	register struct vnode 	*vp;
-	register struct file	*fp;
-	int			error;
+	struct   T_info_ack inforeq;
+	struct	 strioctl strioc;
+	int	 retval;
+	register struct vnode *vp;
+	register struct file *fp;
 
-	error = 0;
 	retval = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
-
-	if (state == NULL)
-		return EINVAL;
 
 	inforeq.PRIM_type = T_INFO_REQ;
 	strioc.ic_cmd = TI_GETINFO;
@@ -85,55 +78,42 @@ t_kgetstate(tiptr, state)
 	strioc.ic_dp = (char *)&inforeq;
 	strioc.ic_len = sizeof(struct T_info_req);
 
-	error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
+	u.u_error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
 					 (char *)NULL, u.u_cred, &retval);
-	if (error) 
-		return error;
+	if (u.u_error) 
+		return -1;
 
 	if (retval) {
 		if ((retval & 0xff) == TSYSERR)
-			error = (retval >> 8) & 0xff;
-		else    error = t_tlitosyserr(retval & 0xff);
-		return error;
+			u.u_error = (retval >> 8) & 0xff;
+		else    u.u_error = tlitosyserr(retval & 0xff);
+		return -1;
 	}
 
-	if (strioc.ic_len != sizeof(struct T_info_ack))
-		return EPROTO;
+	if (strioc.ic_len != sizeof(struct T_info_ack)) {
+		u.u_error = EPROTO;
+		return -1;
+	}
 
 	switch (inforeq.CURRENT_state) {
 		case TS_UNBND:
-			*state = T_UNBND;
-			break;
-
+			return(T_UNBND);
 		case TS_IDLE:
-			*state = T_IDLE;
-			break;
-
+			return(T_IDLE);
 		case TS_WRES_CIND:
-			*state = T_INCON;
-			break;
-
+			return(T_INCON);
 		case TS_WCON_CREQ:
-			*state = T_OUTCON;
-			break;
-
+			return(T_OUTCON);
 		case TS_DATA_XFER:
-			*state = T_DATAXFER;
-			break;
-
+			return(T_DATAXFER);
 		case TS_WIND_ORDREL:
-			*state = T_OUTREL;
-			break;
-
+			return(T_OUTREL);
 		case TS_WREQ_ORDREL:
-			*state = T_INREL;
-			break;
-
+			return(T_INREL);
 		default:
-			error = EPROTO;
-			break;
+			u.u_error = EPROTO;
+			return(-1);
 	}
-	return error;
 }
 
 /******************************************************************************/

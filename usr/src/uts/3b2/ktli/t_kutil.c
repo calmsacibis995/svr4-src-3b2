@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kutil.c	1.5"
+#ident	"@(#)ktli:ktli/t_kutil.c	1.4"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kutil.c 1.2 89/01/11 SMI"
 #endif
@@ -63,185 +63,144 @@ extern char qrunflag;	/* should be in stream.h */
 
 int
 tli_send(tiptr, bp, fmode)
-	register TIUSER		*tiptr;
-	register mblk_t	 	*bp;
-	register int		fmode;
+register TIUSER	*tiptr;
+register mblk_t	 *bp;
+register int	fmode;
 
 {
-	int	 		retval;
-	register int		s;
-	register struct file	*fp;
-	register struct vnode	*vp;
-	register struct stdata	*stp;
-	int			error;
+	int	 retval;
+	register int s;
+	register struct file *fp;
+	register struct vnode *vp;
+	register struct stdata *stp;
 
 	retval = 0;
-	error = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
 
 	s = splstr();
 	while (!canput(stp->sd_wrq->q_next)) {
-		if ((error = strwaitq(stp, WRITEWAIT, (off_t)0, fmode, 
+		if ((u.u_error = strwaitq(stp, WRITEWAIT, (off_t)0, fmode, 
 						&retval)) || retval) {
-			return error;
+			return -1;
 		}
 	}
 	(void)splx(s);
 
 	putnext(stp->sd_wrq, bp);
+	if (qready())
+		runqueues();
 
 	return 0;
 }
 
 int 
 tli_recv(tiptr, bp, fmode)
-	register TIUSER	 	*tiptr;
-	register mblk_t	 	**bp;
-	register int		fmode;
+register TIUSER	 *tiptr;
+register mblk_t	 **bp;
+register int	fmode;
 
 {
-	int	 		retval;
-	register int		s;
-	register struct file	*fp;
-	register struct vnode	*vp;
-	register struct stdata	*stp;
-	int			error;
+	int	 retval;
+	register int s;
+	register struct file *fp;
+	register struct vnode *vp;
+	register struct stdata *stp;
 
 	retval = 0;
-	error = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
 
 	s = splstr();
 	if (stp->sd_flag & (STRDERR|STPLEX)) {
-		error = (stp->sd_flag&STPLEX) ? EINVAL : stp->sd_rerror;
+		u.u_error = ((stp->sd_flag&STPLEX) ? EINVAL : stp->sd_rerror);
 		(void)splx(s);
-		return error;
+		return -1;
 	}
 
 	while ( !(*bp = getq(RD(stp->sd_wrq)))) {
-		if ((error = strwaitq(stp, READWAIT, (off_t)0, fmode,
+		if ((u.u_error = strwaitq(stp, READWAIT, (off_t)0, fmode,
 						 &retval)) || retval) {
 			(void)splx(s);
-			return error;
+			return -1;
 		}
 	}
-	if (stp->sd_flag)
+	if (stp->sd_flag) {
 		stp->sd_flag &= ~STRPRI;
+	}
 	(void)splx(s);
 
+	if (qready())
+		runqueues();
+
+#ifdef KTLIDEBUG
+{
+mblk_t *tp;
+tp = *bp;
+while (tp) {
+	if (tp->b_datap->db_size < 0)
+		printf("tli_recv: tp %x, func %x\n", tp, tp->b_datap->db_frtnp->free_func);
+	tp = tp->b_cont;
+}
+}
+#endif
 	return 0;
 }
 
 int
 get_ok_ack(tiptr, type, fmode)
-	register TIUSER			*tiptr;
-	register int 			type;
-	register int 			fmode;
+register TIUSER	*tiptr;
+register int type, fmode;
 
 {
-	register int			msgsz;
-	register union T_primitives	*pptr;
-	mblk_t				*bp;
-	int				error;
+	register int msgsz, retval;
+	register union T_primitives *pptr;
+	mblk_t *bp;
 
-	error = 0;
+	retval = 0;
 
 	/* wait for ack
 	 */
-	if ((error = tli_recv(tiptr, &bp, fmode)) != 0)
-		return error;
+	if (tli_recv(tiptr, &bp, fmode) < 0)
+		return 1;
 
-	if ((msgsz = (bp->b_wptr - bp->b_rptr)) < sizeof(long))
-		return EPROTO;
+	if ((msgsz = (bp->b_wptr - bp->b_rptr)) < sizeof(long)) {
+		u.u_error = EPROTO;
+		return -1;
+	}
 
 	/* LINTED pointer alignment */
 	pptr = (union T_primitives *)bp->b_rptr;
 	switch(pptr->type) {
 		case T_OK_ACK:
 			if (msgsz < TOKACKSZ ||
-					pptr->ok_ack.CORRECT_prim != type) 
-				error = EPROTO;
+				pptr->ok_ack.CORRECT_prim != type) {
+				u.u_error = EPROTO;
+				retval = -1;
+			}
 			break;
 
 		case T_ERROR_ACK:
 			if (msgsz < TERRORACKSZ) {
-				error = EPROTO;
+				u.u_error = EPROTO;
+				retval = -1;
 				break;
 			}
 
                         if (pptr->error_ack.TLI_error == TSYSERR)
-                                error = pptr->error_ack.UNIX_error;
-                        else    error = t_tlitosyserr(pptr->error_ack.TLI_error);
+                                u.u_error = pptr->error_ack.UNIX_error;
+                        else    u.u_error = tlitosyserr(pptr->error_ack.TLI_error);
 
+			retval = -1;
 			break;
 
 		default:
-			error = EPROTO;
+			u.u_error = EPROTO;
+			retval = -1;
 			break;
 	}
-	return error;
+	return retval;
 }
-
-/*
- * Translate a TLI error into a system error as best we can.
- */
-static ushort tli_errs[] = {
-	      0,		/* no error	 */
-	      EADDRNOTAVAIL,    /* TBADADDR      */
-	      ENOPROTOOPT,      /* TBADOPT       */
-	      EACCES,		/* TACCES	 */
-	      EBADF,		/* TBADF	 */
-	      EADDRNOTAVAIL,	/* TNOADDR       */
-	      EPROTO,		/* TOUTSTATE     */
-	      EPROTO,		/* TBADSEQ       */
-	      0,		/* TSYSERR - will never get */
-	      EPROTO,		/* TLOOK - should never be sent by transport */
-	      EMSGSIZE,		/* TBADDATA      */
-	      EMSGSIZE,		/* TBUFOVFLW     */
-	      EPROTO,		/* TFLOW	 */
-	      EWOULDBLOCK,      /* TNODATA       */
-	      EPROTO,		/* TNODIS	 */
-	      EPROTO,		/* TNOUDERR      */
-	      EINVAL,		/* TBADFLAG      */
-	      EPROTO,		/* TNOREL	 */
-	      EOPNOTSUPP,       /* TNOTSUPPORT   */
-	      EPROTO,		/* TSTATECHNG    */
-};
- 
-int
-t_tlitosyserr(terr)
-	register int	terr;
-{
-	if (terr > (sizeof(tli_errs) / sizeof(ushort)))
-		return EPROTO;
-	else	return tli_errs[terr];
-}
-
-#ifdef DEBUG
-int ktlilog = 0;
-
-/*
- * Kernel level debugging aid. The global variable "ktlilog" is a bit
- * mask which allows various types of debugging messages to be printed
- * out.
- * 
- *	ktlilog & 1 	will cause actual failures to be printed.
- *	ktlilog & 2	will cause informational messages to be
- *			printed.
- */
-int
-ktli_log(level, str, a1)
-	register int	level;
-	register char	*str;
-	register int	a1;
-
-{
-        if (level & ktlilog)
-                printf(str, a1);
-}
-#endif
 

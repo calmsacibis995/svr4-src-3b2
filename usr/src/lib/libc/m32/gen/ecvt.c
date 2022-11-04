@@ -1,11 +1,4 @@
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)libc-m32:gen/ecvt.c	1.16"
+#ident	"@(#)libc-m32:gen/ecvt.c	1.14"
 /*LINTLIBRARY*/
 /*
  *	ecvt converts to decimal
@@ -119,7 +112,7 @@ int	*decpt;
 {
 	register char *end_ptr;
 	char *begin_ptr;
-	int tdecpt, adjustment;
+	int tdecpt;
 	long long1, long2;
 	int *pval = (int *)&value; /* see comment below */
 
@@ -197,7 +190,7 @@ int	*decpt;
 	   of digits before the decimal point.
 	*/
 
-	    {
+	    {   register int adjustment;
 
 		end_ptr = &buf[4] + length_wanted;
 		adjustment = end_ptr -
@@ -240,8 +233,7 @@ int	*decpt;
 			ndigit = NMAX;
 		p = end_ptr = bp + ndigit;
 
-		if (*p > '5' || (*p == '5' && 
-			((((int)*(p - 1)) % 2) || adjustment > 0)))
+		if (*p >= '5')
 			do {
 				*p = '0';
 				if (p == bp) { /* all 9's */

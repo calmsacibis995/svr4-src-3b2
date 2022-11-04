@@ -8,37 +8,16 @@
 #ifndef _SYS_SWAP_H
 #define _SYS_SWAP_H
 
-#ident	"@(#)head.sys:sys/swap.h	11.16"
+#ident	"@(#)head.sys:sys/swap.h	11.14"
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
+#include "sys/stat.h"
 
-/* The following are for the swapctl system call */
+/* The following are for the new swapctl system call */
 
 #define	SC_ADD		1	/* add a specified resource for swapping */
 #define	SC_LIST		2	/* list all the swapping resources */
 #define	SC_REMOVE	3	/* remove the specified swapping resource */
-#define SC_GETNSWP	4	/* get number of swapping resources configued */
+#define SC_GETNSWP	4	/* get the number of swapping resources configued */
 
 typedef struct swapres {
 	char	*sr_name;	/* pathname of the resource specified */
@@ -47,7 +26,7 @@ typedef struct swapres {
 } swapres_t;
 
 typedef struct swapent {
-	char 	*ste_path;	/* get the name of the swap file */
+	char 	*ste_path;		/* get the name of the swap file */
 	off_t	ste_start;	/* starting block for swapping */
 	off_t	ste_length;	/* length of swap area */
 	long	ste_pages;	/* numbers of pages for swapping */

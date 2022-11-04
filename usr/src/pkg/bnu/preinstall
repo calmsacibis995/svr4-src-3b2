@@ -1,4 +1,4 @@
-#ident	"@(#)bnu:preinstall	1.13.5.7"
+#ident	"@(#)bnu:preinstall	1.13.5.6"
 #
 #	Pre installation procedure for "Basic Networking Utilities"
 #	This will be changing radically with SAF and QFT feature changes
@@ -10,7 +10,7 @@ rm -rf  $BASEDIR/usr/lib/uucp/uugetty
 
 #	If user wants to change nodename, do it here...
 
-if [ "`uname -n`" != "$NODENAME" -a "$NODENAME" != "" ]
+if [ "`uname`" != "$NODENAME" -a "$NODENAME" != "" ]
     then
 	uname -S ${NODENAME}
 	date +"#	Node name changed %D %T.

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/strftime.c	1.13"
+#ident	"@(#)libc-port:gen/strftime.c	1.9"
 
 #include	"synonyms.h"
 #include	"shlib.h"
@@ -18,7 +18,7 @@
 #include	<stddef.h>
 #include	<stdlib.h>
 #include	<ctype.h>
-#include	<unistd.h>
+#include	<osfcn.h>
 #include	"_locale.h"
 
 extern  char *tzname[];
@@ -33,7 +33,7 @@ enum {
 	   aSun, aMon, aTue, aWed, aThu, aFri, aSat,
 	   Sun, Mon, Tue, Wed, Thu, Fri, Sat,
 	   Local_time, Local_date, DFL_FMT,
-	   AM, PM, DATE_FMT,
+	   AM, PM,
 	   LAST
 };
 static const char * __time[] = {
@@ -43,8 +43,8 @@ static const char * __time[] = {
 	"October", "November", "December",
 	"Sun","Mon", "Tue", "Wed","Thu", "Fri","Sat",
 	"Sunday","Monday","Tuesday","Wednesday", "Thursday","Friday","Saturday",
-	"%H:%M:%S","%m/%d/%y", "%a %b %d %H:%M:%S %Y",
-	"AM", "PM", "%a %b %e %T %Z %Y", NULL
+	"%H:%M:%S","%m/%d/%y", "%a %b %e %T %Z %Y",
+	"AM", "PM", NULL
 };
 
 
@@ -62,15 +62,8 @@ const struct tm *tm;
 	char		nstr[5];
 	size_t		n;
 	static char	dflcase[] = "%?";
+
 	settime();
-
-/* envoke mktime, for its side effects */
-	{
-		struct tm tmp;
-		memcpy(&tmp, tm, sizeof(struct tm));
-		mktime(&tmp);
-	}
-
 
 	/* Set format string, if not already set */
 	if (format == NULL)
@@ -103,9 +96,6 @@ const struct tm *tm;
 			break;
 		case 'c':	/* Localized date & time format */
 			p = __time[DFL_FMT];
-			goto recur;
-		case 'C':	/* Localized date & time format */
-			p = __time[DATE_FMT];
 			goto recur;
 		case 'd':	/* Day number */
 			p = itoa(tm->tm_mday, nstr, 2);
@@ -146,10 +136,7 @@ const struct tm *tm;
 				p = __time[AM];
 			break;
 		case 'r':
-			if (tm->tm_hour >= 12)
-				p = "%I:%M:%S PM";
-			else
-				p = "%I:%M:%S AM";
+			p = "%I:%M:%S %p";
 			goto recur;
 		case 'R':
 			p = "%H:%M";
@@ -298,14 +285,42 @@ static char *
 gettz(tm)
 struct tm *tm;
 {
+	static char	tznm[MAXTZNAME + 1];
 	register char	*p;
 
+	if ((p = getenv("TZ")) == 0 || *p == '\0')
+		return(tm->tm_isdst ? "" : "GMT");
+	if (p[0] == ':') { /* Olson method */
+		_ltzset(mktime(tm));
+		if (tm->tm_isdst)
+			return(tzname[1]);
+		else
+			return(tzname[0]);
+	}
+	p = tz(p, tznm);
 	if (tm->tm_isdst)
-		p = tzname[1];
-	else
-		p = tzname[0];
-	if (strcmp(p, "   ") == 0)
-		return("");
-	else
-		return(p);
+		p = tz(p, tznm);
+	return(tznm);
+}
+
+static char *
+tz(p, t)
+register char *p;
+register char *t;
+{
+	register int	n = MAXTZNAME;
+
+	while (!isalpha(*p)) {
+		if (*p++ == '\0')
+			goto err;
+	}
+	do {
+		if (--n >= 0)
+			*t++ = *p;
+	} while (isalpha(*++p));
+	while (--n >= 0)
+		*t++ = ' ';
+err:
+	*t = '\0';
+	return(p);
 }

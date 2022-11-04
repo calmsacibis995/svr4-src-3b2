@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/if.c	1.19"
+#ident	"@(#)kernel:io/if.c	1.15"
 /* 
  *
  *		3B2 Computer UNIX Integral Floppy Disk Driver
@@ -39,6 +39,7 @@
 #include "sys/uio.h"
 #include "sys/sysmacros.h"	/* define before ddi.h */
 #include "sys/ddi.h"
+#include "sys/inline.h"
 #include "sys/debug.h"
 #include "vm/vm_hat.h"
 #include "sys/if.h"
@@ -67,7 +68,7 @@ STATIC void ifspindn();
 STATIC void ifsetup();
 STATIC void ifsetblk();
 STATIC void ifflush();
-STATIC void ifrest();
+STATIC void ifrest(void);
 STATIC void ifseek();
 STATIC void ifscan();
 extern void ifstrategy();
@@ -184,7 +185,7 @@ ifstart()
 	 * contain the format buffer.
 	 */
 
-	szbuf = btopr(sizeof(struct iftrkfmat));
+	szbuf = btoc(sizeof(struct iftrkfmat));
 
 #if 0
 	memchng = 2 * szbuf - 1;
@@ -208,14 +209,14 @@ ifstart()
 	 */
 
 	if (((fmataddr&MSK64K) + sizeof(struct iftrkfmat)) > BND64K) {
-		fmat_buf = (struct iftrkfmat *)(fmataddr + ptob(szbuf) - NBPC);
+		fmat_buf = (struct iftrkfmat *)(fmataddr + ctob(szbuf) - NBPC);
 #if 0
 		noneed = fmataddr;
 #endif
 	} else {
 		fmat_buf = (struct iftrkfmat *)fmataddr;
 #if 0
-		noneed = fmataddr + ptob(szbuf);
+		noneed = fmataddr + ctob(szbuf);
 #endif
 	}
 
@@ -225,7 +226,7 @@ ifstart()
 	 */
 
 	for (i = 0; i < szbuf - 1; i++) {
-		freepage((int)kvtopfn(noneed + ptob(i)));
+		freepage((int)kvtopfn(noneed + ctob(i)));
 	}
 	availrmem -= szbuf;
 	availsmem -= szbuf;
@@ -396,7 +397,7 @@ ifinit()
 	iftab.b_actl = NULL;
 	iftab.qcnt = NULL;
 	iftab.b_forw = NULL;
-	iftab.b_back = NULL;
+	iftab.b_forw = NULL;
 	ifisopen = NULL;
 	ifclosed = SET;
 	ifnoscan = SET;
@@ -586,7 +587,7 @@ ifflush()
 		/*
 		 * Should use av_back, but it is not set.
 		 */
-		if ((lp = iftab.b_actf) != NULL)
+		if ((lp = iftab.b_actf) == 0)
 			while (lp->av_forw)
 				lp = lp->av_forw;
 		iftab.b_actl = lp;

@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libns:negotiate.c	1.9.7.1"
+#ident	"@(#)libns:negotiate.c	1.9.6.1"
 #include "grp.h"
 #include "fcntl.h"
 #include "string.h"
 #include "stdio.h"
 #include "errno.h"
-#include "unistd.h"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -187,15 +186,11 @@ negotiate(fd, passwd, flag, ngroups_maxp)
 	}
 	
 	if (rfversion > RFS1DOT0) {
+		int trash;		/* throwaway arg for getgroups */
 		int local_ngrpmax;
 		int remote_ngrpmax;
 
-		local_ngrpmax = sysconf(_SC_NGROUPS_MAX);
-		if (local_ngrpmax < 0) {
-			LOG2(L_TRACE, "(%5d) leave: negotiate\n", Logstamp);
-			return(N_CERROR);
-		}
-		local_ngrpmax = MIN(RF_MAXGROUPS, local_ngrpmax);
+		local_ngrpmax = MIN(RF_MAXGROUPS, getgroups(0, &trash));
 		if ((nbytes = tcanon("l", &local_ngrpmax, &nbuf[0], 0)) == 0) {
 			LOG2(L_TRACE, "(%5d) leave: negotiate\n", Logstamp);
 			return(N_CERROR);

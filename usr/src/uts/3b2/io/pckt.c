@@ -12,7 +12,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/pckt.c	1.9"
+#ident	"@(#)kernel:io/pckt.c	1.7.2.3"
 /*
  * Description: The PCKT module packitizes meesages on
  *		its read queue by pre-fixing an M_PROTO

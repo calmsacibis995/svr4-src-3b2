@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/_xftw.c	1.3"
+#ident	"@(#)libc-port:gen/_xftw.c	1.2"
 /*LINTLIBRARY*/
 /***************************************************************
  *	_xftw - file tree walk the uses expanded stat structure
@@ -77,7 +77,6 @@
 #endif
 
 #include "synonyms.h"
-#include "shlib.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>

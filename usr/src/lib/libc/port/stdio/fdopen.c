@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fdopen.c	1.16"
+#ident	"@(#)libc-port:stdio/fdopen.c	1.15"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -18,7 +18,6 @@
 #endif
 #include "synonyms.h"
 #include <stdio.h>
-#include <limits.h>
 #include "stdiom.h"
 
 extern long lseek(	/* int fd, long offset, int whence */		);
@@ -32,9 +31,9 @@ fdopen(fd, type)	/* associate file desc. with stream */
 	register int plus;
 	register unsigned char flag;
 
-	if (fd > UCHAR_MAX || (iop = _findiop()) == 0)
+	if ((iop = _findiop()) == 0)
 		return 0;
-	iop->_file = (Uchar)fd;
+	iop->_file = (Uchar)fd;	/* assume that fd fits in (Uchar) _file */
 	switch (type[0])
 	{
 	default:

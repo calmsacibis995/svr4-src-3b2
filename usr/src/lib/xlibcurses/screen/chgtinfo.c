@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/chgtinfo.c	1.6"
+#ident	"@(#)curses:screen/chgtinfo.c	1.3"
 #include <curses.h>
 #include <signal.h>
 
@@ -141,7 +141,7 @@ char **argv;
     /* where ? is the first letter of $TERM */
     (void) sprintf(TMPtermfile, "%s/%c/%cTMP+TMP", dirname, *term, *term);
     if (!findtermfile(getenv("TERMINFO"), term) &&
-#ifdef SIGSTOP	/* SVR4 and beyond */
+#ifdef __STDC__
 	!findtermfile("/usr/share/lib/terminfo", term))
 #else
 	!findtermfile("/usr/lib/terminfo", term))
@@ -179,7 +179,7 @@ char **argv;
     /*NOTREACHED*/
 }
 
-#if (defined(SYSV) || defined(USG)) && !defined(SIGPOLL)
+#if (defined(SYSV) || defined(USG)) && !defined(SIG_POLL)
 /*
  *	mkdir(dirname, mode)
  *
@@ -188,9 +188,6 @@ char **argv;
  */
 
 mkdir(directory, mode)
-#ifdef __STDC__
-const
-#endif
 char	*directory;
 int mode;
 {

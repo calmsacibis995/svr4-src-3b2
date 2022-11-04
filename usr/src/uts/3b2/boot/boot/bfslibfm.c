@@ -5,7 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/boot/bfslibfm.c	1.10"
+
+#ident	"@(#)boot:boot/boot/bfslibfm.c	1.6"
 #include	"sys/types.h"
 #include	"sys/psw.h"
 #include	"sys/elog.h"
@@ -29,7 +30,6 @@
 #include 	"sys/libfm.h"
 #include 	"sys/elftypes.h"
 #include	"sys/elf.h"
-#include	"sys/inline.h"
 
 char data[SECTSIZE];
 struct nfso nfso[V_NUMPAR]={0,0};
@@ -205,7 +205,7 @@ do_edt()
 		char buffer[40];
 
 
-		if (!STRCMP(s3bc->name, "SBD"))
+		if (!strcmp(s3bc->name, "SBD"))
 		{
 			if (s3bc->timestamp > SIZOFMEM)
 			{
@@ -296,9 +296,7 @@ int elb;
 			/* found it, therefore mark it found */
 			{
 			s3bc->board = 0;
-#ifdef BOOTDEBUG
 			PRINTF("found board %s\n",s3bc->name);
-#endif
 			if(edtp->indir_dev)
 				/* load bus gen program for configured
 				 * HA device.
@@ -376,16 +374,14 @@ xconfirm()
                  		*/
                 		for (i=0; i<sys3bconfig->count; ++i){
 					s3bc = &sys3bconfig->driver[i];
-					if (0 != STRCMP(xtcp->name,s3bc->name)
+					if (0 != strcmp(xtcp->name,s3bc->name)
 					     || s3bc->flag & S3BC_IGN)
 						continue;
 		
 					if (s3bc->board == xtcp->maj){
                                 	/* found it, therefore mark it found */
 		
-#ifdef BOOTDEBUG
 						PRINTF("found board %s\n",s3bc->name);
-#endif
                                 		s3bc->board = 0;
                                 		break;
 					}
@@ -572,6 +568,7 @@ struct bootattr *battrp;
 
 			ld = (struct bfs_ldirs *) (onekbuf + j);
 			if (ld->l_ino != 0 && STRCMP(ld->l_name, fname) == 0) {
+				PRINTF("Found file  %s\n", ld->l_name);
 				found ++;
 				break;
 			}
@@ -609,7 +606,7 @@ struct bootattr *battrp;
 	battrp->size = dir->d_eoffset - dir->d_sblock +1;
 	battrp->mtime = dir->d_fattr.va_mtime;
 	battrp->ctime = dir->d_fattr.va_ctime;
-	battrp->blksize = BFS_BSIZE;
+	battrp->blksize = dir->d_fattr.va_blksize;
 	return((dir->d_sblock + fso) * SECTSIZE);
 }
 
@@ -734,7 +731,7 @@ struct boothdr *bhdr;
 
 			read(fd, (stroff + eshdr.sh_name), edtstr, 6);
 
-			if (STRCMP(edtstr, "<EDT>") == 0) {
+			if (strcmp(edtstr, "<EDT>") == 0) {
 				bhdr->nsect += 1;
 				break;
 			}

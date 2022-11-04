@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/gettxt.c	1.6"
+#ident	"@(#)libc-port:gen/gettxt.c	1.3.1.1"
 
 #ifdef __STDC__
 	#pragma weak Msgdb = _Msgdb
@@ -26,7 +26,7 @@
 
 #define	P_locale	"/usr/lib/locale/"
 #define L_locale	(sizeof(P_locale))
-#define MAXDB	10	/* maximum number of data bases per program */
+#define MAXDB	5	/* maximum number of data bases per program */
 #define DEF_LOCALE	"/usr/lib/locale/C/LC_MESSAGES/"
 #define MESSAGES 	"/LC_MESSAGES/"
 #define DB_NAME_LEN	15
@@ -132,7 +132,7 @@ const char	*dflt_str;
 						fd, 0)) == (caddr_t)-1 ) {
 			if (fd != -1)
 				close(fd);
-			if (strcmp(saved_locale, "C") == 0)
+			if (*saved_locale == 'C')
 				return(dflt_str && *dflt_str ? 
 					dflt_str : not_found);
 

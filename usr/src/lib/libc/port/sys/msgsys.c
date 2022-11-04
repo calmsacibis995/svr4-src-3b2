@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:sys/msgsys.c	1.6.1.6"
+#ident	"@(#)libc-port:sys/msgsys.c	1.6.1.5"
 #ifdef __STDC__
 	#pragma weak msgctl = _msgctl
 	#pragma weak msgget = _msgget
@@ -66,7 +66,7 @@ int msgflg;
 int
 msgrcv(msqid, msgp, msgsz, msgtyp, msgflg)
 int msqid;
-void *msgp;
+struct msgbuf *msgp;
 int msgsz;
 long msgtyp;
 int msgflg;
@@ -77,7 +77,7 @@ int msgflg;
 int
 msgsnd(msqid, msgp, msgsz, msgflg)
 int msqid;
-const void *msgp;
+const struct msgbuf *msgp;
 int msgsz, msgflg;
 {
 	return(syscall(MSGSYS, MSGSND, msqid, msgp, msgsz, msgflg));

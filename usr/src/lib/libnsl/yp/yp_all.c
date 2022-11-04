@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_all.c	1.2"
+#ident	"@(#)libyp:yp_all.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -99,8 +98,8 @@ yp_all (domain, map, callback)
 	}
 		
 
-	if ((allc = clnt_create(pdomb->dom_binding->ypbind_servername, YPPROG, 
-	    YPVERS, "circuit_n")) == (CLIENT *) NULL) {
+	if ((allc = clnt_create(pdomb->dom_binding->ypbind_servername, YPPROG, YPVERS, 
+	    "circuit_v")) == (CLIENT *) NULL) {
 		    (void) syslog(LOG_ERR,
 		    clnt_spcreateerror("yp_all - transport level create failure"));
 		    return(YPERR_RPC);

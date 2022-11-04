@@ -5,11 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/elf_M32.h	1.3"
-
-
 #ifndef _SYS_ELF_M32_H
 #define _SYS_ELF_M32_H
+
+#ident	"@(#)head.sys:sys/elf_M32.h	1.2"
 
 #define EF_M32_MAU		1	/* e_flags */
 
@@ -25,7 +24,5 @@
 #define R_M32_RELATIVE		9
 #define R_M32_RELATIVE_S	10
 #define R_M32_NUM		11	/* must be >last */
-
-#define ELF_M32_MAXPGSZ		0x2000	/* maximum page size */
 
 #endif

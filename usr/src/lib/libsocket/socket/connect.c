@@ -5,8 +5,33 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:connect.c	1.6"
+#ident	"@(#)libsocket:connect.c	1.4"
 
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 		PROPRIETARY NOTICE (Combined)
+ * 
+ * This source code is unpublished proprietary information
+ * constituting, or derived under license from AT&T's UNIX(r) System V.
+ * In addition, portions of such source code were derived from Berkeley
+ * 4.3 BSD under license from the Regents of the University of
+ * California.
+ * 
+ * 
+ * 
+ * 		Copyright Notice 
+ * 
+ * Notice of copyright on this source code product does not indicate 
+ * publication.
+ * 
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+ * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ * 	          All rights reserved.
+ *  
+ */
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/stropts.h>
@@ -19,11 +44,7 @@
 #include <sys/signal.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
-
-
-#ifndef NULL
-#define	NULL	0
-#endif
+#include <stdio.h>
 
 extern int	errno;
 static int	_connect();
@@ -115,7 +136,6 @@ _connect2(siptr, sndcall)
 	register struct t_call		*sndcall;
 {
 	register int			fctlflg;
-	register void			(*sigsave)();
 
 	if ((fctlflg = fcntl(siptr->fd, F_GETFL, 0)) < 0)
 		return -1;
@@ -136,19 +156,12 @@ _connect2(siptr, sndcall)
 		if (_bind(siptr, NULL, 0, NULL, NULL) < 0) 
 			return -1;
 	}
-
-	/* Save SIGPOLL until the transaction is complete.
-	 */
-	sigsave = sigset(SIGPOLL, SIG_HOLD);
-	if (_s_snd_conn_req(siptr, sndcall) < 0) {
-		(void)sigset(SIGPOLL, sigsave);
+	if (_s_snd_conn_req(siptr, sndcall) < 0)
 		return -1;
-	}
 
 	/*  if no delay, return with error if not CLTS.
 	 */
 	if (fctlflg & O_NDELAY && siptr->udata.servtype != T_CLTS) {
-		(void)sigset(SIGPOLL, sigsave);
 		errno = EINPROGRESS;
 		siptr->udata.so_state |= SS_ISCONNECTING;
 		return -1;
@@ -157,7 +170,6 @@ _connect2(siptr, sndcall)
 	/* if CLTS, don't get the connection confirm.
 	 */
 	if (siptr->udata.servtype == T_CLTS) {
-		(void)sigset(SIGPOLL, sigsave);
 		if (sndcall->addr.len == 0)
 			/* Connect to Null address, breaks
 			 * the connection.
@@ -167,11 +179,8 @@ _connect2(siptr, sndcall)
 		return 0;
 	}
 
-	if (_s_rcv_conn_con(siptr) < 0) {
-		(void)sigset(SIGPOLL, sigsave);
+	if (_s_rcv_conn_con(siptr) < 0)
 		return -1;
-	}
-	(void)sigset(SIGPOLL, sigsave);
 
 	siptr->udata.so_state |= SS_ISCONNECTED;
 

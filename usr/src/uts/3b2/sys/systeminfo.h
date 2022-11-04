@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/systeminfo.h	1.4"
+#ident	"@(#)head.sys:sys/systeminfo.h	1.3"
 
 extern char architecture[];
 extern char hw_serial[];
@@ -25,15 +25,15 @@ extern char srpc_domain[SYS_NMLN];
 #define SI_ARCHITECTURE		6	/* return instruction set arch */
 #define SI_HW_SERIAL		7	/* return hardware serial number */
 #define SI_HW_PROVIDER		8	/* return hardware manufacturer */
-#define SI_SRPC_DOMAIN		9	/* return secure RPC domain */
+#define SI_GET_INET_DOMAIN	9	/* return Internet domain */
 /*
  * These commands are unpublished interfaces to sysinfo().
  */
 #define SI_SET_HOSTNAME		258	/* set name of node */
 					/*  -unpublished option */
-#define SI_SET_SRPC_DOMAIN	265	/* set secure RPC domain */
+#define SI_SET_INET_DOMAIN	265	/* set Internet domain */
 					/* -unpublished option */
-
+	
 #if defined(__STDC__) && !defined(_KERNEL)
 int sysinfo(int, char *, long);
 #endif

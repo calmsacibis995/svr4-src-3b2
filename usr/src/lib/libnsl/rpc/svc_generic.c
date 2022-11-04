@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:svc_generic.c	1.6"
+#ident	"@(#)librpc:svc_generic.c	1.3"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -50,7 +50,7 @@ extern int errno;
 extern int t_errno;
 extern char *t_errlist[];
 
-extern char *strdup(), *malloc();
+extern char *strdup();
 
 /*
  * The highest level interface for server creation. 
@@ -268,15 +268,6 @@ svc_tli_create(fd, nconf, bindaddr, sendsz, recvsz)
 			 */
 			tres->addr.len = 0;
 		break;
- 	case T_DATAXFER:
- 		/*
- 		 * This takes care of the case where a fd
- 		 * is passed on which a connection has already
- 		 * been accepted. t_getname() should have been
- 		 * used to get my own bind address.
- 		 */
- 		tres->addr.len = 0;
- 		break;
 	default:
 		(void) syslog(LOG_ERR,
 		"svc_tli_create: connection in a wierd state (%d)", state);
@@ -289,11 +280,9 @@ svc_tli_create(fd, nconf, bindaddr, sendsz, recvsz)
 	switch(tinfo.servtype) {
 		case T_COTS_ORD:
 		case T_COTS:
- 			if (state == T_DATAXFER)
- 				xprt = svc_fd_create(fd, sendsz, recvsz);
- 			else
- 				xprt = svc_vc_create(fd, sendsz, recvsz);
+			xprt = svc_vc_create(fd, sendsz, recvsz);
 			break;
+
 		case T_CLTS:
 			xprt = svc_dg_create(fd, sendsz, recvsz);
 			break;
@@ -304,7 +293,7 @@ svc_tli_create(fd, nconf, bindaddr, sendsz, recvsz)
 	if (xprt == (SVCXPRT *)NULL)
 		/*
 		 * The error messages here are spitted out by the lower layers:
-		 * svc_vc_create(), svc_fd_create(), and svc_dg_create().
+		 * svc_vc_create() and svc_dg_create().
 		 */
 		goto freedata;
 
@@ -322,6 +311,9 @@ svc_tli_create(fd, nconf, bindaddr, sendsz, recvsz)
 		(void) syslog(LOG_ERR, "svc_tli_create: No memory!");
 		goto freedata;
 	}
+
+	xprt->xp_port = -1;	/* To show that it is tli based. Switch */
+
 	if (nconf) {
 		xprt->xp_netid = strdup(nconf->nc_netid);
 		xprt->xp_tp = strdup(nconf->nc_device);

@@ -8,7 +8,7 @@
 #ifndef _SYS_PRSYSTM_H
 #define _SYS_PRSYSTM_H
 
-#ident	"@(#)head.sys:sys/prsystm.h	1.3"
+#ident	"@(#)head.sys:sys/prsystm.h	1.2"
 
 #include "sys/procfs.h"
 
@@ -23,7 +23,7 @@ extern void prgetstatus(proc_t *, prstatus_t *);
 #else
 extern void prawake();
 extern void prinvalidate();
-extern void prgetpsinfo();
+extern void prgetpsinfo(proc_t *, struct prpsinfo *);
 extern void prgetfpregs();
 extern int prnsegs();
 extern void prexit();

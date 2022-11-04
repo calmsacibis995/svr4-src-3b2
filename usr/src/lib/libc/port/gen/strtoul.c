@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/strtoul.c	1.8"
+#ident	"@(#)libc-port:gen/strtoul.c	1.4"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include <errno.h>
@@ -34,25 +34,14 @@ register int base;
 	int xx;
 	unsigned long	multmax;
 	const char 	**ptr = (const char **)nptr;
-	int neg = 0;
 
 	if (ptr != (const char **)0)
 		*ptr = str; /* in case no number is formed */
-	if (base < 0 || base > MBASE || base == 1) {
-		errno = EINVAL;
+	if (base < 0 || base > MBASE)
 		return (0); /* base is invalid -- should be a fatal error */
-	}
-	if (!isalnum(c = *str)) {
-		while (isspace(c))
-			c = *++str;
-		switch (c) {
-		case '-':
-			neg++;
-			/* FALLTHROUGH */
-		case '+':
-			c = *++str;
-		}
-	}
+	c = *str;
+	while (isspace(c))
+		c = *++str;
 	if (base == 0)
 		if (c != '0')
 			base = 10;
@@ -83,10 +72,9 @@ register int base;
 	}
 	if (ptr != (const char **)0)
 		*ptr = str;
-	return (neg ? -val : val);
+	return (val);
 
 overflow:
-	for (c = *++str; lisalnum(c) && (xx = DIGIT(c)) < base; (c = *++str));
 	if (ptr != (const char **)0)
 		*ptr = str;
 	errno = ERANGE;

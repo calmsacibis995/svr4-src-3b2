@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/rtfcns.c	1.7"
+#ident	"@(#)rtld:common/rtfcns.c	1.4"
 
 #ifdef __STDC__
 #include <stdarg.h>
@@ -15,8 +15,6 @@
 
 #include "rtinc.h"
 #include <fcntl.h>
-
-static int _rtstrncmp ARGS((CONST char *, CONST char *, int));
 
 #define ERRSIZE 512	/* size of buffer for error messages */
 
@@ -77,13 +75,13 @@ unsigned int nb;
 		/* open /dev/zero if not open, for reading anonymous memory */
 		if (_devzero_fd == -1) {
 			if ((_devzero_fd = _open(DEV_ZERO, O_RDONLY)) == -1) {
-				_rt_lasterr("%s: %s: can't open %s",(char*) _rt_name,_proc_name,(CONST char *)DEV_ZERO);
+				_rt_lasterr("ld.so: %s: can't open %s",_proc_name,DEV_ZERO);
 				return 0 ;
 			}
 		}
 		if ((sp = _mmap(0, PROUND(nb), (PROT_READ|PROT_WRITE),
 		    MAP_PRIVATE, _devzero_fd, 0)) == (caddr_t)-1) {
-			_rt_lasterr("%s: %s: can't malloc space",(char*) _rt_name,_proc_name);
+			_rt_lasterr("ld.so: %s: can't malloc space",_proc_name);
 			return 0;
 		}
 		cp = sp;
@@ -259,7 +257,7 @@ va_dcl
 {
 	va_list adx;
 	static char *errptr = 0;
-	static CONST char *no_space = "dynamic linker: can't allocate space";
+	static CONST char *no_space = "ld.so: can't allocate space";
 
 #ifdef __STDC__
 	va_start(adx, fmt);

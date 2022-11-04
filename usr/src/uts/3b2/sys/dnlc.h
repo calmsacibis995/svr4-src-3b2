@@ -5,33 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
 #ifndef _SYS_DNLC_H
 #define _SYS_DNLC_H
 
-#ident	"@(#)head.sys:sys/dnlc.h	1.4.1.2"
+#ident	"@(#)head.sys:sys/dnlc.h	1.3"
 /*
  * This structure describes the elements in the cache of recent
  * names looked up.
@@ -45,7 +22,7 @@ struct ncache {
 	struct ncache *lru_next; 	/* LRU chain */
 	struct ncache *lru_prev;
 	struct vnode *vp;		/* vnode the name refers to */
-	struct vnode *dp;		/* vnode of parent of name */
+	struct vnode *dp;		/* vno of parent of name */
 	char namlen;			/* length of name */
 	char name[NC_NAMLEN];		/* segment name */
 	struct cred *cred;		/* credentials */
@@ -83,7 +60,6 @@ vnode_t	*dnlc_lookup(vnode_t *, char *, cred_t *);
 void	dnlc_purge(void);
 int	dnlc_purge1(void);
 void	dnlc_purge_vp(vnode_t *);
-int	dnlc_purge_vfsp(vfs_t *, int);
 void	dnlc_remove(vnode_t *, char *);
 
 #else
@@ -94,7 +70,6 @@ vnode_t	*dnlc_lookup();
 void	dnlc_purge();
 int	dnlc_purge1();
 void	dnlc_purge_vp();
-int	dnlc_purge_vfsp();
 void	dnlc_remove();
 
 #endif

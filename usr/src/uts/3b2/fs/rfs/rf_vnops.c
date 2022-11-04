@@ -1,11 +1,4 @@
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)fs:fs/rfs/rf_vnops.c	1.32"
+#ident	"@(#)fs:fs/rfs/rf_vnops.c	1.21.1.1 UNOFFICIAL"
 #include "sys/list.h"
 #include "sys/types.h"
 #include "sys/sysinfo.h"
@@ -28,10 +21,10 @@
 #include "sys/statvfs.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/nserve.h"
 #include "sys/rf_cirmgr.h"
+#include "sys/rf_messg.h"
 #include "sys/buf.h"
 #include "sys/stat.h"
 #include "sys/statfs.h"
@@ -78,7 +71,6 @@ STATIC int	rf_ioctl();
 STATIC int	rf_getattr();
 STATIC int	rf_setattr();
 STATIC int	rf_access();
-STATIC int	rf_pathconf();
 STATIC int	rf_lookup();
 STATIC int	rf_create();
 STATIC int	rf_remove();
@@ -91,6 +83,7 @@ STATIC int	rf_symlink();
 STATIC int	rf_readlink();
 STATIC int	rf_fsync();
 STATIC void	rf_inactive();
+STATIC int	rf_fid();
 STATIC void	rf_rwlock();
 STATIC void	rf_rwunlock();
 STATIC int	rf_seek();
@@ -128,7 +121,7 @@ struct vnodeops rf_vnodeops = {
 	rf_readlink,
 	rf_fsync,
 	rf_inactive,
-	rf_nosys,	/* fid */
+	rf_fid,
 	rf_rwlock,
 	rf_rwunlock,
 	rf_seek,
@@ -143,33 +136,6 @@ struct vnodeops rf_vnodeops = {
 	rf_delmap,
 	rf_poll,
 	rf_nosys,	/* dump */
-	rf_pathconf,
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
 	rf_nosys,	/* filler */
 	rf_nosys,	/* filler */
 	rf_nosys,	/* filler */
@@ -226,6 +192,16 @@ rf_inactive(vp, cr)
 }
 
 /* ARGSUSED */
+STATIC int
+rf_fid(vp, fidpp)
+	vnode_t *vp;
+	fid_t **fidpp;
+{
+	rfcl_fsinfo.fsivop_other++;
+	cmn_err(CE_WARN,"rf_fid called\n");
+	return ENOSYS;
+}
+
 STATIC void
 rf_rwlock(vp)
 	vnode_t *vp;
@@ -259,6 +235,8 @@ rf_seek(vp, ooff, noffp)
 	return 0;
 }
 
+/* Ducmp compares two vnodes to see if they refer to the same file.
+ */
 STATIC int
 rf_cmp(vp1,vp2)
 	vnode_t *vp1, *vp2;
@@ -299,6 +277,9 @@ rf_fsync(vp, crp)
 	int		error;
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	/*
 	 * The pre-SVR4 system call protocol does not recognize this
 	 * operation.
@@ -337,6 +318,9 @@ rf_access(vp, mode, flags, crp)
 	register 	sndd_t *sdp = VTOSD(vp);
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (mode & VWRITE && vp->v_vfsp->vfs_flag & VFS_RDONLY) {
 		return EROFS;
 	}
@@ -371,31 +355,10 @@ rf_access(vp, mode, flags, crp)
 	return error;
 }
 
-STATIC int
-rf_pathconf(vp, cmd, valp, crp)
-	vnode_t		*vp;
-	int		cmd;
-	u_long		*valp;
-	cred_t		*crp;
-{
-	register int	error = 0;
-	union rq_arg	rqarg = init_rq_arg;
-	mblk_t		*bp = NULL;
-	register 	sndd_t *sdp = VTOSD(vp);
-
-	rfcl_fsinfo.fsivop_other++;
-	if (QPTOGP(sdp->sd_queue)->version < RFS2DOT0) {
-		return ENOSYS;
-	}
-	rqarg.rqpathconf.cmd = (long)cmd;
-	if ((error = rfcl_op(sdp, crp, RFPATHCONF, &rqarg, &bp, TRUE)) == 0) {
-		*valp = (u_long)RF_RESP(bp)->rp_rval;
-		rf_freemsg(bp);
-	}
-	return error;
-}
-
-/* Close remote file denoted by vp. */
+/*
+ * Perform close op on the remote file denoted by vp.
+ * Returns 0 for success, nonzero errno for failure.
+ */
 STATIC int
 rf_close(vp, flags, cnt, off, crp)
 	vnode_t			*vp;
@@ -405,7 +368,7 @@ rf_close(vp, flags, cnt, off, crp)
 	cred_t			*crp;
 {
 	register int		error;
-	int			nacked = TRUE;
+	int			nacked = 1;
 	mblk_t			*bp = NULL;
 	register rf_request_t	*reqp;
 	rcvd_t			*rdp;
@@ -415,6 +378,9 @@ rf_close(vp, flags, cnt, off, crp)
 	int			lastclose;
 
 	rfcl_fsinfo.fsivop_close++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	/* create an rd on which to receive the response */
 	if ((error = rcvd_create(FALSE, RDSPECIFIC, &rdp)) != 0) {
 		return error;
@@ -512,11 +478,14 @@ rf_create(dvp, nm, vap, ex, mode, vpp, crp)
 	register size_t totalsz;
 	int		canon = gp->hetero != NO_CONV;
 
-	*vpp = NULLVP;		/* vpp is set only in success cases */
+	*vpp = NULL;		/* vpp is set only in success cases */
 	bp = NULL;
 	giftsdp = NULL;
 	rdp = NULL;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	rfcl_fsinfo.fsivop_create++;
 	if (vcver < RFS2DOT0) {
 		return du_create(dvp, nm, vap, ex, mode, vpp, crp);
@@ -571,15 +540,17 @@ rf_create(dvp, nm, vap, ex, mode, vpp, crp)
 		rf_message_t	*msg = RF_MSG(bp);
 
 		if (!(msg->m_stat & RF_GIFT)) {
-			gdp_j_accuse("rf_create: no file reference",
+			gdp_discon("rf_create: no file reference",
 			  QPTOGP((queue_t *)msg->m_queue));
 			error = EPROTO;
 		} else {
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+			sndd_set(giftsdp, (queue_t *)msg->m_queue,
+			  msg->m_giftid);
 			if ((error = rfcl_findsndd(&giftsdp, crp, bp,
-			  dvp->v_vfsp)) == 0) {
-				*vpp = SDTOV(giftsdp);
+			  dvp->v_vfsp)) != 0) {
+				*vpp = NULLVP;
 			}
+				*vpp = SDTOV(giftsdp);
 		}
 	}
 out:
@@ -650,27 +621,18 @@ rf_dofcntl(op, vp, cmd, arg, flag, offset, crp)
 	size_t			hdrsz = RF_MIN_REQ(gp->version);
 	caddr_t			data;
 	int			canon = gp->hetero != NO_CONV;
-	size_t			datasz = 0;
-	int			sendfl = 0;
+	struct flock		*flp = (struct flock *)arg;
+	size_t			datasz;
 
+	datasz = canon ? sizeof(struct flock) + FLOCK_XP - MINXPAND :
+		  sizeof(struct flock);
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (gp->version < RFS2DOT0) {
 		return du_fcntl(op, vp, cmd, arg, flag, offset, crp);
 	}
-
-	/*
-	 * Send record locking data with certain requests only.
-	 */
-	switch (cmd) {
-	case F_GETLK:
-	case F_O_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-	case F_FREESP:
-		datasz = canon ? sizeof(struct flock) + FLOCK_XP : 
-		  sizeof(struct flock);
-		sendfl = 1;
-	}
-
+	/* create an rd on which to receive the response */
 	if ((error = rcvd_create(TRUE, RDSPECIFIC, &rdp)) != 0) {
 		return error;
 	}
@@ -689,8 +651,15 @@ rf_dofcntl(op, vp, cmd, arg, flag, offset, crp)
 		reqp->rq_fcntl.fcntl = (long)arg;
 		reqp->rq_fcntl.offset = offset;
 		reqp->rq_fcntl.fflag = flag;
-
-		if (sendfl) {
+		/*
+		 * Send record locking data with request.
+		 */
+		switch (cmd) {
+		case F_GETLK:
+		case F_O_GETLK:
+		case F_SETLK:
+		case F_SETLKW:
+		case F_FREESP:
 			data = rf_msgdata(bp, hdrsz);
 			if (canon) {
 				reqp->rq_fcntl.prewrite = rf_tcanon(FLOCK_FMT,
@@ -706,23 +675,18 @@ rf_dofcntl(op, vp, cmd, arg, flag, offset, crp)
 	hdrsz = RF_MIN_RESP(gp->version);
 	rcvd_free(&rdp);
 	if (!error && (error = RF_RESP(bp)->rp_errno) == 0 &&
-	  op == RFFRLOCK && (cmd == F_GETLK || cmd == F_O_GETLK) ) {
-	  
-		if (RF_PULLUP(bp, hdrsz, datasz)) {
-			gdp_j_accuse("rf_dofcntl bad data", gp);
-			error = EPROTO;
-		} else {
-			data = rf_msgdata(bp, hdrsz);
-			if (gp->hetero != NO_CONV &&
-			  !rf_fcanon(FLOCK_FMT, data, data + datasz,
-			   (caddr_t)arg)) {
-				gdp_j_accuse("rf_dofcntl bad data from server",
+	  op == RFFRLOCK && (cmd == F_GETLK || cmd == F_O_GETLK) &&
+	  (error = RF_PULLUP(bp, hdrsz, datasz)) == 0) {
+		data = rf_msgdata(bp, hdrsz);
+		if (gp->hetero != NO_CONV) {
+			if (!rf_fcanon(FLOCK_FMT, data, data + datasz,
+			  (caddr_t)flp)) {
+				gdp_discon("rf_dofcntl bad data from server",
 				  gp);
 				error = EPROTO;
 			}
-			if (!error) {
-				*(flock_t *)arg = ((struct flock *)data)[0];
-			}
+		} else {
+			flp[0] = ((struct flock *)data)[0];
 		}
 	}
 	rf_freemsg(bp);
@@ -749,6 +713,9 @@ rf_getattr(vp, vap, flags, crp)
 	size_t			datasz;
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (gp->version < RFS2DOT0) {
 		return du_getattr(vp, vap, flags, crp);
 	}
@@ -757,8 +724,7 @@ rf_getattr(vp, vap, flags, crp)
 	 * Use the rf_attr_t in rfcl_lookup_cache if it is valid (its crp is
 	 * non-NULL) and matches this vp.
 	 */
-	if (!(flags & ATTR_COMM) && rfcl_lookup_cache.lkc_crp &&
-	  rfcl_lookup_cache.lkc_vp == vp) {
+	if (rfcl_lookup_cache.lkc_crp && rfcl_lookup_cache.lkc_vp == vp) {
 		rftov_attr(vap, &rfcl_lookup_cache.lkc_attr);
 		if (flags & ATTR_EXEC) {
 			/* shut out unauthorized setuid programs */
@@ -771,61 +737,51 @@ rf_getattr(vp, vap, flags, crp)
 		rfc_info.rfci_vc_miss++;
 	}
 	rqarg.rqgetattr.mask = vap->va_mask;
-	rqarg.rqgetattr.flags = flags;
 
 	hdrsz = RF_MIN_RESP(gp->version);
 	datasz = gp->hetero == NO_CONV ? sizeof(rf_attr_t) :
-	  sizeof(rf_attr_t) + ATTR_XP;
+	  sizeof(rf_attr_t) + ATTR_XP - MINXPAND;
 	if ((error = rfcl_op(sdp, crp, RFGETATTR, &rqarg, &bp, TRUE)) == 0 &&
-	  (error = RF_RESP(bp)->rp_errno) == 0) {
-		caddr_t	rpdata;
+	  (error = RF_RESP(bp)->rp_errno) == 0 &&
+	  (error = RF_PULLUP(bp, hdrsz, datasz)) == 0) {
 
-		if (RF_PULLUP(bp, hdrsz, datasz)) {
-			gdp_j_accuse("rf_getattr bad data", gp);
-			error = EPROTO;
-			goto out;
-		}
+		caddr_t		rpdata = rf_msgdata(bp, hdrsz);
 
 		/*
 		 * Extract the rf_attr_t from the response.
 		 */
-
-		rpdata = rf_msgdata(bp, hdrsz);
-
 		if (gp->hetero != NO_CONV &&
 		  !rf_fcanon(ATTR_FMT, rpdata, rpdata + datasz, rpdata)) {
-			gdp_j_accuse("rf_getattr bad data", gp);
+			gdp_discon("rf_getattr bad data from server", gp);
 			error = EPROTO;
-			goto out;
-		}
+		} else {
+			rftov_attr(vap, (rf_attr_t *)rpdata);
+			if (flags & ATTR_EXEC) {
+				rf_common_t	*cop = RF_COM(bp);
 
-		rftov_attr(vap, (rf_attr_t *)rpdata);
-		if (flags & ATTR_EXEC) {
-			rf_common_t	*cop = RF_COM(bp);
+				/* shut out unauthorized setuid programs */
 
-			/* shut out unauthorized setuid programs */
+				vap->va_uid = gluid(gp, cop->co_uid);
+				vap->va_gid = glgid(gp, cop->co_gid);
+			}
+			vap->va_vcode = 0;
 
-			vap->va_uid = gluid(gp, cop->co_uid);
-			vap->va_gid = glgid(gp, cop->co_gid);
-		}
-		vap->va_vcode = 0;
-
-		/*
-		 * NOTE:  If va_fsid becomes other than the dev number,
-		 * the following will be obsolete.  It sets the high
-		 * byte of the low word(sic) of that field to the one's
-		 * complement of the gdp index of the circuit to the
-		 * server holding the file.
-		 */
+			/*
+			 * NOTE:  If va_fsid becomes other than the dev number,
+			 * the following will be obsolete.  It sets the high
+			 * byte of the low word(sic) of that field to the one's
+			 * complement of the gdp index of the circuit to the
+			 * server holding the file.
+			 */
 
 #ifdef SHORT_DEVS
-		hibyte(loword(vap->va_fsid)) = ~(gp - gdp);
+			hibyte(loword(vap->va_fsid)) = ~(gp - gdp);
 #else
-		hiword(vap->va_fsid) = ~(gp - gdp);
+			hiword(vap->va_fsid) = ~(gp - gdp);
 #endif
-		ASSERT((long)vap->va_fsid < 0);
+			ASSERT((long)vap->va_fsid < 0);
+		}
 	}
-out:
 	rf_freemsg(bp);
 	return error;
 }
@@ -855,6 +811,9 @@ rf_ioctl(vp, cmd, arg, flag, crp)
 	register int	vcver = QPTOGP(chansdp->sd_queue)->version;
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 
 	bp = NULL;
 	rdp = NULL;
@@ -894,7 +853,9 @@ rf_ioctl(vp, cmd, arg, flag, crp)
 	}
 out:
 	rcvd_free(&rdp);
-	sndd_free(&replysdp);
+	if (error) {
+		sndd_free(&replysdp);
+	}
 	return error;
 }
 
@@ -964,7 +925,7 @@ rf_ioctl_resp(rdp, vcver, bp, giftsdp, replysdp, crp)
 				break;
 			}
 		} else {
-			gdp_j_accuse("rf_ioctl_pass bad opcode",
+			gdp_discon("rf_ioctl_pass bad opcode",
 			  QPTOGP(chansdp->sd_queue));
 			error = EPROTO;
 			break;
@@ -990,7 +951,7 @@ rf_ioctl_resp(rdp, vcver, bp, giftsdp, replysdp, crp)
 		struct file	*fp;	/* sink */
 		int		fd;	/* sink */
 
-		sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+		sndd_set(giftsdp, (queue_t *)msg->m_queue, msg->m_giftid);
 		if (!(error = rfcl_findsndd(&giftsdp, crp, bp,
 		  SDTOV(chansdp)->v_vfsp))) {
 			struct vnode *vp = SDTOV(giftsdp);
@@ -1033,6 +994,9 @@ rf_link(tdvp, fvp, nm, crp)
 	register size_t	totalsz = headsz + datasz;
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (fsdp->sd_queue != chansdp->sd_queue) {
 		return EXDEV;
 	}
@@ -1047,7 +1011,7 @@ rf_link(tdvp, fvp, nm, crp)
 			break;
 		}
 		rfcl_reqsetup(bp, chansdp, crp, RFLINK, ULIMIT);
-		RF_REQ(bp)->rq_link.from = fsdp->sd_gift;
+		RF_REQ(bp)->rq_rflink.link = fsdp->sd_connid;
 		(void)strcpy(rf_msgdata(bp, headsz), nm);
 		error = rfcl_xac(&bp, totalsz, rdp, vcver, FALSE, &nacked);
 	}
@@ -1086,7 +1050,10 @@ rf_lookup(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 
 	rfcl_fsinfo.fsivop_lookup++;
 	*vpp = NULLVP;			/* only reset for success */
-
+	if (RF_SERVER()) {
+		error = EMULTIHOP;
+		goto failed;
+	}
 	if (vcver < RFS2DOT0) {
 		return du_lookup(dvp, comp, vpp, pnp, flags, rdirvp, crp);
 	}
@@ -1143,12 +1110,10 @@ rf_lookup(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 		rqp = RF_REQ(bp);
 		data = rf_msgdata(bp, headsz);
 		if (rdirvp && ISRFSVP(rdirvp) &&
-		  rdirvp->v_vfsp == dvp->v_vfsp) {
-			rqp->rq_rrdir_id = VTOSD(rdirvp)->sd_gift.gift_id;
-			rqp->rq_rrdir_gen = VTOSD(rdirvp)->sd_gift.gift_gen;
+		  VTOSD(rdirvp)->sd_connid == chansdp->sd_connid) {
+			rqp->rq_rrdir = VTOSD(rdirvp)->sd_connid;
 		} else {
-			rqp->rq_rrdir_id = 0;
-			rqp->rq_rrdir_gen = 0;
+			rqp->rq_rrdir = 0;
 		}
 		(void)strcpy(data, comp);
 		if (!nsubmounts) {
@@ -1186,7 +1151,7 @@ failed:
 
 /*
  * Either RFDOTDOT, RFPATHREVAL, or completed successfully.
- * In the non-error cases, update pnp and vpp.  Get new reference to
+ * In the non-error cases, update pnp and vpp .  Get new reference to
  * result vnode and return through vpp.
  */
 STATIC int
@@ -1213,10 +1178,10 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 	int			error = 0;
 	size_t			hdrsz = RF_MIN_RESP(vcver);
 
-	if (RF_PULLUP(bp, hdrsz, (size_t)RF_MSG(bp)->m_size - hdrsz)) {
-		gdp_j_accuse("rf_lookup_pass bad response", gp);
-		sndd_free(&giftsdp);
-		return EPROTO;
+	if (RF_COM(bp)->co_opcode != RFLOOKUP &&
+	  (error = RF_PULLUP(bp, hdrsz, (size_t)RF_MSG(bp)->m_size - hdrsz))
+	  != 0) {
+		return error;
 	}
 
 	msg = RF_MSG(bp);
@@ -1227,17 +1192,15 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 	switch ((int)cop->co_opcode) {
 	case RFLOOKUP:
 		if (!(msg->m_stat & RF_GIFT)) {
-			gdp_j_accuse("rf_lookup_pass: no file reference", gp);
+			gdp_discon("rf_lookup_pass: no file reference", gp);
 			sndd_free(&giftsdp);
 			return EPROTO;
 		}
 		if (!data) {
-			gdp_j_accuse("rf_lookup_pass no response data", gp);
-			sndd_free(&giftsdp);
+			gdp_discon("rf_lookup_pass no response data", gp);
 			return EPROTO;
 		}
 		if (!nsubmounts) {
-
 			/*
 			 * Pathname, rather than component, lookup.
 			 *
@@ -1250,14 +1213,13 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 		 	 * end of the pathname and set the pathlen to 0,
 		 	 * as expected by lookuppn().
 		 	 */
-
 			pnp->pn_path += pnp->pn_pathlen;
 			pnp->pn_pathlen = 0;
 			if (flags & LOOKUP_DIR) {
 				pn_setlast(pnp);
 			}
 		}
-		sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+		sndd_set(giftsdp, (queue_t *)msg->m_queue, msg->m_giftid);
 		if (!(error = rfcl_findsndd(&giftsdp, crp, bp,
 		  dvp->v_vfsp))) {
 			vp = SDTOV(giftsdp);
@@ -1283,10 +1245,8 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 					if (!rf_fcanon(RFLKC_FMT, data, data +
 					  sizeof(rflkc_info_t) + RFLKC_XP,
 					  info)) {
-						gdp_j_accuse(
-						  "rf_lookup_pass bad data",
-						   gp);
-						VN_RELE(vp);
+						gdp_discon("rf_lookup bad data",
+						  gp);
 						error = EPROTO;
 						break;
 					}
@@ -1319,10 +1279,9 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 		break;
 	case RFDOTDOT:
 		sndd_free(&giftsdp);
-		datalen = rp->rp_v2giftinfo.pathlen;
+		datalen = rp->rp_v2gift.pathlen;
 		if (pnp->pn_pathlen < datalen) {
-			gdp_j_accuse("rf_lookup_pass too much response data",
-			  gp);
+			gdp_discon("rf_lookup_pass too much response data", gp);
 			return EPROTO;
 		}
 		pnp->pn_path += pnp->pn_pathlen - datalen;
@@ -1333,7 +1292,7 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 	case RFPATHREVAL:
 		sndd_free(&giftsdp);
 		if (!data) {
-			gdp_j_accuse("rf_lookup_pass no response data", gp);
+			gdp_discon("rf_lookup_pass no response data", gp);
 			return EPROTO;
 		}
 		if ((error = pn_set(pnp, data)) != 0) {
@@ -1350,7 +1309,7 @@ rf_lookup_pass(dvp, vpp, pnp, flags, rdirvp, crp, bp, giftsdp, nsubmounts)
 		break;
 	default:
 		sndd_free(&giftsdp);
-		gdp_j_accuse("rf_lookup_pass bad opcode", gp);
+		gdp_discon("rf_lookup_pass bad opcode", gp);
 		return EPROTO;
 	}
 	if (!error) {
@@ -1381,10 +1340,10 @@ rf_lookup_fail(dvp, pnp, crp, bp, giftsdp, error, nsubmounts)
 		 * First condition implies pathname, rather than component,
 		 * lookup.
 		 */
-		register int	datalen = RF_RESP(bp)->rp_v2giftinfo.pathlen;
+		register int	datalen = RF_RESP(bp)->rp_v2gift.pathlen;
 
 		if (pnp->pn_pathlen < datalen) {
-			gdp_j_accuse("rf_lookup_fail too much response data",
+			gdp_discon("rf_lookup_fail too much response data",
 			  QPTOGP(VTOSD(dvp)->sd_queue));
 			pn_setlast(pnp);
 			error = EPROTO;
@@ -1422,6 +1381,9 @@ rf_mkdir(dvp, nm, vap, vpp, crp)
 	struct rqmkdent		rqmkdent;
 
 	*vpp = NULLVP;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	rfcl_fsinfo.fsivop_other++;
 	if (vcver < RFS2DOT0) {
 		return du_mkdir(dvp, nm, vap, vpp, crp);
@@ -1439,7 +1401,10 @@ rf_mkdir(dvp, nm, vap, vpp, crp)
 		return error;
 	}
 	rdp->rd_sdp = chansdp;
-
+	/*
+	 * Calculate datasz, up datasz to worst case
+	 * in heterogeneous environment.
+	 */
 	headsz = RF_MIN_REQ(vcver);
 	datasz = gp->hetero != NO_CONV ? sizeof(struct rqmkdent) + MKDENT_XP :
 	  sizeof(struct rqmkdent);
@@ -1464,23 +1429,27 @@ rf_mkdir(dvp, nm, vap, vpp, crp)
 		error = rfcl_xac(&bp, totalsz, rdp, vcver, FALSE, &nacked);
 	}
 	rcvd_free(&rdp);
-	if (!error && (error = RF_RESP(bp)->rp_errno) == 0) {
-		register rf_message_t *msg = RF_MSG(bp);
+	if (!error) {
+		if ((error = RF_RESP(bp)->rp_errno) == 0) {
+			register rf_message_t *msg = RF_MSG(bp);
 
-		if (!(msg->m_stat & RF_GIFT)) {
-			gdp_j_accuse("rf_mkdir_pass no file reference",
+			if (!(msg->m_stat & RF_GIFT)) {
+			gdp_discon("rf_mkdir_pass file reference",
 			  QPTOGP((queue_t *)msg->m_queue));
 			error = EPROTO;
 		} else {
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
-			if ((error = rfcl_findsndd(&giftsdp, crp, bp,
-			  dvp->v_vfsp)) == 0) {
-				*vpp = SDTOV(giftsdp);
+				sndd_set(giftsdp, (queue_t *)msg->m_queue,
+				  msg->m_giftid);
+				if ((error = rfcl_findsndd(&giftsdp, crp, bp,
+				  dvp->v_vfsp)) == 0) {
+					*vpp = SDTOV(giftsdp);
+				}
 			}
+		} else {
+			sndd_free(&giftsdp);
 		}
 		rf_freemsg(bp);
-	}
-	if (error) {
+	} else {
 		sndd_free(&giftsdp);
 	}
 	return error;
@@ -1521,7 +1490,8 @@ rf_open(vpp, filemode, crp)
 			 */
 			vfs_t	*vfsp = SDTOV(chansdp)->v_vfsp;
 
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+			sndd_set(giftsdp, (queue_t *)msg->m_queue,
+			  msg->m_giftid);
 			if (!(error = rfcl_findsndd(&giftsdp, crp, bp, vfsp))) {
 				*vpp = SDTOV(giftsdp);
 			} else {
@@ -1563,6 +1533,9 @@ rf_readdir(vp, uiop, crp, eofp)
 	ulong 			oresid = uiop->uio_resid;
 
 	rfcl_fsinfo.fsivop_readdir++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	/* create an rd on which to receive the response */
 	if ((error = rcvd_create(TRUE, RDSPECIFIC, &rdp)) != 0) {
 		goto out;
@@ -1645,7 +1618,8 @@ rf_readdir_resp(rdp, bp, uiop, replysdp, eofp)
 			noffset = rp->rp_offset;
 
 			if (gp->hetero != NO_CONV &&
-			  (error = rf_readdir_fcanon(bp, hdrsz, gp)) != 0) {
+			  (error = rf_readdir_fcanon(bp, hdrsz, gp, &uio_error))
+			   != 0) {
 				goto out;
 			}
 
@@ -1659,19 +1633,16 @@ rf_readdir_resp(rdp, bp, uiop, replysdp, eofp)
 			}
 		}
 		if (rp_op == RFREADDIR) {
-
 			/*
 			 * We are forced to believe that the returned offset is
-			 * correct; reset uio_offset accordingly.
+			 * correct, reset uio_offset accordingly.
 			 */
-
 			uiop->uio_offset = noffset;
 
 			/*
 			 * signals and rp_errno are meaningful only in the final
 			 * response, distinguished here by the RFREADDIR opcode
 			 */
-
 			if (!rf_sigisempty(rp, gp->version)) {
 				rf_postrpsigs(rp, gp->version, u.u_procp);
 			}
@@ -1683,11 +1654,9 @@ rf_readdir_resp(rdp, bp, uiop, replysdp, eofp)
 		}
 
 		/* receive a new response message and verify it is error free */
-
 		if ((error = rf_rcvmsg(rdp, &bp)) != 0) {
 			goto out;
 		}
-
 		rp = RF_RESP(bp);
 	}
 out:
@@ -1727,7 +1696,7 @@ rf_readlink(vp, uiop, crp)
 			error = rfcl_readmove(&bp, uiop, (sndd_t *)NULL,
 			  &uio_error);
 		} else {
-			gdp_j_accuse("rf_rdlink bad response",
+			gdp_discon("rf_rdlink bad response",
 			  QPTOGP(chansdp->sd_queue));
 			error = EPROTO;
 			rf_freemsg(bp);
@@ -1755,6 +1724,9 @@ rf_read(vp, uiop, f, crp)
 	ulong		oresid = uiop->uio_resid;
 
 	rfcl_fsinfo.fsivop_read++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	VOP_RWUNLOCK(vp);
 	for (;;) {
 		if (sdp->sd_stat & SDCACHE) {
@@ -1772,7 +1744,7 @@ rf_read(vp, uiop, f, crp)
 			if (--sdp->sd_crwlock.nreaders == 0 &&
 			  sdp->sd_crwlock.want) {
 			  	sdp->sd_crwlock.want = FALSE;
-				wakeprocs((caddr_t)&sdp->sd_crwlock, PRMPT);
+				wakeup((caddr_t)&sdp->sd_crwlock);
 			}
 			/*
 			 * !error && RFC_INCACHE == done
@@ -1827,8 +1799,15 @@ rf_write(vp, uiop, f, crp)
 
 	rfcl_fsinfo.fsivop_write++;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
+
 	VOP_RWUNLOCK(vp);
 
+	if (f & IO_APPEND && vp->v_type == VREG) {
+		uiop->uio_offset = VTOSD(vp)->sd_size;
+	}
 	rf_rwa.uiop = uiop;
 	rf_rwa.cached = FALSE;
 	rf_rwa.wr_ioflag = f;
@@ -1852,22 +1831,12 @@ rf_write(vp, uiop, f, crp)
 		 * released) at a lower level if caching is disabled
 		 */
 
-		sdp->sd_crwlock.writer = TRUE;
-		rf_rwa.cached = TRUE;
-
-		if (f & IO_APPEND && vp->v_type == VREG) {
-			uiop->uio_offset = VTOSD(vp)->sd_size;
-		}
-
 		if ((error = rfcl_uioclone(uiop, &rf_rwa, &iovsize)) != 0) {
-			sdp->sd_crwlock.writer = FALSE;
-			if (sdp->sd_crwlock.want) {
-		  		sdp->sd_crwlock.want = FALSE;
-				wakeprocs((caddr_t)&sdp->sd_crwlock, PRMPT);
-			}
 			goto rwlock;
 		}
 		iovp = (caddr_t)rf_rwa.cwruio.uio_iov;
+		sdp->sd_crwlock.writer = TRUE;
+		rf_rwa.cached = TRUE;
 
 		/*
 		 * Suppressing this for unmappable files will prevent failing
@@ -1875,10 +1844,7 @@ rf_write(vp, uiop, f, crp)
 		 * we will copy data in twice.
 		 */
 
-		if (!(vp->v_flag & VNOMAP)) {
-			rf_rwa.wr_kern = TRUE;
-			rf_rwa.wr_bufp = NULL;
-		}
+		rf_rwa.wr_kern = !(vp->v_flag & VNOMAP);
 	}
 
 	error = rfcl_write_op(VTOSD(vp), crp, RFWRITE, &rf_rwa);
@@ -1890,7 +1856,7 @@ rf_write(vp, uiop, f, crp)
 		sdp->sd_crwlock.writer = FALSE;
 		if (sdp->sd_crwlock.want) {
 		  	sdp->sd_crwlock.want = FALSE;
-			wakeprocs((caddr_t)&sdp->sd_crwlock, PRMPT);
+			wakeup((caddr_t)&sdp->sd_crwlock);
 		}
 	}
 
@@ -1938,7 +1904,7 @@ rwlock:
 STATIC int
 rf_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	vnode_t			*vp;
-	uint			off;
+	int			off;
 	struct as		*as;
 	caddr_t			*addrp;
 	int			len;
@@ -1947,23 +1913,31 @@ rf_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	uint			flags;
 	cred_t			*cred;
 {
-	struct segvn_crargs	crargs;
+	struct segvn_crargs	crargs;	/* args to segvn_create */
 
 	ASSERT((maxprot & prot) == prot);
 
-	if ((int)off < 0 || (int)(off + len) < 0) {
+	if (RF_SERVER()){
+		return EMULTIHOP;
+	}
+	if (off < 0) {
 		return EINVAL;
-	}
-	if (vp->v_type != VREG && vp->v_type != VBLK) {
-		return ENODEV;
-	}
-	if (vp->v_filocks) {
-		return EAGAIN;
 	}
 	if (vp->v_flag & VNOMAP) {
 		return ENOSYS;
 	}
+	if (off + len > ptob(btopr(VTOSD(vp)->sd_size))) {
+		/* Don't allow a mapping beyond the last page in the file. */
+		return ENXIO;
+	}
 
+	crargs.vp = vp;
+	crargs.offset = off;
+	crargs.type = (u_char)(flags & MAP_TYPE);
+	crargs.prot = (u_char)prot;
+	crargs.maxprot = (u_char)maxprot;
+	crargs.cred = cred;
+	crargs.amp = NULL;
 	if (!(flags & MAP_FIXED)) {
 		(void)map_addr(addrp, len, (off_t)off, 1);
 		if (!*addrp) {
@@ -1974,13 +1948,7 @@ rf_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 		(void)as_unmap(as, *addrp, len);
 	}
 
-	crargs.vp = vp;
-	crargs.offset = off;
-	crargs.type = (u_char)(flags & MAP_TYPE);
-	crargs.prot = (u_char)prot;
-	crargs.maxprot = (u_char)maxprot;
-	crargs.cred = cred;
-	crargs.amp = NULL;
+	/* as_map takes care of aligning its args. */
 
 	return as_map(as, *addrp, len, segvn_create, (caddr_t)&crargs);
 }
@@ -1999,9 +1967,10 @@ rf_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
  *		starting offset in the file of the mapping
  *	as
  *		address space in which to establish the mapping
- *	addr
- *		addr refers to the virtual address in as at which to start 
- *		mapping
+ *	addrp
+ *		if MAP_FIXED is set, addrp refers to the virtual address in
+ *		as at which to start mapping.  Otherwise, map_addr() is
+ *		used to set this address.
  *	len
  *		length of mapping
  *	prot
@@ -2020,11 +1989,11 @@ rf_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
  */
 /* ARGSUSED */
 STATIC int
-rf_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
+rf_addmap(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	vnode_t		*vp;
 	int		off;
 	struct as	*as;
-	caddr_t		addr;
+	caddr_t		*addrp;
 	uint		len;
 	uint		prot;
 	uint		maxprot;
@@ -2034,28 +2003,25 @@ rf_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
 	register sndd_t	*sdp = VTOSD(vp);
 	int		error = 0;
 	mblk_t		*bp = NULL;
-	union rq_arg	rqarg = init_rq_arg;
 
 	if (vp->v_flag & VNOMAP) {
 		return ENOSYS;
 	}
-
-	rqarg.rqmap.offset = off;
-	rqarg.rqmap.len = len;
-	rqarg.rqmap.maxprot = maxprot;
-	if (!(flags & MAP_SHARED)) {
-		rqarg.rqmap.maxprot &= ~PROT_WRITE;
-	}
-
-	if ((error = rfcl_op(sdp, cred, RFADDMAP, &rqarg, &bp, TRUE)) == 0) {
+	if (!sdp->sd_mapcnt && (error = rfcl_op(sdp, cred, RFMAP,
+	  &init_rq_arg, &bp, TRUE)) == 0) {
 		error = RF_RESP(bp)->rp_errno;
 		rf_freemsg(bp);
 		bp = NULL;
+	}
+	if (!error) {
+		sdp->sd_mapcnt += btopr(len);
 	}
 	return error;
 }
 
 /*
+ * Decrement mapcnt to correspond to the removal of any mappings to
+ * the denoted file in the specified range.
  * Args
  *	NOTE:  there are currently no alignment restrictions on off, addr, or
  *	len; they are adjusted internally.  It's unclear to what extent this is
@@ -2068,7 +2034,7 @@ rf_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
  *		starting offset in the file of the area to be unmapped
  *	as
  *		address space of the mapping
- *	addr
+ *	addrp
  *		virtual address at which the mapping starts.
  *	len
  *		length of mapping
@@ -2089,59 +2055,31 @@ rf_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
  */
 /* ARGSUSED */
 STATIC int
-rf_delmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
+rf_delmap(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	vnode_t		*vp;
 	uint		off;
 	struct as	*as;
-	caddr_t		addr;
+	caddr_t		*addrp;
 	uint		len;
 	uint		prot;
 	uint		maxprot;
 	uint		flags;
 	cred_t		*cred;
 {
-	register sndd_t	*sdp = VTOSD(vp);
-	mblk_t		*bp = NULL;
-	int		nacked = TRUE;
-	int		vcver = QPTOGP(sdp->sd_queue)->version;
-	size_t		minreq = RF_MIN_REQ(vcver);
-	rcvd_t		*rdp;
-	union rq_arg	rqarg = init_rq_arg;
+	register sndd_t *sdp = VTOSD(vp);
 
 	if (vp->v_flag & VNOMAP) {
 		return ENOSYS;
 	}
+	sdp->sd_mapcnt -= btopr(len);
+	ASSERT(sdp->sd_mapcnt >= 0);
+	if (!sdp->sd_mapcnt) {
+		mblk_t *bp = NULL;
 
-	rqarg.rqmap.offset = off;
-	rqarg.rqmap.len = len;
-	rqarg.rqmap.maxprot = maxprot;
-	if (!(flags & MAP_SHARED)) {
-		rqarg.rqmap.maxprot &= ~PROT_WRITE;
-
-	} else {
-
-		/*
-		 * Servers will generally only accept our putpages while 
-		 * mappings are current.  Synchronously do them now for the
-		 * range being unmapped.
-		 */
-
-		(void)VOP_PUTPAGE(vp, off, len, 0, cred);
+		if (!(rfcl_op(sdp, cred, RFUNMAP, &init_rq_arg, &bp, FALSE))) {
+			rf_freemsg(bp);
+		}
 	}
-
-	(void)rcvd_create(FALSE, RDSPECIFIC, &rdp);
-	rdp->rd_sdp = sdp;
-	
-	while (nacked) {
-		(void)rf_allocmsg(minreq, (size_t)0, BPRI_MED, FALSE,
-		  NULLCADDR, NULLFRP, &bp);
-		ASSERT(bp);
-		rfcl_reqsetup(bp, sdp, cred, RFDELMAP, ULIMIT);
-		RF_REQ(bp)->rq_arg = rqarg;
-		(void)rfcl_xac(&bp, minreq, rdp, vcver, FALSE, &nacked);
-	}
-	rf_freemsg(bp);
-	rcvd_free(&rdp);
 	return 0;
 }
 
@@ -2213,6 +2151,9 @@ rf_getpage(vp, off, len, protp, pl, plsz, seg, addr, rw, cred)
 	ASSERT(!(off % PAGESIZE));
 
 	rfcl_fsinfo.fsivop_getpage++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (vp->v_flag & VNOMAP) {
 		return ENOSYS;
 	}
@@ -2230,7 +2171,7 @@ rf_getpage(vp, off, len, protp, pl, plsz, seg, addr, rw, cred)
 }
 
 /*
- * Flush to the backing vnode all dirty pages in the range of file
+ * Flush to the backing vnode all dirtypages in the range of file
  * offset [off...off + len), possibly invalidating all pages in the
  * range.  Asumes it is called with vnode unlocked.  If the vnode has
  * no references, returns immediately, else inflates the reference
@@ -2279,13 +2220,24 @@ rf_putpage(vp, off, len, flags, cred)
 	int			error;
 
 	rfcl_fsinfo.fsivop_putpage++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (vp->v_flag & VNOMAP) {
 		return ENOSYS;
 	}
 	if (!vp->v_pages) {
 		return 0;
 	}
-
+	if (off >= sdp->sd_size) {
+		/*
+		 * TO DO:  why is this not an error?  Also, ufs and NFS
+		 * checked this only after checking len != 0, then set
+		 * dirty = NULL, so they would fall through to the end of
+		 * the function.  Why?
+		 */
+		return 0;
+	}
 	/*
 	 * If vp->v_count is 0 here, the vnode is already inactive, return.
 	 */
@@ -2299,8 +2251,7 @@ rf_putpage(vp, off, len, flags, cred)
 	 * PAGESIZE.
 	 */
 
-	bsize = QPTOGP(VTOSD(vp)->sd_queue)->datasz;
-	ASSERT(bsize >= PAGESIZE && !(bsize & PAGEOFFSET));
+	bsize = MAX(PAGESIZE, vp->v_vfsp->vfs_bsize);
 again:
 	sdp->sd_nextr = 0;
 
@@ -2324,11 +2275,13 @@ again:
 		 * TO DO:  Check for illegal offsets on entry into this
 		 * routine, and do reasonable klustering below.
 		 */
+		uint	fsize;	/* file size rounded up to PAGESIZE boundary */
 		uint	eoff;	/* upper bound of range needed */
 		uint	offlo;	/* off rounded down to bsize boundary */
 		uint	offhi;	/* eoff rounded up to bsize boundary */
 
-		eoff = off + len;
+		fsize = ptob(btopr(sdp->sd_size));
+		eoff = MIN(off + len, fsize);
 		offlo = off & ~(bsize - 1);
 		offhi = (eoff + bsize) & ~(bsize - 1);
 
@@ -2346,8 +2299,7 @@ again:
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY && dirty) {
 		error = EROFS;
 	} else {
-		error = rf_pushpages(&dirty, vp, (flags & ~B_ASYNC), 
-		  bsize, cred);
+		error = rf_pushpages(&dirty, vp, flags, bsize, cred);
 	}
 	/*
 	 * The else part below is taken when we're doing synchronous
@@ -2586,8 +2538,7 @@ rf_getapage(vp, off, protp, pl, plsz, seg, addr, rw, cred)
 	cred_t			*cred;
 {
 	register sndd_t		*sdp;
-	register off_t		blksize;	/* file sys block size */
-	size_t			blkoff;
+	register u_int		bsize;	/* file sys block size */
 	struct buf		*bp;
 	page_t			*pp;
 	page_t			*pp2;
@@ -2596,16 +2547,18 @@ rf_getapage(vp, off, protp, pl, plsz, seg, addr, rw, cred)
 	daddr_t			lbn;
 	off_t			io_off;
 	size_t			io_len;
+	size_t			blkoff;
+	off_t			blksize;
 	int			err;
 
 	sdp = VTOSD(vp);
 
-	blksize = vp->v_vfsp->vfs_bsize;
+	bsize = vp->v_vfsp->vfs_bsize;
 
 reread:
 	err = 0;
-	lbn = off / blksize;
-	blkoff = lbn * blksize;
+	lbn = off / bsize;
+	blkoff = lbn * bsize;
 
 	if ((pagefound = page_find(vp, off)) == NULL) {
 		int	resid;		/* detect fault beyond EOF */
@@ -2613,6 +2566,24 @@ reread:
 		/*
 		 * Need to go to server to get a block
 		 */
+
+		if (blkoff < sdp->sd_size && blkoff + bsize > sdp->sd_size) {
+			/*
+			 * If less than a block left in
+			 * file read less than a block.
+			 */
+			if (sdp->sd_size <= off) {
+				/*
+				 * Trying to access beyond EOF,
+				 * set up to get at least one page.
+				 */
+				blksize = off + PAGESIZE - blkoff;
+			} else {
+				blksize = sdp->sd_size - blkoff;
+			}
+		} else {
+			blksize = bsize;
+		}
 
 		pp = pvn_kluster(vp, off, seg, addr, &io_off, &io_len,
 		    blkoff, blksize, 0);
@@ -2663,7 +2634,7 @@ reread:
 		/* async later */
 		bp = pageio_setup(pp, io_len, vp, B_READ);
 
-		bp->b_blkno = 0;
+		bp->b_blkno = RF_OFFTOBLK(io_off);
 		bp->b_dev = 0;
 		bp->b_edev = 0;
 		bp_mapin(bp);
@@ -2671,10 +2642,21 @@ reread:
 		err = rfcl_strategy(bp, cred, &resid);	/* trashes bp */
 		bp = NULL;
 
+		if (!err && resid == io_len && sdp->sd_size <= off) {
+
+			/*
+			 * Faulting beyond EOF.  We DO NOT implement
+			 * VOP_READ and VOP_WRITE with mapped I/O.
+			 * (Otherwise this could be an innocent fault.)
+			 */
+
+			ASSERT(seg != segkmap);
+
+			err = EFAULT;
+		}
+
 		if (!err) {
-
 			/* interaction with read - async faultahead later */
-
 			sdp->sd_nextr = io_off + io_len;
 			vminfo.v_pgin++;
 			vminfo.v_pgpgin += btopr(io_len);
@@ -2763,6 +2745,8 @@ rf_pushpages(ppp, vp, flags, bsize, cred)
 	page_t			*io_list;	/* pages to write together */
 	uint			lbn_off;	/* block-aligned io_list offset
 						 */
+	sndd_t			*sdp = VTOSD(vp);
+	off_t			last_off = sdp->sd_size & PAGEMASK;
 	struct buf		*bp;
 
 	while (!error && (pp = *ppp) != NULL) {
@@ -2787,6 +2771,14 @@ rf_pushpages(ppp, vp, flags, bsize, cred)
 			page_sortadd(&io_list, pp);
 			io_len += PAGESIZE;
 		}
+		if (pp->p_prev->p_offset == last_off) {
+
+			/*
+			 * Last page - make sure not to flush beyond EOF.
+			 */
+
+			io_len -= PAGESIZE - (sdp->sd_size & PAGEOFFSET);
+		}
 
 		/*
 		 * ufs and NFS have code to handle the case that the asserted
@@ -2810,7 +2802,7 @@ rf_pushpages(ppp, vp, flags, bsize, cred)
 		} else {
 			int	sink;
 
-			bp->b_blkno = 0;
+			bp->b_blkno = RF_OFFTOBLK(lbn_off);
 			bp->b_dev = 0;
 			bp->b_edev = 0;
 			bp_mapin(bp);
@@ -2850,6 +2842,9 @@ rf_remove(dvp, nm, crp)
 	register size_t		datasz;
 	register size_t		totalsz;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	rfcl_fsinfo.fsivop_other++;
 	vcver = QPTOGP(chansdp->sd_queue)->version;
 	if (vcver < RFS2DOT0) {
@@ -2904,6 +2899,9 @@ rf_rename(fdvp, fnm, tdvp, tnm, crp)
 	size_t		totalsz;
 
 	rfcl_fsinfo.fsivop_other++;
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	vcver = QPTOGP(chansdp->sd_queue)->version;
 	if (vcver < RFS2DOT0) {
 		return du_rename(fdvp, fnm, tdvp, tnm, crp);
@@ -2931,8 +2929,8 @@ rf_rename(fdvp, fnm, tdvp, tnm, crp)
 		reqp = RF_REQ(bp);
 		rqdatap = rf_msgdata(bp, headsz);
 
-		reqp->rq_rename.from = fdsdp->sd_gift;
-		reqp->rq_rename.to = chansdp->sd_gift;
+		reqp->rq_rename.frdid = fdsdp->sd_connid;
+		reqp->rq_rename.trdid = chansdp->sd_connid;
 		(void)strcpy(rqdatap, fnm);
 		(void)strcpy(rqdatap + fnmlen, tnm);
 		error = rfcl_xac(&bp, totalsz, rdp, vcver, FALSE, &nacked);
@@ -2963,6 +2961,9 @@ rf_rmdir(dvp, nm, cdvp, crp)
 	size_t		datasz;
 	size_t		totalsz;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	rfcl_fsinfo.fsivop_other++;
 	vcver = QPTOGP(chansdp->sd_queue)->version;
 	if (vcver < RFS2DOT0) {
@@ -2982,16 +2983,15 @@ rf_rmdir(dvp, nm, cdvp, crp)
 			break;
 		}
 		rfcl_reqsetup(bp, chansdp, crp, RFRMDIR, ULIMIT);
-
 		/*
-		 * The VOP_RMDIR RFS op specifies that cdvp (the user's
+		 * The VOP_RMDIR interface specifies that cdvp (the user's
 		 * current * directory) must not be removed.  If it and dvp
 		 * (the parent directory of nm) are in the same vfs as seen
-		 * by the client then gift is a cookie for cdvp.  Otherwise,
-		 * gift is empty.
+		 * by the client then connid is a cookie for cdvp.  Otherwise,
+		 * connid is 0.
 		 */
-		RF_REQ(bp)->rq_rmdir.dir = cdvp->v_vfsp == dvp->v_vfsp ?
-		  VTOSD(cdvp)->sd_gift : rf_null_gift;
+		RF_REQ(bp)->rq_rmdir.connid = cdvp->v_vfsp == dvp->v_vfsp ?
+		  VTOSD(cdvp)->sd_connid : 0;
 		(void)strcpy(rf_msgdata(bp, headsz), nm);
 		error = rfcl_xac(&bp, totalsz, rdp, vcver, FALSE, &nacked);
 	}
@@ -3022,6 +3022,9 @@ rf_setattr(vp, vap, flags, crp)
 	size_t		datasz;
 	size_t		totalsz;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	rfcl_fsinfo.fsivop_other++;
 	vcver = QPTOGP(chansdp->sd_queue)->version;
 	if (vcver < RFS2DOT0) {
@@ -3088,6 +3091,10 @@ rf_symlink(dvp, linkname, vap, target, crp)
 	size_t		headsz;
 	size_t		datasz;
 	size_t		totalsz;
+
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 
 	/* If remote is older than RFS2DOT0, symlink is not supported. */
 	if (vcver < RFS2DOT0) {
@@ -3225,7 +3232,7 @@ rf_symlnk_resp(replysdp, bp, gp, targetln, targetnm, rdp)
 		register caddr_t	rpdata;
 		size_t			hdrsz = RF_MIN_RESP(gp->version);
 
-		sndd_set(replysdp, mp->m_queue, &mp->m_gift);
+		sndd_set(replysdp, (queue_t *)mp->m_queue, mp->m_giftid);
 		rf_freemsg(bp);
 		(void)rf_allocmsg(hdrsz, targetln, BPRI_MED, FALSE, NULLCADDR,
 		  NULLFRP, &bp);
@@ -3248,10 +3255,11 @@ rf_symlnk_resp(replysdp, bp, gp, targetln, targetnm, rdp)
 			u.u_procp->p_sig |= resp->rp_v1sig;
 			error = resp->rp_errno;
 		}
-	} else if (cop->co_opcode != RFSYMLINK ||
-	  (error = resp->rp_errno) == 0 && replysdp) {
-		gdp_j_accuse("rf_symlink bad opcode", gp);
+	} else if (cop->co_opcode != RFSYMLINK || replysdp) {
+		gdp_discon("rf_symlink bad opcode", gp);
 		error = EPROTO;
+	} else {
+		error = resp->rp_errno;
 	}
 	rf_freemsg(bp);
 	return error;
@@ -3297,43 +3305,25 @@ rflkc_acc_hit(vp, crp)
  * nonzero for fatal errors.  May update mblk denoted by bp.
  */
 STATIC int
-rf_readdir_fcanon(bp, hdrsz, gp)
+rf_readdir_fcanon(bp, hdrsz, gp, uio_errorp)
 	register mblk_t		*bp;
 	register size_t		hdrsz;
 	gdp_t			*gp;
+	int			*uio_errorp;
 {
 	register size_t		datasz;
 	register caddr_t	msgdata;
 	register rf_response_t	*rp;
-	register mblk_t		*contbp;
 
 	datasz = RF_MSG(bp)->m_size - hdrsz;
-	if (RF_PULLUP(bp, hdrsz, datasz)) {
-		gdp_discon("rf_readdir_fcanon bad data", gp);
-		return EPROTO;
-	}
-	rp = RF_RESP(bp);
-	msgdata = rf_msgdata(bp, hdrsz);
-	if ((rp->rp_count = rf_denfcanon(rp->rp_count, msgdata,
-	   msgdata + datasz)) == 0) {
-		gdp_discon("rf_readdir_fcanon bad data", gp);
-		return EPROTO;
-	}
-
-	if ((contbp = bp->b_cont) != NULL) {
-
-		/* Data is contiguous in second block. */
-
-		ASSERT(msgdata == (caddr_t)contbp->b_rptr);
-
-		contbp->b_wptr = (unsigned char *)msgdata + rp->rp_count;
-	} else {
-
-		/* Headers and data are contiguous in first block. */
-
-		ASSERT(msgdata == (caddr_t)bp->b_rptr + hdrsz);
-
-		bp->b_wptr = (unsigned char *)msgdata + rp->rp_count;
+	if ((*uio_errorp = RF_PULLUP(bp, hdrsz, datasz)) == 0) {
+		rp = RF_RESP(bp);
+		msgdata = rf_msgdata(bp, hdrsz);
+		if ((rp->rp_count = rf_denfcanon(rp->rp_count, msgdata,
+		   msgdata + datasz)) == 0) {
+			gdp_discon("rf_readdir_fcanon bad data", gp);
+			return EPROTO;
+		}
 	}
 	return 0;
 }

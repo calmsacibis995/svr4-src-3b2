@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/select.c	1.4"
+#ident	"@(#)libc-port:gen/select.c	1.2"
 
 /*
  * Copyright (c) 1988 by Sun Microsystems, Inc.
@@ -24,10 +24,8 @@
  *
  */
 
-#ifndef DSHLIB
 #ifdef __STDC__
 	#pragma weak select = _select
-#endif
 #endif
 #include "synonyms.h"
 #include <values.h>
@@ -58,12 +56,7 @@ select(nfds, in0, out0, ex0, tv)
 	register struct pollfd *p = pfd;
 	int lastj = -1;
 	/* "zero" is read-only, it could go in the text segment */
-#ifndef DSHLIB
 	static fd_set zero = { 0 };
-#else
-	fd_set zero;
-	memset(&zero,0,sizeof(fd_set));
-#endif
 
 	/*
 	 * If any input args are null, point them at the null array.
@@ -91,9 +84,9 @@ select(nfds, in0, out0, ex0, tv)
 					goto done;
 				p->events = 0;
 				if (*in & m)
-					p->events |= POLLRDNORM;
+					p->events |= POLLIN;
 				if (*out & m)
-					p->events |= POLLWRNORM;
+					p->events |= POLLOUT;
 				if (*ex & m)
 					p->events |= POLLRDBAND;
 				p++;
@@ -156,7 +149,7 @@ done:
 	 * Convert results of poll back into bits
 	 * in the argument arrays.
 	 *
-	 * We assume POLLRDNORM, POLLWRNORM, and POLLRDBAND will only be set
+	 * We assume POLLIN, POLLOUT, and POLLRDBAND will only be set
 	 * on return from poll if they were set on input, thus we don't
 	 * worry about accidentally setting the corresponding bits in the
 	 * zero array if the input bit masks were null.
@@ -196,9 +189,9 @@ done:
 			}
 
 			m = 1 << (p->fd % NFDBITS);
-			if (p->revents & POLLRDNORM)
+			if (p->revents & POLLIN)
 				*in |= m;
-			if (p->revents & POLLWRNORM)
+			if (p->revents & POLLOUT)
 				*out |= m;
 			if (p->revents & POLLRDBAND)
 				*ex |= m;
@@ -207,17 +200,16 @@ done:
 			 * input conditions.
 			 */
 			if ((p->revents & (POLLHUP|POLLERR)) &&
-				(p->events & POLLRDNORM))
+				(p->events & POLLIN))
 				*in |= m;
 			/*
 			 * Only set this bit on return if we asked about
 			 * output conditions.
 			 */
 			if ((p->revents & (POLLHUP|POLLERR)) &&
-			    (p->events & POLLWRNORM))
+			    (p->events & POLLOUT))
 				*out |= m;
 		}
 	}
 	return (rv);
 }
-

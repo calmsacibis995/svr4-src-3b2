@@ -1,4 +1,4 @@
-*#ident	"@(#)kernel:master.d/tcp	1.4"
+*#ident	"@(#)kernel:master.d/tcp	1.1"
 *
 *
 *  		PROPRIETARY NOTICE (Combined)
@@ -23,11 +23,11 @@
 *
 *FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
 fs 	-	tcp	-	-	-
-						tcp_debug[TCPDEBUG](%0xe4)
 						tcp_dev[(NTCP+7)/8](%c)
-						tcp_ndebug(%i) = {TCPDEBUG}
+						tcpalldebug(%i) = {TCPALLDEBUG}
+						net_tcpwindow(%i) = {TCPWINDOW}
 						ntcp(%i) = {NTCP}
 $$
+TCPALLDEBUG = 1
+TCPWINDOW = 0
 NTCP = 512
-* make TCPDEBUG same size as NTCP to enable debugging via trpt
-TCPDEBUG = 4

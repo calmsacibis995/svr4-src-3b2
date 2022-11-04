@@ -1,0 +1,21 @@
+#ident	"@(#)pkg.npack:pkginfo	1.1"
+
+ARCH="3b2"
+# BASEDIR=/
+CATEGORY="system"
+CLASSES="none"
+# DESC=
+EMAIL="attunix!sar"
+# HOTLINE=
+ISTATES="S 2"
+MAXINST=1
+NAME="NPACK Utilities"
+# ORDER=
+PKG="npack"
+PREDEPEND="npack"
+# PSTAMP=
+RSTATES="S"
+# ULIMIT=
+# VENDOR=
+VERSION="2.0"
+# VSTOCK=

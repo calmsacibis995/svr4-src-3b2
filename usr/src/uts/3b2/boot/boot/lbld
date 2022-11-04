@@ -1,4 +1,4 @@
-/* #ident	"@(#)boot:boot/boot/lbld	1.4" */
+/* #ident	"@(#)boot:boot/boot/lbld	1.3" */
 
 MEMORY	{
 	olbcode: origin = 0x0217a800, length = 0x3000
@@ -9,8 +9,15 @@ SECTIONS {
 	.text:	{
 		stext = .;
 		misc.o(.text)
+		*(.text)
+		*(.text1)
 		}  > olbcode
-	.data:	{} > olbcode
+	.data:	{
+		*(.data)
+		*(.data1)
+		*(.rodata)
+		*(.rodata1)
+		} > olbcode
 	.bss:	{} > olbbss
 	.stack(NOLOAD):
 		{

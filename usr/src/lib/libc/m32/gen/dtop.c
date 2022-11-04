@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-m32:gen/dtop.c	1.7"
+#ident	"@(#)libc-m32:gen/dtop.c	1.6"
 /*
  *	Simulated extended precision floating point conversion functions
  *      ----------------------------------------------------------------
@@ -284,16 +284,8 @@ long *frac_ptr;
 		} else {
 			retval = (w1 << t) + ((w2 << t) >> WSIZE);
 			w1 = w2 & (WMASK >> t);
-			w2 = w3; w3 = w4; w4 = 0;
+			w2 = w3; w3 = w4;
 		}
-
-		/* for the accuracy of rounding result, if the last digit of
-		 * retval is 5, and the remaining fraction part is nonzero,
-		 * do the adjustment - change the last digit to 6.
-		 */
-
-		if(retval%10 == 5 && (w1 || w2 || w3 || w4))
-			retval++;
 
 		if (prec <= 0)
 			return(retval);

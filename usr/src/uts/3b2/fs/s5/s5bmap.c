@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5bmap.c	1.20"
+#ident	"@(#)fs:fs/s5/s5bmap.c	1.12"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/debug.h"
@@ -56,7 +56,7 @@ bmap(ip, lbn, bnp, rabnp, rw, alloc_only)
 	register daddr_t bn = lbn;
 	register struct vnode *vp = ITOV(ip);
 	register int bsize = VBSIZE(vp);
-	register int i, j, k;
+	register int i, j;
 	dev_t dev = ip->i_dev;
 	daddr_t nb, inb;
 	struct buf *bp;
@@ -89,12 +89,8 @@ bmap(ip, lbn, bnp, rabnp, rw, alloc_only)
 		}
 		if (bnp) {
 			*bnp = ip->i_map[lbn];
-			if (*bnp == 0) {
-				ILOCK(ip);
-				s5freemap(ip);
-				IUNLOCK(ip);
-				goto lbmap;
-			}
+			if (*bnp == 0)
+				*bnp = S5_HOLE;
 		}
 		if (rabnp) {
 			if ((lbn + 1) >= nblks) {
@@ -107,7 +103,6 @@ bmap(ip, lbn, bnp, rabnp, rw, alloc_only)
 		}
 		return 0;
 	}
-lbmap:
 	isdir = (vp->v_type == VDIR);
 	issync = ((ip->i_flag & ISYNC) != 0);
 	if (isdir || issync)
@@ -150,29 +145,28 @@ lbmap:
 			 * we don't want s5getpage() to allocate the block.
 			 */
 			fbp = NULL;
-			if (error = blkalloc(vfsp, &nb))
-				return error;
 			if (alloc_only == 0
 			  && (error = fbread(vp, lbn << s5vfsp->vfs_bshift,
-			    bsize, S_OTHER, &fbp))) {
-				blkfree(vfsp, nb);
+			    bsize, S_OTHER, &fbp)))
+				return error;
+			if (error = blkalloc(vfsp, &nb)) {
+				if (fbp)
+					fbrelse(fbp, S_OTHER);
 				return error;
 			}
 
 			if (alloc_only == 0) { /* fbread did get called */
 				blkpp = PAGESIZE/bsize;
 				if (blkpp >= 1) {
-					poffset = (lbn << s5vfsp->vfs_bshift)
-					  & PAGEMASK;
+					poffset = (lbn << s5vfsp->vfs_bshift) & PAGEMASK;
 					pp = page_find(vp, poffset);
 					ASSERT(pp != NULL);
 					pp->p_dblist[lbn % blkpp] = nb;
 				} else {
 					ppblk = bsize/PAGESIZE;
 					poffset = lbn << s5vfsp->vfs_bshift;
-					for (k = 0; k < ppblk; k++) {
-						poffset =
-						  poffset + (k * PAGESIZE);
+					for (i=0; i<ppblk; i++) {
+						poffset = poffset + (i * PAGESIZE);
 						pp = page_find(vp, poffset);
 						ASSERT(pp != NULL);
 						pp->p_dblist[0] = nb;
@@ -282,11 +276,11 @@ lbmap:
 			} else if (alloc_only == 0) {
 				int bshift = s5vfsp->vfs_bshift;
 
-				if (error = blkalloc(vfsp, &nb))
-					return error;
 				if (error = fbread(vp, lbn << bshift,
-				  bsize, S_OTHER, &fbp)) {
-					blkfree(vfsp, nb);
+				  bsize, S_OTHER, &fbp))
+					return error;
+				if (error = blkalloc(vfsp, &nb)) {
+					fbrelse(fbp, S_OTHER);
 					return error;
 				}
 
@@ -299,9 +293,8 @@ lbmap:
 				} else {
 					ppblk = bsize/PAGESIZE;
 					poffset = lbn << bshift;
-					for (k=0; k<ppblk; k++) {
-						poffset =
-						  poffset + (k * PAGESIZE);
+					for (i=0; i<ppblk; i++) {
+						poffset = poffset + (i * PAGESIZE);
 						pp = page_find(vp, poffset);
 						ASSERT(pp != NULL);
 						pp->p_dblist[0] = nb;
@@ -330,8 +323,10 @@ lbmap:
 			 * Now reacquire the bp so that the new block can
 			 * can be recorded.
 			 */
-			bp = bread(dev, inb, bsize);
-			if (error = geterror(bp)) {
+			if ((bp = bread(dev, inb, bsize))->b_flags & B_ERROR) {
+				if ((error = bp->b_error) == 0
+				  && (error = bp->b_oerror) == 0)
+					error = EIO;
 				brelse(bp);
 				return error;
 			}
@@ -362,21 +357,26 @@ lbmap:
  * Allocate all the blocks in the range [first, last].
  */
 int
-bmapalloc(ip, first, last, alloc_only)
+bmapalloc(ip, first, last, alloc_only, dblist)
 	struct inode *ip;
 	daddr_t first;
 	daddr_t last;
 	int alloc_only;
+	daddr_t *dblist;
 {
 	daddr_t lbn, pbn;
+	daddr_t *dbp;
 	int error = 0;
 
+	dbp = dblist;
 	ILOCK(ip);
 	for (lbn = first; error == 0 && lbn <= last; lbn++) {
 		error = bmap(ip, lbn,
 		  (daddr_t *)&pbn, (daddr_t *)NULL, S_WRITE, alloc_only);
 		if (error)
 			break;
+		if (dbp != NULL)
+			*dbp++ = pbn;
 	}
 	IUNLOCK(ip);
 	return error;

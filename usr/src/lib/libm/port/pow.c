@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libm:port/pow.c	1.10"
+#ident	"@(#)libm:port/pow.c	1.9"
 /*LINTLIBRARY*/
 /* 
  */
@@ -105,8 +105,6 @@ double	x, y;
 	if (!x) {
 		if (y > 0.0) 
 			return(x);	/* (0 ** pos) == 0 */
-		if ((y == 0.0) && (_lib_version != c_issue_4))
-			return(1.0);
 		return(pow_exc(x, y, DOM, 0));
 	}
 	if (y == 0.0)
@@ -326,11 +324,7 @@ register int etype, neg;
 	exc.arg2 = y;
 	exc.name = "pow";
 	switch(etype) {
-	case DOM:	
-			if ((x == 0.0) && (_lib_version != c_issue_4))
-				exc.retval = -HUGE_VAL;
-			else
-				exc.retval = 0.0;
+	case DOM:	exc.retval = 0.0;
 			exc.type = DOMAIN;
 			break;
 	case UNDER:	exc.type = UNDERFLOW;

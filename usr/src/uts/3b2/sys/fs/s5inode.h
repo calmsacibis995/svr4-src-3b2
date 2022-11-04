@@ -8,7 +8,7 @@
 #ifndef _FS_S5INODE_H
 #define _FS_S5INODE_H
 
-#ident	"@(#)head.sys:sys/fs/s5inode.h	11.28"
+#ident	"@(#)head.sys:sys/fs/s5inode.h	11.26"
 
 #include "sys/proc.h"	/* XXX -- needed for user-context kludge in ILOCK */
 #include "sys/disp.h"	/* XXX */
@@ -165,7 +165,7 @@ struct s5vfs {
 		(ip)->i_flag |= IWANT; \
 		(void) sleep((caddr_t)(ip), PINOD); \
 	} \
-	(ip)->i_rwowner = curproc->p_slot; \
+	(ip)->i_rwowner = (GET_INDEX(curproc->p_pid)); \
 	(ip)->i_flag |= IRWLOCKED; \
 	if ((ip)->i_vnode.v_flag & VISSWAP) { \
 		curproc->p_swlocks++; \
@@ -182,16 +182,17 @@ struct s5vfs {
 	(ip)->i_flag &= ~IRWLOCKED; \
 	if ((ip)->i_flag & IWANT) { \
 		(ip)->i_flag &= ~IWANT; \
-		wakeprocs((caddr_t)(ip), PRMPT); \
+		wakeup((caddr_t)(ip)); \
 	} \
 }
 
 #define	ILOCK(ip) { \
-	while (((ip)->i_flag & ILOCKED) && (ip)->i_owner != curproc->p_slot) { \
+	while (((ip)->i_flag & ILOCKED) && \
+	    (ip)->i_owner != (GET_INDEX(curproc->p_pid))) { \
 		(ip)->i_flag |= IWANT; \
 		(void) sleep((caddr_t)(ip), PINOD); \
 	} \
-	(ip)->i_owner = curproc->p_slot; \
+	(ip)->i_owner = (GET_INDEX(curproc->p_pid)); \
 	(ip)->i_nilocks++; \
 	(ip)->i_flag |= ILOCKED; \
 	if ((ip)->i_vnode.v_flag & VISSWAP) { \
@@ -212,7 +213,7 @@ struct s5vfs {
 		(ip)->i_flag &= ~ILOCKED; \
 		if ((ip)->i_flag & IWANT) { \
 			(ip)->i_flag &= ~IWANT; \
-			wakeprocs((caddr_t)(ip), PRMPT); \
+			wakeup((caddr_t)(ip)); \
 		} \
 	} \
 }

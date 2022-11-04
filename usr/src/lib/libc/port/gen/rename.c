@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/rename.c	1.10"
+#ident	"@(#)libc-port:gen/rename.c	1.9"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include <sys/types.h>
@@ -34,5 +34,15 @@ rename(old, new)
 const char *old;
 const char *new;
 {
+#ifndef _STYPES
 	return(_rename(old, new));
+#else
+	if (link(old, new) < 0)
+		return(-1);
+	if (unlink(old) < 0) {
+		(void)unlink(new);
+		return(-1);
+	}
+	return(0);
+#endif
 }

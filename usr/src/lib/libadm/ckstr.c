@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckstr.c	1.2"
+#ident	"@(#)libadm:ckstr.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -91,7 +91,7 @@ int length;
 		errstr = ERRMSG3;
 		valid = 0;
 	}
-	return(valid == 0);
+	return(!valid);
 }
 
 void

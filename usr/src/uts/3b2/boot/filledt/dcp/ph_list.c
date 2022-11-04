@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/ph_list.c	1.3"
+#ident	"@(#)boot:boot/filledt/dcp/ph_list.c	1.2"
 
 /*	3b2 Phase Table List Program    */
 
@@ -13,8 +13,6 @@
 #include <sys/firmware.h>
 #include <sys/edt.h>
 #include <sys/diagnostic.h>
-#include <sys/types.h>
-#include <sys/inline.h>
 
 extern void dgnerror(), sysreset();
 

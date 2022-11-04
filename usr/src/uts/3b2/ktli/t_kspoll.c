@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kspoll.c	1.7"
+#ident	"@(#)ktli:ktli/t_kspoll.c	1.6"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kspoll.c 1.3 89/01/27 SMI"
 #endif
@@ -38,8 +38,7 @@ static char sccsid[] = "@(#)t_kspoll.c 1.3 89/01/27 SMI"
  *	a non-zero timeout, then all will be woken.
  *
  *	Returns:
- *		0 on success or positive error code. On
- *		success, "events" is set to
+ *		-1	on failure
  *		 0	on timeout or no events(timout = 0),
  *		 1	if desired event has occurred
  *
@@ -68,54 +67,55 @@ static char sccsid[] = "@(#)t_kspoll.c 1.3 89/01/27 SMI"
 STATIC void ktli_poll();
 
 int 
-t_kspoll(tiptr, timo, waitflg, events)
-	register TIUSER		*tiptr;
-	register int		waitflg;
-	register int		timo;
-	register int		*events;
+t_kspoll(tiptr, timo, waitflg)
+register TIUSER *tiptr;
+register int  waitflg;
+register int timo;
 
 {
-	register int		s;
-	register struct file	*fp;
-	register struct vnode	*vp;
-	register struct stdata	*stp;
-	register int		timeid;
-	int			error;
-	k_sigset_t		sig;
-	sigqueue_t		*sigqueue = NULL;
-	char			cursig = 0;
-	sigqueue_t		*curinfo = NULL;
-	proc_t			*p = u.u_procp;
+	register int s;
+	register int errs;
+	register struct file *fp;
+	register struct vnode *vp;
+	register struct stdata *stp;
+	register int timeid;
+	k_sigset_t	sig;
+	sigqueue_t	*sigqueue = NULL;
+	char		cursig = 0;
+	sigqueue_t	*curinfo = NULL;
+	proc_t		*p = u.u_procp;
 
-	error = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
 
-	if (events == NULL || waitflg != READWAIT)
-		return EINVAL;
-
 again:
-	if (stp->sd_flag & (STRDERR|STPLEX))
-		return (stp->sd_flag & STPLEX) ? EINVAL : stp->sd_rerror;
 
-	if ((RD(stp->sd_wrq))->q_first != NULL) {
-		*events = 1;
-		return 0;
+	if (waitflg != READWAIT) {
+		u.u_error = EINVAL;
+		return -1;
 	}
 
-	if (timo == 0) {
-		*events = 0;
-		return 0;
+	errs = STRDERR|STPLEX;
+	if (stp->sd_flag & errs) {
+		u.u_error = (stp->sd_flag & STPLEX) ? EINVAL : stp->sd_rerror;
+		return -1;
 	}
+
+	if ((RD(stp->sd_wrq))->q_first != NULL)
+		return 1;
+
+	if (timo == 0)
+		return 0;
 
 	/* set timer and sleep.
 	 */
 	if (timo > 0) {
-		KTLILOG(2, "t_kspoll: timo %x\n", timo);
-		timeid = timeout(ktli_poll, (caddr_t)tiptr, (long)timo);
+		if ((timeid = timeout(ktli_poll, tiptr, timo)) < 0) {
+			printf("t_kspoll: Can't set timer\n");
+			return -1;
+		}
 	}
-
 	s = splstr();
 	stp->sd_flag |= RSLEEP;
 	/* remove any pending signals before sleep */
@@ -135,17 +135,17 @@ again:
 		/* don't need to restore saved signal if there wasn't one */
 		if (cursig) {
 			/*
-			 * restore any saved signals before any new signal:
+			 * restore any saved signals before the new signal:
 			 * 1) put the new sig at the head of any new queue
 			 * 2) restore the old signal info before any new ones
 			 */
-			if (p->p_curinfo) {
-				sigaddset (&p->p_sig, p->p_cursig);
-				if (p->p_sigqueue) {
-					p->p_curinfo->sq_next = p->p_sigqueue;
-				}
-				p->p_sigqueue = p->p_curinfo;
+			ASSERT(p->p_curinfo);
+			ASSERT(p->p_cursig);
+			sigaddset (&p->p_sig, p->p_cursig);
+			if (p->p_sigqueue) {
+				p->p_curinfo->sq_next = p->p_sigqueue;
 			}
+			p->p_sigqueue = p->p_curinfo;
 			p->p_cursig = cursig;
 			p->p_curinfo = curinfo;
 			if (!sigisempty(&sig)) {
@@ -160,7 +160,8 @@ again:
 		if (fp->f_count <= 1)		/* shouldn't ever be < 1 */
 			stp->sd_flag &= ~RSLEEP;
 		(void) splx(s);
-		return EINTR;
+		u.u_error = EINTR;
+		return -1;
 	}
 	/* restore any saved signals */
 	if (cursig) {
@@ -179,18 +180,18 @@ again:
 				&sig, sigqueue);
 		}
 	}
-	KTLILOG(2, "t_kspoll: pid %d, woken from sleep\n", u.u_procp->p_pid);
+#ifdef KTLIDEBUG
+printf("t_kspoll: pid %d, woken from sleep\n", u.u_procp->p_pid);
+#endif
 	if (timo > 0)
 		untimeout(timeid);
-	if (fp->f_count <= 1)
-		stp->sd_flag &= ~RSLEEP;
+	stp->sd_flag &= ~RSLEEP;
 	(void)splx(s);
 
 	/* see if the timer expired
 	 */
 	if (tiptr->flags & TIME_UP) {
 		tiptr->flags &= ~ TIME_UP;
-		*events = 0;
 		return 0;
 	}
 	
@@ -201,12 +202,12 @@ again:
 
 STATIC void
 ktli_poll(tiptr)
-	register TIUSER		*tiptr;
+register TIUSER *tiptr;
 
 {
-	register struct vnode	*vp;
-	register struct file	*fp;
-	register struct stdata	*stp;
+	register struct vnode *vp;
+	register struct file *fp;
+	register struct stdata *stp;
 
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
@@ -217,6 +218,7 @@ ktli_poll(tiptr)
 }
 
 /******************************************************************************/
+
 
 
 

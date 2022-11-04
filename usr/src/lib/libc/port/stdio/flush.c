@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/flush.c	1.18"
+#ident	"@(#)libc-port:stdio/flush.c	1.16"
 /*LINTLIBRARY*/		/* This file always part of stdio usage */
 
 #include "synonyms.h"
@@ -221,8 +221,6 @@ int
 fflush(iop)	/* flush (write) buffer */
 	register FILE *iop;
 {
-	int res = 0;
-
 	if (iop == NULL) {
 		register int i;
 		register Link *lp;
@@ -232,16 +230,14 @@ fflush(iop)	/* flush (write) buffer */
 		do {
 			iop = lp->iobp;
 			for (i = lp->niob; --i >= 0; iop++) {
-				if (iop->_flag & _IOWRT)
-					 res |= fflush(iop);
+				if ((iop != NULL) && (iop->_flag & _IOWRT))
+					(void)fflush(iop);
 			}
 		} while ((lp = lp->next) != 0);
-		return res;
 	}
 
 	if (!(iop->_flag & _IOWRT))
 	{
-		lseek(iop->_file, -iop->_cnt, SEEK_CUR);
 		iop->_cnt = 0;
 		iop->_ptr = iop->_base;	/* needed for ungetc & mulitbyte pushbacks */
 		if (iop->_flag & _IORW) {
@@ -250,12 +246,12 @@ fflush(iop)	/* flush (write) buffer */
 		return 0;
 	}
 	if (iop->_base != 0 && iop->_ptr > iop->_base)
-		res = _xflsbuf(iop);
+		_xflsbuf(iop);
 	if (iop->_flag & _IORW) {
 		iop->_flag &= (unsigned short)~_IOWRT;
 		iop->_cnt = 0;
 	}
-	return res;
+	return ferror(iop) ? EOF : 0;
 }
 
 extern int close(	/* int fd */	);

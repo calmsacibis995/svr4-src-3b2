@@ -5,19 +5,20 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/setupterm.c	1.53"
+#ident	"@(#)curses:screen/setupterm.c	1.51"
 #ifndef	NOBLIT
 #include	<sys/jioctl.h>
 #endif	/* NOBLIT */
 #include	"curses_inc.h"
-#include	<errno.h>
-
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
-#ifndef SIGSTOP	/* SVR4.0 and beyond */
+#include	"uparm.h"
+#ifndef	_TERMPATH
+#ifndef __STDC__
 #define	_TERMPATH(file)	"/usr/lib/terminfo/file"
-#else   /* SIGSTOP */
+#else   /* __STDC__ */
 #define	_TERMPATH(file)	"/usr/share/lib/terminfo/" #file
-#endif  /* SIGSTOP */
+#endif  /* __STDC__ */
+#endif	/* _TERMPATH */
+#include	<errno.h>
 
 extern	bool	_use_env;	/* in curses.c */
 

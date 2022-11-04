@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)kernel:io/drivers.mk	1.30"
+#ident	"@(#)kernel:io/drivers.mk	1.29"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -462,7 +462,7 @@ sxt.o: sxt.c \
 	$(INC)/sys/termio.h \
 	$(INC)/sys/errno.h \
 	$(INC)/sys/strtty.h \
-	$(INC)/sys/nsxt.h \
+	$(INC)/sys/sxt.h \
 	$(INC)/sys/cmn_err.h \
 	$(FRC)
 

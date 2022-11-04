@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yperr_string.c	1.2"
+#ident	"@(#)libyp:yperr_string.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -94,7 +93,7 @@ yperr_string(code)
 	}
 	
 	case YPERR_PMAP:  {
-		pmesg = "can't communicate with rpcbind";
+		pmesg = "can't communicate with portmapper";
 		break;
 		}
 		

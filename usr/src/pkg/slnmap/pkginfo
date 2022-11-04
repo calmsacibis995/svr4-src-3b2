@@ -1,0 +1,11 @@
+#ident	"@(#)pkg.slnmap:pkginfo	1.1"
+
+#
+# required parameters
+#
+
+PKG="slnmap"
+VERSION=""
+NAME="AT&T STARLAN NETWORK 3B2 Name to Address Mapping"
+CLASSES="none"
+CATEGORY="system"

@@ -5,13 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/getnum.c	1.3"
+#ident	"@(#)boot:boot/filledt/dcp/getnum.c	1.2"
 
 #include <sys/firmware.h>
 #include <sys/edt.h>
 #include <sys/diagnostic.h>
-#include <sys/types.h>
-#include <sys/inline.h>
 
 
 /*    This function scans for the board and option number in the EDT.
@@ -23,6 +21,7 @@ extern struct edt edt[];      /* equipped device table */
 extern void dgnerror();
 
 extern char option[];		/* option name from input parser   */
+extern char *strcpy();
 extern unsigned char optno;	/* option number from input parser */
 extern unsigned char opt_type;	/* flag to diagnose option type */
 extern char filename[];  	/* diagnostic phase file name  */
@@ -37,7 +36,7 @@ unsigned char dev_match;		/* device type match flag */
 	/* copy EDT phase file name for or DGN all */
 
 	if (!STRCMP(option,"\0"))
-		strcpy(filename,EDTP(*board)->diag_file);
+		(void) strcpy(filename,EDTP(*board)->diag_file);
 
 	/* search for match of device ( & number) */
 
@@ -52,7 +51,7 @@ unsigned char dev_match;		/* device type match flag */
 				/* do device and request numbers match? */
 				if ((EDTP(*board)->opt_num) == optno)
 						{
-						strcpy(filename,(EDTP(*board)->diag_file));
+						(void) strcpy(filename,(EDTP(*board)->diag_file));
 						break;
 						}
 				}

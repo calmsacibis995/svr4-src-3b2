@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckuid.c	1.2"
+#ident	"@(#)libadm:ckuid.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -66,19 +66,16 @@ int	disp;
 	return(msg);
 }
 
-int
+void
 ckuid_dsp()
 {
 	struct passwd *pwdptr;
 
 	/* if display flag is set, then list out passwd file */
-	if (ckpwdfile() == 1)
-		return(1);
 	setpwent();
 	while(pwdptr = getpwent())
 		(void) printf("%s\n", pwdptr->pw_name);
 	endpwent();
-	return(0);
 }
 
 int
@@ -91,20 +88,6 @@ char	*usrnm;
 	valid = (getpwnam(usrnm) ? 0 : 1);
 	endpwent ();
 	return(valid);
-}
-
-int
-ckpwdfile() /* check to see if passwd file there */
-{
-	struct passwd *pwdptr;
-
-	setpwent ();
-	if (!(pwdptr = getpwent())) {
-		endpwent ();
-		return(1);
-	}
-	endpwent ();
-	return(0);
 }
 
 void

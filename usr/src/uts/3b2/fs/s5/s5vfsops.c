@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5vfsops.c	1.44"
+#ident	"@(#)fs:fs/s5/s5vfsops.c	1.36"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -71,10 +71,6 @@ struct vfsops s5vfsops = {
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 };
 
 STATIC int
@@ -101,7 +97,7 @@ s5mount(vfsp, mvp, uap, cr)
 		return EPERM;
 	if (mvp->v_type != VDIR)
 		return ENOTDIR;
-	if (remount == 0 && (mvp->v_count > 1 || (mvp->v_flag & VROOT)))
+	if (remount == 0 && (mvp->v_flag & VROOT))
 		return EBUSY;
 
 	/*
@@ -110,12 +106,12 @@ s5mount(vfsp, mvp, uap, cr)
 	if (error = lookupname(uap->spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp))
 		return error;
 
-	if (bvp->v_type != VBLK) {
-		VN_RELE(bvp);
-		return ENOTBLK;
-	}
-
 	dev = bvp->v_rdev;
+	type = bvp->v_type;
+	VN_RELE(bvp);
+
+	if (type != VBLK)
+		return ENOTBLK;
 
 	/*
 	 * Ensure that this device isn't already mounted, unless this is
@@ -123,7 +119,6 @@ s5mount(vfsp, mvp, uap, cr)
 	 */
 	dvfsp = vfs_devsearch(dev);
 	if (remount) {
-		VN_RELE(bvp);
 		/*
 		 * Remount requires that the device already be mounted,
 		 * and on the same mount point.
@@ -138,24 +133,21 @@ s5mount(vfsp, mvp, uap, cr)
 		/*
 		 * Ordinary mount.
 		 */
-		if (dvfsp != NULL) {
-			VN_RELE(bvp);
+		if (dvfsp != NULL)
 			return EBUSY;
-		}
 		/*
 		 * Allocate VFS private data.
 		 */
 		if ((s5vfsp = (struct s5vfs *)
-		  kmem_alloc(sizeof(struct s5vfs), KM_SLEEP)) == NULL) {
-			VN_RELE(bvp);
+		  kmem_alloc(sizeof(struct s5vfs), KM_SLEEP)) == NULL)
 			return EBUSY;
-		}
 		vfsp->vfs_bcount = 0;
 		vfsp->vfs_data = (caddr_t) s5vfsp;
 		vfsp->vfs_fstype = s5fstype;
 		/*
 		 * Open the device.
 		 */
+		bvp = makespecvp(dev, VBLK);
 		if (error = VOP_OPEN(&bvp, rdonly ? FREAD : FREAD|FWRITE, cr))
 			goto out;
 		vfsp->vfs_dev = dev;
@@ -173,6 +165,7 @@ s5mount(vfsp, mvp, uap, cr)
 	binval(dev);
 	if (remount) {
 		(void) iflush(vfsp, 1);
+		fbinval(vfsp);
 	}
 	/*
 	 * Read the superblock.  We do this in the remount case as well
@@ -281,10 +274,6 @@ s5unmount(vfsp, cr)
 		return EBUSY;
 
 	/*
-	 * Mark inode as stale.
-	 */
-	inull(vfsp);
-	/*
 	 * Flush root inode to disk.
 	 */
 	rvp = s5vfsp->vfs_root;
@@ -319,6 +308,7 @@ s5unmount(vfsp, cr)
 	}
 	VN_RELE(bvp);
 	binval(dev);
+	fbinval(vfsp);
 	brelse(s5vfsp->vfs_bufp);
 	iput(rip);
 	iunhash(rip);
@@ -375,7 +365,6 @@ s5statvfs(vfsp, sp)
 }
 
 STATIC void s5update(), s5flushsb();
-STATIC int s5updlock, s5updwant;
 
 /* ARGSUSED */
 STATIC int
@@ -384,20 +373,10 @@ s5sync(vfsp, flag, cr)
 	short flag;
 	struct cred *cr;
 {
-	while (s5updlock) {
-		s5updwant = 1;
-		sleep((caddr_t)&s5updlock, PINOD);
-	}
-	s5updlock = 1;
 	if (flag & SYNC_ATTR)
 		s5flushi(SYNC_ATTR);
 	else
 		s5update();
-	s5updlock = 0;
-	if (s5updwant) {
-		s5updwant = 0;
-		wakeprocs((caddr_t)&s5updlock, PRMPT);
-	}
 	return 0;
 }
 
@@ -410,13 +389,18 @@ STATIC void
 s5update()
 {
 	register struct vfs *vfsp;
+	static int updlock = 0;
 	extern struct vfsops s5vfsops;
 
+	if (updlock)
+		return;
+	updlock++;
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next)
 		if (vfsp->vfs_op == &s5vfsops)
 			s5flushsb(vfsp);
 	s5flushi(0);
 	bflush(NODEV);	/* XXX */
+	updlock = 0;
 }
 
 int
@@ -446,6 +430,7 @@ s5flushi(flag)
 				iupdat(ip);
 			else
 				(void) syncip(ip, B_ASYNC);
+
 			iput(ip);
 		}
 	}
@@ -547,6 +532,7 @@ s5mountroot(vfsp, why)
 		(void) VOP_PUTPAGE(s5vfsp->vfs_devvp,
 		  0, 0, B_INVAL, (struct cred *) NULL);
 		binval(vfsp->vfs_dev);
+		fbinval(vfsp);
 		fp = getfs(vfsp);
 		if (fp->s_state == FsACTIVE)
 			return EINVAL;
@@ -595,7 +581,6 @@ s5mountroot(vfsp, why)
 	fp->s_inode[0] = 0;
 	fp->s_ronly = 0;
 	if (fp->s_magic != FsMAGIC) {
-		fbrelsei(fbp, S_OTHER);
 		VN_RELE(vp);
 		return EINVAL;
 	}

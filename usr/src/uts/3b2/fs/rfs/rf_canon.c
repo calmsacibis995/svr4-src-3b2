@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_canon.c	1.7"
+#ident	"@(#)fs:fs/rfs/rf_canon.c	1.5"
 
 #include "sys/types.h"
 #include "sys/stream.h"
@@ -25,21 +25,20 @@ extern int	stoi();
 extern int	strlen();
 
 /*
- * Convert from canonical to local representation.  Return length of the
- * local representation, or 0 for bad format or data.
+ * Convert from canonical to local representation.
+ * Return length of the local representation, or 0 for bad format.
  */
 int
 rf_fcanon(fmt, from, end, to)
 	register char		*fmt;		/* conversion format */
-	register caddr_t	from;		/* canonical data */
+	register caddr_t	from;		/* to canonical data */
 	register caddr_t	end;		/* of canonical data */
-	caddr_t			to;		/* local data */
+	caddr_t			to;		/* to local data */
 {
 	long			ltmp;		/* intermediate scalar values */
 	register caddr_t	cptr;		/* cursor into ltmp */
 	caddr_t			tptr = to;	/* cursor into local data */
 	char			*lfmt;		/* addressable copy of fmt */
-	register int		is_string;	/* flag "c0" format */
 
 	while (*fmt) {
 		if (from >= end) {
@@ -97,12 +96,6 @@ rf_fcanon(fmt, from, end, to)
 			if (from >= end) {
 				goto fail;
 			}
-
-			/*
-			 * We use the format-encoded length, and ignore
-			 * that in the data, for character arrays.
-			 */
-
 			lfmt = fmt;
 			ltmp = stoi(&lfmt);
 			fmt = lfmt;
@@ -113,36 +106,28 @@ rf_fcanon(fmt, from, end, to)
 				*cptr++ = lobyte(hiword(*from));
 				*cptr++ = hibyte(loword(*from));
 				*cptr = lobyte(loword(*from));
-				is_string = 1;
-			} else {
-				is_string = 0;
 			}
 
 			/*
-			 * Character array and string sanity checks:
-			 *
-			 * 1 - encoded end of array/string must not exceed
-			 *     end of data and
-			 * 2 - must not exceed MAXNAMELEN
-			 *
-			 * Checks for strings only:
-			 *
-			 * 3 - must be null terminated
-			 * 4 - length must equal that specified in data.
+			 * Character string sanity check:
+			 * 1 string must not exceed end of data
+			 * 2 string must not exceed MAXPATHLEN
+			 * 2 string must be null terminated
+			 * 3 string length must equal that specified
 	 		 */
 
 			from = LNEXT(from);
-			if (from + ltmp > end || ltmp > MAXNAMELEN ||
-			  is_string &&
-			   (*(from + ltmp - 1) != '\0' ||
-			    ltmp != strlen(from) + 1)) {
+			if (from + ltmp >= end ||
+			  ltmp > MAXNAMELEN ||
+			  *(from + ltmp - 1) != '\0' ||
+			  ltmp != strlen(from) + 1) {
 				goto fail;
 			}
 			while (ltmp--) {
+				*tptr++ = *from++;
 				if (from >= end) {
 					goto fail;
 				}
-				*tptr++ = *from++;
 			}
 			continue;
 		default:
@@ -292,7 +277,7 @@ rf_mcfcanon(bp)
 {
 	register caddr_t	rptr = (caddr_t)bp->b_rptr;
 
-	return rf_fcanon(MSGCOM_FMT, rptr, rptr + RF_MCSZ, rptr);
+  return rf_fcanon(MSGCOM_FMT, rptr, rptr + RF_MCSZ, rptr);
 }
 
 /*

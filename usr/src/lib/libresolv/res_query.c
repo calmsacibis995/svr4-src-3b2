@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:res_query.c	1.2"
+#ident	"@(#)libresolv:res_query.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -37,15 +37,10 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <errno.h>
-#ifdef SYSV
-#include <string.h>
-#else
 #include <strings.h>
-#endif /* SYSV */
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-#include "res.h"
 
 #if PACKETSZ > 1024
 #define MAXPACKET	PACKETSZ

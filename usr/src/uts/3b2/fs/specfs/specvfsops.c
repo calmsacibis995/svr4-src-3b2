@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/specfs/specvfsops.c	1.15"
+#ident	"@(#)fs:fs/specfs/specvfsops.c	1.12"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/buf.h"
@@ -43,8 +20,6 @@
 
 #include "fs/fs_subr.h"
 
-extern void strpunlink();
-
 STATIC	int spec_sync();
 
 struct vfsops spec_vfsops = {
@@ -57,10 +32,6 @@ struct vfsops spec_vfsops = {
 	fs_nosys,		/* mountroot */
 	fs_nosys,		/* swapvp */
 	fs_nosys,		/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -85,9 +56,6 @@ spec_sync(vfsp, flag, cr)
 		return 0;
 
 	spec_lock++;
-
-	if (flag & SYNC_CLOSE)
-		(void) strpunlink(cr);
 
 	if (!(flag & SYNC_ATTR)) {
 		for (spp = stable; spp < &stable[STABLESIZE]; spp++) {

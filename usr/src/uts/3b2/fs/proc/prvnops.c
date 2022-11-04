@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/proc/prvnops.c	1.24"
+#ident	"@(#)fs:fs/proc/prvnops.c	1.17"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/time.h"
@@ -92,30 +92,6 @@ struct vnodeops prvnodeops = {
 	fs_poll,
 	fs_nosys,	/* dump */
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -315,7 +291,6 @@ prread(vp, uiop, ioflag, cr)
 	struct prdirect dirbuf;
 	register int i, n, j;
 	int minproc, maxproc, modoff;
-	proc_t *p;
 	register struct prnode *pnp = VTOP(vp);
 	int error = 0;
 
@@ -340,8 +315,9 @@ prread(vp, uiop, ioflag, cr)
 		for (j = 0; j < PRDIRSIZE; j++)
 			dirbuf.d_name[j] = '\0';
 		for (i = minproc; i < min(maxproc, v.v_proc); i++) {
-			if ((p = pid_entry(i)) != NULL) {
-				n = p->p_pid;
+			if (nproc[i] && nproc[i]->p_stat != 0
+			  && nproc[i]->p_stat != SIDL) {
+				n = nproc[i]->p_pid;
 				dirbuf.d_ino = ptoi(n);
 				for (j = PNSIZ-1; j >= 0; j--) {
 					dirbuf.d_name[j] = n % 10 + '0';
@@ -420,8 +396,8 @@ prgetattr(vp, vap, flags, cr)
 		vap->va_nodeid = PRROOTINO;
 		vap->va_size = (v.v_proc + 2) * PRSDSIZE;
 	} else if ((p = pnp->pr_proc) != NULL) {
-		vap->va_uid = p->p_cred->cr_uid;
-		vap->va_gid = p->p_cred->cr_gid;
+		vap->va_uid = p->p_cred->cr_suid;
+		vap->va_gid = p->p_cred->cr_sgid;
 		vap->va_nlink = 1;
 		vap->va_nodeid = ptoi(p->p_pid);
 		vap->va_size = rm_assize(p->p_as);
@@ -432,9 +408,12 @@ prgetattr(vp, vap, flags, cr)
 	vap->va_mode = pnp->pr_mode;
 	vap->va_fsid = procdev;
 	vap->va_rdev = 0;
-	vap->va_atime = vap->va_mtime = vap->va_ctime = hrestime;
+	vap->va_atime.tv_sec = vap->va_mtime.tv_sec = vap->va_ctime.tv_sec
+	 = hrestime.tv_sec;
+	vap->va_atime.tv_nsec = vap->va_mtime.tv_nsec = vap->va_ctime.tv_nsec
+	 = hrestime.tv_nsec;
 	vap->va_blksize = 1024;
-	vap->va_nblocks = btod(vap->va_size);
+	vap->va_nblocks = (vap->va_size + 1023) / 1024;
 	vap->va_vcode = 0;
 	return 0;
 }
@@ -579,7 +558,6 @@ prreaddir(vp, uiop, cr, eofp)
 	register int i, j, n;
 	int oresid, dsize;
 	off_t off;
-	proc_t *p;
 
 	if (uiop->uio_offset < 0 || uiop->uio_resid <= 0
 	  || (uiop->uio_offset % PRSDSIZE) != 0)
@@ -608,9 +586,10 @@ prreaddir(vp, uiop, cr, eofp)
 			 */
 			if ((i = (off-2*PRSDSIZE)/PRSDSIZE) >= v.v_proc)
 				break;
-			if ((p = pid_entry(i)) == NULL)
+			if (nproc[i] == NULL || nproc[i]->p_stat == 0
+			  || nproc[i]->p_stat == SIDL)
 				continue;
-			n = p->p_pid;
+			n = nproc[i]->p_pid;
 			dirent->d_ino = ptoi(n);
 			for (j = PNSIZ-1; j >= 0; j--) {
 				dirent->d_name[j] = n % 10 + '0';

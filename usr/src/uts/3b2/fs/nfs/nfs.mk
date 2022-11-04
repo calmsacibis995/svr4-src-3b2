@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/nfs/nfs.mk	1.7"
+#ident	"@(#)fs:fs/nfs/nfs.mk	1.6"
 #
 #
 #  		PROPRIETARY NOTICE (Combined)
@@ -40,7 +40,6 @@ FRC =
 FILES = \
 	nfs_aux.o\
 	nfs_client.o\
-	nfs_cnvt.o\
 	nfs_common.o\
 	nfs_export.o\
 	nfs_server.o\
@@ -100,22 +99,6 @@ nfs_client.o: nfs_client.c \
 	$(INC)/nfs/nfs.h \
 	$(INC)/nfs/nfs_clnt.h \
 	$(INC)/nfs/rnode.h \
-	$(FRC)
-
-nfs_cnvt.o: nfs_cnvt.c \
-	$(INC)/sys/param.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/systm.h \
-	$(INC)/sys/cred.h \
-	$(INC)/sys/user.h \
-	$(INC)/sys/errno.h \
-	$(INC)/sys/vfs.h \
-	$(INC)/sys/vnode.h \
-	$(INC)/sys/file.h \
-	$(INC)/sys/proc.h \
-	$(INC)/sys/debug.h \
-	$(INC)/rpc/types.h \
-	$(INC)/nfs/nfs.h \
 	$(FRC)
 
 nfs_common.o: nfs_common.c \
@@ -247,6 +230,7 @@ nfs_vfsops.o: nfs_vfsops.c \
 	$(INC)/rpc/xdr.h \
 	$(INC)/rpc/auth.h \
 	$(INC)/rpc/clnt.h \
+	$(INC)/rpc/pmap_prot.h \
 	$(INC)/nfs/nfs.h \
 	$(INC)/nfs/nfs_clnt.h \
 	$(INC)/nfs/rnode.h \

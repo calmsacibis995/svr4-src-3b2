@@ -8,7 +8,7 @@
 #ifndef _FS_XNAMNODE_H
 #define _FS_XNAMNODE_H
 
-#ident	"@(#)head.sys:sys/fs/xnamnode.h	1.5"
+#ident	"@(#)head.sys:sys/fs/xnamnode.h	1.4"
 /*
  * The xnamnode represents a special XENIX file in any filesystem.  There is
  * one xnamnode for each active special XENIX file.  Filesystems that support
@@ -102,7 +102,7 @@ extern struct proc *curproc;	/* XXX vm debugging */
 			curproc->p_flag &= ~SSWLOCKS; \
 	if ((xp)->x_flag & XNAMWANT) { \
 		(xp)->x_flag &= ~XNAMWANT; \
-		wakeprocs((caddr_t)(xp), PRMPT); \
+		wakeup((caddr_t)(xp)); \
 	} \
 	(xp)->x_powns = NULL; \
 }

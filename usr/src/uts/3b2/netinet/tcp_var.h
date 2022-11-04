@@ -8,7 +8,7 @@
 #ifndef _NETINET_TCP_VAR_H
 #define _NETINET_TCP_VAR_H
 
-#ident	"@(#)head.sys:sys/netinet/tcp_var.h	1.6"
+#ident	"@(#)head.sys:sys/netinet/tcp_var.h	1.4"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -32,25 +32,6 @@
  */
 
 /*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
-/*
  * Kernel variables for tcp.
  */
 
@@ -69,7 +50,7 @@ struct tcpcb {
 	short	t_dupacks;		/* consecutive dup acks recd */
 	u_short	t_maxseg;		/* maximum segment size */
 	char	t_force;		/* 1 if forcing out a byte */
-	u_short	t_flags;
+	u_char	t_flags;
 #define	TF_ACKNOW	0x01		/* ack peer immediately */
 #define	TF_DELACK	0x02		/* ack, but try to delay it */
 #define	TF_NODELAY	0x04		/* don't delay packets to coalesce */
@@ -79,7 +60,6 @@ struct tcpcb {
 #define TF_IOLOCK       0x20
 #define TF_NEEDIN       0x40
 #define TF_NEEDOUT      0x80
-#define	TF_NEEDTIMER	0x0100
 #endif STRNET
 	struct	tcpiphdr *t_template;	/* skeletal packet for transmit */
 #ifdef STRNET
@@ -112,7 +92,6 @@ struct tcpcb {
 	tcp_seq	snd_max;		/* highest sequence number sent
 					 * used to recognize retransmits
 					 */
-	u_long	t_maxwin;		/* max window size to use */
 /* congestion control (for slow start, source quench, retransmit after loss) */
 	u_long	snd_cwnd;		/* congestion-controlled window */
 	u_long	snd_ssthresh;		/* snd_cwnd size threshhold for
@@ -151,14 +130,14 @@ struct tcpcb {
 	u_long	t_qsize;		/* number of data chars on outq */
 	/*
 	 * here we save mblks that arrive before the connection is accepted
-	 * by the user and those received when the user's queue is full. 
+	 * by the user and those received when the user's queue is full.
 	 */
 	mblk_t	*t_qfirst;		/* beginning of queued data */
 	mblk_t	*t_qlast;		/* end of queued data */
 	int	t_iqsize;		/* amount of data on input queue */
 	int	t_iqurp;		/* offset of urgent byte on input q */
 	mblk_t	*t_inq;			/* pending input */
-	short	t_linger;		/* linger flag */
+	int	*t_ltidp;		/* ptr to linger timer id */
 #endif STRNET
 };
 
@@ -223,10 +202,6 @@ struct	tcpstat {
 	u_long	tcps_rcvackpack;	/* rcvd ack packets */
 	u_long	tcps_rcvackbyte;	/* bytes acked by rcvd acks */
 	u_long	tcps_rcvwinupd;		/* rcvd window update packets */
-	u_long	tcps_linger;		/* connections that lingered */
-	u_long	tcps_lingerabort;	/* lingers aborted by signal */
-	u_long	tcps_lingerexp;		/* linger timer expired */
-	u_long	tcps_lingercan;		/* linger timer cancelled */
 };
 
 #ifdef STRNET
@@ -249,3 +224,4 @@ struct	tcpcb *tcp_timers(), *tcp_disconnect(), *tcp_usrclosed();
 #define TCP_COMPAT_42
 #endif
 #endif	/* _NETINET_TCP_VAR_H */
+

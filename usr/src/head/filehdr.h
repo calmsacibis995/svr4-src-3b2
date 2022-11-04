@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)sgs-inc:common/filehdr.h	1.23"
+#ident	"@(#)sgs-inc:common/filehdr.h	1.22"
 
 #ifndef _FILEHDR_H
 #define _FILEHDR_H
@@ -171,8 +171,6 @@ struct filehdr {
 
 	/* Zilog */
 /* 0544 and 0545 reserved for Zilog */
-	/* i860 */
-#define	I860MAGIC	0515
 
 #define	FILHDR	struct filehdr
 #define	FILHSZ	sizeof(FILHDR)
@@ -190,7 +188,6 @@ struct filehdr {
 		|| ((x)==I286SMAGIC) || ((x)==I286LMAGIC) \
 		|| ((x)==MC68KWRMAGIC) || ((x)==MC68KROMAGIC) \
 		|| ((x)==MC68KPGMAGIC) \
-		|| ((x)==I860MAGIC) \
 		|| ((x)==I386MAGIC)) 
 
 #endif 	/* _FILEHDR_H */

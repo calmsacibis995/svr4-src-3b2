@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckint.c	1.3"
+#ident	"@(#)libadm:ckint.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -49,9 +49,7 @@ short	base;
 	char	*ptr;
 
 	(void) strtol(value, &ptr, base);
-	if(*ptr == '\0')
-		return(0);
-	return(1);
+	return(*ptr != '\0');
 }
 
 void
@@ -62,7 +60,7 @@ char	*error;
 	char	defmesg[64];
 
 	setmsg(defmesg, base);
-	puterror(stdout, defmesg, error);
+	puterror(stderr, defmesg, error);
 }
 
 void
@@ -73,7 +71,7 @@ char	*help;
 	char	defmesg[64];
 
 	setmsg(defmesg, base);
-	puthelp(stdout, defmesg, help);
+	puthelp(stderr, defmesg, help);
 }
 	
 int

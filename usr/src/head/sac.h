@@ -5,12 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-# ifndef _SAC_H
-# define _SAC_H
-
-# ident	"@(#)head.usr:sac.h	1.4"
-
-# include <sys/types.h>
+# ident	"@(#)head.usr:sac.h	1.3"
 
 # define IDLEN		4	/* length in bytes of a utmp id */
 # define SC_WILDC	0xff	/* wild character for utmp ids */
@@ -33,7 +28,7 @@
 
 struct	pmmsg {
 	char	pm_type;		/* type of message */
-	unchar	pm_state;		/* current state of port monitor */
+	char	pm_state;		/* current state of port monitor */
 	char	pm_maxclass;		/* max message class this PM understands */
 	char	pm_tag[PMTAGSIZE + 1];	/* port monitor's tag */
 	int	pm_size;		/* size of optional data portion */
@@ -112,5 +107,3 @@ struct	sacmsg {
 # define E_PMRUN	7	/* port monitor is running */
 # define E_PMNOTRUN	8	/* port monitor is not running */
 # define E_RECOVER	9	/* in recovery */
-
-# endif /* _SAC_H */

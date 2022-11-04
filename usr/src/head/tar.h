@@ -8,7 +8,7 @@
 #ifndef _TAR_H
 #define _TAR_H
 
-#ident	"@(#)head:tar.h	1.2"
+#ident	"@(#)head:tar.h	1.1"
 
 #define TMAGIC		"ustar"
 #define TMAGLEN		6
@@ -42,6 +42,6 @@
 #define TGEXEC		00010
 #define TOREAD		00004
 #define TOWRITE		00002
-#define TOEXEC		00001
+#define TEXEC		00001
 
 #endif	/* _TAR_H */

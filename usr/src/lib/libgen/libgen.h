@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libgen:libgen.h	2.4.2.5CHANGED"
+#ident	"@(#)libgen:libgen.h	2.4.2.5"
 
 /*	declarations of functions found in libgen
 */
@@ -57,7 +57,7 @@ extern int eaccess();
 #include	<time.h>
 extern struct tm * getdate(const char *);
 #else
-extern struct tm *getdate();
+extern int getdate();
 #endif
 extern int getdate_err;
 

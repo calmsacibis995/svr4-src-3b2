@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)nametoaddr:straddr/straddr.c	1.8"
+#ident	"@(#)nametoaddr:straddr/straddr.c	1.7"
 #include <stdio.h>
 #include <tiuser.h>
 #include <netdir.h>
@@ -112,9 +112,6 @@ struct nd_hostserv  *nd_hostservp;
 
 	if (((fp = fopen(searchfile, "r")) == NULL)
 	 || ((addrpp = searchhost(fp, hostname, &naddr, FIELD2)) == NULL)) {
-		if (fp != NULL) {
-			(void)fclose(fp);
-		}
 		_nderror = ND_NOHOST;
 		return(NULL);
 	}
@@ -128,9 +125,6 @@ struct nd_hostserv  *nd_hostservp;
 
 	if (((fp = fopen(searchfile, "r")) == NULL)
 	 || ((port = searchserv(fp, nd_hostservp->h_serv, FIELD1)) == NULL)) {
-		if (fp != NULL) {
-			(void)fclose(fp);
-		}
 		_nderror = ND_NOSERV;
 		return(NULL);
 	}
@@ -223,9 +217,6 @@ struct netbuf	 *netbufp;
 	if (((fp = fopen(searchfile, "r")) == NULL)
 	 || ((hostpp = searchhost(fp, addr, &nhost, FIELD1)) == NULL)) {
 		_nderror = ND_NOHOST;
-		if (fp != NULL) {
-			(void)fclose(fp);
-		}
 		return(NULL);
 	}
 	(void)fclose(fp);
@@ -237,23 +228,12 @@ struct netbuf	 *netbufp;
 
 	(void)sprintf(searchfile, SERVICEFILE, netconfigp->nc_netid);
 
-	if (port == NULL) {
+	if (((fp = fopen(searchfile, "r")) == NULL)
+	 || ((serv = searchserv(fp, port, FIELD2)) == NULL)) {
 		_nderror = ND_NOSERV;
 		return(NULL);
 	}
-
-	if (((fp = fopen(searchfile, "r")) == NULL)
-	 || ((serv = searchserv(fp, port, FIELD2)) == NULL)) {
-		serv = _taddr2uaddr(netconfigp, netbufp);
-		strcpy(fulladdr, serv);
-		free(serv);
-		serv = fulladdr;
-		while (*serv != '.')
-			serv ++;
-	}
-	if (fp != NULL) {
-		(void)fclose(fp);
-	}
+	(void)fclose(fp);
 
 	/*
 	 *	Allocate space to hold the return structure, set the number

@@ -8,7 +8,7 @@
 #ifndef _SYS_FILE_H
 #define _SYS_FILE_H
 
-#ident	"@(#)head.sys:sys/file.h	11.28"
+#ident	"@(#)head.sys:sys/file.h	11.23"
 /*
  * One file structure is allocated for each open/creat/pipe call.
  * Main use is to hold the read/write pointer associated with
@@ -37,17 +37,18 @@ typedef struct file {
 #define	FNDELAY		0x04
 #define	FAPPEND		0x08
 #define	FSYNC		0x10
+
 #define	FNONBLOCK	0x80
 
 #define	FMASK		0xFF	/* should be disjoint from FASYNC */
+#define FASYNC		0x100
 
 /* open-only modes */
 
-#define	FCREAT		0x0100
-#define	FTRUNC		0x0200
-#define	FEXCL		0x0400
-#define	FNOCTTY		0x0800
-#define FASYNC		0x1000
+#define	FCREAT		0x100
+#define	FTRUNC		0x200
+#define	FEXCL		0x400
+#define	FNOCTTY		0x800
 
 /* file descriptor flags */
 #define FCLOSEXEC	001	/* close on exec */

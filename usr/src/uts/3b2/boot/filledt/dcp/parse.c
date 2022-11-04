@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/parse.c	1.3"
+#ident	"@(#)boot:boot/filledt/dcp/parse.c	1.2"
 
 /* Function to parse up the input request and fill in the structure 
 * request as defined in diagnostic.h.  
@@ -187,8 +187,7 @@ option[0] = '\0';
 
 	/* convert options to upper case */
 	for(temp_ptr=buff;*temp_ptr!= '\0';temp_ptr++)
-		if (*temp_ptr >= 'a' && *temp_ptr <= 'z')
-			*temp_ptr -= 'a' - 'A';
+		*temp_ptr=toupper(*temp_ptr);
 
 	/* check for DGN, H or Q request in first token */
 	if (*buff != '\0') {

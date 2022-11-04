@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:print/fprintf.c	1.14"
+#ident	"@(#)libc-port:print/fprintf.c	1.13"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include "shlib.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <errno.h>
 
 extern int _doprnt();
 
@@ -38,7 +37,6 @@ fprintf(iop, format, va_alist) FILE *iop; char *format; va_dcl
 			iop->_flag |= _IOWRT;
 		} else {
 			/* else error */
-			errno = EBADF;
 			return EOF;
 		}
 	}

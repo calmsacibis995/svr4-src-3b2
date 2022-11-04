@@ -8,7 +8,11 @@
 /*	Portions Copyright (c) 1988, Sun Microsystems, Inc.	*/
 /*	All Rights Reserved.					*/
 
-#ident	"@(#)head.usr:archives.h	1.6"
+#ident	"@(#)head.usr:archives.h	1.3"
+
+/*
+ * Code review updated version.
+ */
 
 /* Magic numbers */
 
@@ -49,7 +53,7 @@ struct hdr_cpio {
 	char	h_name[HNAMLEN];	/* filename */
 } ;
 
-/* cpio ODC header format */
+/* cpio -c header format */
 
 struct c_hdr {
 	char	c_magic[CMS_LEN],
@@ -66,7 +70,7 @@ struct c_hdr {
 		c_name[HNAMLEN];
 } ;
 
-/* -c and CRC header format */
+/* ASCII and CRC header format */
 
 struct Exp_cpio_hdr {
 	char	E_magic[CMS_LEN],
@@ -108,8 +112,6 @@ union tblock {
 			t_gid[TGIDLEN],		/* gid of file */
 			t_size[TSIZLEN],	/* size of file in bytes */
 			t_mtime[TTIMLEN],	/* modification time of file */
-			t_devmajor[8],		/* major number for special files */
-			t_devminor[8],		/* minor number for special files */
 			t_cksum[TCRCLEN],	/* checksum of header */
 			t_linkflag,		/* indicates a link to a file */
 			t_linkname[TNAMLEN];	/* file this file linked with */

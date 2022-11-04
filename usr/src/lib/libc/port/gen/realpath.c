@@ -5,230 +5,238 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/realpath.c	1.2"
-
-/*
- * Copyright (c) 1987 by Sun Microsystems, Inc.
- */
+#ident	"@(#)libc-port:gen/realpath.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak realpath = _realpath
-	#include "synonyms.h"
 #endif
 
-#include <sys/types.h>
-#include <dirent.h>
+#include "synonyms.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/param.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <errno.h>
 
-extern char	*getcwd();
-
-/* LINTLIBRARY */
-
 /*
- * Input name in raw, canonicalized pathname output to canon.  If dosymlinks
- * is nonzero, resolves all symbolic links encountered during canonicalization
- * into an equivalent symlink-free form.  Returns 0 on success, -1 on failure.
- * The routine fails if the current working directory can't be obtained or if
- * either of the arguments is NULL.
- *
- * Sets errno on failure.
+ * Resolve all links for the given "name" and returns the result
+ * in "actual". Returns pointer to the result if successful, else
+ * NULL and errno is set. "actual" contains the path name of the
+ * fault point.
  */
-static int
-pathcanon(raw, canon, dosymlinks)
-    char	*raw,
-		*canon;
-    int		dosymlinks;
-{
-    register char	*s,
-			*d;
-    register char	*limit = canon + MAXPATHLEN;
-    char		*modcanon;
-    int			nlink = 0;
+static char *
+resolvelinks(name, actual)
+	register char *name;
+	char *actual;
+{	int last_is_slash = 0;
+	register char *p = actual;
+	char namebuf[MAXPATHLEN];
+	register char *tmpname = namebuf;
 
-    /*
-     * Do a bit of sanity checking.
-     */
-    if (raw == NULL || canon == NULL) {
-	errno = EINVAL;
-	return (-1);
-    }
-
-    /*
-     * If the path in raw is not already absolute, convert it to that form.
-     * In any case, initialize canon with the absolute form of raw.  Make
-     * sure that none of the operations overflow the corresponding buffers.
-     * The code below does the copy operations by hand so that it can easily
-     * keep track of whether overflow is about to occur.
-     */
-    s = raw;
-    d = canon;
-    if (*s != '/') {
-	/* Relative; prepend the working directory. */
-	if (getcwd(d, MAXPATHLEN) == NULL) {
-	    /* Use whatever errno value getcwd may have left around. */
-	    return (-1);
+	actual[0] = NULL;
+	if ((name == NULL) || (name[0] == NULL))
+		return (actual);
+	if (name[0] == '/') {
+		actual[0] = '/';
+		actual[1] = NULL;
+		if (*++name == NULL)
+			return (actual);
+		++p;
 	}
-	d += strlen(d);
-	/* Add slash to separate working directory from relative part. */
-	if (d < limit)
-	    *d++ = '/';
-	modcanon = d;
-    } else
-	modcanon = canon;
-    while (d < limit && *s)
-	*d++ = *s++;
 
-    /* Add a trailing slash to simplify the code below. */
-    s = "/";
-    while (d < limit && (*d++ = *s++))
-	continue;
-	
+	if (name[strlen(name) - 1] == '/')
+		++last_is_slash;
 
-    /*
-     * Canonicalize the path.  The strategy is to update in place, with
-     * d pointing to the end of the canonicalized portion and s to the
-     * current spot from which we're copying.  This works because
-     * canonicalization doesn't increase path length, except as discussed
-     * below.  Note also that the path has had a slash added at its end.
-     * This greatly simplifies the treatment of boundary conditions.
-     */
-    d = s = modcanon;
-    while (d < limit && *s) {
-	if ((*d++ = *s++) == '/' && d > canon + 1) {
-	    register char  *t = d - 2;
+	strcpy(tmpname, name);	/* Work in tmp area only */
 
-	    switch (*t) {
-	    case '/':
-		/* Found // in the name. */
-		d--;
-		continue;
-	    case '.': 
-		switch (*--t) {
-		case '/':
-		    /* Found /./ in the name. */
-		    d -= 2;
-		    continue;
-		case '.': 
-		    if (*--t == '/') {
-			/* Found /../ in the name. */
-			while (t > canon && *--t != '/')
-			    continue;
-			d = t + 1;
-		    }
-		    continue;
-		default:
-		    break;
+	/*
+	 * "tmpname" points to the yet unresolved path name.
+	 * "actual" points to the resolved path name so far.
+	 */
+	while (tmpname) {
+		register char *start;		/* The new step */
+		char tmpres[MAXPATHLEN];	/* Temp result */
+		struct stat stbuf;
+
+		start = tmpname;
+		if (tmpname = strchr(tmpname, '/'))
+			*tmpname++ = NULL;
+
+		/* start points to the new step */
+		sprintf(tmpres, "%s%s", actual, start);
+		if (lstat(tmpres, &stbuf) == -1) {
+			strcpy(actual, tmpres);	/* Point of error */
+			return (NULL);
 		}
-		break;
-	    default:
-		break;
-	    }
-	    /*
-	     * We're at the end of a component.  If dosymlinks is set
-	     * see whether the component is a symbolic link.  If so,
-	     * replace it by its contents.
-	     */
-	    if (dosymlinks) {
-		char		link[MAXPATHLEN + 1];
-		register int	llen;
 
-		/*
-		 * See whether it's a symlink by trying to read it.
-		 *
-		 * Start by isolating it.
-		 */
-		*(d - 1) = '\0';
-		if ((llen = readlink(canon, link, sizeof link)) >= 0) {
-		    /* Make sure that there are no circular links. */
-		    nlink++;
-		    if (nlink > MAXSYMLINKS) {
-			errno = ELOOP;
-			return (-1);
-		    }
-		    /*
-		     * The component is a symlink.  Since its value can be
-		     * of arbitrary size, we can't continue copying in place.
-		     * Instead, form the new path suffix in the link buffer
-		     * and then copy it back to its proper spot in canon.
-		     */
-		    t = link + llen;
-		    *t++ = '/';
-		    /*
-		     * Copy the remaining unresolved portion to the end
-		     * of the symlink. If the sum of the unresolved part and
-		     * the readlink exceeds MAXPATHLEN, the extra bytes
-		     * will be dropped off. Too bad!
-		     */
-		    (void) strncpy(t, s, sizeof link - llen - 1);
-		    link[sizeof link - 1] = '\0';
-		    /*
-		     * If the link's contents are absolute, copy it back
-		     * to the start of canon, otherwise to the beginning of
-		     * the link's position in the path.
-		     */
-		    if (link[0] == '/') {
-			/* Absolute. */
-			(void) strcpy(canon, link);
-			d = s = canon;
-		    }
-		    else {
-			/*
-			 * Relative: find beginning of component and copy.
-			 */
-			--d;
-			while (d > canon && *--d != '/')
-			    continue;
-			s = ++d;
-			/*
-			 * If the sum of the resolved part, the readlink
-			 * and the remaining unresolved part exceeds
-			 * MAXPATHLEN, the extra bytes will be dropped off.
-			*/
-			if (strlen(link) >= (limit - s)) {
-				(void) strncpy(s, link, limit - s);
-				*(limit - 1) = '\0';
+		if ((stbuf.st_mode & S_IFMT) == S_IFLNK) {
+			char buf[MAXPATHLEN];
+			int count;
+
+			if ((count = readlink(tmpres, buf, MAXPATHLEN)) <= 0) {
+				strcpy(actual, tmpres);	/* Point of error */
+				return (NULL);
 			} else {
-				(void) strcpy(s, link);
-			}
-		    }
-		    continue;
-		} else {
-		   /*
-		    * readlink call failed. It can be because it was
-		    * not a link (i.e. a file, dir etc.) or because the
-		    * the call actually failed.
-		    */
-		    if (errno != EINVAL)
-			return (-1);
-		    *(d - 1) = '/';	/* Restore it */
-		}
-	    } /* if (dosymlinks) */
-	}
-    } /* while */
+				char tmpdir[MAXPATHLEN];
+				char tmpbuf[MAXPATHLEN];
+				char *tptr = &tmpbuf[0];
+				char *resolved_res;
 
-    /* Remove the trailing slash that was added above. */
-    if (*(d - 1) == '/' && d > canon + 1)
-	    d--;
-    *d = '\0';
-    return (0);
+				buf[count] = NULL;
+				/*
+				 * Recursively check for all new links.
+				 */
+				if (getcwd(tmpdir, MAXPATHLEN) == NULL)
+					return (NULL);
+				if (chdir(actual) == -1)
+					return (NULL);
+				resolved_res = resolvelinks(buf, tmpbuf);
+				if (tmpbuf[0] == '/')
+				  	/* The link starts from root */
+					for (p = &actual[0];
+						*p = *tptr; p++, tptr++);
+				else
+					for (; *p = *tptr; p++, tptr++);
+				if (resolved_res == NULL) {
+					(void) chdir(tmpdir);
+					return (NULL);
+				}
+				if (chdir(tmpdir) == -1)
+					return (NULL);
+			}
+		} else
+			/* Append start to actual */
+			for (; *p = *start; p++, start++);
+
+		if (*(p - sizeof(char)) != '/')
+			*p++ = '/';	/* Append '/' to actual */
+		*p = NULL;
+	}
+
+	/* Add/delete "/" depending upon last_is_slash */
+	if (last_is_slash == 0) {
+		if ((*(p - sizeof(char)) == '/') && (actual[1] != NULL))
+			*--p = NULL;
+	} else if (*(p - sizeof(char)) != '/')
+		*p++ = '/';
+	*p = NULL;
+
+	return (actual);
 }
 
 /*
- * Canonicalize the path given in raw, resolving away all symbolic link
- * components.  Store the result into the buffer named by canon, which
- * must be long enough (MAXPATHLEN bytes will suffice).  Returns NULL
- * on failure and canon on success.
- *
- * The routine indirectly invokes the readlink() system call and getcwd()
- * so it inherits the possibility of hanging due to inaccessible file 
- * system resources.
+ * Given a path, it removes all the '.' and '..' in it and returns 
+ * pointer to the result if successful, else returns NULL and the
+ * error number is set. The partially prepared result is in "dots".
+ */
+static char *
+resolvedots(actual, dots)
+	register char *actual;
+	register char *dots;	/* The result */
+{
+	struct stat stbuf;
+	int last_is_slash = 0;
+	char pwd[MAXPATHLEN];
+	char *endp;
+
+	if (dots == NULL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	dots[0] = NULL;
+
+	if ((actual == NULL) || (actual[0] == NULL))
+		return (dots);
+	if (actual[strlen(actual) - 1] == '/')
+		++last_is_slash;
+	if (getcwd(pwd, MAXPATHLEN) == NULL)
+		return (NULL);
+
+	if (lstat(actual, &stbuf) == -1) {
+		strcpy(dots, actual);
+		return (NULL);
+	}
+	if ((stbuf.st_mode & S_IFMT) == S_IFDIR) {
+		char dir[MAXPATHLEN];
+
+		if ((chdir(actual) != 0) || (getcwd(dir, MAXPATHLEN) == NULL)) {
+			(void) chdir(pwd);
+			strcpy(dots, actual);
+			return (NULL);
+		}
+		if ((actual[0] != '/') &&
+		    (strncmp(pwd, dir, strlen(pwd)) == 0) &&
+		    (strlen(pwd) != strlen(dir)))
+			/* Copy only the relative part of the name */
+			strcpy(dots, (char *) (&dir[0] + strlen(pwd) + 1));
+		else
+			strcpy(dots, dir);
+	} else { /* 
+		  * Last component is a file. Find the resolved
+		  * name of the parent of this file, and then append
+		  * the name of this file.
+		  */
+		char *pdir;
+
+		if ((pdir = strrchr(actual, '/')) == NULL)
+			strcpy(dots, actual);
+		else {
+			char partial_dir[MAXPATHLEN];
+
+			*pdir++ = NULL;
+			if ((chdir(actual) != 0) ||
+			    (getcwd(partial_dir, MAXPATHLEN) == NULL)) {
+				(void) chdir(pwd);
+				strcpy(dots, actual);
+				return (NULL);
+			}
+			if ((actual[0] != '/') &&
+			    (strncmp(pwd, partial_dir, strlen(pwd)) == 0)) {
+				if (strlen(pwd) == strlen(partial_dir))
+					strcpy(dots, pdir);
+				else
+					sprintf(dots, "%s/%s",
+					    (char *) (&partial_dir[0] +
+						strlen(pwd) + 1), pdir);
+			} else
+				sprintf(dots, "%s/%s", partial_dir, pdir);
+			*--pdir = '/';
+		}
+	}
+
+	if (chdir(pwd) == -1)
+		return (NULL);
+
+	/* Add/delete "/" depending upon last_is_slash */
+	endp = &dots[strlen(dots)];
+	if (last_is_slash == 0) {
+		if ((*(endp - sizeof(char)) == '/') && (dots[1] != NULL))
+			*(endp - sizeof(char)) = NULL;
+	} else if (*(endp - sizeof(char)) != '/') {
+		*endp++ = '/';
+		*endp = NULL;
+	}
+
+	return (dots);
+}
+
+/*
+ * Given a path, it resolves all links, '.' and '..' in it and
+ * returns pointer to the result if successful, else returns NULL and
+ * error number is set. The partially prepared result is in "linkdots".
+ * Assumes that "linkdots" has enough space allocated to it.
  */
 char *
-realpath(raw, canon)
-    char	*raw;
-    char	*canon;
+realpath(name, linkdots)
+	char *name, *linkdots;
 {
-    return (pathcanon(raw, canon, 1) < 0 ? NULL : canon);
-}
+	char buf[MAXPATHLEN];
 
+	if (resolvelinks(name, buf) == NULL) {
+		strcpy(linkdots, buf);
+		return (NULL);
+	}
+	return (resolvedots(buf, linkdots));
+}

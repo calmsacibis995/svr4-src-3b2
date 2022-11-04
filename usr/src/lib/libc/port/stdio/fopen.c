@@ -5,14 +5,14 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fopen.c	1.20"
+#ident	"@(#)libc-port:stdio/fopen.c	1.19"
 /*LINTLIBRARY*/
 
 #include "synonyms.h"
 #include <stdio.h>
 #include "stdiom.h"
 #include <fcntl.h>
-#include <unistd.h>
+#include <osfcn.h>
 #include <limits.h>
 
 static FILE *

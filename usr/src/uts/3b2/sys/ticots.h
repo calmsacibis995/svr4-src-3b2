@@ -211,4 +211,55 @@ typedef struct tco_addr		tco_addr_t;
 #define TCO_NOOPOPT		0x02			/* for tco_ckopt() */
 #define TCO_BADFORMAT		0x04			/* for tco_ckopt() */
 #define TCO_BADTYPE		0x08			/* for tco_ckopt() */
-#define TCO_BADVALUE		0
+#define TCO_BADVALUE		0x10			/* for tco_ckopt() */
+#define UNIX_PASS		0			/* should be standardized */
+#define UNIX_FAIL		(!UNIX_PASS)		/* should be standardized */
+#define BADSEQNUM		((long)(-1))		/* should be standardized */
+
+/*
+ *	internal defines
+ */
+#define TCO_BIND		1
+#define TCO_CONN		2
+#define TCO_OPEN		3
+#define TCO_RQ			4
+#define TCO_IDFLG_ALL		(TCO_IDFLG_UID | TCO_IDFLG_GID | TCO_IDFLG_RUID | TCO_IDFLG_RGID)
+#define TCO_MHASH		5
+#define TCO_NMHASH		(1 << TCO_MHASH)	/* num of hash buckets in open endpt table */
+#define TCO_MMASK		(TCO_NMHASH - 1)
+#define TCO_RQHASH		5			/* must be <= NBBY*sizeof(te_rqhash) */
+#define TCO_NRQHASH		(1 << TCO_RQHASH)	/* num of hash buckets in te_rq table */
+#define TCO_RQMASK		(TCO_NRQHASH - 1)
+/* following magic number and shift factor for fibonacci hash function */
+#define TCO_RQMAGIC		0x9ce14b36
+#define TCO_RQSHIFT		(NBBY*sizeof(int) - TCO_RQHASH)
+#define TCO_AHASH		5			/* must be <= NBBY*sizeof(ta_ahash) */
+#define TCO_NAHASH		(1 << TCO_AHASH)	/* num of hash buckets in bound addr table */
+#define TCO_AMASK		(TCO_NAHASH - 1)
+
+/*
+ *	some useful macros
+ */
+#define tco_min(TE)		((TE)->te_min)
+#define tco_mkmhash(TE)		((unsigned)(tco_min(TE)) & TCO_MMASK)
+#define tco_mhash(TE)		tco_mkmhash(TE)
+#define tco_mkrqhash(TE)	(((((unsigned)((TE)->te_rq))*TCO_RQMAGIC) >> TCO_RQSHIFT) & TCO_RQMASK)
+#define tco_rqhash(TE)		((unsigned)(TE)->te_rqhash)
+#define tco_alen(TA)		((TA)->ta_alen)
+#define tco_abuf(TA)		((TA)->ta_abuf)
+#define tco_ahash(TA)		((unsigned)(TA)->ta_ahash)
+#define tco_mkahash(TA)		((unsigned)(tco_sumbytes(tco_abuf(TA),tco_alen(TA)) & TCO_AMASK))
+#define tco_eqabuf(TA,TB)	((tco_alen(TA) == tco_alen(TB)) \
+				 && tco_bequal(tco_abuf(TA),tco_abuf(TB),tco_alen(TA)))
+
+/*
+ *	STRLOG tracing levels:
+ *
+ *	0 = urgent
+ *	1 = fatal
+ *	2 = errack
+ *	3 = interesting stuff
+ *	4 = chit-chat
+ */
+
+#endif /* _KERNEL */

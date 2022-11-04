@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:nsl/t_sndudata.c	1.5"
+#ident	"@(#)libnsl:nsl/t_sndudata.c	1.4"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/errno.h"
@@ -39,10 +39,9 @@ register struct t_unitdata *unitdata;
 		return(-1);
 	}
 
-	if (!(tiptr->ti_flags & SENDZERO) && (int)unitdata->udata.len == 0) {
-		t_errno = TBADDATA;
-		return(-1);
-	}
+	if ((int)unitdata->udata.len == 0)
+		return(0);
+
 	if ((int)unitdata->udata.len > tiptr->ti_maxpsz) {
 		t_errno = TSYSERR;
 		errno = EPROTO;

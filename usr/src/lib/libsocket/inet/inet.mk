@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libinet:libinet.mk	1.7"
+#ident	"@(#)libinet:libinet.mk	1.6"
 
 #
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -32,8 +32,7 @@
 INC=		$(ROOT)/usr/include
 
 DASHO=		-O
-PICOPT=		-Kpic
-CFLAGS=		$(DASHO) $(MORECPP) -DSYSV $(PICOPT) -I$(INC)
+CFLAGS=		$(DASHO) $(MORECPP) -DSYSV -Kpic -I$(INC)
 
 OBJS=		bindresvport.o byteorder.o ether_addr.o getnetbyaddr.o \
 		getnetbyname.o getnetent.o getproto.o getprotoent.o \

@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_subr.c	1.7"
+#ident	"@(#)netinet:netinet/tcp_subr.c	1.5"
+
+/*
+ * System V STREAMS TCP - Release 2.0 
+ *
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved. 
+ *
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code. 
+ *
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates. 
+ *
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies. 
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -26,25 +44,6 @@
  *  	(c) 1986,1987,1988,1989  Sun Microsystems, Inc.
  *  	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *  	          All rights reserved.
- */
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
  */
 
 #define STRNET
@@ -71,9 +70,7 @@
 #endif SYSV
 #include <netinet/nihdr.h>
 #ifdef SYSV
-#ifdef SYSV
 #include <sys/cmn_err.h>
-#endif
 #endif SYSV
 
 #include <netinet/in.h>
@@ -167,8 +164,6 @@ tcp_respond(bp, tp, ti, ack, seq, flags)
 	if (tp) {
 		if (tp->t_inpcb->inp_q && !(tp->t_inpcb->inp_state & SS_CANTRCVMORE)) {
 			win = tp->t_inpcb->inp_q->q_hiwat - tp->t_iqsize;
-			if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
-				win = (long)(tp->rcv_adv - tp->rcv_nxt);
 		}
 		ro = &tp->t_inpcb->inp_route;
 	} else {
@@ -273,11 +268,10 @@ tcp_newtcpcb(inp)
 	TCPT_RANGESET(tp->t_rxtcur, 
 	    ((TCPTV_SRTTBASE >> 2) + (TCPTV_SRTTDFLT << 2)) >> 1,
 	    TCPTV_MIN, TCPTV_REXMTMAX);
-	tp->t_linger = 0;
+	tp->t_ltidp = NULL;
 	tp->t_inq = NULL;
 	tp->snd_cwnd = 65535;
 	tp->snd_ssthresh = 65535;		/* XXX */
-	tp->t_maxwin = inp->inp_q->q_hiwat;	/* XXX -- is this right?? */
 	tp->t_iqurp = -1;			/* no urgent data present */
 	inp->inp_ppcb = (caddr_t) tp;
 	STRLOG(TCPM_ID, 1, 5, SL_TRACE, "newtcpcb tcb %x inp %x", tp, inp);
@@ -368,8 +362,8 @@ tcp_freespc(tp)
 #ifdef SYSV
 			cmn_err(CE_PANIC, "tcp_freespc remque");
 #else
-			panic( "tcp_freespc remque");
-#endif
+			panic ("tcp_freespc remque");
+#endif SYSV
 	}
 	bp = tp->t_inq;
 	while (bp) {
@@ -393,7 +387,7 @@ tcp_ctlinput(bp)
 	struct ip_ctlmsg *ctl;
 	extern u_char   inetctlerrmap[];
 	int             tcp_quench(), in_rtchange();
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 	int tcp_errdiscon();
 
 	ctl = (struct ip_ctlmsg *) bp->b_rptr;
@@ -401,7 +395,7 @@ tcp_ctlinput(bp)
 		return;
 	if (ctl->ctl_addr.s_addr == INADDR_ANY)
 		return;
-	sin.sin_family = htons(AF_INET);
+	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = ctl->ctl_addr.s_addr;
 	sin.sin_port = 0;
 
@@ -458,6 +452,7 @@ tcp_enqdata(tp, bp, urp)
 		tp->t_qlast = bp;
 	} else {
 		tp->t_qfirst = tp->t_qlast = bp;
+		
 	}
 
 	if (urp != -1)
@@ -499,8 +494,8 @@ tcp_deqdata(q)
 #ifdef SYSV
 		cmn_err(CE_WARN, "tcp_deqdata: null q_ptr wq %x", WR(q));
 #else
-		printf( "tcp_deqdata: null q_ptr wq %x", WR(q));
-#endif
+		printf ("tcp_deqdata: null q_ptr wq %x", WR(q));
+#endif SYSV
 		return;
 	}
 
@@ -564,7 +559,8 @@ tcp_deqdata(q)
 	}
 }
 
-struct tcpcb *tcp_output(), *tcp_uinput(), *tcp_dotimers();
+#define swap(x,y,t)	{t=x; x=y; y=t;}
+void tcp_output(), tcp_uinput();
 
 tcp_io(tp, flag, bp)
 	register struct tcpcb *tp;
@@ -573,35 +569,41 @@ tcp_io(tp, flag, bp)
 {
 	int s;
 	int oflag, tflag;
-	struct tcpcb *(*func)();
+	void (*func)(), (*ofunc)(), (*tfunc)();
 	mblk_t **bpp;
 
 	s = splstr();
-	if (flag == TF_NEEDIN) {
+	if (flag == TF_NEEDOUT) {
+		func = tcp_output;
+		oflag = TF_NEEDIN;
+		ofunc = tcp_uinput;
+	} else {
+		func = tcp_uinput;
+		oflag = TF_NEEDOUT;
+		ofunc = tcp_output;
 		for (bpp = &tp->t_inq; *bpp; bpp = &(*bpp)->b_next)
 			;
 		*bpp = bp;
 		bp->b_next = NULL;
 	}
-	tp->t_flags |= flag;
-	if (!(tp->t_flags & TF_IOLOCK)) {
+	if (tp->t_flags & TF_IOLOCK) {
+                tp->t_flags |= flag;
+        } else {
                 tp->t_flags |= TF_IOLOCK;
                 for (;;) {
 			/* TF_NEED* flags cleared by service routines */
-			if (tp->t_flags & TF_NEEDTIMER)
-				func = tcp_dotimers;
-			else if (tp->t_flags & TF_NEEDOUT)
-				func = tcp_output;
-			else if (tp->t_flags & TF_NEEDIN)
-				func = tcp_uinput;
-			else {
-				tp->t_flags &= ~TF_IOLOCK;
+			splx(s);
+			(*func)(tp);
+			s = splstr();
+                        if (tp->t_flags & oflag) {
+				swap(flag, oflag, tflag);
+				swap(func, ofunc, tfunc);
+			} else if (tp->t_flags & flag) {
+				continue;
+			} else {
+                                tp->t_flags &= ~TF_IOLOCK;
 				break;
 			}
-			splx(s);
-			if (!(*func)(tp))
-				return;
-			s = splstr();
 		}
 	}
 	splx(s);

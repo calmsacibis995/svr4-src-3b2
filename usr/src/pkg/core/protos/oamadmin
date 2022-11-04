@@ -1,25 +1,38 @@
-#ident	"@(#)pkgcore:protos/oamadmin	1.11"
+#ident	"@(#)pkgcore:protos/oamadmin	1.6"
 
 d oamadmin /usr/sadm/sysadm/menu/netservices 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/netservices/netserve.menu 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files 0755 root other
-f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/Help 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/Menu.rfiles 0644 bin bin
+d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/HELP 0755 root other
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/HELP/local.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/HELP/ops.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/HELP/remote.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/HELP/setup.help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local 0755 root other
-f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/Help 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/Menu.local 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/Menu.type 0644 bin bin
+d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/HELP 0755 root other
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/HELP/list.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/HELP/modify.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/HELP/share.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/local/HELP/unshare.help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/other 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/other/Menu.ops 0644 bin bin
+d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/other/HELP 0755 root other
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/other/HELP/ops.help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote 0755 root other
-f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/Help 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/Menu.remote 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/Menu.type 0644 bin bin
+d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/HELP 0755 root other
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/HELP/umt.rm.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/HELP/mnt.rem.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/HELP/mod.rem.help 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/remote/HELP/lst.rm.help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/setup 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/netservices/remote_files/setup/Menu.type 0644 bin bin
 f oamadmin /usr/sadm/sysadm/bin/Identify 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/adddef 0755 bin bin
-f oamadmin /usr/sadm/sysadm/bin/call_fsck 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/checkfilsys 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/checkfs 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/chkrun 0755 bin bin
@@ -45,7 +58,6 @@ f oamadmin /usr/sadm/sysadm/bin/indeftab 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/invfstab 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/makefs 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/makesys 0755 bin bin
-f oamadmin /usr/sadm/sysadm/bin/mkdtab 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/mkfs_s5 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/mkfs_ufs 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/moddef 0755 bin bin
@@ -59,6 +71,7 @@ f oamadmin /usr/sadm/sysadm/bin/ufs_fragsiz 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/unmountfs 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/valdefdev 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/valdeffs 0755 bin bin
+f oamadmin /usr/sadm/sysadm/bin/valfstype 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/validdev 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/validfs 0755 bin bin
 d oamadmin /usr/sadm/sysadm/menu/files 0775 root other
@@ -83,7 +96,7 @@ f oamadmin /usr/sadm/sysadm/menu/files/defaults/Text.adddef 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/defaults/Text.display 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/defaults/defaults.menu 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/files/diskuse 0755 root other
-f oamadmin /usr/sadm/sysadm/menu/files/diskuse/Form.diskuse 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/files/diskuse/Text.diskuse 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/diskuse/Text.duse2 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/diskuse/Help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/files/display 0755 root other
@@ -116,7 +129,8 @@ f oamadmin /usr/sadm/sysadm/menu/files/make/Form.s52 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/make/Form.ufs 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/make/Form.ufs2 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/make/Help 0644 bin bin
-f oamadmin /usr/sadm/sysadm/menu/files/make/Text.make 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/files/make/Text.makenok 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/files/make/Text.makeok 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/files/mount 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/files/mount/Form.mount 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/files/mount/Form.mount2 0644 bin bin
@@ -136,9 +150,6 @@ f oamadmin /usr/sadm/sysadm/bin/findpmtype 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/lsopts 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/modifypm 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/pmadmopts 0755 bin bin
-f oamadmin /usr/sadm/sysadm/bin/pmckmod 0755 bin bin
-f oamadmin /usr/sadm/sysadm/bin/pmgetpid 0755 bin bin
-f oamadmin /usr/sadm/sysadm/bin/psmod 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/pstest 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/sacopts 0755 bin bin
 f oamadmin /usr/sadm/sysadm/bin/settinglist 0755 bin bin
@@ -194,7 +205,6 @@ f oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Menu.ps_atype 0644 bin 
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Form.ps_addls 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Form.ps_addtm 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Form.ps_adduk 0644 bin bin
-f oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Text.ps_msg 0644 bin bin
 l oamadmin /usr/sadm/sysadm/menu/ports/port_services/add/Help=/usr/sadm/sysadm/menu/ports/port_services/Help
 d oamadmin /usr/sadm/sysadm/menu/ports/port_services/disable 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/disable/Menu.ps_disabl 0644 bin bin
@@ -211,6 +221,7 @@ f oamadmin /usr/sadm/sysadm/menu/ports/port_services/list/Text.ps_lsall 0644 bin
 l oamadmin /usr/sadm/sysadm/menu/ports/port_services/list/Help=/usr/sadm/sysadm/menu/ports/port_services/Help
 d oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify/Menu.ps_modify 0644 bin bin
+f oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify/Menu.ps_modtm 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify/Form.ps_modls 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify/Form.ps_modtm 0644 bin bin
 l oamadmin /usr/sadm/sysadm/menu/ports/port_services/modify/Help=/usr/sadm/sysadm/menu/ports/port_services/Help
@@ -223,7 +234,6 @@ f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/ttyvalues 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/Help 0644 bin bin
 d oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add/Form.tty_add 0644 bin bin
-f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add/Text.tty_add 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add/Menu.tty_baud 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add/Menu.c_labels 0644 bin bin
 l oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/add/Help=/usr/sadm/sysadm/menu/ports/tty_settings/Help
@@ -231,6 +241,3 @@ d oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/list 0755 root other
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/list/Menu.tty_list 0644 bin bin
 f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/list/Text.tty_list 0644 bin bin
 l oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/list/Help=/usr/sadm/sysadm/menu/ports/tty_settings/Help
-d oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/remove 0755 root other
-f oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/remove/Menu.tty_remov 0644 bin bin
-l oamadmin /usr/sadm/sysadm/menu/ports/tty_settings/remove/Help=/usr/sadm/sysadm/menu/ports/tty_settings/Help

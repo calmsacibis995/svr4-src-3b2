@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/waitpid.c	1.2"
+#ident	"@(#)libc-port:gen/waitpid.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak waitpid = _waitpid
@@ -22,8 +22,9 @@ int options;
 	idtype_t idtype;
 	id_t id;
 	siginfo_t info;
-	int error;
+	register error, stat;
 
+	options |= (WEXITED|WTRAPPED);
 	if (pid > 0) {
 		idtype = P_PID;
 		id = pid;
@@ -38,16 +39,13 @@ int options;
 		id = getpgid(0);
 	}
 
-	options |= (WEXITED|WTRAPPED);
-
-	if ((error = waitid(idtype, id, &info, options)) < 0)
+	error = waitid(idtype, id, &info, options);
+	if (error < 0 || stat_loc == 0 || info.si_pid == 0)
 		return error;
 
-	if (stat_loc) {
+	stat = (info.si_status & 0377);
 
-		register stat = (info.si_status & 0377);
-
-		switch (info.si_code) {
+	switch (info.si_code) {
 		case CLD_EXITED:
 			stat <<= 8;
 			break;
@@ -64,10 +62,9 @@ int options;
 		case CLD_CONTINUED:
 			stat = WCONTFLG;
 			break;
-		}
-
-		*stat_loc = stat;
 	}
+
+	*stat_loc = stat;
 
 	return info.si_pid;
 }

@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:print/printf.c	1.14"
+#ident	"@(#)libc-port:print/printf.c	1.13"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include "shlib.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <errno.h>
 
 extern int _doprnt();
 
@@ -38,7 +37,6 @@ printf(format, va_alist) char *format; va_dcl
 			stdout->_flag |= _IOWRT;
 		} else {
 			/* else error */
-			errno = EBADF;
 			return EOF;
 		}
 	}

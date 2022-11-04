@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/trap.c	1.44"
+#ident	"@(#)kernel:os/trap.c	1.35.2.2"
 
 #include "sys/sysmacros.h"
 #include "sys/param.h"
@@ -51,6 +51,7 @@
 
 #include "vm/as.h"
 #include "vm/seg.h"
+#include "sys/immu.h"
 #include "vm/seg_vn.h"
 #include "vm/seg_kmem.h"
 #include "vm/faultcode.h"
@@ -62,19 +63,18 @@
 extern int rf_state;
 
 extern void systrap();
-extern void setintret();
 
 #if __STDC__
 STATIC int usrxmemflt(caddr_t, psw_t, k_siginfo_t *);
 STATIC int krnxmemflt(caddr_t, psw_t);
 STATIC int stop_on_fault(u_int, k_siginfo_t *);
-void krnlflt(psw_t);
+STATIC void krnlflt(psw_t);
 STATIC void fault_to_info(int, k_siginfo_t *);
 #else
 STATIC int usrxmemflt();
 STATIC int krnxmemflt();
 STATIC int stop_on_fault();
-void krnlflt();
+STATIC void krnlflt();
 STATIC void fault_to_info();
 #endif
 
@@ -111,115 +111,6 @@ STATIC char spopcode[256] = {
 };
 
 int	*save_r0ptr;	/* pansave() uses this to find the registers */
-STATIC int fltcr_type;	/* used to pass fltcr to krnlflt */
-
-#ifdef DEBUG
-/*
- * Data watchpoint to help with debugging.
- */
-u_long	watchpt = 0;
-int	wp_fault = 0;
-int	wp_hit = 0;
-paddr_t	wp_pdt = 0;
-pte_t	*wp_pte = 0;
-static	u_long	pdt[NPGPT + 7];
-
-void
-wpset(wp)
-	register u_long wp;
-{
-	register u_int	pfn;
-	register u_int	seglen;
-	register int	i;
-	register pte_t	*pte;
-	register sde_t	*sde;
-
-	if (watchpt != 0) {
-		cmn_err(CE_CONT, "For now, only one watchpoint at a time.\n");
-		return;
-	}
-
-	/*
-	 * Sanity checking on the address.
-	 */
-	if ( (SECNUM(wp) != SCN1)  ||
-	     ((wp & 0x3) != 0)     ||
-	     (SEGNUM(wp) > sramb[SCN1].SDTlen) ||
-	     (!SD_ISVALID(sde = (sde_t *)srama[SCN1] + SEGNUM(wp))) ){
-		/*
-		 * other checks: like not in the page containing an
-		 * interrupt stack, not in a page needed by the trap
-		 * code, ...
-		 */
-		cmn_err(CE_CONT, "Bad addr 0x%x . Watchpoint not set.\n", wp);
-		return;
-	}
-
-	if (SD_ISCONTIG(sde)) {
-		wp_pdt = kvtophys(((u_long)pdt + 0x1F) & (~0x1F));
-		pte = (pte_t *)wp_pdt;
-		pfn = phystopfn(sde->wd2.address);
-		seglen = SD_LASTPG(sde);
-		for (i = 0; i <= seglen; ++i, ++pfn, ++pte)
-			pte->pg_pte = mkpte(PG_V, pfn);
-		for (;i < NPPS; ++i, ++pfn, ++pte)
-			pte->pg_pte = 0;
-
-		sde->seg_flags &= ~SDE_C_bit;
-		sde->wd2.address = wp_pdt;
-		pte = (pte_t *)wp_pdt;
-	} else {
-		pte = (pte_t *)sde->wd2.address;
-	}
-
-	watchpt = wp;
-	pte += PAGNUM(wp);
-	wp_pte = pte;
-	PG_SETW(pte);
-
-	/*
-	 * XXX - I don't think we care if the rest of the segment
-	 * gets flushed. We only care about the page containing our
-	 * watchpoint.
-	 *
-	 * I'm not sure, flush whole segment for now just to be safe.
-	 * I'll check later.
-	 *
-	 * flushaddr(wp);
-	 */
-	 flushmmu((addr_t)(wp & ~SOFFMASK), NPPS);
-}
-
-void
-wpclr(wp)
-	register u_long wp;
-{
-	register sde_t	*sde;
-
-	if (wp != watchpt) {
-		cmn_err(CE_CONT, "There is no watchpoint at 0x%x .\n", wp);
-		return;
-	}
-
-	if (wp_pdt == NULL) {
-		/*
-		 * We can assume the fault-on-write bit was off before
-		 * we set the watchpoint. If it were on, the kernel
-		 * would have panic'd; the kernel doesn't copy-on-write.
-		 */
-		PG_CLRW(wp_pte);
-	} else {
-		sde = (sde_t *)srama[SCN1] + SEGNUM(wp);
-		sde->wd2.address = kvtophys(wp & ~SOFFMASK);
-		sde->seg_flags |= SDE_C_bit;
-		flushmmu((addr_t)(wp & ~SOFFMASK), NPPS);
-		wp_pdt = NULL;
-	}
-
-	watchpt = 0;
-	wp_pte = NULL;
-}
-#endif
 
 STATIC void
 trapsig(pp, ip)
@@ -306,7 +197,7 @@ addupc_clk()
  * Called from ttrap.s if a trap occurs while on the kernel stack.
  */
 
-int
+void
 k_trap(r0ptr)
 	register int	*r0ptr;
 {
@@ -317,13 +208,10 @@ k_trap(r0ptr)
 		int	cint;
 	}			ps;
 
-	ps.cint = r0ptr[PS];
+	/* save pointer to r0 for use by pansave() */
 
-	if (Rcsr & CSRTIMO && u.u_caddrflt) {
-		Wcsr->c_sanity = 0;
-		r0ptr[PC] = u.u_caddrflt;
-		return 0;
-	}
+	save_r0ptr = r0ptr;
+	ps.cint = r0ptr[PS];
 
 	/*
 	 * If we were moving data to or from a user's
@@ -344,19 +232,13 @@ k_trap(r0ptr)
 			if (valid_usr_range((caddr_t)*fltar, 1)) 
 				i = usrxmemflt(r0ptr[PC], ps, &info);
                         else {
-#ifdef KPERF
+                              	#ifdef KPERF
                                 if (kpftraceflg) {
                                         asm(" MOVAW 0(%pc),Kpc ");
                                         kperf_write(KPT_UXMEMF, Kpc, curproc);
                                 }
-#endif /* KPERF */
+                                #endif /* KPERF */
                                 i = krnxmemflt(r0ptr[PC], ps);
-#ifdef DEBUG
-				if (wp_fault != 0) {
-					ps.cps.TE = 1;
-					r0ptr[PS] = ps.cint;
-				}
-#endif
                         }
 
 			/*
@@ -369,9 +251,10 @@ k_trap(r0ptr)
 
 			u.u_caddrflt = caddrsave;
 			if (i != 0)
-				r0ptr[PC] = caddrsave;
+				r0ptr[PC] = u.u_caddrflt;
 			else
 				u.u_pgproc = 0;
+			save_r0ptr = NULL;
 
 #ifdef  KPERF
 			if (kpftraceflg) {
@@ -380,41 +263,18 @@ k_trap(r0ptr)
 			}
 #endif /* KPERF */
 
-			return 0;
+			return;
 		} else {
-			if ((i = krnxmemflt(r0ptr[PC], ps)) == 0) {
-#ifdef DEBUG
-				if (wp_fault != 0) {
-					ps.cps.TE = 1;
-					r0ptr[PS] = ps.cint;
-				}
-#endif
-				return 0;
-			}
+			if ((i = krnxmemflt(r0ptr[PC], ps)) == 0)
+				return;
 		}
 	}
-#ifdef DEBUG
-	if (ps.cps.FT == ON_NORMAL && ps.cps.ISC == TRCTRAP && wp_fault != 0) {
-		if (wp_hit) {
-			cmn_err(CE_CONT, "Hit watchpoint 0x%x:\n", watchpt);
-			call_demon();
-		}
-		ps.cps.TE = 0;
-		r0ptr[PS] = ps.cint;
-		wp_fault = 0;
-		wp_hit = 0;
-		if (watchpt != 0) {
-			PG_SETW(wp_pte);
-			flushaddr(watchpt);
-		}
-		return 0;
-	}
-#endif
 
 	cmn_err(CE_CONT, "TRAP\nproc = %x psw = %x\npc = %x",
 		u.u_procp, ps.cint, r0ptr[PC]);
 
-	return 1;
+	krnlflt(ps.cps);
+	cmn_err(CE_PANIC, "Krnlflt returned to k_trap.");
 }
 
 /*
@@ -718,7 +578,7 @@ systrap()
 		if (rf_state)
 			uptr->u_syscall = scall;
 		if ((callp->sy_flags & SETJUMP) && setjmp(&uptr->u_qsav)) {
-			if ((error = uptr->u_error) == 0)
+			if (uptr->u_error == 0)
 				error = EINTR;
 		} else {
 #ifdef KPERF
@@ -735,23 +595,12 @@ systrap()
 	}
 
 	if (error) {
-
 #ifdef DEBUG
 		sysout();
 #endif
-		if (error == EFBIG)
-			psignal(uptr->u_procp, SIGXFSZ);
-		else if (error == EINTR) {
-			register int cursig = uptr->u_procp->p_cursig;
-			if ((cursig && sigismember(&uptr->u_sigrestart, cursig))
-			  || ev_intr_restart(uptr->u_procp))
-				error = ERESTART;
-		}
-
 		uptr->u_pcb.regsave[K_R0] = error;
 		uptr->u_error = 0;
 		((psw_t *)(uptr->u_pcb.regsave))[K_PS].NZVC |= PS_C;
-
 	} else {
 #ifdef DEBUG
 		sysok();
@@ -881,10 +730,7 @@ intsyserr()
 	}
 	if ((Rcsr & CSRTIMO) != 0) {
 		Wcsr->c_sanity = 0;
-		if (u.u_caddrflt)
-			setintret(u.u_caddrflt);
-		else
-			cmn_err(CE_PANIC,"SYSTEM BUS TIME OUT INTERRUPT");
+		cmn_err(CE_PANIC,"SYSTEM BUS TIME OUT INTERRUPT");
 	}
 }
 
@@ -898,7 +744,7 @@ intsyserr()
 void
 intspwr()
 {
-	psignal(proc_init, SIGPWR);
+	psignal(nproc[1], SIGPWR);
 }
 
 /*
@@ -1156,6 +1002,10 @@ fault_to_info(flt, infop)
 	}
 }
 
+#ifdef DEBUG
+caddr_t ufaultadr;
+int ureqacc, uftype;
+#endif
 
 STATIC int
 usrxmemflt(pc, ps, infop)
@@ -1163,6 +1013,26 @@ usrxmemflt(pc, ps, infop)
 	psw_t	ps;
 	k_siginfo_t *infop;
 {
+#ifdef DEBUG
+	int rval;
+
+	rval = db_usrxmemflt(pc, ps, infop);
+	if (rval)
+		sysoops();
+	ureqacc = uftype = 0;
+	ufaultadr = 0;
+	return rval;
+}
+
+int
+db_usrxmemflt(pc, ps, infop)
+	register char	*pc;
+	psw_t	ps;
+	k_siginfo_t *infop;
+{
+#endif
+	register pte_t	*pte;
+	register sde_t	*sde;
 	struct seg *sp;
 	struct as *asp;
 	FLTCR		faultcr;
@@ -1179,6 +1049,12 @@ usrxmemflt(pc, ps, infop)
 	*(int *)fltar = 0;
 
 	infop->si_addr = faultadr;
+
+#ifdef DEBUG
+	ureqacc = faultcr.reqacc;
+	uftype = faultcr.ftype;
+	ufaultadr = faultadr;
+#endif
 
 #ifdef KPERF
 	if (kpftraceflg) {
@@ -1225,7 +1101,7 @@ usrxmemflt(pc, ps, infop)
 	case F_SDTLEN:
 	case F_PTLEN:
 		if (sp != NULL
-		  || (faultadr >= u.u_procp->p_stkbase + u.u_procp->p_stksize
+		  || (faultadr >= (caddr_t)u.u_procp->p_stkbase + u.u_procp->p_stksize
 		    && grow((int *)(_VOID *)faultadr))) {
 			if ((flt = as_fault(asp, faultadr, 1, ftype, rw)) == 0
 			  && spopcode[lfubyte(pc)] == MAU_SPECIAL
@@ -1240,7 +1116,7 @@ usrxmemflt(pc, ps, infop)
 
 	case F_P_N_P:
 		if (sp == NULL
-		  && faultadr >= u.u_procp->p_stkbase + u.u_procp->p_stksize
+		  && faultadr >= (caddr_t)u.u_procp->p_stkbase + u.u_procp->p_stksize
 		  && !grow((int *)(_VOID *)faultadr)) {
 			infop->si_signo = SIGSEGV;
 			infop->si_code = SEGV_MAPERR;
@@ -1254,6 +1130,13 @@ usrxmemflt(pc, ps, infop)
 		break;
 
 	case F_PWRITE:
+		sde = vatosde(faultadr);
+		pte = vatopte(faultadr, sde);
+		if (!PG_ISVALID(pte)
+		  && (flt = as_fault(asp, faultadr, 1, ftype, rw))) {
+			fault_to_info(flt, infop);
+			break;
+		}
 		if ((flt = as_fault(asp, faultadr, 1, F_PROT, rw)) == 0
 		  && spopcode[lfubyte(pc)] == MAU_SPECIAL
 		  && faultcr.reqacc == AT_SPOPWRITE)
@@ -1327,6 +1210,10 @@ usrxmemflt(pc, ps, infop)
 	return infop->si_signo;
 }
 
+#ifdef DEBUG
+int	kreqacc, kftype;
+caddr_t	kfaultadr;
+#endif
 
 /* ARGSUSED */
 STATIC int
@@ -1334,7 +1221,26 @@ krnxmemflt(pc, ps)
 	register caddr_t pc;
 	psw_t	ps;
 {
+#ifdef DEBUG
+	int rval;
+
+	rval = db_krnxmemflt(pc, ps);
+	if (rval)
+		sysoops();
+	kreqacc = kftype = 0;
+	kfaultadr = 0;
+	return rval;
+}
+
+int
+db_krnxmemflt(pc, ps)
+	register char	*pc;
+	psw_t	ps;
+{
+#endif
 	register int	sig;
+	register pte_t	*pte;
+	register sde_t	*sde;
 	struct seg *sp;
 	struct as *asp;
 	FLTCR		faultcr;
@@ -1346,7 +1252,12 @@ krnxmemflt(pc, ps)
 	faultadr = (caddr_t)*fltar;
 	*(int *)fltcr = 0;
 	*(int *)fltar = 0;
-	fltcr_type = faultcr.ftype;	/* for krnlflt */
+
+#ifdef DEBUG
+	kreqacc = faultcr.reqacc;
+	kftype = faultcr.ftype;
+	kfaultadr = faultadr;
+#endif
 
 	ftype = F_INVAL;
 	rw = S_READ;
@@ -1380,23 +1291,16 @@ krnxmemflt(pc, ps)
 		break;
 
 	case F_PWRITE:
-#ifdef DEBUG
-		if (watchpt != 0 &&
-		    ((u_int)faultadr & ~POFFMASK) == (watchpt & ~POFFMASK)) {
-			wp_fault = 1;
-			if (((u_int)faultadr & ~0x3) == watchpt)
-				wp_hit = 1;
-			else
-				wp_hit = 0;
-			PG_CLRW(wp_pte);
-			flushaddr(faultadr);
-			return 0;
+		sde = vatosde(faultadr);
+		pte = vatopte(faultadr, sde);
+		if (!PG_ISVALID(pte)
+		  && (sig = as_fault(asp, faultadr, 1, ftype, rw))) {
+			sig = 1;
+			break;
 		}
-#endif
 		if ((sig = as_fault(asp, faultadr, 1, F_PROT, rw)) != 0)
 			sig = 1;
 		break;
-
 	default:
 		sig = 1;
 		break;
@@ -1405,7 +1309,7 @@ krnxmemflt(pc, ps)
 	return sig;
 }
 
-void
+STATIC void
 krnlflt(ps)
 	psw_t	ps;			/* previous PSW content */
 {
@@ -1469,6 +1373,10 @@ krnlflt(ps)
 
 	if (ps.FT == ON_NORMAL)
 		if (ps.ISC == XMEMFLT) {
+			int	fltcr_type;
+
+			fltcr_type = fltcr->ftype;
+			*(int *)fltcr = 0;
 			for (i = 0;
 			  i < sizeof(mmu_err)/sizeof(mmu_err[0]); i++)
 				if (mmu_err[i].errno == fltcr_type)

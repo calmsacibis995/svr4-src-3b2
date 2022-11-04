@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nlp:lp/ifiles/postinstall	1.10"
+#ident	"@(#)pkg.nlp:lp/ifiles/postinstall	1.8"
 
 ##########
 #
@@ -10,9 +10,13 @@ OAMBASE=${OAMBASE:-/var/sadm/sysadm}
 INTFBASE=${INTFBASE:-${OAMBASE}/menu}
 
 cp ${INTFBASE}/main.menu ${INTFBASE}/main.backup
-sed 's/printers\/printers/printers/'  ${INTFBASE}/main.menu > ${INTFBASE}/tmp.menu
+sed 's/printers.menu/Menu.lp/' ${INTFBASE}/main.menu > ${INTFBASE}/tmp.menu
 mv ${INTFBASE}/tmp.menu ${INTFBASE}/main.menu
 
+##########
+#
+# Convert old configuration?
+##########
 if [ -s "/usr/spool/lp/pstatus" ]
 then
 

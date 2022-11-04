@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/sem.c	1.17"
+#ident	"@(#)kernel:os/sem.c	1.13"
 /*
  * Inter-Process Communication Semaphore Facility.
  */
@@ -104,13 +104,13 @@ semaoe(val, id, num)
 		return 0;
 	if (val > seminfo.semaem || val < -seminfo.semaem)
 		return ERANGE;
-	if ((up = sem_undo[u.u_procp->p_slot]) == NULL)
+	if ((up = sem_undo[GET_INDEX(u.u_procp->p_pid)]) == NULL)
 		if ((up = semfup) == NULL)
 			return ENOSPC;
 		else {
 			semfup = up->un_np;
 			up->un_np = NULL;
-			sem_undo[u.u_procp->p_slot] = up;
+			sem_undo[GET_INDEX(u.u_procp->p_pid)] = up;
 		}
 	for (uup = up->un_ent, found = i = 0;i < up->un_cnt;i++) {
 		if (uup->un_id < id
@@ -295,11 +295,11 @@ semctl(uap, rvp)
 		for (i = sp->sem_nsems, p = sp->sem_base;i--;p++) {
 			p->semval = p->sempid = 0;
 			if (p->semncnt) {
-				wakeprocs((caddr_t)&p->semncnt, PRMPT);
+				wakeup((caddr_t)&p->semncnt);
 				p->semncnt = 0;
 			}
 			if (p->semzcnt) {
-				wakeprocs((caddr_t)&p->semzcnt, PRMPT);
+				wakeup((caddr_t)&p->semzcnt);
 				p->semzcnt = 0;
 			}
 		}
@@ -320,9 +320,6 @@ semctl(uap, rvp)
 		if (copyin((caddr_t)uap->arg, (caddr_t)&semtmp.ods,
 		  sizeof(semtmp.ods)))
 			return EFAULT;
-		if (semtmp.ods.sem_perm.uid > MAXUID ||
-				semtmp.ods.sem_perm.gid > MAXUID)
-			return(EINVAL);
 		sp->sem_perm.uid = semtmp.ods.sem_perm.uid;
 		sp->sem_perm.gid = semtmp.ods.sem_perm.gid;
 		sp->sem_perm.mode = semtmp.ods.sem_perm.mode & 0777 | IPC_ALLOC;
@@ -337,10 +334,6 @@ semctl(uap, rvp)
 		if (copyin((caddr_t)uap->arg, (caddr_t)&semtmp.ds,
 		  sizeof(semtmp.ds)))
 			return EFAULT;
-		if (semtmp.ds.sem_perm.uid < (uid_t)0 || semtmp.ds.sem_perm.uid > MAXUID
-				|| semtmp.ds.sem_perm.gid < (gid_t)0 ||
-				semtmp.ds.sem_perm.gid > MAXUID)
-			return(EINVAL);
 		sp->sem_perm.uid = semtmp.ds.sem_perm.uid;
 		sp->sem_perm.gid = semtmp.ds.sem_perm.gid;
 		sp->sem_perm.mode = semtmp.ds.sem_perm.mode & 0777 | IPC_ALLOC;
@@ -448,11 +441,11 @@ semctl(uap, rvp)
 		if ((p->semval = uap->arg) != 0) {
 			if (p->semncnt) {
 				p->semncnt = 0;
-				wakeprocs((caddr_t)&p->semncnt, PRMPT);
+				wakeup((caddr_t)&p->semncnt);
 			}
 		} else if (p->semzcnt) {
 			p->semzcnt = 0;
-			wakeprocs((caddr_t)&p->semzcnt, PRMPT);
+			wakeup((caddr_t)&p->semzcnt);
 		}
 		p->sempid = u.u_procp->p_pid;
 		semunrm(uap->semid, uap->semnum, uap->semnum);
@@ -474,11 +467,11 @@ semctl(uap, rvp)
 			if ((p->semval = semtmp.semvals[i++]) != 0) {
 				if (p->semncnt) {
 					p->semncnt = 0;
-					wakeprocs((caddr_t)&p->semncnt, PRMPT);
+					wakeup((caddr_t)&p->semncnt);
 				}
 			} else if (p->semzcnt) {
 				p->semzcnt = 0;
-				wakeprocs((caddr_t)&p->semzcnt, PRMPT);
+				wakeup((caddr_t)&p->semzcnt);
 			}
 		}
 		return 0;
@@ -502,7 +495,7 @@ semexit()
 	register long			v;	/* adjusted value */
 	register struct sem		*semp;	/* semaphore ptr */
 
-	if ((up = sem_undo[u.u_procp->p_slot]) == NULL)
+	if ((up = sem_undo[GET_INDEX(u.u_procp->p_pid)]) == NULL)
 		return;
 	if (up->un_cnt == 0)
 		goto cleanup;
@@ -516,11 +509,11 @@ semexit()
 		semp->semval = (ushort) v;
 		if (v == 0 && semp->semzcnt) {
 			semp->semzcnt = 0;
-			wakeprocs((caddr_t)&semp->semzcnt, PRMPT);
+			wakeup((caddr_t)&semp->semzcnt);
 		}
 		if (up->un_ent[i].un_aoe > 0 && semp->semncnt) {
 			semp->semncnt = 0;
-			wakeprocs((caddr_t)&semp->semncnt, PRMPT);
+			wakeup((caddr_t)&semp->semncnt);
 		}
 	}
 	up->un_cnt = 0;
@@ -535,7 +528,7 @@ semexit()
 cleanup:
 	up->un_np = semfup;
 	semfup = up;
-	sem_undo[u.u_procp->p_slot] = up;
+	sem_undo[GET_INDEX(u.u_procp->p_pid)] = up;
 }
 
 /*
@@ -673,11 +666,11 @@ check:
 			semp->semval += op->sem_op;
 			if (semp->semncnt) {
 				semp->semncnt = 0;
-				wakeprocs((caddr_t)&semp->semncnt, PRMPT);
+				wakeup((caddr_t)&semp->semncnt);
 			}
 			if (semp->semzcnt && !semp->semval) {
 				semp->semzcnt = 0;
-				wakeprocs((caddr_t)&semp->semzcnt, PRMPT);
+				wakeup((caddr_t)&semp->semzcnt);
 			}
 			continue;
 		}
@@ -694,8 +687,7 @@ check:
 				semp->semval += op->sem_op;
 				if (semp->semzcnt && !semp->semval) {
 					semp->semzcnt = 0;
-					wakeprocs((caddr_t)&semp->semzcnt,
-					    PRMPT);
+					wakeup((caddr_t)&semp->semzcnt);
 				}
 				continue;
 			}
@@ -707,8 +699,7 @@ check:
 			if (sleep((caddr_t)&semp->semncnt, PCATCH|PSEMN)) {
 				if ((semp->semncnt)-- <= 1) {
 					semp->semncnt = 0;
-					wakeprocs((caddr_t)&semp->semncnt,
-					    PRMPT);
+					wakeup((caddr_t)&semp->semncnt);
 				}
 				return EINTR;
 			}
@@ -723,8 +714,7 @@ check:
 			if (sleep((caddr_t)&semp->semzcnt, PCATCH|PSEMZ)) {
 				if ((semp->semzcnt)-- <= 1) {
 					semp->semzcnt = 0;
-					wakeprocs((caddr_t)&semp->semzcnt,
-					    PRMPT);
+					wakeup((caddr_t)&semp->semzcnt);
 				}
 				return EINTR;
 			}

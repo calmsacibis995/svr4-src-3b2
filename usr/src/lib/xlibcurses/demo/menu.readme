@@ -1,9 +1,3 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 #ident	"@(#)curses:demo/menu.readme	1.2"
 menu.c is the C source for a demonstration program for libcurses
 and terminfo. It is a menu manager. Input is a file describing

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:malloc.h	1.7"
+#ident	"@(#)head:malloc.h	1.6"
 
 #ifndef _MALLOC_H
 #define _MALLOC_H
@@ -56,7 +56,6 @@ void free();
 char *realloc();
 int mallopt();
 struct mallinfo mallinfo();
-char *calloc();
 
 #endif	/* __STDC__ */
 

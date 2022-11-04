@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/externs.h	1.6"
+#ident	"@(#)rtld:common/externs.h	1.5"
 
 /* declarations of external symbols used in ld.so */
 
@@ -21,7 +21,6 @@ extern int _rt_warn;			/* print warnings for undefines? */
 extern struct r_debug _r_debug;		/* debugging information */
 extern char *_rt_error;			/* string describing last error */
 extern char *_proc_name;		/* file name of executing process */
-extern CONST char *_rt_name;		/* name of the dynamic linker */
 
 extern int _syspagsz;			/* system page size */
 extern unsigned long _flags;		/* machine specific file flags */

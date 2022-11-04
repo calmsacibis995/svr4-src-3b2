@@ -5,13 +5,14 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)boot:boot/boot/boot.mk	1.10"
+#ident	"@(#)boot:boot/boot/boot.mk	1.7"
 
 ROOT =
-INC = $(ROOT)/usr/include
+INCSYS = $(ROOT)/usr/include
 UINC = $(ROOT)/usr/include
+LIB = $(ROOT)/lib
 DASHO = -O
-CFLAGS = $(DASHO) -I$(INC) -I.
+CFLAGS = $(DASHO) -I$(INCSYS) -I.
 SYMLINK = :
 STRIP = strip
 INS = install
@@ -22,16 +23,15 @@ FRC =
 
 FILES = \
 	misc.o \
-	boot.o \
-	strrchr.o \
-	strncat.o
+	boot.o
 
 all: boot
 
-boot: $(FILES) $(IFILE) $(LIBFM) $(MAPFILE) $(FRC)
+boot: $(FILES) $(IFILE) $(LIBFM) $(MAPFILE)
+	$(FRC)
 	if [ x$(CCSTYPE) = xCOFF ] ; \
-	then $(LD) $(LDFLAGS) $(IFILE) $(FILES) $(LIBFM) -o boot ; \
-	else $(LD) $(LDFLAGS) -M $(MAPFILE) $(FILES) $(LIBFM) -dn -o boot ; \
+	then $(LD) $(LDFLAG) $(IFILE) $(FILES) $(LIBFM) -L$(LIB) -lc -o boot ; \
+	else $(LD) $(LDFLAG) -M $(MAPFILE) $(FILES) $(LIBFM) -L$(CCSLIB) -dn -lc -o boot ; \
 	fi
 
 install: boot
@@ -54,17 +54,17 @@ clobber: clean
 #
 
 boot.o: boot.c \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/csr.h \
-	$(INC)/sys/elog.h \
-	$(INC)/sys/firmware.h \
-	$(INC)/sys/id.h \
-	$(INC)/sys/immu.h \
-	$(INC)/sys/nvram.h \
-	$(INC)/sys/sbd.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/dma.h \
-	$(INC)/sys/psw.h \
-	$(INC)/sys/fs/bfs.h \
-	$(INC)/sys/fsiboot.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/csr.h \
+	$(INCSYS)/sys/elog.h \
+	$(INCSYS)/sys/firmware.h \
+	$(INCSYS)/sys/id.h \
+	$(INCSYS)/sys/immu.h \
+	$(INCSYS)/sys/nvram.h \
+	$(INCSYS)/sys/sbd.h \
+	$(INCSYS)/sys/types.h \
+	$(INCSYS)/sys/dma.h \
+	$(INCSYS)/sys/psw.h \
+	$(INCSYS)/sys/fs/bfs.h \
+	$(INCSYS)/sys/fsiboot.h \
 	$(FRC)

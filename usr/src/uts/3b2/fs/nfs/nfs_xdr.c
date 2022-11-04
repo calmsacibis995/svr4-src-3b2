@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_xdr.c	1.6"
+#ident	"@(#)fs:fs/nfs/nfs_xdr.c	1.5"
 
 /*	@(#)nfs_xdr.c 2.38 88/02/08 SMI 	*/
 
@@ -270,7 +270,7 @@ rrokwakeup(rip)
 {
 
 	rip->done = 1;
-	wakeprocs((caddr_t)rip, PRMPT);
+	wakeup((caddr_t)rip);
 }
 */
 

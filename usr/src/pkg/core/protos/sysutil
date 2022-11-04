@@ -1,11 +1,11 @@
-#ident	"@(#)pkgcore:protos/sysutil	1.70"
+#ident	"@(#)pkgcore:protos/sysutil	1.38"
 
 f sysutil /config/ifile4.0 0444 bin bin
 f sysutil /config/mapfile4.0 0444 bin bin
 f sysutil /dgn/PORTS 0500 root root
-f sysutil /dgn/SBD 0500 root root
+f sysutil /dgn/SBD=/init/dgn/SBD 0500 root root
 f sysutil /dgn/X.PORTS 0500 root root
-f sysutil /dgn/X.SBD 0500 root root
+f sysutil /dgn/X.SBD=/init/dgn/X.SBD 0500 root root
 f sysutil /etc/boot_tab 0744 root sys
 f sysutil /etc/bupsched 0644 root sys
 f sysutil /etc/checklist 0664 root sys
@@ -15,19 +15,17 @@ f sysutil /etc/cron.d/at.allow 0644 bin bin
 f sysutil /etc/cron.d/cron.allow 0644 bin bin
 f sysutil /etc/cron.d/logchecker 0544 root sys
 f sysutil /etc/cron.d/queuedefs 0644 bin bin
-f sysutil /etc/datemsk 0444 root sys
+f sysutil /etc/datemsk 0444 root bin
 f sysutil /etc/default/cron 0444 root sys
 f sysutil /etc/default/login 0444 root sys
 f sysutil /etc/default/passwd 0444 root sys
 f sysutil /etc/default/su 0444 root sys
-f sysutil /etc/default/tar 0444 root sys
 f sysutil /etc/dfs/dfstab 0664 root sys
 f sysutil /etc/disketteparm 0444 root sys
 f sysutil /etc/fs/bfs/fstyp 0555 root sys
 f sysutil /etc/fs/proc/mount 0555 bin bin
 f sysutil /etc/fs/rfs/mount 0555 bin bin
 f sysutil /etc/fs/s5/clri 0555 bin bin
-f sysutil /etc/fs/s5/fsdb 0555 bin bin
 f sysutil /etc/fs/s5/fstyp 0555 root sys
 f sysutil /etc/fs/s5/mkfs 0555 bin bin
 f sysutil /etc/init.d/ANNOUNCE 0444 root sys
@@ -37,7 +35,6 @@ f sysutil /etc/init.d/RMTMPFILES 0444 root sys
 f sysutil /etc/init.d/cron 0444 root sys
 f sysutil /etc/init.d/disks 0444 root sys
 f sysutil /etc/init.d/firstcheck 0444 root sys
-f sysutil /etc/init.d/mkdtab 0444 root sys
 f sysutil /etc/init.d/sysetup 0444 root sys
 f sysutil /etc/ioctl.syscon 0644 root root
 f sysutil /etc/iu.ap 0644 root sys
@@ -53,12 +50,10 @@ f sysutil /etc/save.d/except 0444 root sys
 f sysutil /etc/stdprofile 0444 root sys
 f sysutil /etc/sulogin 0555 root sys
 f sysutil /etc/ttydefs 0664 root sys
-f sysutil /etc/ttysrch 0644 root sys
 f sysutil /sbin/autopush 0555 root sys
 f sysutil /sbin/bcheckrc 0744 root sys
 f sysutil /sbin/brc 0744 root sys
 f sysutil /sbin/ckconfig 0555 root root
-f sysutil /sbin/fsrootboot 0555 root root
 f sysutil /sbin/ckmunix 0555 root root
 f sysutil /sbin/df 0555 root bin
 f sysutil /sbin/disks 0755 root sys
@@ -83,6 +78,7 @@ f sysutil /sbin/shutdown 0755 root sys
 f sysutil /sbin/su 4555 root sys
 f sysutil /sbin/umountall 0555 root sys
 f sysutil /usr/admin/checkfsys.d/diskette=/dev/null 0444 root sys
+f sysutil /usr/admin/gettyvalues 0555 root sys
 f sysutil /usr/admin/makefsys.d/diskette=/dev/null 0444 root sys
 f sysutil /usr/admin/menu/DESC 0444 root sys
 f sysutil /usr/admin/menu/diagnostics/DESC 0444 root sys
@@ -139,8 +135,11 @@ f sysutil /usr/admin/menu/ttymgmt/DESC 0444 root sys
 f sysutil /usr/admin/menu/usermgmt/DESC 0444 root sys
 f sysutil /usr/admin/menu/usermgmt/modgroup/DESC 0444 root sys
 f sysutil /usr/admin/menu/usermgmt/moduser/DESC 0444 root sys
+f sysutil /usr/admin/menu/usermgmt/moduser/chgloginid 0444 root sys
+f sysutil /usr/admin/menu/usermgmt/moduser/chgpasswd 0444 root sys
+f sysutil /usr/admin/menu/usermgmt/moduser/chgshell 0444 root sys
 f sysutil /usr/admin/mountfsys.d/diskette=/dev/null 0444 root sys
-f sysutil /usr/admin/r3_sysadm 0555 root sys
+f sysutil /usr/admin/old_sysadm 0555 root sys
 f sysutil /usr/admin/sysadm 0555 root sys
 f sysutil /usr/admin/umountfsys.d/diskette=/dev/null 0444 root sys
 f sysutil /usr/bin/basename 0555 bin bin
@@ -149,6 +148,7 @@ f sysutil /usr/bin/chgrp 0555 bin bin
 f sysutil /usr/bin/chown 0555 bin bin
 f sysutil /usr/bin/cmp 0555 bin bin
 f sysutil /usr/sbin/cunix 0555 root root
+s sysutil /usr/bin/cunix=/usr/sbin/cunix
 f sysutil /usr/bin/cut 0555 bin bin
 f sysutil /usr/bin/date 0555 bin bin
 f sysutil /usr/bin/dd 0555 bin bin
@@ -175,8 +175,7 @@ f sysutil /usr/bin/mailalias 555 bin mail
 f sysutil /usr/bin/mailx 2555 bin mail
 f sysutil /usr/bin/mesg 0555 bin bin
 f sysutil /usr/bin/newgrp 4755 root sys
-f sysutil /usr/ccs/bin/ld 0555 root root
-f sysutil /usr/ccs/bin/strip 0555 root root
+f sysutil /usr/bin/newld=/bin/ld 0555 root root
 f sysutil /usr/bin/news 0555 bin bin
 f sysutil /usr/bin/notify 0555 bin bin
 f sysutil /usr/sbin/passmgmt 0500 root sys
@@ -192,7 +191,7 @@ f sysutil /usr/bin/pwd 0555 bin bin
 f sysutil /usr/sbin/sacadm 4755 root sys
 f sysutil /usr/bin/sed 0555 bin bin
 f sysutil /usr/bin/setpgrp 0555 root sys
-f sysutil /usr/bin/setuname 0555 bin bin
+f sysutil /usr/bin/setuname 0755 root sys
 f sysutil /usr/bin/sleep 0555 bin bin
 f sysutil /usr/bin/sort 0555 bin bin
 f sysutil /usr/bin/strchg 0555 root root
@@ -211,10 +210,11 @@ f sysutil /usr/bin/uname 0555 bin bin
 f sysutil /usr/bin/vacation 0555 bin bin
 f sysutil /usr/bin/vsig 0755 bin bin
 f sysutil /usr/bin/wc 0555 bin bin
-f sysutil /usr/ccs/bin/what 0555 bin bin
+f sysutil /usr/bin/what 0555 bin bin
 f sysutil /usr/bin/who 0555 bin bin
 f sysutil /usr/bin/write 2555 bin tty
 f sysutil /usr/bin/xargs 0555 bin bin
+f sysutil /usr/include/shadow.h 0444 root bin
 f sysutil /usr/include/maillock.h 0644 bin bin
 f sysutil /usr/lbin/admerr 0555 root sys
 f sysutil /usr/lbin/agefile 0555 root sys
@@ -234,6 +234,7 @@ f sysutil /usr/lbin/largest 0555 root sys
 f sysutil /usr/lbin/lightenfs 0555 root sys
 f sysutil /usr/lbin/mkmenus 0555 root sys
 f sysutil /usr/lbin/mktable 0555 root sys
+f sysutil /usr/lbin/ncpio 0555 root sys
 f sysutil /usr/lbin/num 0555 root sys
 f sysutil /usr/lbin/oldfile 0555 root sys
 f sysutil /usr/lbin/optparttn 0555 bin bin
@@ -248,26 +249,22 @@ f sysutil /usr/lib/class/RT/RTdispadmin 0555 bin bin
 f sysutil /usr/lib/class/RT/RTpriocntl 0555 bin bin
 f sysutil /usr/lib/class/TS/TSdispadmin 0555 bin bin
 f sysutil /usr/lib/class/TS/TSpriocntl 0555 bin bin
-f sysutil /usr/lib/locale/C/chrtbl_C 0555 bin bin
+f sysutil /usr/lib/chrtbl/ASCII 0555 bin bin
 f sysutil /usr/lib/diffh 0775 bin bin
-f sysutil /usr/lib/fs/s5/ncheck 0555 bin bin
-f sysutil /usr/lib/fs/s5/ff 0555 bin bin
-f sysutil /usr/lib/fs/s5/dcopy 0555 bin bin
 f sysutil /usr/lib/fs/s5/labelit 0555 bin bin
 f sysutil /usr/lib/fs/s5/volcopy 0755 bin bin
 f sysutil /usr/lib/getoptcvt 0555 bin bin
-f sysutil /usr/lib/ld.so.1 0755 bin bin
-f sysutil /usr/lib/libc.so.1 0755 bin bin
-f sysutil /usr/lib/libnsl_i.so 0755 bin bin
-l sysutil /usr/lib/libnsl.so=/usr/lib/libnsl_i.so
-f sysutil /usr/lib/libc_s  0755 bin bin
+f sysutil /usr/lib/ld.so.1=/usr/lib/ld.so.1 0755 bin bin
+f sysutil /usr/lib/libc.so.1=/usr/lib/libc.so.1 0755 bin bin
+f sysutil /usr/lib/libnsl.so=/usr/lib/libnsl_i.so 0755 bin bin
+f sysutil /usr/lib/libc_s=/shlib/libc_s  0755 bin bin
 f sysutil /usr/lib/libmail.a 0644 bin bin
 f sysutil /usr/lib/llib-lmail 0644 bin bin
 f sysutil /usr/lib/llib-lmail.ln 0644 bin bin
 f sysutil /usr/lib/mail/mail_pipe 4555 root bin
 f sysutil /usr/lib/mail/notify2 555 bin bin
 f sysutil /usr/lib/mail/std_vac_msg 444 bin bin
-f sysutil /etc/mail/namefiles 444 bin bin
+f sysutil /usr/lib/mail/namefiles 444 bin bin
 f sysutil /usr/lib/mail/surrcmd/ckbinarsys 0755 bin bin
 f sysutil /usr/lib/mail/surrcmd/fromsmtp 0755 bin bin
 f sysutil /usr/lib/mail/surrcmd/smtp 02755 bin mail
@@ -276,8 +273,10 @@ f sysutil /usr/lib/mail/surrcmd/smtpqer 02755 bin mail
 f sysutil /usr/lib/mail/surrcmd/smtpsched 06755 root mail
 f sysutil /usr/lib/mail/surrcmd/tosmtp 0755 bin bin
 f sysutil /usr/lib/mail/vacation2 555 bin bin
-f sysutil /usr/share/lib/mailx/mailx.help 0664 bin bin
-f sysutil /usr/share/lib/mailx/mailx.help.~ 0664 bin bin
+f sysutil /usr/lib/mailx/mailx.help 0664 bin bin
+f sysutil /usr/lib/mailx/mailx.help.~ 0664 bin bin
+f sysutil /usr/lib/mailx/rmmail 2755 bin mail
+f sysutil /usr/lib/mv_dir 4555 root sys
 f sysutil /usr/lib/olboot 0555 root root
 f sysutil /usr/lib/pump/ports=/lib/pump/ports 0555 root root
 f sysutil /usr/lib/pump/ports.hpp=/lib/pump/ports.hpp 0555 root root
@@ -291,15 +290,12 @@ f sysutil /usr/sbin/drvinstall 0755 bin bin
 f sysutil /usr/sbin/editsa 0550 root root
 f sysutil /usr/sbin/edittbl 0755 bin bin
 f sysutil /usr/sbin/errdump 0755 bin bin
-f sysutil /usr/sbin/finc 0555 bin bin
 f sysutil /usr/sbin/fltboot 0555 bin bin
-f sysutil /usr/sbin/frec 0555 bin bin
 f sysutil /usr/sbin/fmtflop 0555 root sys
 f sysutil /usr/sbin/format 0555 root root
 f sysutil /usr/sbin/fsba 0555 bin bin
 f sysutil /usr/sbin/getmajor 0555 bin bin
 f sysutil /usr/sbin/gettype 0555 root root
-f sysutil /sbin/prtvtoc=/usr/sbin/prtvtoc 0555 root sys
 f sysutil /usr/sbin/hdeadd 0555 bin bin
 f sysutil /usr/sbin/hdelogger 0555 bin bin
 f sysutil /usr/sbin/install 0555 bin bin
@@ -312,9 +308,7 @@ f sysutil /usr/sbin/priocntl 4555 root root
 f sysutil /usr/sbin/prtconf 0555 root sys
 f sysutil /usr/sbin/savecpio 0555 root sys
 f sysutil /usr/sbin/setmnt 0555 bin bin
-f sysutil /usr/sbin/swap 2755 bin sys
-f sysutil /usr/sbin/sync 555 bin bin
-f sysutil /usr/sbin/tar 555 bin bin
+f sysutil /usr/sbin/swap 0555 bin bin
 f sysutil /usr/sbin/ttyconv 0555 root root
 f sysutil /usr/sbin/wall 2555 bin tty
 f sysutil /var/adm/wtmp=/dev/null 0664 adm adm
@@ -330,15 +324,11 @@ l sysutil /etc/rc2.d/S88smtpd=/etc/init.d/smtpd
 l sysutil /etc/rc3.d/S88smtpd=/etc/init.d/smtpd
 l sysutil /etc/rc0.d/K00ANNOUNCE=/etc/init.d/ANNOUNCE
 l sysutil /etc/rc0.d/K70cron=/etc/init.d/cron
-l sysutil /etc/rc1.d/K00ANNOUNCE=/etc/init.d/ANNOUNCE
-l sysutil /etc/rc1.d/K70cron=/etc/init.d/cron
-l sysutil /etc/rc1.d/K74smtpd=/etc/rc0.d/K74smtpd
 l sysutil /etc/rc1.d/S01MOUNTFSYS=/etc/init.d/MOUNTFSYS
 l sysutil /etc/rc2.d/S00firstcheck=/etc/init.d/firstcheck
 l sysutil /etc/rc2.d/S01MOUNTFSYS=/etc/init.d/MOUNTFSYS
 l sysutil /etc/rc2.d/S05RMTMPFILES=/etc/init.d/RMTMPFILES
 l sysutil /etc/rc2.d/S10disks=/etc/init.d/disks
-l sysutil /etc/rc2.d/S15mkdtab=/etc/init.d/mkdtab
 l sysutil /etc/rc2.d/S20sysetup=/etc/init.d/sysetup
 l sysutil /etc/rc2.d/S75cron=/etc/init.d/cron
 l sysutil /sbin/clri=/sbin/mkfs	# added in K13
@@ -346,6 +336,9 @@ l sysutil /sbin/fsdb=/sbin/mkfs	# added in K13
 l sysutil /sbin/labelit=/sbin/mkfs	# added in K13
 l sysutil /usr/bin/red=/usr/bin/ed
 l sysutil /usr/bin/rmail=/usr/bin/mail
+l sysutil /usr/bin/stop=/usr/bin/kill
+l sysutil /usr/lib/ld.so=/usr/lib/ld.so.1
+l sysutil /usr/lib/libc.so=/usr/lib/libc.so.1
 l sysutil /usr/sbin/devnm=/usr/lib/fs/s5/df
 s sysutil /etc/autopush=/sbin/autopush
 s sysutil /etc/bcheckrc=/sbin/bcheckrc
@@ -353,7 +346,6 @@ s sysutil /etc/brc=/sbin/brc
 s sysutil /etc/buildsys=/sbin/buildsys
 s sysutil /etc/ckbupscd=/usr/sbin/ckbupscd
 s sysutil /etc/ckconfig=/sbin/ckconfig
-s sysutil /etc/fsrootboot=/sbin/fsrootboot
 s sysutil /etc/ckmunix=/sbin/ckmunix
 s sysutil /etc/clri=/sbin/clri
 s sysutil /etc/cron=/usr/sbin/cron
@@ -380,7 +372,6 @@ s sysutil /etc/gettype=/usr/sbin/gettype
 s sysutil /etc/hdeadd=/usr/sbin/hdeadd
 s sysutil /etc/hdefix=/sbin/hdefix
 s sysutil /etc/hdelogger=/usr/sbin/hdelogger
-s sysutil /etc/install=/usr/sbin/install
 s sysutil /etc/killall=/usr/sbin/killall
 s sysutil /etc/labelit=/sbin/labelit
 s sysutil /etc/led=/sbin/led
@@ -394,10 +385,7 @@ s sysutil /etc/nodgmon=/usr/sbin/nodgmon
 s sysutil /etc/npump=/sbin/npump
 s sysutil /etc/ports=/sbin/ports
 s sysutil /etc/prtconf=/usr/sbin/prtconf
-s sysutil /etc/prtvtoc=/sbin/prtvtoc
-s sysutil /etc/tar=/usr/sbin/tar
-s sysutil /etc/finc=/usr/sbin/finc
-s sysutil /etc/frec=/usr/sbin/frec
+s sysutil /etc/prtvtoc=/usr/sbin/prtvtoc
 s sysutil /etc/pump=/sbin/pump
 s sysutil /etc/rc0=/sbin/rc0
 s sysutil /etc/rc1=/sbin/rc1
@@ -417,8 +405,6 @@ s sysutil /etc/utmpx=/var/adm/utmpx
 s sysutil /etc/wall=/usr/sbin/wall
 s sysutil /etc/wtmp=/var/adm/wtmp
 s sysutil /etc/wtmpx=/var/adm/wtmpx
-s sysutil /usr/bin/sync=/usr/sbin/sync
+s sysutil /usr/bin/sync=/sbin/sync
 s sysutil /usr/bin/df=/sbin/df
-s sysutil /usr/lib/mailx/mailx.help=/usr/share/lib/mailx/mailx.help
-s sysutil /usr/lib/mailx/mailx.help.~=/usr/share/lib/mailx/mailx.help.~
-s sysutil /usr/lib/mailx/mailx.rc=/etc/mail/mailx.rc
+s sysutil /usr/lib/terminfo=/usr/share/lib/terminfo

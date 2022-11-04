@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:dbm.c	1.2"
+#ident	"@(#)libyp:dbm.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -58,6 +57,7 @@ dbminit(file)
 		dbrdonly = 1;
 	}
 	if(pagf < 0 || dirf < 0) {
+		printf("cannot open database %s\n", file);
 		return(-1);
 	}
 	fstat(dirf, &statb);

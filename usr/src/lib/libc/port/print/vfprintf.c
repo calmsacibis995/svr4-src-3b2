@@ -5,12 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:print/vfprintf.c	1.7.1.4"
+#ident	"@(#)libc-port:print/vfprintf.c	1.7.1.3"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <errno.h>
 
 extern int _doprnt();
 
@@ -30,7 +29,6 @@ va_list ap;
 			iop->_flag |= _IOWRT;
 		} else {
 			/* else error */
-			errno = EBADF;
 			return EOF;
 		}
 	}

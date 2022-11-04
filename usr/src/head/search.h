@@ -8,7 +8,7 @@
 #ifndef _SEARCH_H
 #define _SEARCH_H
 
-#ident	"@(#)head:search.h	1.3.1.11"
+#ident	"@(#)head:search.h	1.3.1.8"
 
 #ifndef _SIZE_T
 #define _SIZE_T
@@ -24,7 +24,7 @@ struct qelem {
 };
 
 #if defined(__STDC__)
-typedef struct entry { char *key; void *data; } ENTRY;
+typedef struct entry { void *key, *data; } ENTRY;
 int hcreate(size_t);
 void hdestroy(void);
 ENTRY *hsearch(ENTRY, ACTION);
@@ -45,7 +45,7 @@ typedef enum { preorder, postorder, endorder, leaf } VISIT;
 
 #if defined(__STDC__)
 void *tdelete(const void *, void **, int (*)(const void *, const void *)); 
-void *tfind(const void *, void *const *, int (*)(const void *, const void *));
+void *tfind(const void *, void **, int (*)(const void *, const void *));
 void *tsearch(const void *, void **, int (*)(const void *, const void *));
 void twalk(void *, void (*)(void *, VISIT, int));
 #else
@@ -64,7 +64,7 @@ void *bsearch(const void *, const void *, size_t, size_t,
 /* LSEARCH(3C) */
 void *lfind(const void *, const void *, size_t *, size_t, 
 	    int (*)(const void *, const void *));
-void *lsearch(const void *, void *, size_t *, size_t,
+void *lsearch(const void *, const void *, size_t *, size_t,
 	    int (*)(const void *, const void *));
 #else
 char *bsearch();

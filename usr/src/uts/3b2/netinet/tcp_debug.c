@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_debug.c	1.5"
+#ident	"@(#)netinet:netinet/tcp_debug.c	1.3"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -28,31 +28,12 @@
  *  	          All rights reserved.
  */
 
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
-
+#ifdef TCPDEBUG
 #define TCPSTATES
 #define	TCPTIMERS
 #define	TANAMES
 #define PRUREQUESTS
-#define TLI_PRIMS
+#endif
 
 #define STRNET
 
@@ -68,9 +49,6 @@
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/errno.h>
-#ifdef SYSV
-#include <sys/cmn_err.h>
-#endif
 
 #include <net/route.h>
 #include <net/if.h>
@@ -88,9 +66,11 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
 
-int	tcpconsdebug = 0;	/* send debug printfs to console if set */
-int	tcpalldebug = 0;	/* trace all connections if set		*/
+#ifdef TCPDEBUG
+struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
+int	tcpconsdebug = 0;
+#endif TCPDEBUG
 
 /*
  * Tcp debug routines
@@ -102,11 +82,12 @@ tcp_trace(act, ostate, tp, ti, req)
 	struct tcpiphdr *ti;
 	int req;
 {
+#ifdef TCPDEBUG
 	tcp_seq seq, ack;
 	int len, flags;
 	struct tcp_debug *td = &tcp_debug[tcp_debx++];
 
-	if (tcp_debx == tcp_ndebug)
+	if (tcp_debx == TCP_NDEBUG)
 		tcp_debx = 0;
 	td->td_time = iptime();
 	td->td_act = act;
@@ -124,22 +105,10 @@ tcp_trace(act, ostate, tp, ti, req)
 	if (tcpconsdebug == 0)
 		return;
 	if (tp)
-#ifdef SYSV
-		cmn_err(CE_CONT,"%x %s:", tp, tcpstates[ostate]);
-#else
 		printf("%x %s:", tp, tcpstates[ostate]);
-#endif
 	else
-#ifdef SYSV
-		cmn_err(CE_CONT,"???????? ");
-#else
 		printf("???????? ");
-#endif
-#ifdef SYSV
-	cmn_err(CE_CONT,"%s ", tanames[act]);
-#else
 	printf("%s ", tanames[act]);
-#endif
 	switch (act) {
 
 	case TA_INPUT:
@@ -158,93 +127,37 @@ tcp_trace(act, ostate, tp, ti, req)
 		if (act == TA_OUTPUT)
 			len -= sizeof (struct tcphdr);
 		if (len)
-#ifdef SYSV
-			cmn_err(CE_CONT,"[%lx..%lx]", seq, seq + len);
-#else
-			printf("[%lx..%lx]", seq, seq + len);
-#endif
+			printf("[%x..%x)", seq, seq+len);
 		else
-#ifdef SYSV
-			cmn_err(CE_CONT,"%lx", seq);
-#else
-			printf("%lx", seq);
-#endif
-#ifdef SYSV
-		cmn_err(CE_CONT,"@%lx, urp=%lx", ack, ti->ti_urp);
-#else
-		printf("@%lx, urp=%lx", ack, ti->ti_urp);
-#endif
+			printf("%x", seq);
+		printf("@%x, urp=%x", ack, ti->ti_urp);
 		flags = ti->ti_flags;
 		if (flags) {
 #ifndef lint
-			char           *cp = "<";
-#ifdef SYSV
-#define pf(f) { if (ti->ti_flags & f) { cmn_err(CE_CONT,"%s%s", cp, "f"); cp = ","; } }
-#else
-#define pf(f) { if (ti->ti_flags & f) { printf("%s%s", cp, "f"); cp = ","; } }
+			char *cp = "<";
+#define pf(f) { if (ti->ti_flags&TH_/**/f) { printf("%s%s", cp, "f"); cp = ","; } }
+			pf(SYN); pf(ACK); pf(FIN); pf(RST); pf(PUSH); pf(URG);
 #endif
-			pf(TH_SYN);
-			pf(TH_ACK);
-			pf(TH_FIN);
-			pf(TH_RST);
-			pf(TH_PUSH);
-			pf(TH_URG);
-#endif
-#ifdef SYSV
-			cmn_err(CE_CONT,">");
-#else
 			printf(">");
-#endif
 		}
 		break;
 
 	case TA_USER:
-#ifdef SYSV
-		cmn_err(CE_CONT,"%s", tli_primitives[req & 0xff]);
-#else
-		printf("%s", tli_primitives[req & 0xff]);
-#endif
-		break;
-	case TA_TIMER:
-#ifdef SYSV
-		cmn_err(CE_CONT,"<%s>", tcptimers[req]);
-#else
-		printf("<%s>", tcptimers[req]);
-#endif
-		break;
-	default:
+		printf("%s", prurequests[req&0xff]);
+		if ((req & 0xff) == PRU_SLOWTIMO)
+			printf("<%s>", tcptimers[req>>8]);
 		break;
 	}
 	if (tp)
-		if (tp->t_state > TCP_NSTATES || tp->t_state < 0) {
-#ifdef SYSV
-			cmn_err(CE_CONT," -> Bad State (%d)", tp->t_state);
-#else
-			printf(" -> Bad State (%d)", tp->t_state);
-#endif
-		} else {
-#ifdef SYSV
-			cmn_err(CE_CONT," -> %s", tcpstates[tp->t_state]);
-#else
-			printf(" -> %s", tcpstates[tp->t_state]);
-#endif
-		}
+		printf(" -> %s", tcpstates[tp->t_state]);
 	/* print out internal state of tp !?! */
-#ifdef SYSV
-	cmn_err(CE_CONT,"\n");
-#else
 	printf("\n");
-#endif
 	if (tp == 0)
 		return;
-#ifdef SYSV
-	cmn_err(CE_CONT,"\trcv_(nxt,wnd,up) (%lx,%lx,%x) snd_(una,nxt,max) (%lx,%lx,%lx)\n", tp->rcv_nxt, tp->rcv_wnd, tp->rcv_up, tp->snd_una, tp->snd_nxt, tp->snd_max);
-#else
-	printf("\trcv_(nxt,wnd,up) (%lx,%lx,%x) snd_(una,nxt,max) (%lx,%lx,%lx)\n", tp->rcv_nxt, tp->rcv_wnd, tp->rcv_up, tp->snd_una, tp->snd_nxt, tp->snd_max);
-#endif
-#ifdef SYSV
-	cmn_err(CE_CONT,"\tsnd_(wl1,wl2,wnd) (%x,%x,%x) snd_cwnd %x\n", tp->snd_wl1, tp->snd_wl2, tp->snd_wnd, tp->snd_cwnd);
-#else
-	printf("\tsnd_(wl1,wl2,wnd) (%x,%x,%x) snd_cwnd %x\n", tp->snd_wl1, tp->snd_wl2, tp->snd_wnd, tp->snd_cwnd);
-#endif
+	printf("\trcv_(nxt,wnd,up) (%x,%x,%x) snd_(una,nxt,max) (%x,%x,%x)\n",
+	    tp->rcv_nxt, tp->rcv_wnd, tp->rcv_up, tp->snd_una, tp->snd_nxt,
+	    tp->snd_max);
+	printf("\tsnd_(wl1,wl2,wnd) (%x,%x,%x)\n",
+	    tp->snd_wl1, tp->snd_wl2, tp->snd_wnd);
+#endif TCPDEBUG
 }

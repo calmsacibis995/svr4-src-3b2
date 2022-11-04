@@ -5,10 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/hde.c	1.15"
-
-/*
- * This file contains the Hard Disk Error Log Driver
+#ident	"@(#)kernel:io/hde.c	1.14"
+/* This file contains the Hard Disk Error Log Driver
  * that is part of the Bad Block Handling Feature.
  *
  * This driver provides the hdeeqd() and hdelog() subroutines
@@ -84,7 +82,7 @@ STATIC int	hdecmp();
 
 STATIC o_dev_t
 hdeddev(ddev)
-	o_dev_t ddev;
+o_dev_t ddev;
 {
 	/* The purpose of this function is to get rid of the */
 	/* extra bit used in the SV file system macros. */
@@ -208,7 +206,11 @@ int flag, otyp;
 	hdeclinp = u.u_procp->p_pid;
 	for (edp = hdeeqdt, i = 0; i < hdeeduc; edp++, i++) {
 		if (edp->hdepid) {
-			u.u_error = (*cdevsw[major(edp->hdeedev)].d_close)
+			if (*cdevsw[major(edp->hdeedev)].d_flag & D_OLD)
+				(*cdevsw[major(edp->hdeedev)].d_close)
+				    (edp->hdeedev, FREAD|FWRITE, OTYP_LYR);
+			else
+				u.u_error = (*cdevsw[major(edp->hdeedev)].d_close)
 				    (expdev(edp->hdeedev), FREAD|FWRITE, OTYP_LYR,
 				    u.u_cred);
 			edp->hdepid = 0;
@@ -235,7 +237,11 @@ hdeexit()
 	mypid = u.u_procp->p_pid;
 	for (edp = hdeeqdt, i = 0; i < hdeeduc; edp++, i++) {
 		if (edp->hdepid == mypid) {
-			u.u_error = (*cdevsw[major(edp->hdeedev)].d_close)
+			if (*cdevsw[major(edp->hdeedev)].d_flag & D_OLD)
+				(*cdevsw[major(edp->hdeedev)].d_close)
+				    (edp->hdeedev, FREAD|FWRITE, OTYP_LYR);
+			else
+				u.u_error = (*cdevsw[major(edp->hdeedev)].d_close)
 				    (expdev(edp->hdeedev), FREAD|FWRITE, OTYP_LYR,
 				    u.u_cred);
 			edp->hdepid = 0;
@@ -344,7 +350,11 @@ struct hdearg *uap, *kap;
 		bcopy((caddr_t) &khdarg, uadr, sizeof(struct io_arg));
 	}
 	ddev = kap->hdebody.hdedskio.hdeddev;
-	u.u_error = (*cdevsw[major(ddev)].d_ioctl)
+	if (*cdevsw[major(ddev)].d_flag & D_OLD)
+		(*cdevsw[major(ddev)].d_ioctl)
+		    (ddev, iocmd, uadr, FREAD|FWRITE);
+	else
+		u.u_error = (*cdevsw[major(ddev)].d_ioctl)
 		    (expdev(ddev), iocmd, uadr, FREAD|FWRITE, u.u_cred, &dummyrval);
 	if (u.u_error) {
 		kap->hderval = HDE_IOE;
@@ -436,7 +446,11 @@ struct hdearg *uarg;
 			/* LINTED implicit narrowing */
 			hdeeqdt[i].hdepid = my_pid;
 			maj = major(karg.hdebody.hdedskio.hdeddev);
-			{
+			if (*cdevsw[maj].d_flag & D_OLD)
+				(*cdevsw[maj].d_open)
+				    (karg.hdebody.hdedskio.hdeddev,
+				    FREAD|FWRITE, OTYP_LYR);
+			else {
 				dev_t tmpdev;
 				/* new-style drive so expand dev */
 				tmpdev = expdev(karg.hdebody.hdedskio.hdeddev);
@@ -483,7 +497,12 @@ struct hdearg *uarg;
 				break;
 			}
 			maj = major(karg.hdebody.hdedskio.hdeddev);
-			u.u_error = (*cdevsw[maj].d_close)
+			if (*cdevsw[maj].d_flag & D_OLD)
+				(*cdevsw[maj].d_close)
+				    (karg.hdebody.hdedskio.hdeddev,
+				    FREAD|FWRITE, OTYP_LYR);
+			else
+				u.u_error = (*cdevsw[maj].d_close)
 				    (expdev(karg.hdebody.hdedskio.hdeddev),
 				    FREAD|FWRITE, OTYP_LYR, u.u_cred);
 			hdeeqdt[i].hdepid = 0;

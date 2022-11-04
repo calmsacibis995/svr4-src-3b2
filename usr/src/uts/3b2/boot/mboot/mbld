@@ -1,4 +1,4 @@
-/* #ident	"@(#)boot:boot/mboot/mbld	11.3" */
+/* #ident	"@(#)boot:boot/mboot/mbld	11.2" */
 
 /* mboot.b loader instruction file */
 
@@ -9,6 +9,9 @@ MEMORY	{
 SECTIONS	{
 	.text: { } > mbcode
 	.data: { } > mbcode
+	.data1: { } > mbcode
+	.rodata: { } > mbcode
+	.rodata1: { } > mbcode
 	.bss:  { } > mbbss
 	}
 mboot.o

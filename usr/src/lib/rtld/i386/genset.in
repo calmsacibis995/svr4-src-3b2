@@ -1,0 +1,33 @@
+#ident	"@(#)rtld:i386/genset.in	1.1"
+
+errno	MIN
+_fp_hw	MIN
+_asr	MIN
+_environ	MIN
+__flt_rounds	MIN
+__ctype		MIN
+
+# defined in opt_data.o
+optind
+optarg
+opterr
+optopt
+
+# defined in data.o
+__iob
+_lastbuf
+_smbuf
+_bufendtab
+
+# defined in values-X*.o
+_lib_version
+
+# defined in _loc_data.o
+_cur_locale	MIN
+_numeric	MIN
+
+# defined in time_gdata.o
+_altzone	MIN
+_daylight	MIN
+_timezone	MIN
+_tzname	MIN

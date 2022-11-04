@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:sys/execl.c	1.5.1.6"
+#ident	"@(#)libc-port:sys/execl.c	1.5.1.5"
 /*
  *	execl(name, arg0, arg1, ..., argn, 0)
  *	environment automatically passed.
@@ -15,24 +15,13 @@
 	#pragma weak execl = _execl
 #endif
 #include "synonyms.h"
-#include <stdarg.h>
 
 extern int execve();
 
-int
-#ifdef __STDC__
-execl(char *name, ...)
-#else
-execl(name, va_alist) char *name; va_dcl
-#endif
+execl(name, args)
+char *name, *args;
 {
-	va_list args;
 	extern char **environ;
 
-#ifdef __STDC__
-	va_start(args,);
-#else
-	va_start(args);
-#endif
-	return (execve(name, args, environ));
+	return (execve(name, &args, environ));
 }

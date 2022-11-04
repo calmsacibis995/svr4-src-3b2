@@ -11,7 +11,7 @@
 /*	This Module contains Proprietary Information of Microsoft 	*/
 /*	Corporation and should be treated as Confidential.	*/
 
-#ident	"@(#)fs:fs/xnamfs/xsd.c	1.12"
+#ident	"@(#)fs:fs/xnamfs/xsd.c	1.11"
 
 /*
  *	@(#)sd.c	1.5 87/06/22 
@@ -575,7 +575,7 @@ sdlvcm(sdp)
 	if (*flg & SDI_NTFY)
 	{
 		*flg &= ~(SDI_NTFY);
-		wakeprocs((caddr_t)sdp->sd_xnamnode, PRMPT);
+		wakeup((caddr_t)sdp->sd_xnamnode);
 	}
 }
 

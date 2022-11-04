@@ -8,7 +8,7 @@
 #ifndef _FS_RFS_SERVE_H
 #define  _FS_RFS_SERVE_H
 
-#ident	"@(#)fs:fs/rfs/rf_serve.h	1.9"
+#ident	"@(#)fs:fs/rfs/rf_serve.h	1.4.1.1"
 /*
  * Declarations internal to the RFS/DUFST server
  *
@@ -120,13 +120,7 @@ extern int	rsubyte();
 extern int	rsuword();
 extern mblk_t	*rfsr_rpalloc();
 extern int	rfsr_lastdirents();
-extern int	rfsr_j_accuse();
-extern int	rfm_addmap();
-extern int	rfm_check();
-extern void	rfm_delmap();
-extern void	rfm_empty();
-extern void	rfm_lock();
-extern void	rfm_unlock();
+extern int	rfsr_discon();
 
 extern void	rf_serve();		/* main program of RFS server */
 
@@ -150,11 +144,5 @@ extern struct proc *rfsr_active_procp;
 extern int rfsr_nactive;
 
 extern int rfsr_nservers;		/* total number of servers */
-
-#ifdef DEBUG
-extern int	rfsr_idle_lock;
-extern int	rfsr_active_lock;
-extern int	rfsr_msg_lock;
-#endif
 
 #endif /* _FS_RFS_SERVE_H */

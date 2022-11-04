@@ -6,15 +6,14 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:pkgxpand.c	1.3.1.1"
+#ident	"@(#)libpkg:pkgxpand.c	1.3"
 
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
 
 extern char	*fpkginst();
-extern void	*calloc(), 
-		*realloc();
+extern void	*malloc(), *realloc();
 extern char	*pkgdir;
 
 #define LSIZE	512

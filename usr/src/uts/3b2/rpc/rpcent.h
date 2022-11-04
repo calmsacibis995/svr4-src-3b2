@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/rpc/rpcent.h	1.3"
+#ident	"@(#)head.sys:sys/rpc/rpcent.h	1.2"
 
 /*	@(#)rpcent.h 1.1 88/12/06 SMI	*/
 
@@ -36,9 +36,6 @@
  *
  */
 
-#ifndef _RPC_RPCENT_H
-#define _RPC_RPCENT_H
-
 struct rpcent {
 	char	*r_name;	/* name of server for this rpc program */
 	char	**r_aliases;	/* alias list */
@@ -49,4 +46,3 @@ extern struct rpcent *getrpcbyname(), *getrpcbynumber(), *getrpcent();
 extern int setrpcent();
 extern void endrpcent();
 
-#endif /* _RPC_RPCENT_H */

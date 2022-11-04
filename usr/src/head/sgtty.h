@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:sgtty.h	1.3.1.3"
+#ident	"@(#)head:sgtty.h	1.3.1.2"
 
 #ifndef _SGTTY_H
 #define _SGTTY_H
@@ -64,17 +64,6 @@ struct sgttyb {
 	char	sg_kill;		/* kill character */
 	int	sg_flags;		/* mode flags */
 };
-
-/* BSD local special chars. Structure for TIOCSLTC/TIOCGLTC */
-struct ltchars {
-	char	t_suspc;	/* stop process signal */
-	char	t_dsuspc;	/* delayed stop process signal */
-	char	t_rprntc;	/* reprint line */
-	char	t_flushc;	/* flush output (toggles) */
-	char	t_werasc;	/* word erase */
-	char	t_lnextc;	/* literal next character */
-};
-
 /*
  * Speeds
  */

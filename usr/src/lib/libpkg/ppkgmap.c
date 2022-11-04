@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:ppkgmap.c	1.4.1.1"
+#ident	"@(#)libpkg:ppkgmap.c	1.4"
 
 #include <stdio.h>
 #include <string.h>
@@ -43,14 +43,14 @@ FILE *fp;
 	}
 
 	if(strchr("cb", ept->ftype)) {
-		if(ept->ainfo.major == BADMAJOR) {
+		if(ept->ainfo.major < 0) {
 			if(fprintf(fp, " ?") < 0)
 				return(-1);
 		} else {
 			if(fprintf(fp, " %d", ept->ainfo.major) < 0)
 				return(-1);
 		}
-		if(ept->ainfo.minor == BADMINOR) {
+		if(ept->ainfo.minor < 0) {
 			if(fprintf(fp, " ?") < 0)
 				return(-1);
 		} else {
@@ -60,7 +60,7 @@ FILE *fp;
 	}
 
 	if(strchr("dxcbpfve", ept->ftype)) {
-		if(fprintf(fp, ((ept->ainfo.mode == BADMODE) ? " ?" : " %04o"), 
+		if(fprintf(fp, ((ept->ainfo.mode < 0) ? " ?" : " %04o"), 
 		   ept->ainfo.mode) < 0)
 			return(-1);
 		if(fprintf(fp, " %s %s", ept->ainfo.owner, ept->ainfo.group) < 0)
@@ -73,13 +73,13 @@ FILE *fp;
 	}
 
 	if(strchr("ifve", ept->ftype)) {
-		if(fprintf(fp, ((ept->cinfo.size == BADCONT) ? " ?" : " %ld"), 
+		if(fprintf(fp, ((ept->cinfo.size < 0) ? " ?" : " %ld"), 
 		   ept->cinfo.size) < 0)
 			return(-1);
-		if(fprintf(fp, ((ept->cinfo.cksum == BADCONT) ? " ?" : " %ld"), 
+		if(fprintf(fp, ((ept->cinfo.cksum < 0) ? " ?" : " %ld"), 
 		   ept->cinfo.cksum) < 0)
 			return(-1);
-		if(fprintf(fp, ((ept->cinfo.modtime == BADCONT) ? " ?" : " %ld"), 
+		if(fprintf(fp, ((ept->cinfo.modtime < 0) ? " ?" : " %ld"), 
 		   ept->cinfo.modtime) < 0)
 			return(-1);
 	}

@@ -1,4 +1,4 @@
-/*	Copyright (c) 1988 AT&T	*/
+/*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 /*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
@@ -175,7 +175,7 @@ minute 00
 	fields to the given values.  the following shell procedure
 	might be used to populate the data_input file and invoke mkform.
 
-date "+by $LOGNAME%nmonth %m%nday %d%nhour 8/22/89nminute %M" >/usr/tmp/data$$
+date "+by $LOGNAME%nmonth %m%nday %d%nhour 6/7/89nminute %M" >/usr/tmp/data$$
 mkform memo.desc /usr/tmp/data$$ msg$$
 rm /usr/tmp/data$$
 

@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_blklist.c	1.7"
+#ident	"@(#)fs:fs/ufs/ufs_blklist.c	1.5"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -165,18 +142,9 @@ int			indlvl;
 	int 		bsize;
 	struct vnode	*vp;
 	struct fs *fs;
-	int sksize;
 
 	vp = ITOV(ip);
 	bsize = vp->v_vfsp->vfs_bsize;
-	if (blknbr == 0) {
-		sksize = 1;
-		for (cnt = 0; cnt <= indlvl; cnt++)
-			sksize *= (bsize/sizeof(int));
-		for (cnt = 0; cnt < sksize; cnt++)
-			*lp++ = 0;
-		return lp;
-	}
 	fs = getfs(vp->v_vfsp);
 	bp = bread(dev, fragstoblks(fs, blknbr), bsize);
 	if (u.u_error) {

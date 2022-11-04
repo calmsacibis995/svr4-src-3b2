@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:disp/sysclass.c	1.12"
+#ident	"@(#)kernel:disp/sysclass.c	1.11"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/psw.h"
@@ -37,44 +37,98 @@
  */
 
 void		sys_init();
-STATIC int	sys_fork(), sys_nosys();
-STATIC void	sys_forkret(), sys_nullsys(), sys_preempt(), sys_setrun();
+STATIC int	sys_admin(), sys_enterclass(), sys_fork(), sys_getclinfo();
+STATIC int	sys_parmsin(), sys_parmsout(), sys_parmsset(), sys_proccmp();
+STATIC void	sys_forkret(), sys_nullclass(), sys_preempt(), sys_setrun();
 STATIC void	sys_sleep(), sys_wakeup();
 
 STATIC struct classfuncs sys_classfuncs = {
-	sys_nosys,
-	sys_nosys,
-	sys_nullsys,
+	sys_admin,
+	sys_enterclass,
+	sys_nullclass,
 	sys_fork,
 	sys_forkret,
-	sys_nosys,
-	sys_nullsys,
-	sys_nullsys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
+	sys_getclinfo,
+	sys_nullclass,
+	sys_nullclass,
+	sys_parmsin,
+	sys_parmsout,
+	sys_parmsset,
 	sys_preempt,
-	sys_nosys,
+	sys_proccmp,
 	sys_setrun,
 	sys_sleep,
-	sys_nullsys,
-	sys_nullsys,
-	sys_nullsys,
-	sys_nullsys,
-	sys_nullsys,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
 	sys_wakeup,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys,
-	sys_nosys
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass,
+	sys_nullclass
 };
+
+
+/*
+ * The following several functions are no-ops for the sys class.
+ * They will never be called but they make things build nicely.
+ */
+STATIC int
+sys_admin()
+{
+	return(0);
+}
+
+
+STATIC int
+sys_enterclass()
+{
+	return(0);
+}
+
+	
+STATIC int
+sys_getclinfo()
+{
+	return(0);
+}
+
+	
+STATIC int
+sys_parmsin()
+{
+	return(0);
+}
+
+
+STATIC int
+sys_parmsout()
+{
+	return(0);
+}
+
+
+STATIC int
+sys_parmsset()
+{
+	return(0);
+}
+
+
+STATIC int
+sys_proccmp()
+{
+	return(0);
+}
 
 
 /* ARGSUSED */
@@ -126,15 +180,8 @@ proc_t	*pprocp;
 }
 
 
-STATIC int
-sys_nosys()
-{
-	return(ENOSYS);
-}
-
-
 STATIC void
-sys_nullsys()
+sys_nullclass()
 {
 }
 

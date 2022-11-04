@@ -5,10 +5,33 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/sockmod.c	1.10"
+#ident	"@(#)kernel:io/sockmod.c	1.4.2.6"
 
 /*
- * Socket Interface Library cooperating module - issue 1
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 		PROPRIETARY NOTICE (Combined)
+ * 
+ * This source code is unpublished proprietary information
+ * constituting, or derived under license from AT&T's UNIX(r) System V.
+ * In addition, portions of such source code were derived from Berkeley
+ * 4.3 BSD under license from the Regents of the University of
+ * California.
+ * 
+ * 
+ * 
+ * 		Copyright Notice 
+ * 
+ * Notice of copyright on this source code product does not indicate 
+ * publication.
+ * 
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+ * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ * 	          All rights reserved.
+ *  
+ */
+
+/*
+ * Socket Interface Library cooperating module
  */
 #include <sys/param.h>
 #include <sys/types.h>
@@ -36,7 +59,7 @@
 
 #define	SIMOD_ID	50
 #define SIMWAIT		(1*HZ)
-#define	MSGBLEN(A)	(int)((A)->b_wptr - (A)->b_rptr)
+#define	MSGBLEN(A)	((A)->b_wptr - (A)->b_rptr)
 #define	MBLKLEN(A)	(int)((A)->b_datap->db_lim - (A)->b_datap->db_base)
 #define _S_RECOVER(A, B, C) \
 			{ \
@@ -81,49 +104,14 @@ struct so_so {
 	mblk_t  		*bigmsg;
 	struct	so_ux		so_ux;
 	ulong			msgcnt;
-	int			sndbuf;
-	int			rcvbuf;
-	int			sndlowat;
-	int			rcvlowat;
-	int			linger;
-	int			sndtimeo;
-	int			rcvtimeo;
-	int			prototype;
 };
 
 extern	struct so_so	so_so[];
 extern 	int		so_cnt;
 extern	int		nulldev();
 
-#if defined(__STDC__)
-static	int		tlitosyserr(int);
-static	long		_t_setsize(long);
-STATIC	int		so_options(queue_t *, mblk_t *);
-STATIC	mblk_t		*_s_getmblk(mblk_t *, size_t);
-STATIC	void		snd_ERRACK(queue_t *, mblk_t *, int, int);
-STATIC	void		snd_OKACK(queue_t *, mblk_t *, int);
-STATIC	int		so_init(struct so_so *, struct T_info_ack *);
-STATIC	void		strip_zerolen(mblk_t *);
-STATIC	void		save_addr(struct netbuf *, caddr_t, size_t);
-STATIC	void		snd_SIGPIPE(queue_t *);
-STATIC	void		snd_ZERO(queue_t *);
-STATIC	void		snd_FLUSHR(queue_t *);
-STATIC	void		snd_ERRORW(queue_t *);
-STATIC	void		snd_IOCNAK(queue_t *, mblk_t *, int);
-STATIC	void		ux_dellink(struct so_so *);
-STATIC	void		ux_addlink(struct so_so *);
-STATIC	struct so_so	*ux_findlink(caddr_t, size_t);
-STATIC	void		ux_restoreaddr(struct so_so *, mblk_t *,
-						caddr_t, size_t);
-STATIC	void		ux_saveraddr(struct so_so *, struct bind_ux *);
-STATIC	void		fill_udata_req_addr(mblk_t *, caddr_t, size_t);
-STATIC	void		fill_udata_ind_addr(mblk_t *, caddr_t, size_t);
-STATIC  mblk_t		*_s_makeopt(struct so_so *);
-STATIC  void		_s_setopt(mblk_t *, struct so_so *);
-STATIC	void		do_ERROR(struct so_so *, queue_t *, mblk_t *);
-#else
-static	int		tlitosyserr();
-static	long		_t_setsize();
+STATIC	int		tlitosyserr();
+STATIC	long		_t_setsize();
 STATIC	int		so_options();
 STATIC	mblk_t		*_s_getmblk();
 STATIC	void		snd_ERRACK();
@@ -143,10 +131,6 @@ STATIC	void		ux_restoreaddr();
 STATIC	void		ux_saveraddr();
 STATIC	void		fill_udata_req_addr();
 STATIC	void		fill_udata_ind_addr();
-STATIC  mblk_t		*_s_makeopt();
-STATIC  void		_s_setopt();
-STATIC	void		do_ERROR();
-#endif
 
 int	socklog = 0;
 #define SOCKLOG(S, A, B, C, D, E, F)  \
@@ -239,17 +223,9 @@ SOCKLOG((struct so_so *)NULL, SIMOD_ID, 0, 0, SL_TRACE, "sockmodopen: Allocated 
 	so->consave = NULL;
 	so->oob = NULL;
 	so->so_error = 0;
+	so->so_option = 0;
 	so->so_conn = NULL;
 	so->msgcnt = 0;
-	so->so_option = 0;
-	so->sndbuf = 0;
-	so->rcvbuf = 0;
-	so->sndlowat = 0;
-	so->rcvlowat = 0;
-	so->linger = 0;
-	so->sndtimeo = 0;
-	so->rcvtimeo = 0;
-	so->prototype = 0;
 	bzero((caddr_t)&so->udata, sizeof(struct si_udata));
 
 	bzero((caddr_t)&so->lux_dev, sizeof(struct ux_extaddr));
@@ -263,19 +239,19 @@ SOCKLOG((struct so_so *)NULL, SIMOD_ID, 0, 0, SL_TRACE, "sockmodopen: Allocated 
 	/* Send down T_INFO_REQ and wait for a reply
 	 */
 	if ((bp = allocb(sizeof(struct T_info_req) +
-		sizeof(struct T_info_ack), BPRI_LO)) == (mblk_t *)NULL) {
+			 sizeof(struct T_info_ack), BPRI_LO)) == NULL) {
 		so->flags = 0;
 		return ENOSR;
 	}
  
 	so->flags |= S_WINFO;
 	bp->b_datap->db_type = M_PCPROTO;
-	*(long *)bp->b_wptr = (long)T_INFO_REQ;
+	*(long *)bp->b_wptr = T_INFO_REQ;
 	bp->b_wptr += sizeof(struct T_info_req);
 	putnext(WR(q), bp);
 
 	while (so->flags & S_WINFO) {
-		 if (sleep((caddr_t)so, (int)(PZERO+1|PCATCH))) {
+		 if (sleep(so, PZERO+1|PCATCH)) {
 			/* Interrupted
 			 */
 			so->flags = 0;
@@ -292,7 +268,7 @@ SOCKLOG((struct so_so *)NULL, SIMOD_ID, 0, 0, SL_TRACE, "sockmodopen: Allocated 
 	 * addresses.
 	 */
 	if ((so->laddr.buf = (char *)kmem_alloc(so->udata.addrsize, 
-						KM_SLEEP)) == (caddr_t)NULL) {
+						KM_SLEEP)) == NULL) {
 		so->flags = 0;
 		return EAGAIN;
 	}
@@ -301,7 +277,7 @@ SOCKLOG((struct so_so *)NULL, SIMOD_ID, 0, 0, SL_TRACE, "sockmodopen: Allocated 
 	(void)bzero(so->laddr.buf, so->udata.addrsize);
 
 	if ((so->raddr.buf = (char *)kmem_alloc(so->udata.addrsize, 
-						KM_SLEEP)) == (caddr_t)NULL) {
+						KM_SLEEP)) == NULL) {
 		so->flags = 0;
 		kmem_free(so->laddr.buf, so->laddr.maxlen);
 		return EAGAIN;
@@ -326,7 +302,7 @@ SOCKLOG(so, SIMOD_ID, 0, 0, SL_TRACE, "sockmodopen: WRq maxpsz %x\n", OTHERQ(q)-
 	 * Set M_READ and discard M_PROTO/M_PASSFP
 	 * messages in strread().
 	 */
-	if ((bp = allocb(sizeof(*stropt), BPRI_MED)) == (mblk_t *)NULL) {
+	if ((bp = allocb(sizeof(*stropt), BPRI_MED)) == NULL) {
 		so->flags = 0;
 		return ENOSR;
 	}
@@ -387,8 +363,6 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodclose: Entered\n", 0);
 	ux_dellink(so);
 #endif
 	so->flags = 0;
-
-	return 0;
 }
 
 
@@ -418,18 +392,6 @@ sockmodrput(q, mp)
 
 	case M_FLUSH:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Got M_FLUSH\n", 0);
-		/* This is a kludge until something better
-		 * is done. If this is a AF_UNIX socket,
-		 * ignore the M_FLUSH and don't propogate it.
-		 */
-		if (so->laddr.len > 0 && 
-				((sockaddr_t)so->laddr.buf)->sa_family ==
-								 AF_UNIX) {
-SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Ignoring M_FLUSH\n", 0);
-			freemsg(mp);
-			return 0;
-		}
-
 		if (*mp->b_rptr & FLUSHW)
 			flushq(WR(q), FLUSHDATA);
 		if (*mp->b_rptr & FLUSHR)
@@ -449,14 +411,13 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Got M_IOCACK\n", 0);
 			return 0;
 
 		case TI_GETPEERNAME:
+			if (so->udata.servtype == T_CLTS)
+				so->udata.so_state |= SS_ISCONNECTED;
+			/* Deliberate fall thru.
+			 */
 		case TI_GETMYNAME:
 			ASSERT(so->iocsave != NULL);
 			freemsg(so->iocsave);
-
-			if (iocbp->ioc_cmd == TI_GETPEERNAME &&
-					so->udata.servtype == T_CLTS)
-				so->udata.so_state |= SS_ISCONNECTED;
-
 			so->iocsave = NULL;
 			so->flags &= ~WAITIOCACK;
 			putnext(q, mp);
@@ -553,7 +514,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Got T_UNITDATA_IND\n"
 				}
 				else	{
 					if (bcmp(so->raddr.buf, 
-				  (caddr_t)(mp->b_rptr+udata_ind->SRC_offset),
+				  	      mp->b_rptr+udata_ind->SRC_offset,
 					      so->raddr.len) != 0) {
 						/* Log error and free the msg.
 					 	 */
@@ -578,14 +539,13 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Got T_UNITDATA_IND\n"
 			if (((sockaddr_t)so->raddr.buf)->sa_family == AF_UNIX) {
 #ifdef _AF_UNIX
 				register struct so_so	*oso;
-				register size_t		size;
+				register int		size;
 				register char 		*addr;
 
 				addr = (caddr_t)(mp->b_rptr +
 						udata_ind->SRC_offset);
 				if ((oso = ux_findlink(addr,
-					  (size_t)udata_ind->SRC_length)) ==
-								NULL) {
+					  udata_ind->SRC_length)) == NULL) {
 					freemsg(mp);
 					return 0;
 				}
@@ -594,8 +554,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrput: Got T_UNITDATA_IND\n"
 				if (MBLKLEN(mp) < size) {
 					register mblk_t		*bp;
 
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+								 == NULL) {
 						putq(q, mp);
 						return 0;
 					}
@@ -692,14 +652,14 @@ sockmodrsrv(q)
 	register mblk_t			*bp;
 	register mblk_t			*mp;
 	register int			s;
-	register size_t			size;
+	register int			size;
 
 	ASSERT(q != NULL);
 	so = (struct so_so *)q->q_ptr;
 	ASSERT(so != NULL);
 
 rgetnext:
-	if ((mp = getq(q)) == (mblk_t *)NULL) {
+	if ((mp = getq(q)) == NULL) {
 		if (so->flags & S_RBLOCKED)
 			so->flags &= ~S_RBLOCKED;
 		return 0;
@@ -725,37 +685,47 @@ rgetnext:
 
 		case T_DISCON_IND:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_DISCON_IND Reason: %d\n", pptr->discon_ind.DISCON_reason);
+			so->udata.so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
 			so->so_error = pptr->discon_ind.DISCON_reason;
 
-			/* If this is in response to a connect,
+			/* If this is in response to a disconnect,
 			 * and the caller is waiting, then send the
 			 * disconnect up.
 			 */
-			if (so->udata.so_state & SS_ISCONNECTING) {
-				if ((so->flags & S_WRDISABLE) == 0) {
-					/* Send the disconnect up, so that
-				  	 * the reason can be extracted.
-				 	 */
-					putnext(q, mp);
+			if (so->udata.so_state & SS_ISCONNECTING &&
+						!(so->flags & S_WRDISABLE)) {
+				/* Make sure we can get a buffer before we
+				 * carry on.
+				 */
+				if ((bp = _s_getmblk(NULL, 2)) == NULL) {
+					_S_RECOVER(q, mp, 2);
+					return 0;
 				}
-				else	{
-					/* Enable the write service queue to
-					 * be scheduled, and schedule it.
-					 */
-					enableok(WR(q));
-					qenable(WR(q));
-					freemsg(mp);
-				}
+				/* Send the disconnect up, so that
+				 * the reason can be extracted.
+				 */
+				putnext(q, mp);
+				mp = bp;
 			}
 			else	{
-				/* Just wake any readers.
-				 */
-				freemsg(mp);
-				snd_ZERO(q);
+				mp->b_rptr = mp->b_wptr = mp->b_datap->db_base;
+				freemsg(mp->b_cont);
+				mp->b_cont = NULL;
 			}
 
-			so->udata.so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
-			so->udata.so_state &= ~(SS_ISCONNECTED|SS_ISCONNECTING);
+			/* Send up an M_ERROR with the disconnect reason
+			 */
+SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Sending up M_ERROR\n",0);
+			/* New M_ERROR flavour.
+			 */
+			mp->b_datap->db_type = M_ERROR;
+			*mp->b_wptr++ = so->so_error;
+			*mp->b_wptr++ = EPIPE;
+			putnext(q, mp);
+
+			/* Send a SIGPIPE for good luck.
+			 */
+			snd_SIGPIPE(q);
 
 			goto rgetnext;
 
@@ -777,7 +747,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_CONN_IND\n", 0)
 			/* Make sure we can dup the new
 			 * message before proceeding.
 			 */
-			if ((nbp = dupmsg(mp)) == (mblk_t *)NULL) {
+			if ((nbp = dupmsg(mp)) == NULL) {
 				_S_RECOVER(q, mp, sizeof(mblk_t));
 				return 0;
 			}
@@ -798,16 +768,15 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_CONN_IND\n", 0)
 				addr = (caddr_t)(mp->b_rptr +
 						conn_ind->SRC_offset);
 				if ((oso = ux_findlink(addr,
-					(size_t)conn_ind->SRC_length)) ==
-								NULL) {
+					conn_ind->SRC_length)) == NULL) {
 					freemsg(mp);
 					goto rgetnext;
 				}
 
 				size = sizeof(*nconn_ind) + oso->laddr.len;
 				if (MBLKLEN(mp) < size) {
-					if ((bp = _s_getmblk((mblk_t *)NULL, 
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+								 == NULL) {
 						_S_RECOVER(q, mp, size);
 						freemsg(nbp);
 						return 0;
@@ -823,8 +792,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_CONN_IND\n", 0)
 				}
 				conn_ind = (struct T_conn_ind *)mp->b_rptr;
 				(void)bcopy(oso->laddr.buf,
-					(caddr_t)(mp->b_rptr +
-						conn_ind->SRC_offset),
+					mp->b_rptr + conn_ind->SRC_offset,
 					oso->laddr.len);
 
 				conn_ind->SRC_length = oso->laddr.len;
@@ -879,8 +847,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_CONN_CON\n", 0)
 					register struct T_conn_con *nconn_con;
 					register mblk_t		   *bp;
 
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+								 == NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -905,8 +873,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_CONN_CON\n", 0)
 #endif
 			}
 			else	save_addr(&so->raddr,
-				(caddr_t)(mp->b_rptr+conn_con->RES_offset),
-						(size_t)conn_con->RES_length);
+						mp->b_rptr+conn_con->RES_offset,
+						conn_con->RES_length);
 
 			putnext(q, mp);
 			goto rgetnext;
@@ -935,8 +903,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_UNITDATA_IND\n"
 						udata_ind->SRC_offset);
 
 				if ((oso = ux_findlink(addr,
-					  (size_t)udata_ind->SRC_length)) ==
-								NULL) {
+					  udata_ind->SRC_length)) == NULL) {
 					freemsg(mp);
 					goto rgetnext;
 				}
@@ -945,8 +912,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_UNITDATA_IND\n"
 				if (MBLKLEN(mp) < size) {
 					register mblk_t		*bp;
 
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+								 == NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -1001,7 +968,7 @@ SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "sockmodrput: Got zero length msg\n", 0);
 			goto rgetnext;
 
 		case T_EXDATA_IND: {
-			register mblk_t	*nmp, *nbp;
+			register mblk_t	*nmp;
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_EXDATA_IND\n", 0);
 			/* If the socket is marked such that we don't
 			 * want to get anymore data then free it.
@@ -1040,44 +1007,32 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_EXDATA_IND\n", 
 				 * Make sure that we can allocate the
 				 * message block for the SIGURG as well.
 				 */
-				if ((nmp = _s_getmblk((mblk_t *)NULL, size))
-							== (mblk_t *)NULL ||
-				     (bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL ||
-				     (nbp = _s_getmblk((mblk_t *)NULL,
-						(size_t)2)) == (mblk_t *)NULL) {
+				if ((nmp = _s_getmblk(NULL, size)) == NULL ||
+				     (bp = _s_getmblk(NULL, size)) == NULL) {
 					if (nmp)
 						freemsg(nmp);
-					if (bp)
-						freemsg(bp);
-					_S_RECOVER(q, mp, size*2+2);
+					_S_RECOVER(q, mp, size*2);
 					return 0;
 				}
+				nmp->b_datap->db_type = M_PROTO;
+				*(long *)nmp->b_wptr = T_EXDATA_IND;
+				nmp->b_wptr += size;
+				nmp->b_flag |= MSGMARK;
+				putnext(q, nmp);
 
-				if (so->oob)
+				nmp = mp->b_cont;
+				if (so->oob) 
 					freemsg(so->oob);
-				so->oob = mp->b_cont;
-				mp->b_cont = NULL;
+				so->oob = nmp;
+
+				nmp->b_cont = NULL;
 				freeb(mp);
-
-				mp = nmp;
-				mp->b_datap->db_type = M_PROTO;
-				*(long *)mp->b_wptr = (long)T_EXDATA_IND;
-				mp->b_wptr += size;
-				mp->b_flag |= MSGMARK;
-
 			}
 			else	{
-				/* Allocate the SIGURG message block,
-				 * and the M_FLUSH.
+				/* Allocate the SIGURG message block.
 				 */
-				if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL ||
-					(nbp = _s_getmblk((mblk_t *)NULL,
-						(size_t)2)) == (mblk_t *)NULL) {
-					if (bp)
-						freemsg(bp);
-					_S_RECOVER(q, mp, size+2);
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
+					_S_RECOVER(q, mp, size);
 					return 0;
 				}
 				/* Send up the OOB data.
@@ -1085,6 +1040,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_EXDATA_IND\n", 
 				strip_zerolen(mp);
 				mp->b_band = 0;
 				mp->b_flag |= MSGMARK;
+				putnext(q, mp);
 			}
 
 			/* Cause a SIGURG to be sent irrespective
@@ -1102,18 +1058,6 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_EXDATA_IND\n", 
 			 */
 			bp->b_band = 1;
 			putnext(q, bp);
-
-			/* Flush it so that I_ATMARK works okay if
-			 * there is no other data at the stream head.
-			 */
-			nbp->b_datap->db_type = M_FLUSH;
-			*nbp->b_wptr++ = FLUSHR|FLUSHBAND;
-			*nbp->b_wptr++ = 1;	/* Band to flush */
-			putnext(q, nbp);
-
-			/* Now send up the mark or OOB data.
-			 */
-			putnext(q, mp);
 
 			goto rgetnext;
 		}
@@ -1135,7 +1079,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_ERROR_ACK\n", 0
 					so->so_error = 
 						pptr->error_ack.UNIX_error;
 				else	so->so_error = 
-				tlitosyserr((int)pptr->error_ack.TLI_error);
+					tlitosyserr(pptr->error_ack.TLI_error);
 
 				/* The error is a result of
 				 * our internal unbind request.
@@ -1151,7 +1095,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_ERROR_ACK\n", 0
 					so->so_error = 
 						pptr->error_ack.UNIX_error;
 				else	so->so_error = 
-				tlitosyserr((int)pptr->error_ack.TLI_error);
+					tlitosyserr(pptr->error_ack.TLI_error);
 
 				so->flags &= ~S_WINFO;
 				wakeup(so);
@@ -1182,21 +1126,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_ERROR_ACK\n", 0
 			}
 			else
 			if (pptr->error_ack.ERROR_prim == T_OPTMGMT_REQ) {
-SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE,
-				"sockmodrsrv: T_ERROR_ACK-optmgmt- %x\n",
-							so->so_option);
-				if (pptr->error_ack.TLI_error == TBADOPT &&
-							so->so_option) {
-					/* Must have been a T_NEGOTIATE
-					 * for a socket option. Make it
-					 * all work.
-					 */
-					freemsg(mp);
-					mp = _s_makeopt(so);
+				if (so->so_option)
 					so->so_option = 0;
-					goto out;
-				}
-				else	so->so_option = 0;
 			}
 
 			switch (pptr->error_ack.ERROR_prim) {
@@ -1229,12 +1160,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE,
 
 		case T_OK_ACK:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_OK_ACK\n", 0);
-
 			if (pptr->ok_ack.CORRECT_prim == T_CONN_RES) {
-				register struct so_so	*oso;
-
-				oso = so->so_conn;
-				oso->udata.so_state |= SS_ISCONNECTED;
+				so->so_conn->udata.so_state |= SS_ISCONNECTED;
 				so->so_conn = NULL;
 			}
 			if (so->flags & S_WUNBIND &&
@@ -1304,7 +1231,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 				if (so->lux_dev.size == 0) {
 					(void)bcopy(addr,
 					(caddr_t)&so->lux_dev.addr,
-						(size_t)bind_ack->ADDR_length);
+						bind_ack->ADDR_length);
 					so->lux_dev.size =
 							bind_ack->ADDR_length;
 				}
@@ -1313,14 +1240,13 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 				 * string part of the address as well as
 				 * the actual address bound to.
 				 */
-				size = sizeof(struct bind_ux) +
-						 sizeof(*bind_ack);
+				size = sizeof(struct bind_ux) + sizeof(*bind_ack);
 				if (MBLKLEN(mp) < size) {
 					register struct T_bind_ack *nbind_ack;
 					register mblk_t		   *bp;
 
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+								 == NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -1331,7 +1257,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 					*nbind_ack = *bind_ack;
 
 					ux_restoreaddr(so, bp, addr,
-						(size_t)bind_ack->ADDR_length);
+						bind_ack->ADDR_length);
 					bp->b_wptr = bp->b_rptr + size;
 
 					freemsg(mp);
@@ -1339,7 +1265,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 				}
 				else	{
 					ux_restoreaddr(so, mp, addr,
-						(size_t)bind_ack->ADDR_length);
+						bind_ack->ADDR_length);
 					mp->b_wptr = mp->b_rptr + size;
 				}
 			}
@@ -1348,8 +1274,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 				/* Remember the bound address.
 				 */
 				save_addr(&so->laddr,
-				(caddr_t)(mp->b_rptr+bind_ack->ADDR_offset),
-					(size_t)bind_ack->ADDR_length);
+					mp->b_rptr+bind_ack->ADDR_offset,
+					bind_ack->ADDR_length);
 			}
 
 			so->udata.so_state |= SS_ISBOUND;
@@ -1361,18 +1287,12 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_BIND_ACK\n", 0)
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_OPTMGMT_ACK\n", 0);
 			if (so->flags & WAITIOCACK) {
 				ASSERT(so->iocsave != NULL);
-				if (*(long *)so->iocsave->b_cont->b_rptr !=
-								T_OPTMGMT_REQ) {
+				if (*(long *)so->iocsave->b_cont->b_rptr != T_OPTMGMT_REQ) {
 					putnext(q, mp);
 					goto rgetnext;
 				}
 				if (so->so_option) {
-SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, 
-		"sockmodrsrv: T_OPTMGMT_ACK option %x\n", so->so_option);
-					/* Check that the value negotiated is
-				 	* the one that we stored.
-				 	*/
-					_s_setopt(mp, so);
+					so->udata.so_options |= so->so_option;
 					so->so_option = 0;
 				}
 				goto out;
@@ -1385,6 +1305,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodrsrv: Got T_INFO_ACK\n", 0)
 			if (so->flags & S_WINFO) {
 				so->so_error = so_init(so,
 				    (struct T_info_ack *)pptr);
+
 
 				so->flags &= ~S_WINFO;
 				wakeup(so);
@@ -1440,7 +1361,7 @@ sockmodwput(q, mp)
 	register struct so_so		*so;
 	register union T_primitives	*pptr;
 	register mblk_t			*bp;
-	register size_t			size;
+	register int			size;
 	register int			s;
 
 	ASSERT(q != NULL);
@@ -1520,11 +1441,6 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got M_IOCDATA\n", 0);
 
 	case M_DATA:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got M_DATA state %x\n", so->udata.so_state);
-		if (so->udata.so_state & SS_CANTSENDMORE) {
-			do_ERROR(so, RD(q), mp);
-			return 0;
-		}
-
 		if ( !(so->udata.so_state & SS_ISCONNECTED)) {
 			/* Set so_error, and free the message.
 			 */
@@ -1532,6 +1448,17 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got M_DATA state %x\n
 			freemsg(mp);
 			return 0;
 		}
+		if (so->udata.so_state & SS_CANTSENDMORE) {
+			/* Set so_error, send SIGPIPE,
+			 * followed by new M_ERROR.
+			 */
+			freemsg(mp);
+			so->so_error = EPIPE;
+			snd_SIGPIPE(RD(q));
+			snd_ERRORW(RD(q));
+			return 0;
+		}
+
 		/* Pre-pend the M_PROTO header.
 		 */
 		if (so->udata.servtype == T_CLTS) {
@@ -1539,8 +1466,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got M_DATA state %x\n
 #ifdef _AF_UNIX
 				size = sizeof(struct T_unitdata_req) +
 							 so->rux_dev.size;
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					putq(q, mp);
 					return 0;
 				}
@@ -1555,8 +1481,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: M_DATA: size %x\n", s
 				 */
 				size = sizeof(struct T_unitdata_req) +
 							 so->raddr.len;
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					putq(q, mp);
 					return 0;
 				}
@@ -1597,10 +1522,14 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: canput returned true\
 		case T_DATA_REQ:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got T_DATA_REQ\n", 0);
 			if (so->udata.so_state & SS_CANTSENDMORE) {
-				do_ERROR(so, RD(q), mp);
+				/* Set so_error and send SIGPIPE
+				 */
+				freemsg(mp);
+				so->so_error = EPIPE;
+				snd_SIGPIPE(RD(q));
+				snd_ERRORW(RD(q));
 				return 0;
 			}
-
 			if ( !(so->udata.so_state & SS_ISCONNECTED)) {
 				/* Set so_error and free the message.
 				 */
@@ -1630,10 +1559,15 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: T_DATA_REQ len %d\n",
 
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Got T_UNITDATA_REQ state %x\n", so->udata.so_state);
 			if (so->udata.so_state & SS_CANTSENDMORE) {
-				do_ERROR(so, RD(q), mp);
+				/* Set so_error, send SIGPIPE,
+				 * followed by new M_ERROR.
+				 */
+				freemsg(mp);
+				so->so_error = EPIPE;
+				snd_SIGPIPE(RD(q));
+				snd_ERRORW(RD(q));
 				return 0;
 			}
-
 			/* If no destination address then make it look
 			 * like a plain M_DATA and try again.
 			 */
@@ -1644,7 +1578,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwput: Bad unitdata header %
 				return 0;
 			}
 			if (udata_req->DEST_length == 0) {
-				if (mp->b_cont == (mblk_t *)NULL) {
+				if (mp->b_cont == NULL) {
 					/* Zero length message.
 					 */
 					mp->b_datap->db_type = M_DATA;
@@ -1691,14 +1625,14 @@ sockmodwsrv(q)
 	register mblk_t			*bp;
 	register union T_primitives	*pptr;
 	register int			s;
-	register size_t			size;
+	register int			size;
 
 	ASSERT(q != NULL);
 	so = (struct so_so *)q->q_ptr;
 	ASSERT(so != NULL);
 
 wgetnext:
-	if ((mp = getq(q)) == (mblk_t *)NULL) {
+	if ((mp = getq(q)) == NULL) {
 		/* If we have been blocking downstream writes 
 		 * in the put procedure, then re-enable them.
 		 */
@@ -1742,7 +1676,13 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCDATA\n", 0);
 
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_DATA %x bytes\n", MSGBLEN(mp));
 		if (so->udata.so_state & SS_CANTSENDMORE) {
-			do_ERROR(so, RD(q), mp);
+			/* Set so_error, send SIGPIPE,
+			 * followed by new M_ERROR message.
+			 */
+			freemsg(mp);
+			so->so_error = EPIPE;
+			snd_SIGPIPE(RD(q));
+			snd_ERRORW(RD(q));
 			goto wgetnext;
 		}
 
@@ -1753,8 +1693,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_DATA %x bytes\n
 #ifdef _AF_UNIX
 				size = sizeof(struct T_unitdata_req) +
 							so->rux_dev.size;
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 					return 0;
 				}
@@ -1766,8 +1705,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_DATA %x bytes\n
 			else	{
 				size = sizeof(struct T_unitdata_req) +
 							so->raddr.len;
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 			       		return 0;
 				}
@@ -1811,7 +1749,13 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: canput returned false
 		case T_DATA_REQ:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: got T_[UNIT]DATA_REQ\n", 0);
 			if (so->udata.so_state & SS_CANTSENDMORE) {
-				do_ERROR(so, RD(q), mp);
+				/* Set so_error, send SIGPIPE,
+				 * followed by new M_ERROR message.
+				 */
+				freemsg(mp);
+				so->so_error = EPIPE;
+				snd_SIGPIPE(RD(q));
+				snd_ERRORW(RD(q));
 				goto wgetnext;
 			}
 
@@ -1845,8 +1789,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got T_CONN_REQ\n", 0)
 			 */
 			size = max(sizeof(struct T_error_ack), 
 					sizeof(struct T_ok_ack));
-			if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-							(mblk_t *)NULL) {
+			if ((bp = _s_getmblk(NULL, size)) == NULL) {
 				_S_RECOVER(q, mp, size);
 				return 0;
 			}
@@ -1909,7 +1852,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: T_CONN_REQ(CLTS) on U
 					/* Not UNIX domain.
 					 */
 					save_addr(&so->raddr, (caddr_t)addr,
-						 (size_t)con_req->DEST_length);
+						 con_req->DEST_length);
 				}
 				so->udata.so_state |= SS_ISCONNECTED;
 
@@ -1961,8 +1904,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: T_CONN_REQ(CLTS) on U
 				 * is to work.
 				 */
 				size = q->q_hiwat;
-				if ((nmp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((nmp = _s_getmblk(NULL, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 					freemsg(bp);
 					return 0;
@@ -1995,8 +1937,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: T_CONN_REQ(COTS) on U
 				ux_saveraddr(so, bind_ux);
 
 				(void)bcopy((caddr_t)&so->rux_dev.addr,
-						(caddr_t)addr,
-						(size_t)so->rux_dev.size);
+					addr, so->rux_dev.size);
 
 				con_req->DEST_length = so->rux_dev.size;
 				mp->b_wptr = mp->b_rptr + con_req->DEST_offset
@@ -2038,8 +1979,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Putting big msg %d\n"
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got T_CONN_RES\n", 0);
 			if (MSGBLEN(mp) < sizeof(*conn_res)) {
 				size = sizeof(struct T_error_ack);
-				if ((bp = _s_getmblk((mblk_t *)mp, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(mp, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 					return 0;
 				}
@@ -2070,7 +2010,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got T_CONN_RES\n", 0)
 					}
 				}
 			}
-			if (soq == (queue_t *)NULL) {
+			if (soq == NULL) {
 				/* Something wrong here 
 				 * let the transport provider
 				 * find it.
@@ -2113,10 +2053,9 @@ found:
 			if (((sockaddr_t)so->laddr.buf)->sa_family == AF_UNIX) {
 				register struct so_so		*nso;
 
-				if ((nso = ux_findlink((caddr_t)(bp->b_rptr +
-					       conn_ind->SRC_offset),
-				   	       (size_t)conn_ind->SRC_length)) ==
-								NULL) {
+				if ((nso = ux_findlink(bp->b_rptr +
+					       conn_ind->SRC_offset,
+				   	       conn_ind->SRC_length)) == NULL) {
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: UNIX: No peer\n", 0);
 					oso->raddr.len = 0;
 				}
@@ -2133,15 +2072,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: UNIX: No peer\n", 0);
 				}
 			}
 			else	save_addr(&oso->raddr, 
-				(caddr_t)(bp->b_rptr+conn_ind->SRC_offset),
+					bp->b_rptr+conn_ind->SRC_offset,
 					conn_ind->SRC_length);
-
-			/* The new socket inherits the properties of the
-			 * old socket.
-			 */
-			oso->udata.so_state = so->udata.so_state;
-			oso->udata.so_options = so->udata.so_options;
-			oso->linger = so->linger;
 
 			freemsg(bp);
 
@@ -2196,16 +2128,14 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			if (mp->b_cont) {
 				/* Make sure there is a peer.
 				 */
-				if (ux_findlink((caddr_t)mp->b_cont->b_rptr,
-						(size_t)MSGBLEN(mp->b_cont)) ==
-								NULL) {
+				if (ux_findlink(mp->b_cont->b_rptr,
+						MSGBLEN(mp->b_cont)) == NULL) {
 					snd_IOCNAK(q, mp, ECONNREFUSED);
 					goto wgetnext;
 				}
 
 				size = sizeof(*tcl_sictl) + MSGBLEN(mp->b_cont);
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 					return 0;
 				}
@@ -2221,8 +2151,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 				}
 
 				size = sizeof(*tcl_sictl) + so->rux_dev.size;
-				if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-								NULL) {
+				if ((bp = _s_getmblk(NULL, size)) == NULL) {
 					_S_RECOVER(q, mp, size);
 					return 0;
 				}
@@ -2234,9 +2163,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			tcl_sictl->type = TCL_LINK;
 			tcl_sictl->ADDR_len = addrlen;
 			tcl_sictl->ADDR_offset = sizeof(*tcl_sictl);
-			(void)bcopy(addr, 
-				(caddr_t)(bp->b_wptr + tcl_sictl->ADDR_offset),
-				(size_t)tcl_sictl->ADDR_len);
+			(void)bcopy(addr, bp->b_wptr + tcl_sictl->ADDR_offset,
+					tcl_sictl->ADDR_len);
 			bp->b_datap->db_type = M_CTL;
 			bp->b_wptr += (tcl_sictl->ADDR_offset +
 							tcl_sictl->ADDR_len);
@@ -2262,8 +2190,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			/* Format an M_CTL and send it down.
 			 */
 			size = sizeof(long);
-			if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-						(mblk_t *)NULL) {
+			if ((bp = _s_getmblk(NULL, size)) == NULL) {
 				_S_RECOVER(q, mp, size);
 				goto wgetnext;
 			}
@@ -2284,7 +2211,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			register int		olen;
 			register mblk_t		*ibp;
 			register mblk_t		*obp;
-			register caddr_t	pos;
+			register u_char		*pos;
 			int			error;
 
 			error = 0;
@@ -2294,11 +2221,11 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			(so->udata.servtype & (T_COTS | T_COTS_ORD)) == 0)
 				error = EOPNOTSUPP;
 			else
-			if (mp->b_cont == (mblk_t *)NULL || 
+			if (mp->b_cont == NULL || 
 					so->udata.so_options & SO_OOBINLINE)
 				error = EINVAL;
 			else
-			if (so->oob == (mblk_t *)NULL)
+			if (so->oob == NULL)
 				error = EWOULDBLOCK;
 
 			if (error) {
@@ -2312,14 +2239,14 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 			iocbp->ioc_count = 0;
 			obp = mp->b_cont;
 			ibp = so->oob;
-			pos = (caddr_t)ibp->b_rptr;
+			pos = ibp->b_rptr;
 			for (;;) {
 				ilen = MSGBLEN(ibp);
 				olen = MSGBLEN(obp);
 				size = MIN(olen, ilen);
 				obp->b_wptr = obp->b_rptr;
 
-				(void)bcopy(pos, (caddr_t)obp->b_wptr, size);
+				(void)bcopy(pos, obp->b_wptr, size);
 
 				pos += size;
 				if ( !(iocbp->ioc_cmd & MSG_PEEK))
@@ -2348,7 +2275,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got M_IOCTL\n", 0);
 					 */
 					if (ibp->b_cont) {
 						ibp = ibp->b_cont;
-						pos = (caddr_t)ibp->b_rptr;
+						pos = ibp->b_rptr;
 						continue;
 					}
 					/* No more oob data, finished.
@@ -2388,7 +2315,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_LISTEN\n", 0);
 			}
 			if (iocbp->ioc_count < 
 				(sizeof(*bind_req) + so->laddr.len) ||
-						mp->b_cont == (mblk_t *)NULL) {
+							mp->b_cont == NULL) {
 				snd_IOCNAK(q, mp, EINVAL);
 				goto wgetnext;
 			}
@@ -2396,8 +2323,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_LISTEN\n", 0);
 			/* Set up the T_UNBIND_REQ request.
 			 */
 			size = sizeof(struct T_unbind_req);
-			if ((bp = _s_getmblk((mblk_t *)NULL, size)) ==
-							(mblk_t *)NULL) {
+			if ((bp = _s_getmblk(NULL, size)) == NULL) {
 				_S_RECOVER(q, mp, size);
 				return 0;
 			}
@@ -2432,8 +2358,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_LISTEN\n", 0);
 					error = EINVAL;
 				else	{
 					(void)bcopy(so->laddr.buf,
-						(caddr_t)(mp->b_cont->b_rptr +
-						bind_req->ADDR_offset),
+						(caddr_t)bind_req +
+						bind_req->ADDR_offset,
 						size);
 					bind_req->ADDR_length = size;
 				}
@@ -2455,13 +2381,12 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_LISTEN\n", 0);
 		case SI_GETUDATA:
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_GETUDATA\n", 0);
 			if (iocbp->ioc_count < sizeof(struct si_udata) ||
-						mp->b_cont == (mblk_t *)NULL) {
+							mp->b_cont == NULL) {
 				snd_IOCNAK(q, mp, EINVAL);
 				goto wgetnext;
 			}
 
-			(void)bcopy((caddr_t)&so->udata,
-						(caddr_t)mp->b_cont->b_rptr,
+			(void)bcopy((caddr_t)&so->udata, mp->b_cont->b_rptr,
 						sizeof(struct si_udata));
 			mp->b_datap->db_type = M_IOCACK;
 			iocbp->ioc_count = sizeof(struct si_udata);
@@ -2494,7 +2419,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: peer len %d\n", so->r
 			}
 			/* See if the transport provider supports it.
 			 */
-			if ((bp = copymsg(mp)) == (mblk_t *)NULL) {
+			if ((bp = copymsg(mp)) == NULL) {
 				snd_IOCNAK(q, mp, EAGAIN);
 				goto wgetnext;
 			}
@@ -2528,7 +2453,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got TI_GETMYNAME stat
 
 			/* See if the transport provider supports it.
 			 */
-			if ((bp = copymsg(mp)) == (mblk_t *)NULL) {
+			if ((bp = copymsg(mp)) == NULL) {
 				snd_IOCNAK(q, mp, EAGAIN);
 				goto wgetnext;
 			}
@@ -2550,7 +2475,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SETPEERNAME\n"
 			else
 			if (iocbp->ioc_count == 0 || 
 				iocbp->ioc_count > so->raddr.maxlen || 
-					(bp = mp->b_cont) == (mblk_t *)NULL)
+						(bp = mp->b_cont) == NULL)
 				iocbp->ioc_error = EINVAL;
 
 			if (iocbp->ioc_error) {
@@ -2559,8 +2484,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SETPEERNAME\n"
 			}
 
 			so->udata.so_state |= SS_ISCONNECTED;
-			save_addr(&so->raddr, (caddr_t)bp->b_rptr,
-							iocbp->ioc_count);
+			save_addr(&so->raddr, bp->b_rptr, iocbp->ioc_count);
 
 			mp->b_datap->db_type = M_IOCACK;
 			iocbp->ioc_count = 0; 
@@ -2575,7 +2499,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SETMYNAME\n", 
 			if ( !iocbp->ioc_count || 
 				 !(so->udata.so_state & SS_ISBOUND) ||
 				iocbp->ioc_count > so->laddr.maxlen || 
-					(bp = mp->b_cont) == (mblk_t *)NULL)
+						(bp = mp->b_cont) == NULL)
 				iocbp->ioc_error = EINVAL;
 
 			if (iocbp->ioc_error) {
@@ -2583,8 +2507,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SETMYNAME\n", 
 				goto wgetnext;
 			}
 
-			save_addr(&so->laddr, (caddr_t)bp->b_rptr,
-					iocbp->ioc_count);
+			save_addr(&so->laddr, bp->b_rptr, iocbp->ioc_count);
 
 			mp->b_datap->db_type = M_IOCACK;
 			iocbp->ioc_count = 0; 
@@ -2596,7 +2519,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SETMYNAME\n", 
 SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Got SI_SHUTDOWN\n", 0);
 
 			if (iocbp->ioc_count < sizeof(int) ||
-						mp->b_cont == (mblk_t *)NULL)
+							mp->b_cont == NULL)
 				iocbp->ioc_error = EINVAL;
 
 			if ((how = *(int *)mp->b_cont->b_rptr) > 2 || how < 0)
@@ -2623,8 +2546,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: SI_SHUTDOWN how %d\n"
 					/* Send an orderly release.
 					 */
 					size = sizeof(struct T_ordrel_req);
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+							== NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -2645,8 +2568,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: SI_SHUTDOWN how %d\n"
 							     SS_CANTSENDMORE);
 				if (so->udata.servtype == T_COTS_ORD) {
 					size = sizeof(struct T_ordrel_req);
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+							== NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -2662,8 +2585,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: SI_SHUTDOWN how %d\n"
 					register struct T_discon_req *req;
 
 					size = sizeof(struct T_discon_req);
-					if ((bp = _s_getmblk((mblk_t *)NULL,
-						size)) == (mblk_t *)NULL) {
+					if ((bp = _s_getmblk(NULL, size))
+							== NULL) {
 						_S_RECOVER(q, mp, size);
 						return 0;
 					}
@@ -2701,7 +2624,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: SI_SHUTDOWN how %d\n"
 		case TI_UNBIND:
 		case TI_GETINFO:
 		case TI_OPTMGMT:
-			if (mp->b_cont == (mblk_t *)NULL) {
+			if (mp->b_cont == NULL) {
 				snd_IOCNAK(q, mp, EINVAL);
 				goto wgetnext;
 			}
@@ -2746,7 +2669,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: UNIX domain BIND\n", 
 					/* Remember the address string
 				 	 */
 					bind_ux = (struct bind_ux *)addr;
-					save_addr(&so->laddr, (caddr_t)addr,
+					save_addr((caddr_t)&so->laddr,
+						(caddr_t)addr,
 						sizeof(struct sockaddr_un));
 
 					/* If the user specified an address
@@ -2772,8 +2696,8 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: Non null BIND\n", 0);
 						 */
 						(void)bcopy(
 						(caddr_t)&so->lux_dev.addr,
-						(caddr_t)bind_ux,
-						so->lux_dev.size);
+						  	(caddr_t)bind_ux,
+						  	so->lux_dev.size);
 
 						bind_req->ADDR_length =
 						 	so->lux_dev.size;
@@ -2818,7 +2742,7 @@ SOCKLOG(so, SIMOD_ID, so-so_so, 0, SL_TRACE, "sockmodwsrv: BIND length %d\n", bi
 				}
 			}
 
-			if ((bp = copymsg(mp->b_cont)) == (mblk_t *)NULL) {
+			if ((bp = copymsg(mp->b_cont)) == NULL) {
 				snd_IOCNAK(q, mp, ENOSR);
 				goto wgetnext;
 			}
@@ -2855,6 +2779,7 @@ so_options(q, mp)
 	 */
 	register struct T_optmgmt_req	*opt_req;
 	register struct opthdr		*opt;
+	register int			*optval;
 	register struct so_so		*so;
 
 	so = (struct so_so *)q->q_ptr;
@@ -2875,6 +2800,12 @@ so_options(q, mp)
 		/* Retrieve current value.
 		 */
 		switch(opt->name) {
+		case SO_DEBUG:
+			*(int *)OPTVAL(opt) = so->udata.so_options & SO_DEBUG;
+			opt_req->PRIM_type = T_OPTMGMT_ACK;
+			opt->len = sizeof(int);
+			return 1;
+
 		case SO_ERROR:
 			*(int *)OPTVAL(opt) = so->so_error;
 			opt_req->PRIM_type = T_OPTMGMT_ACK;
@@ -2882,313 +2813,75 @@ so_options(q, mp)
 			so->so_error = 0;
 			return 1;
 
-		case SO_DEBUG:
 		case SO_OOBINLINE:
-		case SO_REUSEADDR:
-		case SO_BROADCAST:
-		case SO_KEEPALIVE:
-		case SO_DONTROUTE:
-		case SO_USELOOPBACK:
-			*(int *)OPTVAL(opt) = so->udata.so_options & opt->name;
+			*(int *)OPTVAL(opt) = 
+					so->udata.so_options & SO_OOBINLINE;
 			opt_req->PRIM_type = T_OPTMGMT_ACK;
 			opt->len = sizeof(int);
 			return 1;
 
-		case SO_LINGER: {
-			struct linger  *l;
-
-			if (opt->len != sizeof(struct linger))
-				return -EINVAL;
-
- 			l = (struct linger *)OPTVAL(opt);
-			if (so->udata.so_options & SO_LINGER) {
-				l->l_onoff = 1;
-				l->l_linger = so->linger;
-			}
-			else	{
-				l->l_onoff = 0;
-				l->l_linger = 0;
-			}
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(struct linger);
-			return 1;
-		}
-
-		case SO_SNDBUF:
-			*(int *)OPTVAL(opt) = so->sndbuf;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-
-		case SO_RCVBUF:
-			*(int *)OPTVAL(opt) = so->rcvbuf;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-
-		case SO_SNDLOWAT:
-			*(int *)OPTVAL(opt) = so->sndlowat;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-
-		case SO_RCVLOWAT:
-			*(int *)OPTVAL(opt) = so->rcvlowat;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-			
-		case SO_SNDTIMEO:
-			*(int *)OPTVAL(opt) = so->sndtimeo;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-			
-		case SO_RCVTIMEO:
-			*(int *)OPTVAL(opt) = so->rcvtimeo;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-			
-		case SO_PROTOTYPE:
-			*(int *)OPTVAL(opt) = so->prototype;
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-			
 		default:
-			return -ENOPROTOOPT;
+			return 0;
 		}
+		break;
 
 	case T_NEGOTIATE:
-		/* We wait until the negotiated option comes
-		 * back before setting most of these.
+		/* Set new value.
+		 * if value is non-zero, then the option should
+		 * be set, otherwise it is reset.
 		 */
 		switch(opt->name) {
-		case SO_ERROR:
-			return -EINVAL;
-
-		case SO_LINGER:
-			if (opt->len != OPTLEN(sizeof(struct linger)))
-				return -EINVAL;
-			break;
-
-		case SO_OOBINLINE:
-			if (*(int *)OPTVAL(opt))
-				so->udata.so_options |= SO_OOBINLINE;
-			else	so->udata.so_options &= ~SO_OOBINLINE;
-
-			opt_req->PRIM_type = T_OPTMGMT_ACK;
-			opt->len = sizeof(int);
-			return 1;
-
 		case SO_DEBUG:
-		case SO_USELOOPBACK:
-		case SO_REUSEADDR:
-		case SO_BROADCAST:
-		case SO_KEEPALIVE:
-		case SO_DONTROUTE:
+		case SO_ERROR:
+		case SO_OOBINLINE:
 		case SO_SNDBUF:
 		case SO_RCVBUF:
-		case SO_SNDLOWAT:
-		case SO_RCVLOWAT:
-		case SO_SNDTIMEO:
-		case SO_RCVTIMEO:
-		case SO_PROTOTYPE:
 			if (opt->len != OPTLEN(sizeof(int)))
 				return -EINVAL;
-			break;
 
+			optval = (int *)OPTVAL(opt);
+
+			switch (opt->name) {
+			case SO_DEBUG:
+				if (*optval)
+					so->udata.so_options |= SO_DEBUG;
+				else	so->udata.so_options &= ~SO_DEBUG;
+				return 0;
+
+			case SO_ERROR:
+				so->so_error = *optval;
+				return 1;
+	
+			case SO_OOBINLINE:
+				if (*optval)
+					so->udata.so_options |=  SO_OOBINLINE; 
+				else	so->udata.so_options &= ~SO_OOBINLINE;
+				opt_req->PRIM_type = T_OPTMGMT_ACK;
+				return 1;
+	
+			case SO_SNDBUF:
+				/* Never allow it above the max.
+				 */
+				q->q_maxpsz = so->udata.tidusize =
+						MIN(*optval * 2, SB_MAX);	
+				return 0;
+	
+			case SO_RCVBUF:
+				RD(q)->q_maxpsz = MIN(*optval * 2, SB_MAX);	
+				return 0;
+			}
 		default:
-			return -ENOPROTOOPT;
+			return 0;
 		}
 	}
-	/* Set so_option so that we know what
-	 * we are dealing with.
-	 */
-	so->so_option = opt->name;
 	return 0;
 }
-
-/* The transport provider does not support the option,
- * but we must because it is a SOL_SOCKET option.
- * If value is non-zero, then the option should
- * be set, otherwise it is reset.
- */
-STATIC mblk_t *
-_s_makeopt(so)
-	register struct so_so	*so;
-{
-	register mblk_t		*bp;
-	struct T_optmgmt_req	*opt_req;
-	struct linger		*l;
-	register struct opthdr	*opt;
-
-	/* Get the saved request.
-	 */
-	opt_req = (struct T_optmgmt_req *)so->iocsave->b_cont->b_rptr;
-	opt = (struct opthdr *)(so->iocsave->b_cont->b_rptr +
-					opt_req->OPT_offset);
-	switch(opt->name) {
-	case SO_LINGER:
- 		l = (struct linger *)OPTVAL(opt);
-		if (l->l_onoff) {
-			so->udata.so_options |= SO_LINGER;
-			so->linger = l->l_linger;
-		}
-		else	{
-			so->udata.so_options &= ~SO_LINGER;
-			so->linger = 0;
-		}
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(struct linger);
-		break;
-
-	case SO_DEBUG:
-	case SO_KEEPALIVE:
-	case SO_DONTROUTE:
-	case SO_USELOOPBACK:
-	case SO_BROADCAST:
-	case SO_REUSEADDR: 
-		if (*(int *)OPTVAL(opt))
-			so->udata.so_options |= opt->name;
-		else	so->udata.so_options &= ~opt->name;
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_SNDBUF:
-		so->sndbuf = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_RCVBUF:
-		so->rcvbuf = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_SNDLOWAT:
-		so->sndlowat = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_RCVLOWAT:
-		so->rcvlowat = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_SNDTIMEO:
-		so->sndtimeo = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_RCVTIMEO:
-		so->rcvtimeo = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-
-	case SO_PROTOTYPE:
-		so->prototype = *(int *)OPTVAL(opt);
-
-		opt_req->PRIM_type = T_OPTMGMT_ACK;
-		opt->len = sizeof(int);
-		break;
-	}
-
-	bp = so->iocsave->b_cont;
-	so->iocsave->b_cont = NULL;
-	return bp;
-}
-
-/* The transport provider returned T_OPTMGMT_ACK,
- * copy the values it negotiated.
- */
-STATIC void
-_s_setopt(mp, so)
-	register mblk_t		*mp;
-	register struct so_so	*so;
-{
-	struct T_optmgmt_ack	*opt_ack;
-	register struct opthdr	*opt;
-	register struct linger	*l;
-
-	opt_ack = (struct T_optmgmt_ack *)mp->b_rptr;
-	opt = (struct opthdr *)(mp->b_rptr + opt_ack->OPT_offset);
-
-	switch(opt->name) {
-	case SO_DEBUG:
-	case SO_USELOOPBACK:
-	case SO_REUSEADDR:
-	case SO_BROADCAST:
-	case SO_KEEPALIVE:
-	case SO_DONTROUTE:
-		if (*(int *)OPTVAL(opt))
-			so->udata.so_options |= opt->name;
-		else	so->udata.so_options &= ~opt->name;
-		break;
-
-	case SO_LINGER:
-	 	l = (struct linger *)OPTVAL(opt);
-		if (l->l_onoff) {
-			so->udata.so_options |= SO_LINGER;
-			so->linger = l->l_linger;
-		}
-		else	{
-			so->udata.so_options &= ~SO_LINGER;
-			so->linger = 0;
-		}
-		break;
-
-	case SO_SNDBUF:
-		so->sndbuf = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_RCVBUF:
-		so->rcvbuf = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_SNDLOWAT:
-		so->sndlowat = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_RCVLOWAT:
-		so->rcvlowat = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_SNDTIMEO:
-		so->sndtimeo = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_RCVTIMEO:
-		so->rcvtimeo = *(int *)OPTVAL(opt);
-		break;
-
-	case SO_PROTOTYPE:
-		so->prototype = *(int *)OPTVAL(opt);
-		break;
-	}
-}
-
 
 /*
  * Set sizes of buffers
  */
 #define	DEFSIZE	128
-static long
+STATIC long
 _t_setsize(infosize)
 	long	infosize;
 {
@@ -3206,7 +2899,7 @@ _t_setsize(infosize)
 /*
  * Translate a TLI error into a system error as best we can.
  */
-static ushort tli_errs[] = {
+STATIC ushort tli_errs[] = {
 	      0,		/* no error	 */
 	      EADDRNOTAVAIL,    /* TBADADDR      */
 	      ENOPROTOOPT,      /* TBADOPT       */
@@ -3229,13 +2922,13 @@ static ushort tli_errs[] = {
 	      EPROTO,		/* TSTATECHNG    */
 };
  
-static int
+STATIC int
 tlitosyserr(terr)
 	register int	terr;
 {
 	if (terr > (sizeof(tli_errs) / sizeof(ushort)))
 		return EPROTO;
-	else	return (int)tli_errs[terr];
+	else	return tli_errs[terr];
 }
 
 /* This function will walk through the message block given
@@ -3250,14 +2943,14 @@ tlitosyserr(terr)
 STATIC mblk_t *
 _s_getmblk(mp, size)
 	register mblk_t		*mp;
-	register size_t		size;
+	register int		size;
 {
 	register mblk_t		*nmp;
 	register mblk_t		*bp;
 
 	bp = mp;
 	while (bp) {
-		if (MBLKLEN(bp) >= (int)size) {
+		if (MBLKLEN(bp) >= size) {
 			bp->b_rptr = bp->b_wptr = bp->b_datap->db_base;
 			while (mp && bp != mp) {
 				/* Free each block up to the one
@@ -3280,11 +2973,11 @@ _s_getmblk(mp, size)
 		bp = bp->b_cont;
 
 	}
-	if ((bp =  allocb(size, BPRI_MED)) == (mblk_t *)NULL) {
+	if ((bp =  allocb(size, BPRI_MED)) == NULL) {
 		/* But we have not touched mp.
 		 */
 SOCKLOG((struct so_so *)NULL, SIMOD_ID, -1, 0, SL_TRACE, "_s_getmblk: No memory\n", 0);
-		return (mblk_t *)NULL;
+		return NULL;
 	}
 	else	{
 SOCKLOG((struct so_so *)NULL, SIMOD_ID, -1, 0, SL_TRACE, "_s_getmblk: Allocated %d bytes\n", size);
@@ -3350,9 +3043,6 @@ so_init(so, info_ack)
 	
 	so->udata.optsize = so->tp_info.options = 
 		_t_setsize(info_ack->OPT_size);
-
-	so->udata.etsdusize = so->tp_info.etsdu = 
-		_t_setsize(info_ack->ETSDU_size);
 
 	switch(info_ack->SERV_type) {
 	case T_CLTS:
@@ -3425,9 +3115,9 @@ STATIC void
 save_addr(save, buf, len)
 	register struct netbuf	*save;
 	register char		*buf;
-	register size_t		len;
+	register int		len;
 {
-	register size_t llen;
+	register int llen;
 
 	llen = min(save->maxlen, len);
 SOCKLOG((struct so_so *)NULL, SIMOD_ID, -1, 0, SL_TRACE, "save_addr: Copying %d bytes\n", llen);
@@ -3441,7 +3131,7 @@ snd_ZERO(q)
 {
 	register mblk_t		*mp;
 
-	if ((mp = _s_getmblk((mblk_t *)NULL, (size_t)1)) == (mblk_t *)NULL) {
+	if ((mp = _s_getmblk(NULL, 1)) == NULL) {
 		if (!bufcall(1, BPRI_MED, snd_ZERO, (caddr_t)q))
 			(void)timeout(snd_ZERO, (caddr_t)q, SIMWAIT);
 	}
@@ -3457,12 +3147,14 @@ snd_ERRORW(q)
 {
 	register mblk_t		*mp;
 
-	if ((mp = _s_getmblk((mblk_t *)NULL, (size_t)2)) == (mblk_t *)NULL)
+	if ((mp = _s_getmblk(NULL, 2)) == NULL)
 		if (!bufcall(2, BPRI_MED, snd_ERRORW, (caddr_t)q))
 			(void)timeout(snd_ERRORW, (caddr_t)q, SIMWAIT);
 
 	mp->b_datap->db_type = M_ERROR;
+#ifdef noerror
 	*mp->b_wptr++ = NOERROR;
+#endif
 	*mp->b_wptr++ = EPIPE;
 SOCKLOG((struct so_so *)NULL, SIMOD_ID, -1, 0, SL_TRACE, "snd_ERRORW: Sending up M_ERROR\n",0);
 	putnext(q, mp);
@@ -3505,50 +3197,6 @@ snd_IOCNAK(q, mp, error)
  	qreply(q, mp);
 }
 
-/* The following complicated procedure is an attempt to get the
- * semantics right for generating SIGPIPE and closing the socket
- * down.
- */
-STATIC void
-do_ERROR(so, q, mp)
-	register struct so_so	*so;
-	register queue_t	*q;
-	register mblk_t		*mp;
-{
-SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "do_ERROR: Sending up SIGPIPE\n",0);
-	snd_SIGPIPE(q);
-	if (so->udata.servtype == T_CLTS) {
-		freemsg(mp);
-SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "do_ERROR: Closing write side\n",0);
-		snd_ERRORW(q);
-	}
-	else	{
-		/* If a disconnect has been received send
-		 * an M_ERROR. If a shutdown(2) has been done
-		 * just close down the write side, the read side
-		 * will automatically get EOF.
-		 */
-		if (so->udata.so_state & SS_CANTRCVMORE &&
-				(so->udata.so_state & SS_ISCONNECTED) == 0) {
-			/* Disconnect received. Send up new M_ERROR
-			 * with read side set to disconnect error
-			 * and write side set to EPIPE.
-			 */
-SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "do_ERROR: Sending up M_ERROR\n",0);
-			mp->b_wptr = mp->b_rptr = mp->b_datap->db_base;
-			mp->b_datap->db_type = M_ERROR;
-			*mp->b_wptr++ = so->so_error;
-			*mp->b_wptr++ = EPIPE;
-			putnext(q, mp);
-		}
-		else	{
-SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "do_ERROR: Closing write side\n",0);
-			freemsg(mp);
-			snd_ERRORW(q);
-		}
-	}
-}
-
 #ifdef _AF_UNIX
 /* Looks up the socket structure which has as
  * its local dev/ino the same as passed in.
@@ -3556,7 +3204,7 @@ SOCKLOG(so, SIMOD_ID, -1, 0, SL_TRACE, "do_ERROR: Closing write side\n",0);
 STATIC struct so_so *
 ux_findlink(addr, len)
 	register char		*addr;
-	register size_t		len;
+	register int		len;
 {
 	register struct so_so 	*so;
 
@@ -3573,10 +3221,10 @@ ux_dellink(so)
 {
 	register struct so_so	*oso;
 
-	if ((oso = so->so_ux.next) != (struct so_so *)NULL)
+	if (oso = so->so_ux.next)
 		oso->so_ux.prev = so->so_ux.prev;
 
-	if ((oso = so->so_ux.prev) != (struct so_so *)NULL)
+	if (oso = so->so_ux.prev)
 		oso->so_ux.next = so->so_ux.next;
 	else	so_ux_list = so->so_ux.next;
 }
@@ -3601,7 +3249,7 @@ ux_restoreaddr(so, mp, addr, addrlen)
 	register struct so_so		*so;
 	register mblk_t			*mp;
 	register char			*addr;
-	register size_t			addrlen;
+	register int			addrlen;
 {
 	struct T_bind_ack		*bind_ack;
 	struct bind_ux			*bind_ux;
@@ -3630,7 +3278,7 @@ ux_saveraddr(so, bind_ux)
 	register struct so_so		*so;
 	register struct bind_ux		*bind_ux;
 {
-	save_addr(&so->raddr, (caddr_t)&bind_ux->name,
+	save_addr((caddr_t)&so->raddr, (caddr_t)&bind_ux->name,
 		sizeof(struct sockaddr_un));
 
 	(void)bcopy((caddr_t)&bind_ux->extaddr,
@@ -3644,14 +3292,14 @@ STATIC void
 fill_udata_req_addr(bp, addr, len)
 	register mblk_t			*bp;
 	register char			*addr;
-	register size_t			len;
+	register int			len;
 {
 	register struct T_unitdata_req	*udata_req;
 
 	udata_req = (struct T_unitdata_req *)bp->b_rptr;
 	udata_req->DEST_length = len;
 	udata_req->DEST_offset = sizeof(*udata_req);
-	(void)bcopy(addr, (caddr_t)(bp->b_rptr + udata_req->DEST_offset), len);
+	(void)bcopy(addr, bp->b_rptr + udata_req->DEST_offset, len);
 
 	udata_req->PRIM_type = T_UNITDATA_REQ;
 	udata_req->OPT_length = 0;
@@ -3667,20 +3315,16 @@ STATIC void
 fill_udata_ind_addr(bp, addr, len)
 	register mblk_t			*bp;
 	register char			*addr;
-	register size_t			len;
+	register int			len;
 {
 	register struct T_unitdata_ind	*udata_ind;
 
 	udata_ind = (struct T_unitdata_ind *)bp->b_rptr;
 	udata_ind->SRC_length = len;
 	udata_ind->SRC_offset = sizeof(*udata_ind);
-	(void)bcopy(addr, (caddr_t)(bp->b_rptr + udata_ind->SRC_offset), len);
+	(void)bcopy(addr, bp->b_rptr + udata_ind->SRC_offset, len);
 
 	bp->b_datap->db_type = M_PROTO;
 	bp->b_wptr = bp->b_rptr + sizeof(*udata_ind) + len;
 }
 #endif
-
-
-
-

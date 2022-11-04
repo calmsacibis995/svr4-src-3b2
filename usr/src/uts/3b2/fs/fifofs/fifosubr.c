@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/fifofs/fifosubr.c	1.37"
+#ident	"@(#)fs:fs/fifofs/fifosubr.c	1.32"
 /*
  * The routines defined in this file are supporting routines for FIFOFS 
  * file sytem type.
@@ -63,7 +63,7 @@ struct	fifonode	*fifoalloc;
 dev_t	fifodev;
 struct	vfs	*fifovfsp;
 int	fifofstype;
-int	fifoinit(),	fs_sync(),	fifo_stropen();
+int	fifoinit(),	fifosync(),	fifo_stropen();
 ushort		fifogetid();
 void		fifoclearid(),	fifoinsert(),	fiforemove(),	fifo_flush();
 struct vnode	*fifovp(),	*makepipe();
@@ -82,15 +82,11 @@ struct vfsops fifovfsops = {
 	fs_nosys,	/* umount */
 	fs_nosys,	/* root */
 	fs_nosys,	/* statvfs */
-	fs_sync,
+	fifosync,
 	fs_nosys,	/* vget */
 	fs_nosys,	/* mountroot */
 	fs_nosys,	/* swapvp */
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -130,6 +126,21 @@ fifoinit(vswp, fstype)
 	fifovfsp->vfs_data = NULL;
 	fifovfsp->vfs_dev = fifodev;
 	fifovfsp->vfs_bcount = 0;
+	return (0);
+}
+
+/*
+ * VOP_FSYNC flushes file system buffers to disk. Since
+ * pipes and FIFOs are streams based, they have no buffers
+ * to be flushed. 
+ * This routine must be supported for all file system types,
+ * therefore a 0 is returned instead of ENOSYS.
+ */
+/*ARGSUSED*/
+int
+fifosync(vfsp)
+	struct vfs *vfsp;
+{
 	return (0);
 }
 
@@ -187,11 +198,15 @@ makepipe()
 {
 	register struct fifonode *fnp;
 	register struct vnode *newvp;
+	static ushort pipeino = 1;
 
 	fnp = (struct fifonode *)kmem_zalloc(sizeof(struct fifonode), KM_SLEEP);
 
+	pipeino = fifogetid(pipeino);
+
 	fnp->fn_rcnt = fnp->fn_wcnt = 1;
 	fnp->fn_atime = fnp->fn_mtime = fnp->fn_ctime = hrestime.tv_sec;
+	fnp->fn_ino = pipeino;
 	fnp->fn_flag |= ISPIPE;
 
 	newvp = FTOV(fnp);
@@ -272,9 +287,6 @@ fifo_stropen(vpp, flag, crp)
 	
 	if ((error = stropen(oldvp, &pdev, flag, crp)) != 0)
 		return (error);
-	
-	fnp->fn_open++;
-
 	/*
 	 * If the vnode was switched (connld on the pipe), return the
 	 * new vnode (in fn_unique field) to the upper layer and 
@@ -425,33 +437,3 @@ register queue_t *qp;
 			qenable(nq);
 	}
 }
-
-/* #ifdef MERGE */
-/*
- * XENIX rdchk support.
- */
-int
-fifo_rdchk(vp)
-struct vnode *vp;
-{
-	struct fifonode *fnp = VTOF(vp);
-
-	if (vp->v_type != VFIFO || vp->v_op != &fifo_vnodeops)
-		return 0;
-
-	if (fnp->fn_flag & ISPIPE)
-		/*
-		 * If it's a pipe and the other end is still open,
-		 * return 1. Otherwise, return 0.
-		 */
-		if (fnp->fn_mate)
-			return 1;
-		else
-			return 0;
-	else
-		/*
-		 * For non-pipe FIFO, return number of writers.
-		 */
-		return (fnp->fn_wcnt);
-}
-/* #endif MERGE */

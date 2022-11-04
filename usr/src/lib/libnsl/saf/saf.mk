@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libnet:saf/saf.mk	1.16"
+#ident	"@(#)libnet:saf/saf.mk	1.15"
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #	PROPRIETARY NOTICE (Combined)
@@ -34,13 +34,39 @@ CFLAGS = -O  -Kpic -I$(INC)
 STRIP = strip
 SIZE = size
 LINT = lint
-OBJECTS = doconfig.o checkver.o
-LIBOBJECTS = ../doconfig.o ../checkver.o
+OBJECTS = ut.o utx.o doconfig.o checkver.o
+LIBOBJECTS = ../ut.o ../utx.o ../doconfig.o ../checkver.o
 SRCS = $(OBJS:%.o=%.c)
 
 all:	$(OBJECTS)
 	cp $(OBJECTS) ../
 
+ut.o:	ut.c \
+	$(INC)/sys/types.h \
+	$(INC)/utmp.h \
+	$(INC)/utmpx.h \
+	$(INC)/ctype.h \
+	$(INC)/unistd.h \
+	$(INC)/sys/fcntl.h \
+	$(INC)/sys/signal.h \
+	$(INC)/sac.h \
+	$(INC)/sys/param.h \
+	$(INC)/sys/stat.h \
+	$(INC)/errno.h \
+	$(INC)/stdio.h
+
+utx.o:	utx.c \
+	$(INC)/sys/types.h \
+	$(INC)/utmpx.h \
+	$(INC)/ctype.h \
+	$(INC)/unistd.h \
+	$(INC)/sys/fcntl.h \
+	$(INC)/sys/signal.h \
+	$(INC)/sac.h \
+	$(INC)/sys/param.h \
+	$(INC)/sys/stat.h \
+	$(INC)/errno.h \
+	$(INC)/stdio.h
 
 doconfig.o:	doconfig.c \
 		$(INC)/stdio.h \

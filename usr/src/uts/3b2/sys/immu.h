@@ -8,25 +8,25 @@
 #ifndef _SYS_IMMU_H
 #define _SYS_IMMU_H
 
-#ident	"@(#)head.sys:sys/immu.h	11.18"
+#ident	"@(#)head.sys:sys/immu.h	11.15"
 
 /*
  * Page Table Entry Definitions
  */
 
 typedef union pte {    /*  page table entry  */
-
-/*    	                   DEBUG                  */
-/*    	                   only                   */
-/*  +---------------------+---+---+-+-+-+-+-+-+   */
-/*  |        pfn          |tag|   |r|w| |l|m|v|   */
-/*  +---------------------+---+---+-+-+-+-+-+-+   */
-/*             21           3   2  1 1 1 1 1 1    */
-/*                                                */
+/*    	                                               */
+/*  +---------------------+---+--+--+--+-+-+-+-+-+-+   */
+/*  |        pfn          |lck|nr|  |  |r|w| |l|m|v|   */
+/*  +---------------------+---+--+--+--+-+-+-+-+-+-+   */
+/*             21            1  1  1  2 1 1 1 1 1 1    */
+/*                                                     */
 	struct {
 		uint pg_pfn	: 21,	/* Physical page frame number */
-		     pg_tag	:  3,	/* Unused software bits. */
-				:  2,	/* Reserved by hardware. */
+		     pg_lock	:  1,	/* Lock in core (software) */
+		     pg_ndref	:  1,	/* Needs reference (software).	*/
+				:  1,	/* Unused software bit.		*/
+				:  2,	/* Reserved by hardware.	*/
 		     pg_ref	:  1,	/* Page has been referenced */
 		     pg_w	:  1,	/* Fault on write */
 		     		:  1,	/* Reserved by hardware.	*/
@@ -65,9 +65,8 @@ typedef struct ptbl {
 /* Page descriptor (table) entry field masks */
 
 #define PG_ADDR		0xFFFFF800	/* physical page address */
-#ifdef DEBUG
-#define PG_LOCK		0x00000700	/* mapping SOFTLOCK count (software) */
-#endif
+#define PG_LOCK		0x00000400	/* page lock bit (software) */
+#define PG_NDREF	0x00000200	/* need reference bit (software) */
 #define PG_REF		0x00000020	/* reference bit */
 #define PG_W		0x00000010	/* fault on write bit */
 #define PG_LAST		0x00000004	/* last page bit */
@@ -96,45 +95,28 @@ typedef struct ptbl {
 
 #define	mkpte(mode,pfn)	(mode | ((pfn) << PNUMSHFT))
 
-/*	The following macros are used to set/check the values
+/* The following macros are used to check the value
+ * of the bits in a page table entry 
+ */
+
+#define PG_ISVALID(pte) 	((pte)->pgm.pg_v)
+#define PG_ISLOCKED(pte)	((pte)->pgm.pg_lock)
+
+/*	The following macros are used to set the value
  *	of the bits in a page descrptor (table) entry 
  *
  *	Atomic instruction is available to clear the present bit,
  *	other bits are set or cleared in a word operation.
  */
 
-#define PG_ISVALID(pte) 	((pte)->pgm.pg_v)
 #define PG_SETVALID(pte)	((pte)->pg_pte |= PG_V)
 #define PG_CLRVALID(pte)	((pte)->pg_pte &= ~PG_V)
 
 #define PG_SETNDREF(pte)	((pte)->pg_pte |= PG_NDREF)
 #define PG_CLRNDREF(pte)	((pte)->pg_pte &= ~PG_NDREF)
 
-#ifdef DEBUG
-
-/*
- * Macros to keep track of SOFTLOCKs on a mapping.
- */
-
-#define PG_ISLOCKED(pte)	((pte)->pgm.pg_tag)
-#define PG_SETLOCK(pte)  	{ \
-	if ((pte)->pgm.pg_tag == 7) \
-		cmn_err(CE_PANIC, "Too many SOFTLOCKs on mapping !\n"); \
-	++(pte)->pgm.pg_tag; \
-}
-#define PG_CLRLOCK(pte)  	{ \
-	if ((pte)->pgm.pg_tag == 0) \
-		cmn_err(CE_PANIC, "SOFTUNLOCK on an unlocked mapping !\n"); \
-	--(pte)->pgm.pg_tag; \
-}
-
-#else
-
-#define PG_ISLOCKED(pte)
-#define PG_SETLOCK(pte)
-#define PG_CLRLOCK(pte)
-
-#endif
+#define PG_SETLOCK(pte)  	((pte)->pg_pte |= PG_LOCK)	
+#define PG_CLRLOCK(pte)  	((pte)->pg_pte &= ~PG_LOCK)
 
 #define PG_SETMOD(pte)   	((pte)->pg_pte |= PG_M)	
 #define PG_CLRMOD(pte)   	((pte)->pg_pte &= ~PG_M)	
@@ -212,7 +194,7 @@ typedef struct sde {    /*  segment descriptor (table) entry  */
 #define SD_ISCONTIG(sde)	((sde)->seg_flags & SDE_C_bit)
 #define SD_ISTRAP(sde)  	((sde)->seg_flags & SDE_T_bit)
 #define SD_SEGBYTES(sde)	(int)((((sde)->seg_len) + 1) << 3)
-#define SD_LASTPG(sde)  	(((sde)->seg_len) >> 8)
+#define SD_LASTPG(sde)  	((sde)->seg_len) >> 8)
 #define SD_U_ACCESS(sde)	(((sde)->seg_prot) & UACCESS)
 #define SD_K_ACCESS(sde)	(((sde)->seg_prot) & KACCESS)
 #define SD_SEGINDX(addr)	((int)addr & MSK_IDXSEG)
@@ -221,7 +203,6 @@ typedef struct sde {    /*  segment descriptor (table) entry  */
 /*	Segment descriptor (table) dependent constants.	*/
 
 #define NBPS		0x20000 /* Number of bytes per segment.  */
-#define NPPS		64	/* Number of pages per segment.  */
 #define PPSSHFT		6	/* Shift for pages per segment.  */
 #define SOFFMASK	0x1FFFF	/* Mask for offset into segment. */
 #define SEGOFF(x)	((uint)(x) & SOFFMASK)
@@ -412,6 +393,7 @@ extern int	availsmem;	/* Available swapable memory in	*/
 */
 
 extern paddr_t	svirtophys(/* va */);
+extern paddr_t	kvtophys(/* va */);
 
 #define phystokv(paddr) (paddr)
 

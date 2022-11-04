@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"mcrt1.s"
-	.ident	"@(#)libc-m32:csu/mcrt1.s	1.20"
+	.ident	"@(#)libc-m32:csu/mcrt1.s	1.18"
 	_section23_(.pesel,i,strtab)
 	.text
 #	C runtime startup and exit with profiling
@@ -127,6 +121,11 @@ nospacex:
 	MOVW	&_exit,%r1
 	GATE
 
+	.data
+	.align	4
+_dwdef_(`environ'):
+	.word	0
+
 emesg:          # "No space for monitor buffer\n"
         .byte   78,111,32,115,112,97,99,101,32,102,111,114
         .byte   32,109,111,110,105,116,111,114
@@ -137,9 +136,4 @@ emesg:          # "No space for monitor buffer\n"
         .text
         .align  4       # generate padding NOP's before _eprol
 _dgdef_(_eprol):        # beginning of user text
-
-	.data
-	.align	4
-_dgdef_(__longdouble_used):
-	.globl	__longdouble_used
 

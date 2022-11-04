@@ -5,11 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)oamhdrs:pkgtrans.h	1.2.1.1"
+#ident	"@(#)oamhdrs:pkgtrans.h	1.2"
 
 #define	PT_OVERWRITE	0x01
 #define PT_INFO_ONLY	0x02
 #define PT_RENAME	0x04
 #define PT_DEBUG	0x08
 #define	PT_SILENT	0x10
-#define PT_ODTSTREAM	0x40

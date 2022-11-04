@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.inet:prototype	1.31"
+#ident	"@(#)pkg.inet:prototype	1.20"
 #
 # information files
 #
@@ -18,7 +18,6 @@ d	none	/boot	?	?	?
 d	none	/etc	?	?	?
 d	none	/etc/init.d	?	?	?
 d	none	/etc/rc0.d	?	?	?
-d	none	/etc/rc1.d	?	?	?
 d	none	/etc/rc2.d	?	?	?
 d	none	/etc/inet 0775 root sys
 d	none	/etc/master.d	?	?	?
@@ -30,10 +29,6 @@ d	none	/usr/include	?	?	?
 d	none	/usr/include/arpa	?	?	?
 d	none	/usr/include/protocols	?	?	?
 d	none	/usr/include/sys	?	?	?
-d 	none	/usr/sadm/sysadm/menu/netservices	?	?	?
-d 	none	/usr/sadm/sysadm/menu/netservices/name_to_addr	?	?	?
-d 	none	/usr/sadm/sysadm/menu/netservices/name_to_addr/inet	?	?	?
-d	none	/usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin	?	?	?
 
 !default	0444	root	root
 e	none	/boot/APP=/usr/src/uts/3b2/netinet/APP
@@ -58,15 +53,12 @@ e	none	/etc/master.d/udp=/usr/src/uts/3b2/master.d/udp
 #
 !default	0444	root	sys
 f	none	/etc/init.d/inetinit
-f	none	/etc/inet/rc.inet
-l	none	/etc/rc0.d/K69inet=/etc/init.d/inetinit
-l	none	/etc/rc1.d/K69inet=/etc/init.d/inetinit
+l	none	/etc/rc0.d/K70inet=/etc/init.d/inetinit
 l	none	/etc/rc2.d/S69inet=/etc/init.d/inetinit
 
 
 !default	0444	root	sys
 f	none	/usr/lib/tcpip.so
-f	none	/usr/lib/resolv.so
 f	none	/usr/lib/libresolv.a
 
 #
@@ -75,7 +67,6 @@ f	none	/usr/lib/libresolv.a
 !default	0444	root	sys
 f	none	/etc/inet/hosts
 f	none	/etc/inet/inetd.conf
-f	none	/etc/inet/named.boot
 f	none	/etc/inet/networks
 f	none	/etc/inet/protocols
 f	none	/etc/inet/services
@@ -88,7 +79,6 @@ f	none	/usr/lib/nslookup.help
 !default	0444	root	sys
 s	none	/etc/hosts=/etc/inet/hosts
 s	none	/etc/inetd.conf=/etc/inet/inetd.conf
-s	none	/etc/named.boot=/etc/inet/named.boot
 s	none	/etc/networks=/etc/inet/networks
 s	none	/etc/protocols=/etc/inet/protocols
 s	none	/etc/services=/etc/inet/services
@@ -111,6 +101,7 @@ f	none	/usr/bin/rwho
 f	none	/usr/bin/talk
 f	none	/usr/bin/telnet
 f	none	/usr/bin/tftp
+f	none	/usr/bin/tftp_tli
 f	none	/usr/bin/whois
 
 #
@@ -118,6 +109,7 @@ f	none	/usr/bin/whois
 #
 !default	0555	bin	bin
 f	none	/usr/sbin/arp 02555 bin sys
+f	none	/usr/sbin/domainname
 f	none	/usr/sbin/gettable
 f	none	/usr/sbin/htable
 f	none	/usr/sbin/ifconfig
@@ -136,11 +128,12 @@ f	none	/usr/sbin/in.rwhod
 f	none	/usr/sbin/in.talkd
 f	none	/usr/sbin/in.telnetd
 f	none	/usr/sbin/in.tftpd
+f	none	/usr/sbin/in.timed
 f	none	/usr/sbin/in.tnamed
 f	none	/usr/sbin/inetd
 f	none	/usr/sbin/ping 04555 root bin
 f	none	/usr/sbin/route
-f	none	/usr/sbin/slink 0500 root bin
+f	none	/usr/sbin/slink
 f	none	/usr/sbin/trpt
 
 #
@@ -163,20 +156,3 @@ f	none	/usr/include/protocols/timed.h=/usr/src/head/protocols/timed.h
 f	none	/usr/include/syslog.h=/usr/src/head/syslog.h
 f	none	/usr/include/sys/syslog.h=/usr/src/uts/3b2/sys/syslog.h
 f	none	/usr/include/sys/un.h=/usr/src/uts/3b2/sys/un.h
-
-#
-#	OAM name to address files...
-#
-!default 0644 bin bin
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Form.inethost
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Form.inetserv
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Help
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Menu.inet
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.badaddr
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.badport
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.h_exists
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.h_success
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.s_exists
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/Text.s_success
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin/inet.host 0755 bin bin
-f none /usr/sadm/sysadm/menu/netservices/name_to_addr/inet/bin/inet.services 0755 bin bin

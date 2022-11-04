@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)emd:sys/emd.h	1.10"
+#ident	"@(#)emd:sys/emd.h	1.9"
 
 /*
  * Ethernet Media Driver header file.
@@ -49,7 +49,7 @@ struct emd {
  * each item in this structure.
  */
 struct emd_board {
-	long		eb_major;	/* major dev number of the EMD board */
+	int		eb_major;	/* major dev number of the EMD board */
 	struct emd	*eb_emdp;	/* start of emd structures for board */
 	RQUEUE		eb_rq;		/* EMD request queue */
 	CQUEUE		eb_cq;		/* EMD completion queue */

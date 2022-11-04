@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/fmtmsg.c	1.9"
+#ident	"@(#)libc-port:gen/fmtmsg.c	1.7"
 
 /*LINTLIBRARY*/
 
@@ -31,7 +31,6 @@
  *	<fcntl.h>		UNIX file control definitions
  *	<errno.h>		UNIX error numbers and definitions
  *	<fmtmsg.h>		Global definitions for fmtmsg()
- *	<stdlib.h>		miscellaneous function declarations
  */
 
 #ifdef __STDC__
@@ -39,13 +38,12 @@
 	#pragma weak addseverity = _addseverity
 #endif
 #include	"synonyms.h"
-#include	"shlib.h"
+#include "shlib.h"
 #include	<stdio.h>
 #include	<string.h>
 #include	<fcntl.h>
 #include	<errno.h>
 #include	<fmtmsg.h>
-#include	<stdlib.h>
 
 /*
  * External functions referenced:
@@ -58,6 +56,10 @@
  *	clearerr	Clears an error on a stream (this is to make "lint" happy)
  */
 
+extern	char	       *getenv();
+extern	VOID	       *malloc();
+extern	void		free();
+extern	long		strtol();
 #ifdef	lint
 extern	void		clearerr();
 #endif
@@ -264,15 +266,10 @@ static	struct sevstr  *pstdsevs	= &sevstrs[0];
  *	The '\' character also must be escaped.
  */
 
-#if __STDC__
-static char *
-exttok(const char *tok, const char *delims)
-#else
 static char *
 exttok(tok, delims)
 	char   *tok;		/* Ptr to the token we're parsing */
 	char   *delims;		/* Ptr to string with delimiters */
-#endif
 {
 
 	/* Automatic Data */
@@ -849,6 +846,7 @@ writemsg(stream, verbosity, label, severity, text, action, tag)
 		    if (psev == (struct sevstr *) NULL) {
 
 			/* Use default string, SV=severity */
+			/* SOMEDAY don't use sprintf()!  It's too big */
 			(void) sprintf(sevpstrbuf, "SV=%d", severity);
 			sevpstr = sevpstrbuf;
 
@@ -867,7 +865,7 @@ writemsg(stream, verbosity, label, severity, text, action, tag)
 
 
 	/*
-	 * Figure out the indents.
+	 * Figure out the indents.  What a mess.
 	 */
 
 	if (doaction && dotext) {

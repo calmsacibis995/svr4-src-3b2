@@ -5,10 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/elf_SPARC.h	1.2"
-
 #ifndef _SYS_ELF_SPARC_H
 #define _SYS_ELF_SPARC_H
+
+#ident	"@(#)head.sys:sys/elf_SPARC.h	1.1"
 
 #define R_SPARC_NONE		0	/* relocation type */
 #define R_SPARC_8		1
@@ -35,8 +35,5 @@
 #define R_SPARC_RELATIVE	22
 #define R_SPARC_UA32		23
 #define R_SPARC_NUM		24	/* must be >last */
-
-#define ELF_SPARC_MAXPGSZ	0x10000	/* maximum page size */
-
 
 #endif

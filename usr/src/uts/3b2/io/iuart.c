@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/iuart.c	1.36"
+#ident	"@(#)kernel:io/iuart.c	1.30"
 
 /*
  *	3B2 Integral UART Streams Driver
@@ -28,6 +28,7 @@
 #include "sys/conf.h"
 #include "sys/firmware.h"
 #include "sys/nvram.h"
+#include "sys/inline.h"
 #include "sys/cmn_err.h"
 #include "sys/stream.h"
 #include "sys/stropts.h"
@@ -38,7 +39,7 @@
 #include "sys/cred.h"
 #include "sys/ddi.h"
 
-#ifdef KPERF     /* KPERF is for kernel performance measurement tool */
+#ifdef KPERF     /* KPERF is for kernel performance measurment tool */
 #include "sys/proc.h"
 #include "sys/disp.h"
 #endif /* KPERF */
@@ -47,22 +48,17 @@
 #define	IUCONTTY    1	/* minor device number for system board second uart */
 #define	IU_CNT      2	/* number of iuarts on the system board (one duart) */
 
+
 /*  Values used to designate whether characters should be queued or
  *  processed depending upon the rate characters are being received.
  */
 #define IU_IDLE		0	/* no characters have been rcv for 30ms */
+#define IU_TIMEOUT	1	/* state was active but no chars rcv for 30ms */
 #define IU_ACTIVE	2	/* character was rcv within last 30ms */
 #define	IU_SCAN		3	/* clock ticks for the iuart scan timeout */
+#define	IU_BRK		2	/* set in t_dstat if a break of 0.25 sec is to be sent */
 
 #define ISSUE_PIR9	0x01	/* sets the CSR bit for UART lo-IPL handler */
-
-/*
- * t_dstat values
- */
-#define IU_TIMEOUT	0x01	/* state was active but no chars rcv for 30ms */
-#define	IU_BRK		0x02	/* set if a break of 0.25 sec is to be sent */
-#define	IU_CLDRAIN	0x04	/* set if timeout called in close */
-#define	IU_DTIMEOUT	0x08	/* set if M_DELAY time delay in progress */
 
 /*
  *  Register defines for the interrupt mask register and the 
@@ -88,7 +84,6 @@
 #define DIS_DMAC	0x04	/*  disables dmac chan for requested chan */
 #define	IUCTRHZ		230525	/*  counter/timer frequency (CLK/16)  */
 #define	IUCTRMAX	0xffff	/*  maximum counter/timer value (16 bits) */
-#define	CL_TIME		500	/*  time to complete output drain on close */
 
 extern struct duart duart;	/* system board duart structure */
 extern struct dma dmac;		/* system board dma controller structure */
@@ -118,7 +113,6 @@ STATIC void iuparam();
 STATIC void iurint();
 STATIC void iuxint();
 STATIC void iubufwake();
-STATIC void iu_nodrain();
 STATIC mblk_t *iu_get_buffer();
 
 void iuinit();
@@ -264,7 +258,7 @@ register cred_t *credp;
 		putnext( q, mop);
 
 		if ( mdev == IUCONSOLE) {
-			tp->t_iflag = IXON|IXANY|BRKINT|IGNPAR;
+			tp->t_iflag |= IXON|IXANY|BRKINT|IGNPAR;
 			/*
 			 * get control modes from the nvram
 			 */
@@ -276,7 +270,7 @@ register cred_t *credp;
 			else
 				tp->t_cflag = consbaud;
 		} else	/* default contty setting */
-			tp->t_cflag = SSPEED | CS8 | CREAD | HUPCL;
+			tp->t_cflag |= SSPEED | CS8 | CREAD | HUPCL;
 		iuparam( mdev);
 	}
 
@@ -291,7 +285,7 @@ register cred_t *credp;
 			if ( sleep( (caddr_t)tp->t_rdqp, TTIPRI|PCATCH)) {
 				q->q_ptr = NULL;
 				WR(q)->q_ptr = NULL;
-				tp->t_state &= ~( WOPEN | BUSY);
+				tp->t_state &= ~(WOPEN|BUSY);
 				tp->t_rdqp = NULL;
 
 				splx( oldpri);
@@ -299,13 +293,8 @@ register cred_t *credp;
 			}
 		}
 
-
 	tp->t_state &= ~WOPEN;
 	tp->t_state |= ISOPEN;
-
-	/* write service procedure not used - only for canput */
-
-	noenable( WR( tp->t_rdqp));
 	splx( oldpri);
 	return( 0);
 }  /* iuopen */
@@ -320,26 +309,13 @@ register cred_t	*credp;
 	register struct strtty *tp;
 	register int	oldpri;
 
-	int	tid;
 
-
-	oldpri = splstr();
 	tp = (struct strtty *)q->q_ptr;
 
-	if ( !( tp->t_state & ISOPEN)) {  /* Check if it's closed already */
-		splx( oldpri);
+	if ( !( tp->t_state & ISOPEN))  /* See if it's closed already */
 		return( 0);
-	}
 
-	/*
-	 * May need to relieve flow control
-	 */
-	if ( tp->t_state & TTSTOP)
-		iuproc( tp, T_RESUME);
-
-	if ( tp->t_state & TBLOCK)
-		iuproc( tp, T_UNBLOCK);
-
+	oldpri = splstr();
 	if ( !( oflag & (FNDELAY|FNONBLOCK)))
 		/*
 		 * Drain queued output to the console/contty line.
@@ -349,30 +325,15 @@ register cred_t	*credp;
 
 			if ( iugetoblk( tp) == 0) {
 				tp->t_state |= TTIOW;
-				tp->t_dstat |= IU_CLDRAIN;
-				/*
-				 * Need timeout here to break a deadlock
- 				 * condition since the last transaction
-				 * to the duart could have been a suspend output
-				 * or there could be a hardware problem on the
-				 * duart.  In either case the transmitter could
-				 * be disabled and further transmission to the
-				 * device is suspended.
-				 */
-				tid = timeout( iu_nodrain, (caddr_t)tp, CL_TIME);
-				sleep( (caddr_t)&tp->t_oflag, PZERO|PCATCH);
-				if ( tp->t_dstat & IU_CLDRAIN) {
-					untimeout( tid);
-					tp->t_dstat &= ~IU_CLDRAIN;
-				} else {
-					tp->t_state &= ~( TTIOW | BUSY);
+				if ( sleep((caddr_t)&tp->t_oflag, PZERO + 1| PCATCH)) {
+					tp->t_state &= ~TTIOW;
 					break;
 				}
 			}
 		}
 
 	if ( tp->t_cflag & HUPCL)
-		iumodem( tp->t_dev, OFF);
+		iumodem(tp->t_dev, OFF);
 
 	/*
 	 * reinitialize the duart registers for the closing
@@ -395,23 +356,12 @@ register cred_t	*credp;
 		freeb( tp->t_out.bu_bp);
 		tp->t_out.bu_bp = NULL;
 	}
-	tp->t_state &= ~( ISOPEN | BUSY);
+	tp->t_state &= ~(ISOPEN|BUSY);
 	tp->t_rdqp = NULL;
 	splx( oldpri);
 	return( 0);
 
 }  /* iuclose */
-
-/*
- * Wakeup sleep (waiting for transmitter to become available) in close routine.
- */
-STATIC void
-iu_nodrain( tp)
-register struct strtty *tp;
-{
-	tp->t_dstat &= ~IU_CLDRAIN;
-	wakeup( (caddr_t)&tp->t_oflag);
-}
 
 /*
  * This is the console's write put procedure
@@ -432,6 +382,14 @@ register struct msgb *bp;
 	switch(bp->b_datap->db_type) {
 	case M_DATA:
 
+		/*
+		 * If no carrier then just queue the message on the
+		 * driver's write queue
+		 */
+		if ( !( tp->t_state & CARR_ON)) {
+			putq( q, bp);
+			return( 0);
+		}
 		while( bp) {
 			bp->b_datap->db_type = M_DATA;
 			bp1 = unlinkb( bp);
@@ -440,13 +398,6 @@ register struct msgb *bp;
 			else
 				putq( q,bp);
 			bp = bp1;
-		}
-		/*
-		 * If no carrier then just return
-		 * the message has been queued.
-		 */
-		if ( !( tp->t_state & CARR_ON)) {
-			return( 0);
 		}
 		if ( q->q_first != NULL)
 			iugetoblk( tp);
@@ -491,12 +442,7 @@ register struct msgb *bp;
 
 	case M_DELAY:
 		s = splstr();
-		if ( tp->t_dstat & IU_DTIMEOUT) {
-			putq( q, bp);
-			splx( s);
-			break;
-		}
-		tp->t_dstat |= IU_DTIMEOUT;
+		tp->t_state |= TIMEOUT;
 		timeout( iudelay, (caddr_t)tp, ((int)*(bp->b_rptr))*HZ/60);
 		splx( s);
 		freemsg( bp);
@@ -540,9 +486,9 @@ register struct strtty *tp;
 
 	paddr_t addr;
 
-	if ( tp->t_rdqp == NULL)	/* Driver not open */
-		return( 0);
 
+	if ( tp->t_rdqp == NULL)	/* Check if driver is open */
+		return( 0);
 	q = WR(tp->t_rdqp);
 
 	if ( tp->t_state & BUSY) 
@@ -555,7 +501,7 @@ register struct strtty *tp;
 		 * wakeup close write queue drain
 		 */
 		if ( tp->t_state & TTIOW) {
-			tp->t_state &= ~TTIOW;
+			tp->t_state &= ~(TTIOW);
 			wakeup( (caddr_t)&tp->t_oflag);
 		}
 		splx( s);
@@ -566,7 +512,7 @@ register struct strtty *tp;
 	switch ( bp->b_datap->db_type) {
 
 	case M_DATA:
-		if ( tp->t_state & (TTSTOP | TIMEOUT | IU_DTIMEOUT)) {
+		if ( tp->t_state & (TTSTOP | TIMEOUT)) {
 			putbq( q, bp);
 			splx( s);
 			return( 0);
@@ -606,17 +552,6 @@ register struct strtty *tp;
 	case M_IOCTL:
 
 		iusrvioc( q, bp);
-		break;
-
-	case M_DELAY:
-
-		if ( tp->t_dstat & IU_DTIMEOUT) {
-			putbq( q, bp);
-			break;
-		}
-		tp->t_dstat |= IU_DTIMEOUT;
-		timeout( iudelay, (caddr_t)tp, ((int)*(bp->b_rptr))*HZ/60);
-		freemsg( bp);
 		break;
 
 	default:
@@ -663,7 +598,7 @@ register mblk_t *bp;
 		case TCSBRK:
 			/*
 			 * Run these now if possible if no data
-			 * queued or if the uart is not busy.
+			 * queued of if the uart is not busy.
 			 */
 			if ( q->q_first != NULL || (tp->t_state & BUSY)) {
 				putq( q, bp);
@@ -916,9 +851,7 @@ register mblk_t *bp;
 			}
 			arg = *(int *)bp->b_cont->b_rptr;
 			if ( arg == 0)
-				tp->t_dstat |= IU_BRK;
-
-			iuproc( tp, T_BREAK);
+				iuproc( tp, T_BREAK);
 			bp->b_datap->db_type = M_IOCACK;
 			bp1 = unlinkb( bp);
 			if ( bp1)
@@ -974,18 +907,21 @@ register struct strtty *tp;
 	if ( cmd&FWRITE) {
 		q = WR(tp->t_rdqp);
 		flushq( q, FLUSHDATA);
-		tp->t_state &= ~BUSY; 
+		tp->t_state &= ~(BUSY); 
+		tp->t_state &= ~(TBLOCK);
 		if ( tp->t_state & TTIOW) {
-			tp->t_state &= ~TTIOW;
+			tp->t_state &= ~(TTIOW);
 			wakeup( (caddr_t)&tp->t_oflag);
 		}
 	}
 	if ( cmd&FREAD) {
 		q = tp->t_rdqp;
 		flushq( q, FLUSHDATA);
-		tp->t_state &= ~TBLOCK;
+		tp->t_state &= ~(BUSY);
+		tp->t_state &= ~(TBLOCK);
 	}
 	splx( s);
+	iugetoblk( tp);
 }  /* iuflush */
 
 
@@ -1127,8 +1063,8 @@ iuint()
 			ignore2 = ignore2;	/* To satisfy lint only! */
 			if ( tp->t_cflag & CLOCAL || !(duart.ip_opcr & DCD(dev))) {
 				if ((tp->t_state & CARR_ON) == 0) {
-					tp->t_state |= CARR_ON;
 					wakeup( (caddr_t)tp->t_rdqp);
+					tp->t_state |= CARR_ON;
 					/*
 					 * May need to print prompt
 					 */
@@ -1319,42 +1255,29 @@ register dev;
 	room_left = bpt->b_datap->db_lim - bpt->b_wptr;
 	if ( room_left < lcnt) {
 		/*
-		 * No more room in this message block.
-		 * Check if adding this block to the queue will cause
-		 * the byte count to exceed the hi-water mark
-		 */
-		if ( (int)tp->t_rdqp->q_count + (int)( bpt->b_wptr - bpt->b_rptr) > (int)tp->t_rdqp->q_hiwat) {
-			if (( tp->t_iflag & IXOFF) && !( tp->t_state & TBLOCK)) 
-				iuproc( tp, T_BLOCK);
-
-			if ( tp->t_rdqp->q_count > MAX_INPUT)  {
-				/*
-				 * Flush the entire read side queue
-				 * and reuse the input buffer.
-				 */
-				iuflush( tp, FREAD);
-				putctl1( tp->t_rdqp->q_next, M_FLUSH, FLUSHR);
-				tp->t_in.bu_bp->b_wptr = tp->t_in.bu_bp->b_rptr = tp->t_in.bu_bp->b_datap->db_base;
-				return;
-			}
-		}
-		/*
-		 * Queue this one and allocate another one
+		 * No more room in this message block. Queue this one
+		 * and allocate another one
 		 */
 		putq( tp->t_rdqp, tp->t_in.bu_bp);
 		tp->t_in.bu_bp = NULL;
+		if ( tp->t_rdqp->q_count > tp->t_rdqp->q_hiwat) {
+			if (( tp->t_iflag & IXOFF) && !(tp->t_state & TBLOCK)) 
+				iuproc( tp, T_BLOCK);
+			if ( tp->t_rdqp->q_count > MAX_INPUT) 
+				iuflush( tp, FREAD);
+		}
 		if (( bpt = iu_get_buffer( tp)) == NULL)
 			return;
 	}
 
 	/*
-	 * We have room for more data at this point.
+	 * We have rooma for more data at this point.
 	 * Copy the data to this buffer 
 	 */
 	bcopy( lbuf, (caddr_t)bpt->b_wptr, lcnt);
 	bpt->b_wptr += lcnt;
 	tp->t_in.bu_cnt += lcnt;
-	if ( !( tp->t_dstat & IU_TIMEOUT)) {
+	if (!( tp->t_dstat & IU_TIMEOUT)) {
 		timeout( iuscan, (caddr_t)tp, IU_SCAN);
 		tp->t_dstat |= IU_TIMEOUT;
 	}
@@ -1366,37 +1289,18 @@ iuscan( tp)
 register struct strtty *tp;
 {
 	register int s;
-	register int poss_queue_sz;	/* The size of current input buffer plus the current queue size */
 
 
 	s = splstr();
-	tp->t_dstat &= ~IU_TIMEOUT;
 	if ( tp->t_rdqp) {
 		if ( tp->t_in.bu_cnt) {
-			poss_queue_sz = tp->t_in.bu_cnt + tp->t_rdqp->q_count;
-			if (( tp->t_iflag & IXOFF) && !( tp->t_state & TBLOCK)
-			   && ( (int)poss_queue_sz >= (int)tp->t_rdqp->q_hiwat))
-				iuproc( tp, T_BLOCK);
-
-			if ( poss_queue_sz > MAX_INPUT) {
-				/*
-				 * Flush the entire read side stream
-				 * and reuse the same large input buffer
-				 */
-				iuflush( tp, FREAD);
-				putctl1( tp->t_rdqp->q_next, M_FLUSH, FLUSHR);
-				tp->t_in.bu_bp->b_wptr = tp->t_in.bu_bp->b_rptr = tp->t_in.bu_bp->b_datap->db_base;
-				splx( s);
-				return;
-			}
-
 			putq( tp->t_rdqp, tp->t_in.bu_bp);
 			tp->t_in.bu_bp = NULL;
 			iu_get_buffer( tp);
 		}
 	}
+	tp->t_dstat &= ~IU_TIMEOUT;
 	splx( s);
-	return;
 }
 
 int
@@ -1413,6 +1317,7 @@ iupirint()
 		(*fn)();
 	}
 	return( 0);
+
 }
 
 
@@ -1661,9 +1566,9 @@ void	(*fn)();
 
 	s = splstr();
 	if ( iutimefn)
-		cmn_err( CE_PANIC, "iutime race");
+		cmn_err( CE_PANIC, "iudelay race");
 	if ( ms > IUCTRMAX || ( ticks = (IUCTRHZ * ms) / 1000) > IUCTRMAX)
-		cmn_err( CE_PANIC, "iutime range");
+		cmn_err( CE_PANIC, "iudelay range");
 	iutimefn = fn;
 	ignore = duart.scc_ropbc;	/* Stop counter */
 	duart.ctur = (ticks & 0xff00) >> 8;
@@ -1691,7 +1596,6 @@ queue_t *q;
 	tp = (struct strtty *)q->q_ptr;
 
 	while (( mp = getq( q)) != NULL) {
-
 		if ( canput( q->q_next) == 0) {
 			putbq( q, mp);
 			splx( s);
@@ -1730,11 +1634,10 @@ register struct strtty *tp;
 
 
 	s = splstr();
-	tp->t_dstat &= ~IU_DTIMEOUT;
+	tp->t_state &= ~TIMEOUT;
 	splx( s);
 	iugetoblk( tp);  /* Restart any ouput waiting on queue */
 }
-
 STATIC mblk_t *
 iu_get_buffer( tp)
 register struct strtty *tp;
@@ -1743,7 +1646,7 @@ register struct strtty *tp;
 
 
 	/*
-	 * if no current message allocate a block for it 
+	 * if no current message. allocate a block for it 
 	 */
 	if (( bp = tp->t_in.bu_bp) == NULL) {
 		if (( bp = allocb( READBUFSZ, BPRI_HI)) == NULL) {

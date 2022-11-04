@@ -1,0 +1,15 @@
+*#ident	"@(#)npack:master.d/npack	1.6"
+*
+* PACK	protocol multiplexer module
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+fs	-	pck	-	-	-	
+						nvc (%i) ={ #C }
+						pck_vc[#C] (%0x90)
+						pckminor[#C] (%0x4)
+						PKTIME (%i) ={ 400 }
+						NRETRNS (%i) ={ 2 }
+						ACKTIME (%i) ={ 200 }
+						CREDIT (%i) ={ 4 }
+						MONITORTIME (%i) ={ 3000 }
+$$

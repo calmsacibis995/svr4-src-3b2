@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_admin.c	1.4.1.15"
+#ident	"@(#)fs:fs/rfs/rf_admin.c	1.4.3.1"
 
 /*
  * RFS administrative daemon and associated functions.
@@ -23,11 +23,11 @@
 #include "sys/cred.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/psw.h"
 #include "sys/pcb.h"
 #include "sys/user.h"
+#include "sys/rf_messg.h"
 #include "sys/errno.h"
 #include "sys/proc.h"
 #include "sys/wait.h"
@@ -46,15 +46,12 @@
 #include "sys/statfs.h"
 #include "rfcl_subr.h"
 #include "sys/uio.h"
-#include "sys/buf.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 #include "vm/seg_kmem.h"
 #include "sys/fcntl.h"
 #include "sys/flock.h"
 #include "sys/file.h"
 #include "sys/session.h"
-#include "sys/kmem.h"
 
 /* imports */
 extern int	cleanlocks();
@@ -63,9 +60,10 @@ extern int	nsrmount;
 extern int	rf_state;
 extern int	waitid();
 
+proc_t		*rf_daemon_procp;
 int		rf_daemon_flag;		/* reason for wakeup */
 int		rf_daemon_lock;
-rcvd_t		*rf_daemon_rd;
+rcvd_t		*rf_daemon_rd;		/* rd for rf_recovery */
 proc_t		*rf_recovery_procp;	/* sleep address for rf_recovery */
 int		rf_recovery_flag;	/* set to KILL when it's time to exit */
 
@@ -73,16 +71,12 @@ int		rf_recovery_flag;	/* set to KILL when it's time to exit */
 ls_elt_t	rf_umsgq = { &rf_umsgq, &rf_umsgq };
 int		rf_umsgcnt;
 
-/* rf_daemon stray message queue */
-STATIC ls_elt_t	rfd_strayq = { &rfd_strayq, &rfd_strayq };
-
-/* queue of asynchronous work to do */
+/* rf_async work queue */
 STATIC ls_elt_t	rfa_workq = { &rfa_workq, &rfa_workq };
 
-STATIC proc_t	*rf_daemon_procp;
+STATIC unsigned	n_rf_async = 3;
+STATIC unsigned	nidle_rf_async;
 
-STATIC void	rf_recovery();
-STATIC void	rf_tmo();
 STATIC void	rfadmin_reply();
 STATIC void	rf_que_umsg();
 STATIC void	rf_disable_cache();
@@ -95,15 +89,16 @@ STATIC void	rf_rec_cleanup();
 STATIC void	rf_user_msg();
 STATIC void	rf_cl_fumount();
 STATIC void	clean_GRD();
+STATIC void	rf_async();
 
 /*
  * RFS administrative daemon, started when file sharing starts.
  * Forks new servers, calls rf_rec_cleanup() for rf_recovery.
- * To reduce stack size, rf_daemon returns a pointer to a function
- * to execute (e.g., rf_serve).  Otherwise it exits rather than returns.
+ * To reduce stack size, rf_daemon returns when the invoking code
+ * should become a server.  Otherwise it exits rather than returns.
  */
-void	(*
-rf_daemon())()
+void
+rf_daemon()
 {
 	int		s;
 	int		i;
@@ -118,77 +113,45 @@ rf_daemon())()
 	int		error;
 	int		nd;		/* n daemons */
 	pid_t		xpid;		/* unwanted out param from newproc */
-	int		nret;
-	gdp_t		*gp;
-	rfa_work_t	*wp;
-	file_t		*fp;
-	k_siginfo_t	sink;
-
 
 	/* disassociate this process from terminal */
-	sess_create();
+	newsession();
 
 	/* ignore all signals */
 	for (i = 1; sigismember(&fillset, i); i++) {
 		setsigact(i, SIG_IGN, 0, 0);
 	}
-
+	rf_daemon_flag = 0;
 	u.u_procp->p_flag |= SNOWAIT;
-	u.u_procp->p_cstime = u.u_procp->p_stime =
-		u.u_procp->p_cutime = u.u_procp->p_utime = 0;
-	rf_daemon_procp = u.u_procp;
 
-	bcopy("rf_daemon", u.u_comm, sizeof("rf_daemon"));
-	bcopy("rf_daemon", u.u_psargs, sizeof("rf_daemon"));
+	for (nd = error = 0; nd < n_rf_async && !error; nd++) {
 
-	relvm(rf_daemon_procp);
+		/* TO DO:  return to spawn these??? */
 
-	VN_RELE(u.u_cdir);
-	u.u_cdir = rootdir;
-	VN_HOLD(u.u_cdir);
-
-	if (u.u_rdir) {
-		VN_RELE(u.u_rdir);
-	}
-	u.u_rdir = NULL;
-
-	for (i = 0; i < u.u_nofiles; i++) {
-		if (getf(i, &fp) == 0) {
-			closef(fp);
-			setf(i, NULLFP);
+		switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC, &xpid,
+		  &error)) {
+		case 0:
+			break;
+		case 1:
+			rf_async();
+		default:
+			cmn_err(CE_WARN, "rf_async newproc failed");
 		}
 	}
 
-	switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC, &xpid, &error))  {
-	case 0:
-		break;
-	case 1:
-		return rf_recovery;
-	default:
-		cmn_err(CE_WARN, "rf_recovery newproc failed");
-		goto out;
-	}
-
-	switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC, &xpid, &error)) {
-	case 0:
-		break;
-	case 1:
-		return rf_tmo;
-	default:
-		cmn_err(CE_WARN, "rf_tmo newproc failed");
-		goto out;
-	}
-
 	for (nd = error = 0; nd < minserve && !error; nd++) {
-		if ((nret = newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC, &xpid,
-		  &error)) < 0) {
+		switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC, &xpid,
+		  &error)) {
+		case 0:
+			break;
+		case 1:
+			return;
+		default:
 			/* Post signal to the last server so it won't sleep */
 			if (rfsr_active_procp != NULL) {
 				psignal(rfsr_active_procp, SIGUSR1);
 			}
 			break;
-		} else if (nret == 1) {
-			return rf_serve;
 		}
 	}
 	if (nd != minserve) {
@@ -203,60 +166,21 @@ rf_daemon())()
 
 	s = splstr();
 
-	while ((wp = (rfa_work_t *)
-	  LS_REMQUE(&rfa_workq)) != NULL) {
-		splx(s);
-		(*wp->rfaw_func)(wp);
-		s = splstr();
-	}
-
 	LS_INIT(&rf_umsgq);
 	rf_umsgcnt = 0;
 	reply_port.sd_stat = SDUSED;
 	SDTOV(&reply_port)->v_count = 1;
 
-
-	/* Discard old stray messages. */
-	while ((bp = (mblk_t *)LS_REMQUE(&rfd_strayq)) != NULL) {
-		rf_freemsg(bp);
-	}
-
 	rf_state = RF_UP;
-
-	/* end of critical section begun in rfsys_start */
-
-	wakeprocs((caddr_t)&rf_state, PRMPT);
+	/*
+	 * end of critical section begun in rfstart
+	 */
+	wakeup((caddr_t)&rf_state);
 	sleep((caddr_t)&rf_daemon_rd->rd_qslp, PRIBIO);
-
 	for (;;) {
 		register rf_message_t *msg;
 
 		bp = rf_dequeue(rf_daemon_rd);
-
-		if (!bp) {
-
-			/*
-			 * Stray message handling schemes that superficially
-			 * appear more temperate have subtle drawbacks:
-			 * Local processes sleeping on specific RDs are
-			 * left hanging or, if awakened, inititate operations
-			 * on the remote that collide with ops still in
-			 * progress on the remote.  E.g., they close files
-			 * that are still being read.
-			 */
-
-			bp = (mblk_t *)LS_REMQUE(&rfd_strayq);
-			if (bp) {
-				splx(s);
-				gdp_discon("rf_daemon - stray message",
-				  QPTOGP(RF_MSG(bp)->m_queue));
-				rf_freemsg(bp);
-				bp = NULL;
-				s = splstr();
-				continue;
-			}
-		}
-
 		if (!bp) {
 
 			if (rf_daemon_flag & RFDDISCON) {
@@ -271,20 +195,33 @@ rf_daemon())()
 						tmp->constate = GDPRECOVER;
 					}
 				}
-			} else if (rf_daemon_flag & RFDASYNC) {
-				rf_daemon_flag &= ~RFDASYNC;
-				while ((wp = (rfa_work_t *)
-				  LS_REMQUE(&rfa_workq)) != NULL) {
-					splx(s);
-					(*wp->rfaw_func)(wp);
-					s = splstr();
-				}
-				splx(s);
+
+				/* Give rf_async oppty to fail requests. */
+
+				wakeup((caddr_t)&rfa_workq);
 
 			} else if (rf_daemon_flag & RFDKILL) {
-				splx(s);
-				goto out;
+				k_siginfo_t	sink;
 
+				splx(s);
+				/*
+				 * Signal all children and wait for them to die
+				 */
+				signal(rf_daemon_procp->p_pgrp, SIGKILL);
+#ifdef DEBUG
+				ASSERT(waitid(P_ALL, 0, &sink, WEXITED) ==
+				  ECHILD);
+#else
+				(void)waitid(P_ALL, 0, &sink, WEXITED);
+#endif
+				rf_daemon_flag = 0;
+				rf_daemon_procp = NULL;
+				if (!rf_recovery_procp) {
+					rf_commdinit();
+					rf_state = RF_DOWN;
+					wakeup((caddr_t)&rf_state);
+				}
+				exit(CLD_EXITED, 0);
 			} else if (rf_daemon_flag & RFDSERVE) {
 				rf_daemon_flag &= ~RFDSERVE;
 				splx(s);
@@ -293,7 +230,7 @@ rf_daemon())()
 				case 0:
 					break;
 				case 1:
-					return rf_serve;
+					return;
 				default:
 					/*
 					 * Post signal to the last server so
@@ -309,7 +246,6 @@ rf_daemon())()
 					}
 					break;
 				}
-
 			} else {
 				sleep((caddr_t)&rf_daemon_rd->rd_qslp, PRIBIO);
 				continue;
@@ -317,264 +253,232 @@ rf_daemon())()
 			s = splstr();
 			continue;
 		}
-
 		splx(s);
-
 		msg = RF_MSG(bp);
 		qp = (queue_t *)msg->m_queue;
+		request = RF_REQ(bp);
 		cop = RF_COM(bp);
-		gp = QPTOGP(qp);
+		sndd_set(&reply_port, qp, msg->m_giftid);
+		reply_port.sd_mntid = cop->co_mntid;
+		switch ((int)cop->co_opcode) {
+		case REC_FUMOUNT: {
+			rf_vfs_t	*rf_vfsp = findrfvfs(cop->co_mntid);
+			long		req_srmntid =
+					  request->rq_rec_fumount.srmntid;
 
-		if (cop->co_type == RF_REQ_MSG) {
-
-			request = RF_REQ(bp);
-			sndd_set(&reply_port, qp, &msg->m_gift);
-			reply_port.sd_mntid = cop->co_mntid;
-
-			switch ((int)cop->co_opcode) {
-
-			case REC_FUMOUNT: {
-				rf_vfs_t	*rf_vfsp;
-				long		req_srmntid ;
-
-				rf_vfsp = findrfvfs(cop->co_mntid);
-				req_srmntid = request->rq_rec_fumount.srmntid;
-				rf_freemsg(bp);
-				bp = NULL;
-
-				/*
-				 * We found an rf_vfs with the right mntid;
-				 * now see if the resource is from the
-				 * originating server.  Note that this is
-				 * still ONLY PROBABLISTIC, even though a
-				 * little more cautious than SVR3.X.  If the
-				 * rf_vfs has no rootvp, it's because the
-				 * fumount or recovery kicked off in the
-				 * middle of the mount.  It's still okay to go
-				 * ahead, though, because we'll mark the rf_vfs
-				 * fumounted, and will fail to find sndds or
-				 * rcvds linked into the rf_vfs.  Send message
-				 * to user level only if mount is fully defined.
-				 * Reply to the fumount request in any case.
-				 */
-
-				if (rf_vfsp) {
-					vnode_t	*rootvp;
-
-					rootvp = rf_vfsp->rfvfs_rootvp;
-					if (rootvp &&
-					  qp == VTOSD(rootvp)->sd_queue &&
-					  req_srmntid ==
-					   VTOSD(rootvp)->sd_mntid) {
-						size_t	namelen;
-
-						namelen = (size_t)
-						  strlen(rf_vfsp->rfvfs_name);
-						rf_cl_fumount(rf_vfsp);
-						rf_user_msg(RFUD_FUMOUNT,
-						  rf_vfsp->rfvfs_name, namelen);
-					} else if(!rootvp) {
-						rf_cl_fumount(rf_vfsp);
-					}
+			rf_freemsg(bp);
+			bp = NULL;
+			/*
+			 * We found an rf_vfs with the right mntid, now see
+			 * if the resource is from the originating server.
+			 * Note that this is still ONLY PROBABLISTIC, even
+			 * though a little more cautious than SVR3.X.  If
+			 * the rf_vfs has no rootvp, it's because the fumount
+			 * or rf_recovery kicked off in the middle of the mount.
+			 * It's still okay to go ahead, though, because we'll
+			 * mark the rf_vfs fumounted, and will fail to find
+			 * sndds or rcvds linked into the rf_vfs.
+			 * Send message to user level only if mount is fully
+			 * defined.
+			 * Reply to the fumount request in any case.
+			 */
+			if (rf_vfsp) {
+				if (rf_vfsp->rfvfs_rootvp &&
+				  VTOSD(rf_vfsp->rfvfs_rootvp)->sd_queue ==
+				    qp &&
+				  VTOSD(rf_vfsp->rfvfs_rootvp)->sd_mntid ==
+				    req_srmntid) {
+					rf_cl_fumount(rf_vfsp);
+					rf_user_msg(RFUD_FUMOUNT,
+					    rf_vfsp->rfvfs_name,
+					    (size_t)strlen(rf_vfsp->rfvfs_name));
+				} else if(!rf_vfsp->rfvfs_rootvp) {
+					rf_cl_fumount(rf_vfsp);
 				}
-				rfadmin_reply(&reply_port, REC_FUMOUNT);
-				break;
 			}
-
-			case REC_MSG: {
-				size_t	datasz;
-				size_t	hdrsz;
-
-				/*
-				 * Got a message for user-level daemon.
-				 * Enque message and wake up daemon.
-				 *
-				 * ASSERT based on circuit manager guarantees.
-				 */
-
-				hdrsz = RF_MIN_REQ(gp->version);
-
-				ASSERT(bp->b_wptr - bp->b_rptr >= hdrsz);
-
-				datasz = (size_t)request->rq_rec_msg.count;
-
-				if (RF_PULLUP(bp, hdrsz, datasz)) {
-					gdp_discon("rf_daemon bad REC_MSG",
-					  QPTOGP(qp));
-					rf_freemsg(bp);
-				} else {
-					strncpy(usr_msg, rf_msgdata(bp, hdrsz),
-					  datasz);
-					rf_freemsg(bp);
-					rfadmin_reply(&reply_port, REC_MSG);
-					rf_user_msg(RFUD_GETUMSG, usr_msg,
-					  datasz);
-				}
-				bp = NULL;
-				break;
-			}
-
-			case RFSYNCTIME: {
-
-				rfsr_adj_timeskew(gp,
-				  request->rq_synctime.time, 0);
-				(void)rf_allocmsg(RFV1_MINRESP, (size_t)0,
-				  BPRI_MED, FALSE, NULLCADDR, NULLFRP,
-				  &resp_bp);
-				response = RF_RESP(resp_bp);
-				cop = RF_COM(resp_bp);
-				response->rp_synctime.time = hrestime.tv_sec;
-				response->rp_errno = 0;
-				cop->co_type = RF_RESP_MSG;
-				cop->co_opcode = RFSYNCTIME;
-				rf_clrrpsigs(response, gp->version);
-				rf_freemsg(bp);
-				bp = NULL;
-
-				/* TO DO:  failure??? */
-				(void)rf_sndmsg(&reply_port, resp_bp,
-				  RFV1_MINRESP, (rcvd_t *)NULL, FALSE);
-				break;
-			}
-
-			case RFTMO: {
-				int	vcver;
-				size_t	respsize;
-
-				rf_freemsg(bp);
-				bp = NULL;
-				vcver = gp->version;
-				respsize = RF_MIN_RESP(vcver);
-
-				(void)rf_allocmsg(respsize, (size_t)0,
-				  BPRI_MED, FALSE, NULLCADDR, NULLFRP,
-				  &resp_bp);
-				response = RF_RESP(resp_bp);
-				cop = RF_COM(resp_bp);
-				response->rp_errno = 0;
-				cop->co_type = RF_RESP_MSG;
-				cop->co_opcode = RFTMO;
-				rf_clrrpsigs(response, vcver);
-
-				/* TO DO:  failure??? */
-				(void)rf_sndmsg(&reply_port, resp_bp,
-				  respsize, (rcvd_t *)NULL, FALSE);
-				break;
-			}
-
-			case RFCACHEDIS: {
-				int	vcver;
-				size_t	respsize;
-				int	vcode;
-
-				vcver = QPTOGP(qp)->version;
-				respsize = RF_MIN_RESP(vcver);
-
-				/* vcode is defined only from newer servers */
-
-				vcode = vcver >= RFS2DOT0 ?
-				  request->rq_cachedis.vcode : 0;
-
-				rf_disable_cache(qp,
-				  request->rq_cachedis.fhandle, (ulong)vcode);
-				rfc_info.rfci_rcv_dis++;
-				rf_freemsg(bp);
-				bp = NULL;
-				(void)rf_allocmsg(respsize, (size_t)0, BPRI_MED,
-				  FALSE, NULLCADDR, NULLFRP, &resp_bp);
-				ASSERT(resp_bp);
-				response = RF_RESP(resp_bp);
-				cop = RF_COM(resp_bp);
-				response->rp_errno = 0;
-				cop->co_type = RF_RESP_MSG;
-				cop->co_opcode = RFCACHEDIS;
-				rf_clrrpsigs(response, vcver);
-				(void)rf_sndmsg(&reply_port, resp_bp,
-				     respsize, (rcvd_t *)NULL, FALSE);
-
-				/*
-				 * Link down is the only case that rf_sndmsg
-				 * can fail; if it happens, server rf_recovery
-				 * should take care of losing the message
-				 */
-
-				break;
-			}
-
-			default:
-				rf_freemsg(bp);
-				bp = NULL;
-			}
-
-		} else {
-
-			switch ((int)cop->co_opcode) {
-
-			case RFTMO:
-			case RFSYNCTIME:
-
-				/* Request originated by rf_tmo */
-
-			default:
-				rf_freemsg(bp);
-				bp = NULL;
-			}
+			rfadmin_reply(&reply_port, REC_FUMOUNT);
+			break;
 		}
+		case REC_MSG: {
+			size_t	datasz = (size_t)request->rq_rec_msg.count;
+			size_t	hdrsz = msg->m_size - datasz;
 
+			/*
+			 * Got a message for user-level daemon.
+			 * Enque message and wake up daemon.
+			 */
+
+			if (pullupmsg(bp, hdrsz, datasz)) {
+				gdp_discon("rf_daemon bad REC_MSG", QPTOGP(qp));
+				rf_freemsg(bp);
+			} else {
+				strncpy(usr_msg, rf_msgdata(bp, hdrsz), datasz);
+				rf_freemsg(bp);
+				rfadmin_reply(&reply_port, REC_MSG);
+				rf_user_msg(RFUD_GETUMSG, usr_msg, datasz);
+			}
+			bp = NULL;
+			break;
+		}
+		case RFSYNCTIME: {
+			gdp_t	*gp = QPTOGP(qp);
+
+			rfsr_adj_timeskew(gp, request->rq_synctime.time, 0);
+			(void)rf_allocmsg(RFV1_MINRESP, (size_t)0,
+			  BPRI_MED, FALSE, NULLCADDR, NULLFRP, &resp_bp);
+			ASSERT(resp_bp);
+			response = RF_RESP(resp_bp);
+			cop = RF_COM(resp_bp);
+			response->rp_synctime.time = hrestime.tv_sec;
+			response->rp_errno = 0;
+			cop->co_type = RF_RESP_MSG;
+			cop->co_opcode = RFSYNCTIME;
+			rf_clrrpsigs(response, gp->version);
+			rf_freemsg(bp);
+			bp = NULL;
+			/* TO DO:  failure??? */
+			(void)rf_sndmsg(&reply_port, resp_bp, RFV1_MINRESP,
+			  (rcvd_t *)NULL, FALSE);
+			break;
+		}
+		case RFCACHEDIS: {
+			register queue_t *qp = (queue_t *)RF_MSG(bp)->m_queue;
+			size_t respsize = RF_MIN_RESP(QPTOGP(qp)->version);
+			int vcver = QPTOGP(qp)->version;
+			/* vcode is defined only from newer servers */
+			int vcode = vcver >= RFS2DOT0 ?
+					request->rq_cachedis.vcode : 0;
+
+
+			rf_disable_cache(qp, request->rq_cachedis.fhandle,
+				      (ulong)vcode);
+			rfc_info.rfci_rcv_dis++;
+			rf_freemsg(bp);
+			bp = NULL;
+			(void)rf_allocmsg(respsize, (size_t)0, BPRI_MED,
+			  FALSE, NULLCADDR, NULLFRP, &resp_bp);
+			ASSERT(resp_bp);
+			response = RF_RESP(resp_bp);
+			cop = RF_COM(resp_bp);
+			response->rp_errno = 0;
+			cop->co_type = RF_RESP_MSG;
+			cop->co_opcode = RFCACHEDIS;
+			rf_clrrpsigs(response, vcver);
+			(void)rf_sndmsg(&reply_port, resp_bp,
+			     respsize, (rcvd_t *)NULL, FALSE);
+			/*
+			 * Link down is the only case that rf_sndmsg
+			 * can fail, if it happens, server rf_recovery
+			 * should take care of losing the message
+			 */
+			break;
+		}
+		default:
+			rf_freemsg(bp);
+			bp = NULL;
+		}
 		s = splstr();
 	}
-out:
-	
-	/*
-	 * Wait for children to die.  Set flag bit in case we got
-	 * here other than via rfsys_stop, and in case kids are not
-	 * yet accepting SIGKILL.
-	 */
-	
-	rf_daemon_flag |= RFDKILL;
-	signal(rf_daemon_procp->p_pgrp, SIGKILL);
-	(void)waitid(P_ALL, 0, &sink, WEXITED);
-	rf_daemon_flag = 0;
-	rf_daemon_procp = NULL;
-	rf_commdinit();
-
-	/* end of critical section begun in rfsys_start */
-
-	rf_state = RF_DOWN;
-	wakeprocs((caddr_t)&rf_state, PRMPT);
-	exit(CLD_EXITED, 0);
 	/* NOTREACHED */
 }
 
 /*
- * Recovery daemon, awakened by rf_rec_cleanup to clean up after
- * fumount or disconnect.  This part of recovery calls routines that
- * can sleep.
+ * Handle asynchronous RF_INACTIVE requests and other drudgery.
+ * TO DO:  We currently have only one of these.  Expand interface
+ * to support an arbitrary number, and then asynchronous read/page
+ * ahead.  Keep nidle_rf_async current.
  */
 STATIC void
-rf_recovery()
+rf_async()
 {
-	int	slpret = 0;
+	int		s;
+	rfa_work_t	*wp;
 
-	bcopy("rf_recovery", u.u_comm, sizeof("rf_recovery"));
-	bcopy("rf_recovery", u.u_psargs, sizeof("rf_recovery"));
+	bcopy("rf_async", u.u_comm, sizeof("rf_async"));
+	bcopy("rf_async", u.u_psargs, sizeof("rf_async"));
 
 	/*
 	 * rf_daemon may have issued a SIGKILL, but that would be discarded
 	 * if this process was still in newproc() since the parent (rf_daemon)
 	 * ignores all signals.	 Exit if RFS is stopping.
 	 */
-
 	if (rf_daemon_flag & RFDKILL) {
-		rf_recovery_flag = 0;
 		exit(CLD_EXITED, 0);
 	}
 
+	nidle_rf_async++;
+
 	setsigact(SIGKILL, SIG_DFL, 0, 0);
 
-	u.u_procp->p_cstime = u.u_procp->p_stime =
-		u.u_procp->p_cutime = u.u_procp->p_utime = 0;
-	rf_recovery_procp = u.u_procp;
+	do {
+
+		--nidle_rf_async;
+		s = splstr();
+		while ((wp = (rfa_work_t *)LS_REMQUE(&rfa_workq)) != NULL) {
+			ASSERT(wp->rfaw_func);
+			splx(s);
+			(*wp->rfaw_func)(wp);
+			s = splstr();
+		}
+		splx(s);
+		nidle_rf_async++;
+
+	} while (!sleep((caddr_t)&rfa_workq, PREMOTE | PCATCH | PNOSTOP));
+
+	s = splstr();
+	while ((wp = (rfa_work_t *)LS_REMQUE(&rfa_workq)) != NULL) {
+		splx(s);
+		(*wp->rfaw_func)(wp);
+		s = splstr();
+	}
+	splx(s);
+			
+	--nidle_rf_async;
+	exit(CLD_EXITED, 0);
+}
+
+/*
+ * Can return a nonzero errno iff wp->rfaw.canfail.  In that case,
+ * the caller must dispose of its wp and otherwise see that its
+ * work gets done (probably by calling wp->rfaw_func directly).
+ */
+int
+rfa_workenq(wp)
+	rfa_work_t	*wp;
+{
+	int		s;
+
+	s = splstr();
+	if (wp->rfaw_canfail && !LS_ISEMPTY(&rfa_workq) && !nidle_rf_async) {
+		splx(s);
+		return ENOMEM;
+	}		
+	LS_INSQUE(&rfa_workq, &wp->rfaw_elt);
+	splx(s);
+	wakeup((caddr_t)&rfa_workq);
+	return 0;
+}
+
+/*
+ * Recovery daemon, awakened by rf_rec_cleanup to clean up after
+ * fumount or disconnect.  This part of rf_recovery calls
+ * routines that can sleep.
+ */
+void
+rf_recovery()
+{
+	int	sig;
+
+	rf_recovery_flag = 0;
+
+	/*
+	 * Disassociate this process from terminal
+	 * and ignore all signals.
+	 */
+	newsession();
+	for (sig = 1; sigismember(&fillset, sig); sig++) {
+		setsigact(sig, SIG_IGN, 0, 0);
+	}
 
 	for (;;) {
 		while (rf_recovery_flag) {
@@ -592,141 +496,20 @@ rf_recovery()
 			} else if (rf_recovery_flag & RFRECFUMOUNT) {
 				rf_recovery_flag &= ~RFRECFUMOUNT;
 				rf_srmntck();
-			}
-		}
-		if (slpret) {
-			break;
-		}
-		slpret =
-		  sleep((caddr_t)&rf_recovery_procp,  PZERO + 1 | PCATCH);
-	}
-	
-	if (rf_recovery_procp->p_curinfo) {
-		kmem_free((caddr_t)rf_recovery_procp->p_curinfo,
-		  sizeof(*rf_recovery_procp->p_curinfo));
-		rf_recovery_procp->p_curinfo = NULL;
-	}
-	rf_recovery_procp->p_cursig = 0;
-	rf_recovery_flag = 0;
-	rf_recovery_procp = NULL;
-	exit(CLD_EXITED, 0);
-}
-
-
-/*
- * Provoke timeouts and recovery over transports that do not themselves
- * provide an adequate facility (e.g., TCP and it's ~10 minute timeout).
- * For now, we use a sixty second timeout, but this should be specifiable
- * for each virtual circuit, e.g., as a mount option.
- */
-#define RFTMO_TIME	(60 * HZ)
-STATIC void
-rf_tmo()
-{
-	register gdp_t		*endgdp = gdp + maxgdp;
-	register gdp_t		*gp;
-	register queue_t	*qp;
-	mblk_t			*bp;
-	int			tid;
-	int			opcode;
-	size_t			hdrsz;
-	union rq_arg		rqarg;
-	sndd_t			out_port;
-
-	bcopy("rf_tmo", u.u_comm, sizeof("rf_tmo"));
-	bcopy("rf_tmo", u.u_psargs, sizeof("rf_tmo"));
-
-	/*
-	 * rf_daemon may have issued a SIGKILL, but that would be discarded
-	 * if this process was still in newproc() since the parent (rf_daemon)
-	 * ignores all signals.	 Exit if RFS is stopping.
-	 */
-
-	if (rf_daemon_flag & RFDKILL) {
-		exit(CLD_EXITED, 0);
-	}
-
-	setsigact(SIGKILL, SIG_DFL, 0, 0);
-
-	u.u_procp->p_cstime = u.u_procp->p_stime =
-		u.u_procp->p_cutime = u.u_procp->p_utime = 0;
-
-	out_port.sd_stat = SDUSED;
-	SDTOV(&out_port)->v_count = 1;
-
-	do {
-		if (!(dudebug & NO_RECOVER)) {
-			for (gp = gdp; gp < endgdp; gp++) {
-				if (gp->constate == GDPCONNECT &&
-				  (qp = gp->queue) != NULL) {
-
-					/*
-					 * timeout is cleared by any arriving
-					 * message.
-					 */
-
-					if (gp->timeout) {
-						gdp_discon(
-						  "rfs virtual circuit timeout",
-						   gp);
-						continue;
-					}
-					
-					/*
-					 * We send new peers an RFTMO request,
-					 * old ones and RFSYNCTIME.  The former
-					 * is not in the old protocol, the
-					 * latter is preserved only for
-					 * compatability outside this context.
-					 *
-					 * In either case, we arrange for the
-					 * response to go to the rf_daemon_rd,
-					 * so we don't have to wait.  The
-					 * rf_daemon knows to toss such
-					 * responses.
-					 */
-
-					rqarg = init_rq_arg;
-					sndd_set(&out_port, qp,
-					  &rf_daemon_gift);
-
-					if (gp->version < RFS2DOT0) {
-						rqarg.rqsynctime.time =
-						  hrestime.tv_sec;
-						opcode = RFSYNCTIME;
-						hdrsz = RFV1_MINREQ;
-					} else {
-						opcode = RFTMO;
-						hdrsz = RF_MIN_REQ(gp->version);
-					}
-
-					(void)rf_allocmsg(hdrsz, (size_t)0,
-					  BPRI_MED, FALSE, NULLCADDR, NULLFRP,
-					  &bp);
-					rfcl_reqsetup(bp, &out_port, u.u_cred,
-					  opcode, ULIMIT);
-					RF_REQ(bp)->rq_arg = rqarg;
-					gp->timeout = 1;
-					(void)rf_sndmsg(&out_port, bp,
-					  hdrsz, rf_daemon_rd, FALSE);
+			} else if (rf_recovery_flag & RFRECKILL) {
+				/* RFS stop */
+				rf_recovery_flag &= ~RFRECKILL;
+				rf_recovery_procp = NULL;
+				if (!rf_daemon_procp) {
+					rf_commdinit();
+					rf_state = RF_DOWN;
+					wakeup((caddr_t)&rf_state);
 				}
+				exit(CLD_EXITED, 0);
 			}
 		}
-
-		tid = timeout((void(*)())wakeup, (caddr_t)u.u_procp+1,
-		  RFTMO_TIME);
-
-	} while (!sleep((caddr_t)u.u_procp+1, PZERO + 1 | PCATCH));
-
-	untimeout(tid);
-
-	if (u.u_procp->p_curinfo) {
-		kmem_free((caddr_t)u.u_procp->p_curinfo,
-		  sizeof(*u.u_procp->p_curinfo));
-		u.u_procp->p_curinfo = NULL;
+		sleep((caddr_t)&rf_recovery_procp, PREMOTE);
 	}
-	u.u_procp->p_cursig = 0;
-	exit(CLD_EXITED, 0);
 }
 
 /*
@@ -741,6 +524,7 @@ rf_tmo()
  * sleeping in resources that have been disconnected.  Otherwise
  * these servers and the recovery daemon can deadlock.
  */
+
 STATIC void
 rf_rec_cleanup(bad_q)
 	queue_t	*bad_q;		/* stream that has gone away */
@@ -753,7 +537,7 @@ rf_rec_cleanup(bad_q)
 	clean_SRD(bad_q);
 
 	/* Wakeup procs sleeping on stream head */
-	wakeprocs((caddr_t)bad_q->q_ptr, PRMPT);
+	wakeup((caddr_t)bad_q->q_ptr);
 
 	bad_sysid = QPTOGP(bad_q)->sysid;
 
@@ -771,7 +555,7 @@ rf_rec_cleanup(bad_q)
 		rsrcp = rsrcp->r_nextp;
 	}
 	rf_recovery_flag |= RFRECDISCON;
-	wakeprocs((caddr_t)&rf_recovery_procp, PRMPT);
+	wakeup((caddr_t)&rf_recovery_procp);
 	return;
 }
 
@@ -779,7 +563,7 @@ rf_rec_cleanup(bad_q)
 /*
  * Go through vfs list looking for remote mounts over bad stream.
  * Send message to user-level daemon for every mount with bad link.
- * (Kernel recovery works without this routine.)
+ * (Kernel rf_recovery works without this routine.)
  */
 STATIC void
 rf_check_mount(bad_q)
@@ -831,7 +615,7 @@ clean_SRD(bad_q)
 			srm_mntid = rd->rd_sdp->sd_mntid;
 			rf_checkq(rd, srm_mntid);
 			rd->rd_stat |= RDLINKDOWN;
-			wakeprocs((caddr_t)&rd->rd_qslp, PRMPT);
+			wakeup((caddr_t)&rd->rd_qslp);
 		}
 	}
 }
@@ -846,15 +630,13 @@ clean_SRD(bad_q)
 STATIC void
 rf_srmntck()
 {
-	rf_resource_t	*rsrcp = rf_resource_head.rh_nextp;
-	register rcvd_t	*rd;
-	queue_t		*bad_q;
-	queue_t		*gdp_sysidtoq();
+	rf_resource_t *rsrcp = rf_resource_head.rh_nextp;
+	register rcvd_t *rd;
+	queue_t * bad_q, *gdp_sysidtoq();
 
 	while (rsrcp != (rf_resource_t *)&rf_resource_head) {
-		sr_mount_t		*srmp = rsrcp->r_mountp;
-		register rf_resource_t	*rsrcnextp = rsrcp->r_nextp;
-		register long		mntid = rsrcp->r_mntid;
+		register sr_mount_t *srmp = rsrcp->r_mountp;
+		register rf_resource_t *rsrcnextp = rsrcp->r_nextp;
 
 		while (srmp) {
 			/* srmp becomes dangling reference in clean_GRD
@@ -870,24 +652,24 @@ rf_srmntck()
 				}
 				bad_q = gdp_sysidtoq(srmp->srm_sysid);
 				ASSERT(bad_q);
-				/*
-				 * Now clean up RDGENERAL RDs
+				/* Hold vnode so it won't go away -
+				 * VN_RELE in dec_srmcnt when doing unmount
 				 */
+				VN_HOLD(rsrcp->r_rootvp);
+				/* Now clean up RDGENERAL RDs */
 				for (rd = rcvd; rd < endrcvd; rd++) {
-					if (ACTIVE_GRD(rd)) {
+					if (ACTIVE_GRD(rd))
 						clean_GRD(&rsrcp, rd,
-						  bad_q, &srmp, mntid);
-					}
+							  bad_q, srmp);
+					if (!rsrcp)
+						break;
 				}
 			}
 			srmp = srmnextp;
 		}
 		/* free this resource if unadvertised and not mounted */
 		if (rsrcp && !rsrcp->r_mountp && (rsrcp->r_flags & R_UNADV)) {
-			vnode_t	*rvp = rsrcp->r_rootvp;
-
 			freersc(&rsrcp);
-			VN_RELE(rvp);
 		}
 		rsrcp = rsrcnextp;
 	}
@@ -957,18 +739,19 @@ clean_sndd(bad_q)
  */
 /* ARGSUSED */
 STATIC void
-clean_GRD(rsrcpp, rd, bad_q, srmpp, srm_mntid)
-	rf_resource_t	**rsrcpp;
-	rcvd_t		*rd;
-	queue_t		*bad_q;
-	sr_mount_t	**srmpp;
-	long		srm_mntid;
+clean_GRD(rsrcpp, rd, bad_q, srmp)
+	rf_resource_t **rsrcpp;
+	rcvd_t	*rd;
+	queue_t	*bad_q;
+	sr_mount_t *srmp;
 {
-	vnode_t		*vp;
-	rd_user_t	*rduptr;
-	rd_user_t	*rdup_next;
-	cred_t		cred;
-	sysid_t		badsysid = QPTOGP(bad_q)->sysid;
+	register int vcount;
+	vnode_t *vp;
+	rd_user_t *rduptr;
+	rd_user_t *rdup_next;
+	long srm_mntid = (*rsrcpp)->r_mntid;
+	cred_t cred;
+	sysid_t badsysid = QPTOGP(bad_q)->sysid;
 
 	bzero((caddr_t)&cred, sizeof(cred_t));
 	crhold(&cred);
@@ -981,7 +764,10 @@ clean_GRD(rsrcpp, rd, bad_q, srmpp, srm_mntid)
 
 	while (rduptr) {
 		ASSERT(rd);
-
+		/*
+		 * Save the next rduser pointer in case the current
+		 * rduser is freed.
+		 */
 		rdup_next = rduptr->ru_next;
 		if (rduptr->ru_srmntid != srm_mntid
 		    || QPTOGP(rduptr->ru_queue)->sysid != badsysid) {
@@ -990,43 +776,77 @@ clean_GRD(rsrcpp, rd, bad_q, srmpp, srm_mntid)
 		}
 
 		/*
-		 * Mimic what a server would do to get rid of references
-		 * from client denoted by rduptr.
+		 * Mimic what a server would do to get rid of reference.
 		 */
 
-		(void)cleanlocks(vp, IGN_PID, badsysid);
-		if (*srmpp) {
-			ASSERT(rsrcpp && *rsrcpp);
-			dec_srmcnt(rsrcpp, srmpp, bad_q, rduptr->ru_vcount);
+		/* Undo opens and creats for this resource. */
+		if (rduptr->ru_fcount > 0) {
+			/* One VN_RELE because each rduser structure
+			 * denotes a single vnode reference, given the
+			 * present implementation of rfcl_sdrele.  This
+			 * should not be a problem for VOP_CLOSEs(?)
+			 */
+			(void)cleanlocks(vp, IGN_PID, badsysid);
+			while (rduptr->ru_frcnt) {
+				VOP_CLOSE(vp, FREAD, rduptr->ru_fcount,
+					0, &cred);
+				rduptr->ru_frcnt--;
+				rduptr->ru_fcount--;
+			}
+			while (rduptr->ru_fwcnt) {
+				VOP_CLOSE(vp, FWRITE, rduptr->ru_fcount,
+					0, &cred);
+				rduptr->ru_fwcnt--;
+				rduptr->ru_fcount--;
+			}
+			while (rduptr->ru_fcount) {
+				VOP_CLOSE(vp, FWRITE | FREAD, rduptr->ru_fcount,
+					0, &cred);
+				rduptr->ru_fcount--;
+			}
 		}
-		rcvd_delete(&rd, QPTOGP(bad_q)->sysid, srm_mntid,
-		  rduptr->ru_vcount);
-		
+		ASSERT(!rduptr->ru_fcount);
+
+		/* Clean up references to this resource. */
+		for (vcount = rduptr->ru_vcount; vcount > 0; --vcount) {
+			dec_srmcnt(rsrcpp, srmp, bad_q);
+			rcvd_delete(&rd, QPTOGP(bad_q)->sysid, srm_mntid);
+			VN_RELE(vp);
+		}
 		rduptr = rdup_next;
-	}
+	} /* end while */
 }
 
 
 /*
- * Decrement the reference count in the sr_mount structure by count.
+ * Decrement the reference count in the sr_mount structure.
  * If it goes to zero, do the unmount.
  */
 STATIC void
-dec_srmcnt(rsrcpp, srmpp, bad_q, count)
+dec_srmcnt(rsrcpp, srmp, bad_q)
 	rf_resource_t **rsrcpp;
-	sr_mount_t **srmpp;
+	sr_mount_t *srmp;
 	queue_t *bad_q;
 {
+	vnode_t *vp;
 	gdp_t *gdpp;
 
-	if (((*srmpp)->srm_refcnt -= count) > 1) {
+	if (srmp->srm_refcnt > 1) { /* srumount wants refcnt of 1 */
+		--srmp->srm_refcnt;
 		return;
 	}
 
 	/*
 	 * Giving up last ref for this sr_mount entry - free it.
+	 * The vnode we're working on is NOT necessarily
+	 * the root of the resource we're unmounting.
 	 */
-	(void)srm_remove(rsrcpp, srmpp);
+	vp = (*rsrcpp)->r_rootvp;
+
+	(void)srm_remove(rsrcpp, srmp);
+
+	/* One extra VN_RELE for VN_HOLD in rf_srmntck and fumount. */
+	VN_RELE(vp);
 
 	/* Client usually cleans up circuit, but client is gone. */
 	gdpp = QPTOGP(bad_q);
@@ -1049,8 +869,6 @@ rf_checkq(rd, srmid)
 
 	slevel = splstr();
 
-	ASSERT(!rd->rd_qslp++);
-
 	qcnt = rd->rd_qcnt;
 	for (cnt = 0; cnt < qcnt; cnt++) {
 		bp = (mblk_t *)LS_REMQUE(&rd->rd_rcvdq);
@@ -1070,9 +888,6 @@ rf_checkq(rd, srmid)
 			LS_INSQUE(&rd->rd_rcvdq, bp);
 		}
 	}
-
-	ASSERT(!--rd->rd_qslp);
-
 	splx(slevel);
 }
 
@@ -1139,7 +954,7 @@ rf_que_umsg(bp)
 	LS_INIT(bp);
 	LS_INSQUE(&rf_umsgq, bp);
 	splx(s);
-	wakeprocs((caddr_t)&rf_daemon_lock, PRMPT);
+	wakeup((caddr_t)&rf_daemon_lock);
 }
 
 /*
@@ -1203,43 +1018,8 @@ rf_cl_fumount(rf_vfsp)
 			DUPRINT2(DB_MNT_ADV,
 			    "fumount: waking SRD for rf_vfsp %x\n", rf_vfsp);
 			rd->rd_stat |= RDLINKDOWN;
-			wakeprocs((caddr_t)&rd->rd_qslp, PRMPT);
+			wakeup((caddr_t)&rd->rd_qslp);
 		}
 	}
-	rf_daemon_flag &= ~RFDASYNC;
-	wakeprocs((caddr_t)&rf_daemon_flag, PRMPT);
-}
-
-void
-rfd_stray(bp)
-	mblk_t	*bp;
-{
-	int	s;
-
-	if (!(RF_MSG(bp)->m_stat & RF_GIFT)) {
-		rf_freemsg(bp);
-		return;
-	}
-
-	s = splstr();
-	LS_INSQUE(&rfd_strayq, bp);
-	splx(s);
-	wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
-}
-
-/*
- * Post work for rf_daemon() to do, wake it up.
- */
-int
-rfa_workenq(wp)
-	rfa_work_t	*wp;
-{
-	int		s;
-
-	s = splstr();
-	LS_INSQUE(&rfa_workq, &wp->rfaw_elt);
-	rf_daemon_flag |= RFDASYNC;
-	wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
-	splx(s);
-	return 0;
+	wakeup((caddr_t)&rfa_workq);
 }

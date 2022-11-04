@@ -8,26 +8,21 @@
 #ifndef _SYS_IOCTL_H
 #define _SYS_IOCTL_H
 
-#ident	"@(#)head.sys:sys/ioctl.h	11.8"
+#ident	"@(#)head.sys:sys/ioctl.h	11.5"
 /*
- *      There are some inherent problems in having a single file
- *      ioctl.h, with both System V and BSD flags. Introducing
- * 	BSD flags into this file creates compilation problems
- *	with flags such as ECHO, NL1 etc., if termio.h and ioctl.h
- *      are included by the same file. Since these two files can
- * 	be only included by System V applications, /usr/inclule/sys/ioctl.h
- *      will be System V mode and all the BSD flags will be turned off
- *      using #ifdef BSD_COMP. This file will also exist in 
- *	/usr/ucbinclude/sys/ioctl.h for BSD applications but without the
- *      BSD flags turned off. System V appliactions can use ioctl.h without
- *      any changes, System V applications requiring BSD flags should
- *      -D BSD_COMP when compiling (and be warned about the common
- *      flags between System V and BSD) and BSD applications should
- * 	use /usr/ucbinclude/sys/ioctl.h.
- *     
+ * 	Currently only used by BSD applications.
+ *      Includes ttold.h for BSD terminal definitions.
+ *      ioctl.h should not be included when
+ *      termios.h is included.
+ *  	LIOC/DIOC defines are commented because we want
+ *      get rid of these ioctls (eventually).
  */
-
 #define	IOCTYPE	0xff00
+
+#if 0
+/* note this is commented */
+/* if no software is using these ioctls */
+/* they should be removed */
 
 #define	LIOC	('l'<<8)
 #define	LIOCGETP	(LIOC|1)
@@ -40,13 +35,9 @@
 #define	DIOCGETB	(DIOC|2)
 #define	DIOCSETE	(DIOC|3)
 
-/* BSD related defines */
+#endif /* end if 0 */
 
-#ifdef BSD_COMP
-
-#include <sys/ttychars.h>
-#include <sys/ttydev.h>
-#include <sys/ttold.h>
+#include "sys/ttold.h"
 
 #define	TANDEM		O_TANDEM
 #define	CBREAK		O_CBREAK
@@ -98,9 +89,8 @@
 #define	DECCTQ		O_DECCTQ
 #define	NOFLSH		O_NOFLSH
 
-#include <sys/filio.h>
-#include <sys/sockio.h>
-
-#endif /* BSD_COMP */
+/* SUN has these files included, are they required in SVR4.0? */
+/* #include "sys/filio.h" */
+/* #include "sys/sockio.h" */
 
 #endif	/* _SYS_IOCTL_H */

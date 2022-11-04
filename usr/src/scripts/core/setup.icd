@@ -1,4 +1,4 @@
-#ident	"@(#)core:setup.icd	1.3.3.1"
+#ident	"@(#)core:setup.icd	1.3.2.6"
 ROOT=${ROOT:-"/"}
 BOOTBLK=ICDboot
 
@@ -31,7 +31,7 @@ usr/lib/mboot
 usr/lib/flboot
 config/ifile4.0
 config/mapfile4.0
-usr/ccs/bin/ld
+bin/ld
 bin/strip
 !
 	# Copy all master.d files
@@ -82,7 +82,7 @@ echo "Preparing a generic unix for the first restore floppy"
 TMP_CMDS=
 for CMD in	/usr/sbin/mkboot \
 		/usr/sbin/cunix \
-		/usr/ccs/bin/ld \
+		/bin/ld \
 		/bin/strip \
 		/mkfs/inst/bin/absunix \
 		/usr/sbin/newboot \

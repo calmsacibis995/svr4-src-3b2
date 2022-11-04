@@ -5,15 +5,13 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:sys/hrtsys.c	1.2"
+#ident	"@(#)libc-port:sys/hrtsys.c	1.1"
 
-#ifndef DSHLIB
 #ifdef __STDC__
 	#pragma weak hrtcntl = _hrtcntl
 	#pragma weak hrtalarm = _hrtalarm
 	#pragma weak hrtsleep = _hrtsleep
 	#pragma weak hrtcancel = _hrtcancel
-#endif
 #endif
 #include	"synonyms.h"
 #include	"sys/types.h"
@@ -35,8 +33,6 @@ hrtime_t *hrtp;
 	return(syscall(HRTSYS, HRTCNTL, cmd, clk, intp, hrtp));
 }
 
-#ifndef DSHLIB
-
 hrtalarm(cmdp, cmds)
 hrtcmd_t *cmdp;
 int cmds;
@@ -56,4 +52,3 @@ int eids;
 {
 	return(syscall(HRTSYS, HRTCANCEL, eidp, eids));
 }
-#endif

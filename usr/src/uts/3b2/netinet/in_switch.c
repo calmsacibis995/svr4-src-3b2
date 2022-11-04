@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/in_switch.c	1.5"
+#ident	"@(#)netinet:netinet/in_switch.c	1.4"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -87,7 +87,7 @@
 #include <netinet/ip_str.h>
 
 #define mtod(m,t) ((t)((m)->b_rptr))
-/* #define ATOL(sa) (((struct sockaddr_in *)(sa))->sin_addr.s_addr) */
+/* #define ATOL(sa) (((struct taddr_in *)(sa))->sin_addr.s_addr) */
 #define ATOL(sa) ((sa)->s_addr)
 
 #define satosin(sa)	((struct sockaddr_in *) (sa))
@@ -329,11 +329,11 @@ slcheckuse(rt)
 sldocall(addr)
 	register struct in_addr *addr;
 {
-	struct sockaddr_in sock;
+	struct taddr_in sock;
 	register mblk_t *m, **mpp;
 	register int    s;
 
-	bzero((caddr_t) & sock, sizeof(struct sockaddr_in));
+	bzero((caddr_t) & sock, sizeof(struct taddr_in));
 	sock.sin_family = AF_INET;
 	sock.sin_addr = *addr;
 	s = splstr();
@@ -354,7 +354,7 @@ sldocall(addr)
 #endif SYSV
 		return;
 	}
-	if ((m = allocb(sizeof(struct sockaddr_in), BPRI_MED)) == NULL) {
+	if ((m = allocb(sizeof(struct taddr_in), BPRI_MED)) == NULL) {
 		splx(s);
 #ifdef SYSV
 		cmn_err(CE_CONT, "switched slip: no space\n");
@@ -363,8 +363,8 @@ sldocall(addr)
 #endif SYSV
 		return;
 	}
-	m->b_wptr += sizeof(struct sockaddr_in);
-	*(struct sockaddr_in *) (m->b_wptr) = sock;
+	m->b_wptr += sizeof(struct taddr_in);
+	*(struct taddr_in *) (m->b_wptr) = sock;
 	m->b_cont = 0;
 	for (mpp = &Slreq.waiting; *mpp; mpp = &((*mpp)->b_cont));
 	*mpp = m;

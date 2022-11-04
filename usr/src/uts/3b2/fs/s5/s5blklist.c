@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5blklist.c	1.9"
+#ident	"@(#)fs:fs/s5/s5blklist.c	1.8"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -42,7 +42,7 @@
 #include "fs/fs_subr.h"
 
 STATIC int	s5bldblklst();
-STATIC int	s5bldindr();
+STATIC int	*s5bldindr();
 
 /*
  * Allocate and build the block address map.
@@ -55,10 +55,9 @@ s5allocmap(ip)
 	register int	bsize;
 	register int	nblks;
 	register struct vnode *vp = ITOV(ip);
-	int err = 0;
 
 	if (ip->i_map) 
-		return err;
+		return 1;
 
 	/*
 	 * Get number of blocks to be mapped.
@@ -68,17 +67,15 @@ s5allocmap(ip)
 	nblks = (ip->i_size + bsize - 1)/bsize;
 	bnptr = (int *)kmem_alloc(sizeof(int)*nblks, KM_NOSLEEP);
 	if (bnptr == NULL)
-		return ENOMEM;
+		return 0;
 
 	/*
 	 * Build the actual list of block numbers for the file.
 	 */
-	if ((err= s5bldblklst(bnptr, ip, nblks)) == 0)
-		ip->i_map = bnptr;
-	else
-		kmem_free(bnptr, sizeof(int) * nblks);
+	(void) s5bldblklst(bnptr, ip, nblks);
+	ip->i_map = bnptr;
 
-	return err;
+	return 1;
 }
 
 /*
@@ -88,7 +85,7 @@ s5allocmap(ip)
 STATIC
 int
 s5bldblklst(lp, ip, nblks)
-	int	*lp;
+	register int		*lp;
 	register struct inode	*ip;
 	register int		nblks;
 {
@@ -96,7 +93,6 @@ s5bldblklst(lp, ip, nblks)
 	register int	*eptr;
 	register int	i;
 	register struct vnode *vp = ITOV(ip);
-	int err;
 	dev_t	 dev;
 
 	/*
@@ -109,23 +105,23 @@ s5bldblklst(lp, ip, nblks)
 		*lp++ = ip->i_addr[i];
 	
 	if (lp >= eptr)
-		return 0;
+		return 1;
 	
 	dev = vp->v_vfsp->vfs_dev;
 	while (lp < eptr) {
-		err = s5bldindr(ip, &lp, eptr, dev, ip->i_addr[i], i-(NADDR-3));
-		if (err)
-			return err;
+		lp = s5bldindr(ip, lp, eptr, dev, ip->i_addr[i], i-(NADDR-3));
+		if (lp == 0)
+			return 0;
 		i++;
 	}
-	return 0;
+	return 1;
 }
 
 STATIC
-int 
+int *
 s5bldindr(ip, lp, eptr, dev, blknbr, indlvl)
 	struct inode 		*ip;
-	register int		**lp;
+	register int		*lp;
 	register int		*eptr;
 	register dev_t	dev;
 	int			blknbr;
@@ -135,43 +131,34 @@ s5bldindr(ip, lp, eptr, dev, blknbr, indlvl)
 	register int	*bnptr;
 	int		cnt;
 	struct s5vfs	*s5vfsp;
-	int err = 0;
-	int 		bsize, sksize;
+	int 		bsize;
 	struct vnode	*vp = ITOV(ip);
 
 	bsize = VBSIZE(vp);
-	if (blknbr == 0){
-		sksize = 1;
-		for (cnt=0; cnt < (indlvl + 1); cnt++)
-			sksize *= (bsize/sizeof(int));
-
-		for (cnt=0; cnt < sksize; cnt++)
-			*(*lp)++ = 0;
-		return 0;
-	}
-
 	bp = bread(dev, blknbr, bsize);
 	if (bp->b_flags & B_ERROR) {
 		brelse(bp);
-		return ENXIO;
+		return NULL;
 	}
 	bnptr = bp->b_un.b_words;
 	s5vfsp = S5VFS(vp->v_vfsp);
 	cnt = s5vfsp->vfs_nindir;
 	
 	ASSERT(indlvl >= 0);
-	while (cnt-- && *lp < eptr) {
+	while (cnt-- && lp < eptr) {
 		if (indlvl == 0)
-			*(*lp)++ = *bnptr++;
+			*lp++ = *bnptr++;
 		else {
-			err = s5bldindr(ip, lp, eptr, dev, *bnptr++, indlvl-1);
-			if (err) 
-				break;
+			lp = s5bldindr(ip, lp, eptr, dev, *bnptr++, indlvl-1);
+			if (lp == 0) {
+				brelse(bp);
+				return NULL;
+			}
 		}
 	}
 
 	brelse(bp);
-	return err;
+	return lp;
 }
 
 /*

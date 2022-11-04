@@ -8,7 +8,7 @@
 #ifndef _GRP_H
 #define _GRP_H 
 
-#ident	"@(#)head:grp.h	1.3.1.9"
+#ident	"@(#)head:grp.h	1.3.1.8"
 
 #include <sys/types.h>
 
@@ -26,7 +26,7 @@ struct	group {	/* see getgrent(3) */
 extern void endgrent(void);
 extern struct group *fgetgrent(FILE *);
 extern struct group *getgrent(void);
-extern struct group *getgrgid(gid_t);
+extern struct group *getgrgid(uid_t);
 extern struct group *getgrnam(const char *);
 extern void setgrent(void);
 extern int initgroups(const char *, gid_t);

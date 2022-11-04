@@ -1,10 +1,4 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-.ident	"@(#)libc-m32:print.defs	1.6.1.11"
+.ident	"@(#)libc-m32:print.defs	1.6.1.10"
 #
 	.set	.Rcnt,6			# Number of registers to save on entry.
 #
@@ -75,7 +69,7 @@ _m4_define_(`BMAXARG', 120)#	default size of parofflst
 #
 # Conversion constants -- from "print.h"
 #
-	.set	MAXDIGS,12	# Maximum length of any integer representation
+	.set	MAXDIGS,11	# Maximum length of any integer representation
 	.set	MAXECVT,17	# Maximum length of E format conversion
 	.set	MAXFCVT,60	# Maximum places after decimal in F format
 	.set	MAXFSIG,17	# Maximum significant places in floating rep.

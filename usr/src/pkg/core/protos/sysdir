@@ -1,4 +1,4 @@
-#ident	"@(#)pkgcore:protos/sysdir	1.13"
+#ident	"@(#)pkgcore:protos/sysdir	1.10"
 
 d sysdir / 755 root sys
 d sysdir /bck 775 root sys
@@ -16,10 +16,8 @@ d sysdir /etc/fs/bfs 775 root sys
 d sysdir /etc/fs/proc 775 root sys
 d sysdir /etc/fs/rfs 775 root sys
 d sysdir /etc/fs/s5 775 root sys
-d sysdir /etc/fs/fd 775 root sys
 d sysdir /etc/init.d 775 root sys
 d sysdir /etc/mail 775 bin mail
-d sysdir /etc/mail/lists 775 bin mail
 d sysdir /etc/master.d 775 root sys
 d sysdir /etc/rc.d 775 root sys
 d sysdir /etc/rc0.d 775 root sys
@@ -92,14 +90,12 @@ d sysdir /usr/lib/fs/bfs 775 root sys
 d sysdir /usr/lib/fs/proc 775 root sys
 d sysdir /usr/lib/fs/rfs 775 root sys
 d sysdir /usr/lib/fs/s5 775 root sys
-d sysdir /usr/lib/fs/fd 775 root sys
 d sysdir /usr/lib/lex 775 bin bin
 d sysdir /usr/lib/libp 775 bin bin
 d sysdir /usr/lib/macros 775 bin bin
 d sysdir /usr/lib/mail 775 bin mail
 d sysdir /usr/lib/mail/surrcmd 775 bin mail
 d sysdir /usr/lib/mailx 775 root sys
-d sysdir /usr/share/lib/mailx 775 root sys
 d sysdir /usr/lib/pump 775 bin bin
 d sysdir /usr/lib/sa 775 adm bin
 d sysdir /usr/lib/saf 775 root bin

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/exec.c	1.56"
+#ident	"@(#)kernel:os/exec.c	1.50"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -108,45 +108,38 @@ exece(uap, rvp)
 		pn_free(&pn);
 		return error;
 	}
-
 	strncpy(exec_file, pn.pn_path, PSCOMSIZ);
+	pn_free(&pn);
 	struct_zero(&args, sizeof(args));
 
-	if (uap->argp) {
-		switch (arglistsz(uap->argp, &args.argc, &args.argsize,
-		  exec_ncargs)) {
-		case -2:
-			error = E2BIG;
-			goto done;
-		case -1:
-			error = EFAULT;
-			goto done;
-		default:
-			args.argp = uap->argp;
-			break;
-		}
+	if (uap->argp)
+	switch (arglistsz(uap->argp, &args.argc, &args.argsize, exec_ncargs)) {
+	case -2:
+		return E2BIG;
+	case -1:
+		return EFAULT;
+	default:
+		args.argp = uap->argp;
+		break;
 	}
 
-	if (uap->envp) {
-		switch (arglistsz(uap->envp, &args.envc, &args.envsize,
-		    exec_ncargs - args.argsize)) {
-		case -2:
-			error = E2BIG;
-			goto done;
-		case -1:
-			error = EFAULT;
-			goto done;
-		default:
-			args.envp = uap->envp;
-			break;
-		}
+	if (uap->envp)
+	switch (arglistsz(uap->envp, &args.envc, &args.envsize,
+	    exec_ncargs - args.argsize)) {
+	case -2:
+		return E2BIG;
+	case -1:
+		return EFAULT;
+	default:
+		args.envp = uap->envp;
+		break;
 	}
 
-	args.fname = pn.pn_buf;
+	args.fname = uap->fname;
 
 
 	PREEMPT();
-	if (error = gexec(&vp, &args, 0, &execsz))
+	if (error = gexec(vp, &args, 0, &execsz))
 		goto done;
 	PREEMPT();
 
@@ -160,9 +153,9 @@ exece(uap, rvp)
 
 	if ((error = setregs(&args)) != 0)
 		psignal(u.u_procp, SIGKILL);
+
 done:
 	PREEMPT();
-	pn_free(&pn);
 	VN_RELE(vp);
 	return error;
 }
@@ -182,13 +175,14 @@ exec(uap, rvp)
 exhdmap_t *exhd_freelist;
 int exhd_freeincr = 8;
 
-STATIC int
+STATIC
+int
 exhd_getfbuf(ehdap, off, size, keep, mappp)
-	exhda_t *ehdap;
-	off_t off;
-	int size;
-	int keep;
-	exhdmap_t **mappp;
+ exhda_t *ehdap;
+ off_t off;
+ int size;
+ int keep;
+ exhdmap_t **mappp;
 {
 	register exhdmap_t *mapp;
 	extern struct as kas;
@@ -218,7 +212,7 @@ exhd_getfbuf(ehdap, off, size, keep, mappp)
 						S_READ);
 				if (err) {
 					if (FC_CODE(err) == FC_OBJERR)
-						return FC_ERRNO(err);
+						return(FC_ERRNO(err));
 					else
 						return EIO;
 				}
@@ -235,7 +229,7 @@ exhd_getfbuf(ehdap, off, size, keep, mappp)
 						S_READ);
 				if (err) {
 					if (FC_CODE(err) == FC_OBJERR)
-						return FC_ERRNO(err);
+						return(FC_ERRNO(err));
 					else
 						return EIO;
 				}
@@ -257,7 +251,7 @@ exhd_getfbuf(ehdap, off, size, keep, mappp)
 	error = fbread(ehdap->vp, bpoff, epoff - bpoff, S_READ, &mapp->fbufp);
 	if (error) {
 		kmem_fast_free((caddr_t *) &exhd_freelist, (caddr_t)mapp);
-		return error;
+		return(error);
 	}
 	mapp->nextmap = ehdap->maplist;
 	ehdap->maplist = mapp;
@@ -268,13 +262,14 @@ exhd_getfbuf(ehdap, off, size, keep, mappp)
 	return 0;
 }
 
-STATIC int
+STATIC
+int
 exhd_nomap(ehdap, off, size, flags, cpp)
-	exhda_t *ehdap;
-	off_t off;
-	int size;
-	int flags;
-	caddr_t cpp;
+ exhda_t *ehdap;
+ off_t off;
+ int size;
+ int flags;
+ caddr_t cpp;
 {
 	register exhdmap_t *mapp;
 	register exhdmap_t **mpp;
@@ -291,13 +286,14 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 	poff = off & PAGEMASK;
 	epoff = (eoff + (PAGESIZE-1)) & PAGEMASK;
 
-	/*
-	 * The code rejects doing the autofree for VNOMAP files
+	/* the code rejects doing the autofree for VNOMAP files
 	 * to avoid losing this hidden cache.
 	 * So, only non-vnode pages are autofreed.
 	 */
+
 	for (mpp = &ehdap->maplist; (mapp = *mpp) != NULL; ) {
-		if (mapp->keepcnt || mapp->cureoff) {
+		if (mapp->keepcnt
+		  || mapp->cureoff) {
 			mpp = &mapp->nextmap;
 			continue;
 		}
@@ -322,9 +318,8 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 		copymapp = mapp;
 	}
 
-	/*
-	 * Keep the maplist sorted by offset and allow no overlaps.
-	 */
+	/* keep the maplist sorted by offset and allow no overlaps */
+
 	for (mpp = &ehdap->maplist; (mapp = *mpp) != NULL; ) {
 		if (mapp->cureoff == 0) {
 			mpp = &mapp->nextmap;
@@ -339,10 +334,8 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 					if (copymapp != NULL) {
 						*((caddr_t *)cpp) =
 							copymapp->bndrycasep;
-						bcopy(mapp->bndrycasep
-							  + off - mapp->curoff,
-							copymapp->bndrycasep,
-							size);
+						bcopy(mapp->bndrycasep + off - mapp->curoff,
+							copymapp->bndrycasep, size);
 						return 0;
 					}
 					*((caddr_t *)cpp) = mapp->bndrycasep
@@ -377,13 +370,12 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 		mapp->cureoff = epoff;
 		error = vn_rdwr(UIO_READ, vp, mapp->bndrycasep, cnt, poff,
 			UIO_SYSSPACE, 0, (long) 0, u.u_cred, &resid);
-		if (error || (resid && resid + ehdap->vnsize != epoff)) {
-			kmem_fast_free((caddr_t *) &exhd_freelist,
-			  (caddr_t)mapp);
+		if (error || resid) {
+			kmem_fast_free((caddr_t *) &exhd_freelist, (caddr_t)mapp);
 			ehdap->state = EXHDA_HADERROR;
 			if (error)
-				return error;
-			return ENOEXEC;
+				return(error);
+			return(ENOEXEC);
 		}
 		mapp->nextmap = *mpp;
 		*mpp = mapp;
@@ -407,11 +399,11 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 			return 0;
 		}
 	}
-	/*
-	 * A partial overlap:
+	/* a partial overlap:
 	 * copy to a separate buffer
 	 * rather than fiddling with merging vnode pages.
 	 */
+
 	if (!(flags & EXHD_COPY)) {
 		if (copymapp)
 			tcp = copymapp->bndrycasep;
@@ -463,8 +455,8 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 			if (error || resid) {
 				ehdap->state = EXHDA_HADERROR;
 				if (error)
-					return error;
-				return ENOEXEC;
+					return(error);
+				return(ENOEXEC);
 			}
 			mapp->curoff = poff;
 			mapp->cureoff = poff + cnt;
@@ -475,7 +467,7 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 			cnt = size;
 		bcopy(mapp->bndrycasep + off - mapp->curoff, tcp, cnt);
 		if ((size -= cnt) <= 0)
-			return 0;
+			return(0);
 		off += cnt;
 		tcp += cnt;
 		mpp = &mapp->nextmap;
@@ -497,22 +489,22 @@ exhd_nomap(ehdap, off, size, flags, cpp)
 	if (error || resid) {
 		ehdap->state = EXHDA_HADERROR;
 		if (error)
-			return error;
-		return ENOEXEC;
+			return(error);
+		return(ENOEXEC);
 	}
 	mapp->curoff = off;
 	mapp->cureoff = off + cnt;
 	bcopy(mapp->bndrycasep, tcp, size);
-	return 0;
+	return(0);
 }
 
 int
 exhd_getmap(ehdap, off, size, flags, cpp)
-	exhda_t *ehdap;
-	off_t off;
-	int size;
-	int flags;
-	caddr_t cpp;
+ exhda_t *ehdap;
+ off_t off;
+ int size;
+ int flags;
+ caddr_t cpp;
 {
 	register exhdmap_t *mapp;
 	register exhdmap_t **mpp;
@@ -524,21 +516,20 @@ exhd_getmap(ehdap, off, size, flags, cpp)
 
 	ASSERT(size > 0);
 	if (ehdap->state == EXHDA_HADERROR)
-		return ENOEXEC;	/* we failed previously */
+		return(ENOEXEC);	/* we failed previously */
 	eoff = off + size;
 	if (eoff < off || eoff > ehdap->vnsize) {
 		ehdap->state = EXHDA_HADERROR;
-		return ENOEXEC;
+		return(ENOEXEC);
 	}
 
-	/*
-	 * Assumption: the mappability of a vnode is constant during exec.
-	 */
+	/* assumption: the mappability of a vnode is constant during exec */
+
 /*
 	if (ehdap->vp->v_flag & VNOMAP)
 */
-	if (ehdap->nomap)
-		return exhd_nomap(ehdap, off, size, flags, cpp);
+	if(ehdap->nomap)
+		return(exhd_nomap(ehdap, off, size, flags, cpp));
 	boff = off & MAXBMASK;
 	eboff = (eoff-1) & MAXBMASK;
 	for (mpp = &ehdap->maplist; (mapp = *mpp) != NULL; ) {
@@ -557,18 +548,18 @@ exhd_getmap(ehdap, off, size, flags, cpp)
 	}
 	if (!(flags & EXHD_COPY || boff != eboff
 	    || !((flags & EXHD_4BALIGN) == 0 || (off & 3) == 0))) {
-		/*
-		 * The simple case of returning a pointer to seg_map space
-		 */
+
+		/* the simple case of returning a pointer to seg_map space */
+
 		error = exhd_getfbuf(ehdap, off, size, flags & EXHD_KEEPMAP,
 			&curmapp);
 		if (error) {
 			ehdap->state = EXHDA_HADERROR;
-			return error;
+			return(error);
 		}
 		mapp = curmapp;
 		*((caddr_t *)cpp) = mapp->fbufp->fb_addr + (off - mapp->curoff);
-		return 0;
+		return(0);
 	}
 
 	if (flags & EXHD_COPY)
@@ -593,43 +584,40 @@ exhd_getmap(ehdap, off, size, flags, cpp)
 		&curmapp);
 	if (error) {
 		ehdap->state = EXHDA_HADERROR;
-		return error;
+		return(error);
 	}
 	mapp = curmapp;
 	fcp = mapp->fbufp->fb_addr + (off - mapp->curoff);
 	eoff = mapp->cureoff;
 	cnt = eoff - off;
-	if (cnt > size)
-		cnt = size;
+	if (cnt > size) cnt = size;
 	for (;;) {
 		bcopy(fcp, tcp, cnt);
 		if ((size -= cnt) <= 0)
-			return 0;
+			return(0);
 		tcp += cnt;
 		off += cnt;
 		error = exhd_getfbuf(ehdap, off, size, flags & EXHD_KEEPMAP,
 			&curmapp);
 		if (error) {
 			ehdap->state = EXHDA_HADERROR;
-			return error;
+			return(error);
 		}
 		mapp = curmapp;
 		fcp = mapp->fbufp->fb_addr + (off - mapp->curoff);
 		eoff = mapp->cureoff;
 		cnt = eoff - off;
-		if (cnt > size)
-			cnt = size;
+		if (cnt > size) cnt = size;
 	}
 }
 
 void
 exhd_release(hdp)
-	register exhda_t *hdp;
+ register exhda_t *hdp;
 {
 	register exhdmap_t *mapp, *nmapp;
 
-	if (hdp == NULL)
-		return;
+	if (hdp == NULL) return;
 	for (mapp = hdp->maplist; mapp != NULL; mapp = nmapp) {
 		if (mapp->bndrycasep)
 			kmem_free(mapp->bndrycasep, mapp->bndrycasesz);
@@ -642,17 +630,16 @@ exhd_release(hdp)
 
 int
 execpermissions(vp, vattrp, ehdp, args)
-	struct vnode *vp;
-	struct vattr *vattrp;
-	exhda_t *ehdp;
-	struct uarg *args;
+struct vnode *vp;
+struct vattr *vattrp;
+exhda_t *ehdp;
+struct uarg *args;
 {
 	int error;
-	register proc_t *p = u.u_procp;
 
 	struct_zero(ehdp, sizeof(*ehdp));
 	vattrp->va_mask = AT_MODE|AT_UID|AT_GID|AT_SIZE;
-	if (error = VOP_GETATTR(vp, vattrp, ATTR_EXEC, p->p_cred))
+	if (error = VOP_GETATTR(vp, vattrp, ATTR_EXEC, u.u_cred))
 		return error;
 	/*
 	 * Check the access mode.
@@ -665,12 +652,12 @@ execpermissions(vp, vattrp, ehdp, args)
 		return error;
 	}
 
-       if ((p->p_trace || (p->p_flag & (STRC|SPROCTR)))
+       if ((u.u_procp->p_trace || (u.u_procp->p_flag & (STRC|SPROCTR)))
           && (error = VOP_ACCESS(vp, VREAD, 0, u.u_cred))) {
 		/*
                  * If process is traced via ptrace(2), fail the exec(2).
                  */
-                if (p->p_flag & STRC)
+                if (u.u_procp->p_flag & STRC)
                         goto bad;
 		/*
                  * Process is traced via /proc.
@@ -689,119 +676,88 @@ bad:
 	return error;
 }
 
-STATIC int
-execsetid(vp, vattrp, uidp, gidp)
-	struct vnode *vp;
-	struct vattr *vattrp;
-	uid_t *uidp;
-	uid_t *gidp;
-{
-	proc_t *pp = u.u_procp;
-	uid_t uid, gid;
-
-	/*
-	 * Remember credentials.
-	 */
-	uid = pp->p_cred->cr_uid;
-	gid = pp->p_cred->cr_gid;
-
-	if ((vp->v_vfsp->vfs_flag & VFS_NOSUID) == 0) {
-		if (vattrp->va_mode & VSUID)
-			uid = vattrp->va_uid;
-		if (vattrp->va_mode & VSGID)
-			gid = vattrp->va_gid;
-	}
-
-	/*
- 	 * Set setuid/setgid protections, if no tracing.  
-	 * For the super-user, honor setuid/setgid even in 
-	 * the presence of tracing.
- 	 */
-	if (((pp->p_flag & STRC) == 0 || pp->p_cred->cr_uid == 0)
-  	  && (pp->p_cred->cr_uid != uid
-	    || pp->p_cred->cr_gid != gid
-	    || pp->p_cred->cr_suid != uid
-	    || pp->p_cred->cr_sgid != gid)) {
-		*uidp = uid;
-		*gidp = gid;
-		return 1;
-	} 
-	return 0;
-}
-
 int
-gexec(vpp, args, level, execsz)
-	struct vnode **vpp;
+gexec(vp, args, level, execsz)
+	struct vnode *vp;
 	struct uarg *args;
 	int level;
 	long *execsz;
 {
 	register proc_t *pp = u.u_procp;
 	register int i;
-	register vnode_t *vp;
-	int error = 0, closerr = 0;
+	int error = 0;
 	int resid;
 	uid_t uid, gid;
 	struct vattr vattr;
 	short magic;
 	char *mcp;
 	exhda_t ehda;
-	int setid;
 
-	vp = *vpp;
 	if ((error = execpermissions(vp, &vattr, &ehda, args)) != 0)
-		goto out;
+		goto bad;
 
-	if ((error = VOP_OPEN(vpp, FREAD, u.u_cred) != 0))
-		goto out;
-
-	vp = *vpp;
-	if ((error = exhd_getmap(&ehda, 0, 2, EXHD_NOALIGN, (caddr_t)&mcp))
-	  != 0) {
+	if ((error = exhd_getmap(&ehda, 0, 2, EXHD_NOALIGN, (caddr_t)&mcp)) != 0) {
 		exhd_release(&ehda);
-		goto closevp;
+		goto bad;
 	}
 	magic = getexmag(mcp);
 
-	setid = execsetid(vp, &vattr, &uid, &gid);
-
 	for (i = 0; i < nexectype; i++) {
 		if (magic == *execsw[i].exec_magic) {
-			error = (*execsw[i].exec_func)
-			  (vp, args, level, execsz, &ehda, setid);
+			error = (*execsw[i].exec_func)(vp, args, level, execsz, &ehda);
 			break;
 		}
 	}
 	exhd_release(&ehda);
 
-	if (i >= nexectype && !error)
-		error = ENOEXEC;
-	if (error)
-		goto closevp;
+	if (i >= nexectype || error)
+		goto bad;
 
 	if (level == 0) {
-		if (setid) {
+
+		/*
+		 * Remember credentials.
+		 */
+
+		uid = u.u_cred->cr_uid;
+		gid = u.u_cred->cr_gid;
+	
+		if ((vp->v_vfsp->vfs_flag & VFS_NOSUID) == 0) {
+			if (vattr.va_mode & VSUID)
+				uid = vattr.va_uid;
+			if (vattr.va_mode & VSGID)
+				gid = vattr.va_gid;
+		}
+	
+		/*
+	 	 * Set setuid/setgid protections, if no tracing.  
+		 * For the super-user, honor setuid/setgid even in 
+		 * the presence of tracing.
+	 	 */
+
+		if (((pp->p_flag & STRC) == 0 || u.u_cred->cr_uid == 0)
+	  	&& (u.u_cred->cr_uid != uid || u.u_cred->cr_gid != gid)) {
+
 			/*
-			 * Prevent unprivileged processes from enforcing
+			 * prevent unprivledged processes from enforcint
 			 * resource limitations on setuid/setgid processes
-			 * by reinitializing them to system defaults.
 			 */
 			for (i = 0; i < RLIM_NLIMITS; i++) {
 				u.u_rlimit[i].rlim_cur = rlimits[i].rlim_cur;
 				u.u_rlimit[i].rlim_max = rlimits[i].rlim_max;
 			}
 
-			pp->p_cred = crcopy(pp->p_cred);
-			pp->p_cred->cr_uid = uid;
-			pp->p_cred->cr_gid = gid;
-			pp->p_cred->cr_suid = uid;
-			pp->p_cred->cr_sgid = gid;
-			if (uid < USHRT_MAX)
+			u.u_cred = crcopy(u.u_cred);
+			u.u_cred->cr_uid = uid;
+			u.u_cred->cr_gid = gid;
+			u.u_cred->cr_suid = uid;
+			u.u_cred->cr_sgid = gid;
+			if ( uid < USHRT_MAX)
 				u.u_uid = (o_uid_t) uid;
 			else
 				u.u_uid = (o_uid_t) UID_NOBODY;
 
-			if (gid < USHRT_MAX)
+			if ( gid < USHRT_MAX)
 				u.u_gid = (o_gid_t) gid;
 			else
 				u.u_gid = (o_gid_t) UID_NOBODY;
@@ -810,6 +766,7 @@ gexec(vpp, args, level, execsz)
 			 * If process is traced via /proc, arrange to
 			 * invalidate the associated /proc vnode.
 			 */
+
 			if (pp->p_trace || (pp->p_flag & SPROCTR))
 				args->traceinval = 1;
 		}
@@ -820,10 +777,12 @@ gexec(vpp, args, level, execsz)
 		if (args->traceinval)
 			prinvalidate(&u);
 	}
-closevp:
-	closerr = VOP_CLOSE(vp, FREAD, 1, 0, u.u_cred);
-out:
-	return error ? error : closerr;
+
+	return 0;
+bad:
+	if (error == 0)
+		error = ENOEXEC;
+	return error;
 }
 
 int
@@ -841,9 +800,11 @@ execmap(vp, addr, len, zfodlen, offset, prot)
 	proc_t *p = u.u_procp;
 	off_t oldoffset;
 
+
 	if (((long)offset & PAGEOFFSET) == ((long)addr & PAGEOFFSET)
-	  && (!(vp->v_flag & VNOMAP)))
+		&& (!(vp->v_flag & VNOMAP))) {
 			page = 1;
+	}
 		
 	oldaddr = addr;
 	addr = (caddr_t)((long)addr & PAGEMASK);
@@ -855,7 +816,7 @@ execmap(vp, addr, len, zfodlen, offset, prot)
 		if (page) {
 			if (error = VOP_MAP(vp, offset, p->p_as, &addr,
 				len, prot, PROT_ALL,
-				 MAP_PRIVATE | MAP_FIXED, p->p_cred))
+				 MAP_PRIVATE | MAP_FIXED, u.u_cred))
 					goto bad;
 			/*
 			 * If the segment can fit, then we prefault
@@ -867,6 +828,7 @@ execmap(vp, addr, len, zfodlen, offset, prot)
 				(void) as_fault(p->p_as, (caddr_t)addr,
 				  	   	 len, F_INVAL, S_READ);
 			}
+
 		} else {	
 			if (error = as_map(p->p_as, addr, len,
 			  segvn_create, zfod_argsp))
@@ -876,7 +838,7 @@ execmap(vp, addr, len, zfodlen, offset, prot)
 			 */
 			if (error = vn_rdwr(UIO_READ, vp, (caddr_t)oldaddr,
 			  oldlen, oldoffset, UIO_USERSPACE, 0,
-			  (u_long) 0, p->p_cred, (int *)0))
+			  (u_long) 0, u.u_cred, (int *)0))
 				goto bad;
 			/*
 			 * Now set protections.
@@ -885,34 +847,36 @@ execmap(vp, addr, len, zfodlen, offset, prot)
 		}
 	}
 
-	if (zfodlen) {
+	if (zfodlen){
 		end = (size_t)addr + len;
 		zfodbase = (caddr_t)roundup(end, PAGESIZE);
 		zfoddiff = (size_t)zfodbase - end;
 		if (zfoddiff != 0)
 			bzeroba((caddr_t)end, zfoddiff);
-		if (zfodlen > zfoddiff) {
+		if ( zfodlen > zfoddiff){
 			zfodlen -= zfoddiff;
 			if (error = as_map(p->p_as, (caddr_t)zfodbase, zfodlen,
-			  segvn_create, zfod_argsp))
+				segvn_create, zfod_argsp))
 				goto bad;
 
 			(void)as_setprot(p->p_as, (caddr_t)zfodbase, 
-			  zfodlen, prot);
+					  zfodlen, prot);
 		}
 	}
 
+		
 	return 0;
 bad:
 	return error;
 }
 
 /*
- * Machine-independent final setup code goes in setexecenv().
+ * machine independent final setup code goes in setexecenv().
  */
+
 void
 setexecenv(ep)
-	struct execenv *ep;
+struct execenv *ep;
 {
 	register int	i;
 	register struct proc *p = u.u_procp;
@@ -921,11 +885,7 @@ setexecenv(ep)
 	u.u_execid = (int)ep->ex_magic;
 	p->p_brkbase = ep->ex_brkbase;
 	p->p_brksize = 0;
-	if (p->p_exec)
-		VN_RELE(p->p_exec);	/* out with the old */
 	p->p_exec = ep->ex_vp;
-	if (p->p_exec)
-		VN_HOLD(p->p_exec);	/* in with the new */
 
 	u.u_oldcontext = 0;
 
@@ -933,12 +893,12 @@ setexecenv(ep)
 	u.u_signodefer = 0;
 	u.u_sigonstack = 0;
 
-	u.u_sigaltstack.ss_sp = 0;
-	u.u_sigaltstack.ss_size = 0;
-	u.u_sigaltstack.ss_flags = SS_DISABLE;
+	u.u_altsp = 0;
+	u.u_altsize = 0;
+	u.u_altflags = SS_DISABLE;
 
 	/*
-	 * Any pending signals remain held, so don't clear p_hold and
+	 * Any pending signal remain held, so don't clear p_hold and
 	 * p_sig.
 	 */	
 
@@ -963,11 +923,10 @@ setexecenv(ep)
 	p->p_flag &= ~(SNOWAIT|SJCTL);
 	p->p_flag |= SEXECED;
 
-	pgdetach(p);
+	detachcld(p);
 
-	/*
-	 * Clear illegal opcode handler.
-	 */
+
+	/* Clear illegal opcode handler. */
 	u.u_iop = NULL;
 
 	for (i = 0; i < u.u_nofiles; i++) {
@@ -993,8 +952,9 @@ remove_proc(args)
 	
 	u.u_prof.pr_scale = 0;
 
-	if (error = extractarg(args))
-		return error;
+	if (error = extractarg(args)) {
+		return(error);
+	}
 	ev_exec(p);
 
 	if (u.u_nshmseg)
@@ -1016,62 +976,12 @@ remove_proc(args)
 	return 0;
 }
 
-int
-execopen(vpp, fdp)
-	struct vnode **vpp;
-	int *fdp;
-{
-	struct vnode *vp = *vpp;
-	struct cred *credp;
-	file_t *fp;
-	int error = 0;
-	int filemode = FREAD;
-
-	VN_HOLD(vp);		/* open reference */
-	if (error = falloc((struct vnode *)NULL, filemode, &fp, fdp)) {
-		VN_RELE(vp);
-		*fdp = -1;	/* just in case falloc changed value */
-		return error;
-	}
-	credp = crdup(u.u_cred);
-	credp->cr_uid = 0; 	/* make sure we can open file */
-	credp->cr_gid = 0;
-	if (error = VOP_OPEN(&vp, filemode, credp)){
-		VN_RELE(vp);
-		setf(*fdp, NULLFP);
-		unfalloc(fp);
-		*fdp = -1;		
-		return error;
-	}
-	(void) crfree(credp);
-	*vpp = vp;		/* vnode should not have changed */
-	fp->f_vnode = vp;
-	return 0;
-}
-
-int
-execclose(fd)
-	int fd;
-{
-	int error;
-	file_t *fp;
-
-	if (error = getf(fd, &fp))
-		return error;
-	setf(fd, NULLFP);
-	return closef(fp);
-}
-
-
-
 /* ARGSUSED */
-int
-noexec(vp, args, level, ehdp, setid)
+noexec(vp, args, level, ehdp)
 	struct vnode *vp;
 	struct uarg *args;
 	int level;
 	exhda_t *ehdp;
-	int setid;
 {
 	cmn_err(CE_WARN, "missing exec capability for %s\n", args->fname);
 	return ENOEXEC;

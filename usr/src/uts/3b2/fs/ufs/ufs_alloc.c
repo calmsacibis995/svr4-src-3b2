@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_alloc.c	1.18"
+#ident	"@(#)fs:fs/ufs/ufs_alloc.c	1.16"
 
 #include <sys/types.h>
 #include <sys/debug.h>
@@ -50,7 +27,6 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/sysmacros.h>
-#include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
 #include <fs/fs_subr.h>
@@ -1092,7 +1068,17 @@ ufs_freesp(vp, lp, flag)
 	register struct flock *lp;
 	int flag;
 {
+#ifdef notneeded
 	register int i;
+	register struct vfs *vfsp;
+	register daddr_t bn;
+	register daddr_t lastblock;
+	register long bsize;
+	long nindir;
+	daddr_t lastiblock[NIADDR];
+	daddr_t save[UFSNADDR];
+	struct fs *fs;
+#endif
 	register struct inode *ip = VTOI(vp);
 	int error;
 	
@@ -1101,48 +1087,125 @@ ufs_freesp(vp, lp, flag)
 
 	if (lp->l_len != 0)
 		return EINVAL;
-	if (ip->i_size == lp->l_start)
+	if (ip->i_size <= lp->l_start)
 		return 0;
 
 	/*
-	 * Check if there is any active mandatory lock on the
-	 * range that will be truncated/expanded.
+	 * Truncation honors mandatory record locking protocol
+	 * exactly as writing does.
 	 */
-	if (MANDLOCK(vp, ip->i_mode)) {
-		int save_start;
-
-		save_start = lp->l_start;
-
-		if (ip->i_size < lp->l_start) {
-			/*
-			 * "Truncate up" case: need to make sure there
-			 * is no lock beyond current end-of-file. To
-			 * do so, we need to set l_start to the size
-			 * of the file temporarily.
-			 */
-			lp->l_start = ip->i_size;
-		}
-		lp->l_type = F_WRLCK;
-		lp->l_sysid = u.u_procp->p_sysid;
-		lp->l_pid = u.u_procp->p_epid;
-		i = (flag & (FNDELAY|FNONBLOCK)) ? 0 : SLPFLCK;
-		if ((i = reclock(vp, lp, i, 0, lp->l_start)) != 0
-		  || lp->l_type != F_UNLCK)
-			return i ? i : EAGAIN;
-
-		lp->l_start = save_start;
-	}
 
 	ILOCK(ip);
 
- 	if (vp->v_type == VREG && (error = fs_vcode(vp, &ip->i_vcode))) {
- 		IUNLOCK(ip);
- 		return error;
+ 	if (vp->v_type == VREG) {
+ 		error = fs_vcode(vp, &ip->i_vcode);
+
+ 		if (error) {
+ 			IUNLOCK(ip);
+ 			return error;
+ 		}
  	}
 
 	error = ufs_itrunc(ip, lp->l_start);
 	IUNLOCK(ip);
 	return error;
+#if notneeded	
+	if (ip->i_map) {
+		ufs_freemap(ip);
+	}
+	
+	vfsp = vp->v_vfsp;
+	bsize = vfsp->vfs_bsize;
+	fs = ip->i_fs;
+
+	/*
+	 * Update the pages of the file.  If the file is not being
+	 * truncated to a block boundary, the contents of the
+	 * pages following the end of the file must be zeroed
+	 * in case they ever become accessible again because
+	 * of subsequent file growth.
+	 */
+	pvn_vptrunc(vp, lp->l_start, (uint)(bsize - (lp->l_start & ~(fs->fs_bmask))));
+
+	/*
+	 * Calculate index into inode's block list of last block
+	 * we want to keep.  Lastblock is -1 when the file is
+	 * truncated to 0.
+	 *
+	 * Think of the file as consisting of four separate lists
+	 * of data blocks:  one list of up to NDADDR blocks pointed
+	 * to directly from the inode, and three lists of up to
+	 * nindir, nindir**2 and nindir**3 blocks, respectively
+	 * headed by the SINGLE, DOUBLE and TRIPLE indirect block
+	 * pointers.  For each of the four lists, we're calculating
+	 * the index within the list of the last block we want to
+	 * keep.  If the index for list i is negative, it means
+	 * that said block is not in list i (but perhaps in list i-1),
+	 * hence all blocks in list i are to be discarded; if the
+	 * index is beyond the end of list i, it means that the
+	 * block is not in list i (but perhaps in list i+1), hence
+	 * all blocks in list i are to be kept.
+	 */
+
+	nindir = NINDIR(fs);
+	lastblock =
+	 (long)(((ulong)lp->l_start + fs->fs_bsize-1) >> fs->fs_bshift) - 1;
+	lastiblock[SINGLE] = lastblock - NDADDR;
+	lastiblock[DOUBLE] = lastiblock[SINGLE] - nindir;
+	lastiblock[TRIPLE] = lastiblock[DOUBLE] - nindir*nindir;
+
+	/*
+	 * Update file size and block pointers in
+	 * disk inode before we start freeing blocks.
+	 * Also normalize lastiblock values to -1
+	 * for calls to ufsindirtrunc below.
+	 */
+	for (i = UFSNADDR-1; i >= 0; i--)
+		save[i] = ip->i_db[i];
+
+	for (i = TRIPLE; i >= SINGLE; i--)
+		if (lastiblock[i] < 0) {
+			ip->i_ib[i] = 0;
+			lastiblock[i] = -1;
+		}
+
+	for (i = NDADDR-1; i > lastblock; i--)
+		ip->i_db[i] = 0;
+
+	ip->i_size = lp->l_start;
+	ip->i_flag |= IUPD|ICHG;
+	ufs_iupdat(ip, 1);
+
+	/*
+	 * Indirect blocks first.
+	 */
+	for (i = TRIPLE; i >= SINGLE; i--) {
+		if ((bn = save[IB(i)]) != 0) {
+			ufsindirtrunc(vfsp, fs, bn, lastiblock[i], i, ip);
+			if (lastiblock[i] < 0)
+				(void)free(ip, bn, fs->fs_bsize);
+		}
+		if (lastiblock[i] >= 0)
+			return 0;
+	}
+
+	/*
+	 * Direct blocks.
+	 */
+
+	for (i = NDADDR-1; i > lastblock; i--) {
+		if ((bn = save[i]) != 0)
+			if (ip->i_size < (bn + 1) << fs->fs_bshift)
+				/*
+				 * We are freeing a fragment
+				 */
+				(void)free(ip, bn, fs->fs_fsize);
+			else
+				(void)free(ip, bn, fs->fs_bsize);
+	}
+	IUNLOCK(ip);
+	return 0;
+#endif
 }
 
 STATIC void

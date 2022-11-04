@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/globals.c	1.4"
+#ident	"@(#)rtld:common/globals.c	1.3"
 
 #include "rtinc.h"
 
@@ -25,7 +25,6 @@ struct r_debug _r_debug = { LD_DEBUG_VERSION,
 int _devzero_fd = -1;		/* file descriptor for /dev/zero */
 char *_rt_error = 0;	/* string describing last error */
 char *_proc_name = 0;		/* file name of executing process */
-CONST char *_rt_name = "dynamic linker";
 
 int _syspagsz = 0;		/* system page size */
 unsigned long _flags = 0;	/* machine specific file flags */

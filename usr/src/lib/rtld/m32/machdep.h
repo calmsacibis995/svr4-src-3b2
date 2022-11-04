@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:m32/machdep.h	1.3"
+#ident	"@(#)rtld:m32/machdep.h	1.2"
 
 /* 3B2 machine dependent macros, constants and declarations */
 
@@ -26,19 +26,11 @@ extern int _sys3b	ARGS((int, unsigned long *));
 
 /* segment boundary */
 
-#ifdef	ELF_M32_MAXPGSZ
-#define SEGSIZE		ELF_M32_MAXPGSZ
-#else
 #define SEGSIZE		0x2000	/* 8k */
-#endif
 
 /* macro to truncate to previous page boundary */
 
 #define PTRUNC(X)	((X) & ~(PAGESIZE - 1))
-
-/* macro to truncate to previous segment boundary */
-
-#define STRUNC(X)	((X) & ~(SEGSIZE - 1))
 
 /* macro to round to next page boundary */
 

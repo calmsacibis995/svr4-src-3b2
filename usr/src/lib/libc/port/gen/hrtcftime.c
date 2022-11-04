@@ -5,8 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/hrtcftime.c	1.3"
+#ident	"@(#)libc-port:gen/hrtcftime.c	1.2"
 
+#ifdef __STDC__
+	#pragma weak hrtcftime = _hrtcftime
+	#pragma weak hrtascftime = _hrtascftime
+#endif
 #include "synonyms.h"
 #include <time.h>
 #include <limits.h>
@@ -19,7 +23,7 @@
 extern char	*getenv();
 
 int
-_hrtcftime(bufp, fmtp, tdp)
+hrtcftime(bufp, fmtp, tdp)
 char *bufp;
 char *fmtp;
 hrtime_t *tdp;
@@ -39,7 +43,7 @@ hrtime_t *tdp;
 } 
 
 int
-_hrtascftime(buf, format, tm, rem, res)
+hrtascftime(buf, format, tm, rem, res)
 char *buf;
 char *format;
 struct tm *tm;

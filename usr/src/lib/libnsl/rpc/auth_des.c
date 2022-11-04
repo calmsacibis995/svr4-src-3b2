@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:auth_des.c	1.5"
+#ident	"@(#)librpc:auth_des.c	1.4"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -19,15 +18,15 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
-*/
+*/ 
 
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)auth_des.c 1.9 89/05/02 Copyr 1986 Sun Micro";
@@ -35,7 +34,7 @@ static char sccsid[] = "@(#)auth_des.c 1.9 89/05/02 Copyr 1986 Sun Micro";
 
 /*
  * auth_des.c, client-side implementation of DES authentication
- *
+ * 
  */
 
 #include <rpc/rpc.h>
@@ -44,24 +43,23 @@ static char sccsid[] = "@(#)auth_des.c 1.9 89/05/02 Copyr 1986 Sun Micro";
 #ifdef SYSLOG
 #include <sys/syslog.h>
 #else
-#define	LOG_ERR 1
+#define LOG_ERR 1
 #endif /* SYSLOG */
 #endif /* _KERNEL */
 
-#define	MILLION			1000000L
-#define	RTIME_TIMEOUT		5	/* seconds to wait for sync */
+#define MILLION			1000000L
+#define RTIME_TIMEOUT		5	/* seconds to wait for sync */
 
-#define	AUTH_PRIVATE(auth)	(struct ad_private *) auth->ah_private
-#define	ALLOC(object_type)	(object_type *) mem_alloc(sizeof (object_type))
-#define	FREE(ptr, size)		mem_free((char *)(ptr), (int) size)
-#define	ATTEMPT(xdr_op)		if (!(xdr_op)) return (FALSE)
+#define AUTH_PRIVATE(auth)	(struct ad_private *) auth->ah_private
+#define ALLOC(object_type)	(object_type *) mem_alloc(sizeof(object_type))
+#define FREE(ptr, size)		mem_free((char *)(ptr), (int) size)
+#define ATTEMPT(xdr_op)		if (!(xdr_op)) return (FALSE)
 
 #ifdef _KERNEL
-#define	gettimeofday(tvp, tzp)	uniqtime(tvp)	/* fake system call */
+#define gettimeofday(tvp, tzp)	uniqtime(tvp)	/* fake system call */
 #endif
 
 static struct auth_ops *authdes_ops();
-extern char *malloc();
 
 /*
  * This struct is pointed to by the ah_private field of an "AUTH *"
@@ -72,7 +70,7 @@ struct ad_private {
 	char *ad_servername;		/* server's full name */
 	u_int ad_servernamelen;		/* length of name, rounded up */
 	u_int ad_window;		/* client specified window */
-	bool_t ad_dosync;		/* synchronize? */
+	bool_t ad_dosync;		/* synchronize? */		
 	char *ad_timehost;		/* remote host to sync with */
 	struct timeval ad_timediff;	/* server's time - client's time */
 	u_long ad_nickname;		/* server's nickname for client */
@@ -81,7 +79,7 @@ struct ad_private {
 	struct timeval ad_timestamp;	/* timestamp sent */
 	des_block ad_xkey;		/* encrypted conversation key */
 };
-
+	
 AUTH *
 authdes_seccreate(servername, window, timehost, ckey)
 	char *servername;		/* network name of server */
@@ -94,7 +92,7 @@ authdes_seccreate(servername, window, timehost, ckey)
 	char namebuf[MAXNETNAMELEN+1];
 
 	/*
-	 * Allocate everything now
+ 	 * Allocate everything now
 	 */
 	auth = ALLOC(AUTH);
 	if (auth == NULL) {
@@ -108,8 +106,6 @@ authdes_seccreate(servername, window, timehost, ckey)
 	}
 	ad->ad_fullname = ad->ad_servername = NULL; /* Sanity reasons */
 	ad->ad_timehost = NULL;
-	ad->ad_timediff.tv_sec = 0;
-	ad->ad_timediff.tv_usec = 0;
 	(void) getnetname(namebuf);
 	ad->ad_fullnamelen = RNDUP(strlen(namebuf));
 	ad->ad_fullname = mem_alloc(ad->ad_fullnamelen + 1);
@@ -136,8 +132,7 @@ authdes_seccreate(servername, window, timehost, ckey)
 	ad->ad_window = window;
 	if (ckey == NULL) {
 		if (key_gendes(&auth->ah_key) < 0) {
-			msgout(
-	"authdes_seccreate: unable to gen conversation key");
+			msgout("authdes_seccreate: unable to gen conversation key");
 			goto failed;
 		}
 	} else {
@@ -159,7 +154,7 @@ authdes_seccreate(servername, window, timehost, ckey)
 
 failed:
 	if (auth)
-		FREE(auth, sizeof (AUTH));
+		FREE(auth, sizeof(AUTH));
 	if (ad) {
 		if (ad->ad_fullname)
 			FREE(ad->ad_fullname, ad->ad_fullnamelen + 1);
@@ -167,7 +162,7 @@ failed:
 			FREE(ad->ad_servername, ad->ad_servernamelen + 1);
 		if (ad->ad_timehost)
 			FREE(ad->ad_timehost, strlen(ad->ad_timehost) + 1);
-		FREE(ad, sizeof (struct ad_private));
+		FREE(ad, sizeof(struct ad_private));
 	}
 	return (NULL);
 }
@@ -179,7 +174,7 @@ failed:
 
 /*
  * 1. Next Verifier
- */
+ */	
 /*ARGSUSED*/
 static void
 authdes_nextverf(auth)
@@ -230,11 +225,10 @@ authdes_marshal(auth, xdrs)
 		IXDR_PUT_U_LONG(ixdr, ad->ad_window - 1);
 		ivec.key.high = ivec.key.low = 0;
 		status = cbc_crypt((char *)&auth->ah_key, (char *)cryptbuf,
-			2 * sizeof (des_block),
-			DES_ENCRYPT | DES_HW, (char *)&ivec);
+			2*sizeof(des_block), DES_ENCRYPT | DES_HW, (char *)&ivec);
 	} else {
 		status = ecb_crypt((char *)&auth->ah_key, (char *)cryptbuf,
-			sizeof (des_block), DES_ENCRYPT | DES_HW);
+			sizeof(des_block), DES_ENCRYPT | DES_HW);
 	}
 	if (DES_FAILED(status)) {
 		msgout("authdes_marshal: DES encryption failure");
@@ -306,7 +300,7 @@ authdes_validate(auth, rverf)
 	 * Decrypt the timestamp
 	 */
 	status = ecb_crypt((char *)&auth->ah_key, (char *)&verf.adv_xtimestamp,
-		sizeof (des_block), DES_DECRYPT | DES_HW);
+		sizeof(des_block), DES_DECRYPT | DES_HW);
 
 	if (DES_FAILED(status)) {
 		msgout("authdes_validate: DES decryption failure");
@@ -314,7 +308,7 @@ authdes_validate(auth, rverf)
 	}
 
 	/*
-	 * xdr the decrypted timestamp
+	 * xdr the decrypted timestamp 
 	 */
 	ixdr = (u_long *)verf.adv_xtimestamp.c;
 	verf.adv_timestamp.tv_sec = IXDR_GET_LONG(ixdr) + 1;
@@ -324,7 +318,7 @@ authdes_validate(auth, rverf)
 	 * validate
 	 */
 	if (memcmp((char *)&ad->ad_timestamp, (char *)&verf.adv_timestamp,
-		sizeof (struct timeval)) != 0) {
+		 sizeof(struct timeval)) != 0) {
 		msgout("authdes_validate: verifier mismatch");
 		return (FALSE);
 	}
@@ -378,8 +372,8 @@ authdes_destroy(auth)
 
 	FREE(ad->ad_fullname, ad->ad_fullnamelen + 1);
 	FREE(ad->ad_servername, ad->ad_servernamelen + 1);
-	FREE(ad, sizeof (struct ad_private));
-	FREE(auth, sizeof (AUTH));
+	FREE(ad, sizeof(struct ad_private));
+	FREE(auth, sizeof(AUTH));
 }
 
 /*

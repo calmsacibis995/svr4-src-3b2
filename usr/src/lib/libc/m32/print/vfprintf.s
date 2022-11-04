@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"vfprintf.s"
-.ident	"@(#)libc-u3b:print/vfprintf.s	1.16"
+.ident	"@(#)libc-u3b:print/vfprintf.s	1.14"
 
 #---------------------------------------------------------------#
 #								#
@@ -35,7 +29,6 @@ _fgdef_(vfprintf):
 	jnz	.wset
 	bitb	&_IORW,_flag(iop)	# Check that write flag set
 	jnz	.rwset
-	movw	&9,_dref_(errno)	# Set errno to EBADF
 	mnegw	&EOFN,%r0		# Set error return
 	ret	&.Rcnt
 .rwset:	orb2	&_IOWRT,_flag(iop)	# Set write bit

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/gentty.c	1.22"
+#ident	"@(#)kernel:io/gentty.c	1.20"
 /*
  * Indirect driver for controlling tty.
  */
@@ -29,11 +29,11 @@
 #include "sys/ddi.h"
 #include "sys/debug.h"
 
-int sydevflag = 0;
+int sydevflag = 2;
 
 STATIC int
 sycheck(sp)
-	register sess_t *sp;
+register sess_t *sp;
 {
 	if (sp->s_dev == NODEV)
 		return ENXIO;
@@ -59,9 +59,11 @@ syopen(devp, flag, otyp, cr)
 	sydev = sp->s_vp->v_rdev;
 	if (cdevsw[getmajor(sydev)].d_str)
 		error = stropen(sp->s_vp, &sydev, flag, cr);
-	else
-		error = (*cdevsw[getmajor(sydev)].d_open)
-		  (&sydev, flag, otyp, cr);
+	else if (*cdevsw[getmajor(sydev)].d_flag & D_OLD) {
+		(void)(*cdevsw[getmajor(sydev)].d_open)(cmpdev(sydev), flag);
+		error = u.u_error;		/* XXX */
+	} else
+		error = (*cdevsw[getmajor(sydev)].d_open)(&sydev, flag, otyp, cr);
 	return error;
 }
 
@@ -91,7 +93,17 @@ syread(dev, uiop, cr)
 		return error;
 	if (cdevsw[getmajor(ttyd)].d_str)
 		error = strread(sp->s_vp, uiop, cr);
-	else
+	else if (*cdevsw[getmajor(ttyd)].d_flag & D_OLD) {
+		u.u_offset = uiop->uio_offset;
+		u.u_base = uiop->uio_iov->iov_base;
+		u.u_count = uiop->uio_resid;
+		u.u_segflg = uiop->uio_segflg;
+		u.u_fmode = uiop->uio_fmode;
+		(void)(*cdevsw[getmajor(ttyd)].d_read)(cmpdev(ttyd));
+		uiop->uio_resid = u.u_count;
+		uiop->uio_offset = u.u_offset;
+		error = u.u_error;		/* XXX */
+	} else
 		error = (*cdevsw[getmajor(ttyd)].d_read) (ttyd, uiop, cr);
 	return error;
 }
@@ -111,7 +123,17 @@ sywrite(dev, uiop, cr)
 		return error;
 	if (cdevsw[getmajor(ttyd)].d_str)
 		error = strwrite(sp->s_vp, uiop, cr);
-	else
+	else if (*cdevsw[getmajor(ttyd)].d_flag & D_OLD) {
+		u.u_offset = uiop->uio_offset;
+		u.u_base = uiop->uio_iov->iov_base;
+		u.u_count = uiop->uio_resid;
+		u.u_segflg = uiop->uio_segflg;
+		u.u_fmode = uiop->uio_fmode;
+		(void)(*cdevsw[getmajor(ttyd)].d_write)(cmpdev(ttyd));
+		uiop->uio_resid = u.u_count;
+		uiop->uio_offset = u.u_offset;
+		error = u.u_error;		/* XXX */
+	} else
 		error = (*cdevsw[getmajor(ttyd)].d_write) (ttyd, uiop, cr);
 	return error;
 }
@@ -135,7 +157,11 @@ syioctl(dev, cmd, arg, mode, cr, rvalp)
 		return error;
 	if (cdevsw[getmajor(ttyd)].d_str)
 		error = strioctl(sp->s_vp, cmd, arg, mode, U_TO_K, cr, rvalp);
-	else
+	else if (*cdevsw[getmajor(ttyd)].d_flag & D_OLD) {
+		(void)(*cdevsw[getmajor(ttyd)].d_ioctl) (cmpdev(ttyd), cmd, arg, mode);
+		error = u.u_error;		/* XXX */
+		*rvalp = u.u_rval1;	/* XXX */
+	} else
 		error = (*cdevsw[getmajor(ttyd)].d_ioctl)
 		  (ttyd, cmd, arg, mode, cr, rvalp);
 	return error;

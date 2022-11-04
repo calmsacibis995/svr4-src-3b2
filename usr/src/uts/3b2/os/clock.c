@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/clock.c	1.34"
+#ident	"@(#)kernel:os/clock.c	1.31.1.10"
 
 #include "sys/param.h"
 #include "sys/types.h"
@@ -56,11 +56,11 @@
 unsigned	prfstat;
 extern int	fsflush();
 extern struct buf *bclnlist;
-extern int	desfree;
+extern int desfree;
+
 extern int	tickdelta;
 extern long	timedelta;
 extern int	doresettodr;
-extern int	idleswtch;	/* flag set while idle in pswtch() */
 
 extern int (*io_poll[])();	/* driver entry points to poll every tick */
 
@@ -74,18 +74,13 @@ int	fsflushcnt;	/* counter for t_fsflushr */
 
 int	calllimit	= -1;	/* index of last valid entry in table */
 
-/*
- * Kludge for SVID-compliance is preferable to allocating the
- * structure in generic code.  rf_init points this at a
- * counter.
- */
-time_t	*rfsi_servep;
-
 #ifdef DEBUG
 int	catchmenowcnt;		/* counter for debuging interrupt */
 int	catchmestart = 60;	/* counter for debuging interrupt */
-int	idlecntdown;
-int	idlemsg;
+#endif
+#ifdef DEBUG
+int idlecntdown;
+int idlemsg;
 #endif
 
 int
@@ -94,7 +89,7 @@ clock(pc, ps)
 	psw_t ps;
 {
 	extern	void	clkreld();
-	register struct proc *pp;
+	register struct proc *pp,**ppp;
 	register int	retval;
 	register rlim_t rlim_cur;
 	static rqlen, sqlen;
@@ -159,8 +154,6 @@ clock(pc, ps)
 		} else {
 			sysinfo.cpu[CPU_KERNEL]++;
 			pp->p_stime++;
-			if (rfsi_servep && RF_SERVER())
-				(*rfsi_servep)++;
 			/*
 			 * Enforce CPU rlimit.
 			 */
@@ -183,9 +176,6 @@ clock(pc, ps)
 	 	 */
 		CL_TICK(pp, pp->p_clproc);
 	}
-
-	if (idleswtch == 0 && pp->p_cpu < 80)
-		pp->p_cpu++;
 
 	lbolt++;	/* time in ticks */
 
@@ -260,19 +250,23 @@ clock(pc, ps)
 
 		rqlen = 0;
 		sqlen = 0;
+		for (ppp = &nproc[0]; ppp < v.ve_proc; ppp++) {
+			if (*ppp == NULL)	/*not used */
+				continue;
 
-		for (pp = practive; pp != NULL; pp = pp->p_next) {
-			if (pp->p_clktim)
-				if (--pp->p_clktim == 0)
-					psignal(pp, SIGALRM);
-			pp->p_cpu >>= 1;
-			if (pp->p_stat == SRUN || pp->p_stat == SONPROC)
-				if (pp->p_flag & SLOAD)
-					rqlen++;
-				else
-					sqlen++;
+			if ((*ppp)->p_stat) {
+				if ((*ppp)->p_clktim)
+					if (--(*ppp)->p_clktim == 0)
+						psignal((*ppp), SIGALRM);
+				(*ppp)->p_cpu >>= 1;
+	
+				if ((*ppp)->p_stat == SRUN || (*ppp)->p_stat == SONPROC)
+					if ((*ppp)->p_flag & SLOAD)
+						rqlen++;
+					else
+						sqlen++;
+			}
 		}
-
 		if (rqlen) {
 			sysinfo.runque += rqlen;
 			sysinfo.runocc++;
@@ -299,7 +293,7 @@ clock(pc, ps)
 		 */
 		if (--fsflushcnt <= 0) {
 			fsflushcnt = tune.t_fsflushr;
-			wakeprocs((caddr_t)fsflush, PRMPT);
+			wakeup((caddr_t)fsflush);
 		}
 		/*
 		 * XXX
@@ -310,14 +304,14 @@ clock(pc, ps)
 		vmmeter();
 		if (runin != 0) {
 			runin = 0;
-			setrun(proc_sched);
+			setrun(nproc[0]);
 		}
                 if (((freemem <= tune.t_gpgslo) || sqlen) && runout != 0) {
                         runout = 0;
-                        setrun(proc_sched);
+                        setrun(nproc[0]);
 		}
 		if (bclnlist != NULL || freemem < desfree) {
-			wakeprocs((caddr_t)proc_pageout, PRMPT);
+			wakeup((caddr_t)nproc[2]);
 		}
 		one_sec = 0;
 	}
@@ -578,6 +572,9 @@ heap_down(t, j)
 }
 
 #define	PDELAY	(PZERO-1)
+#undef wakeup	/* we want to refer to the function, not the macro */
+
+extern void	wakeup();
 
 void
 delay(ticks)

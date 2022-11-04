@@ -5,9 +5,9 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)klm:klm/klm_lkmgr.c	1.11"
+#ident	"@(#)klm:klm/klm_lkmgr.c	1.4"
 #ifndef lint
-static char sccsid[] = "@(#)klm_lkmgr.c 1.11 89/09/22 SMI";
+static char sccsid[] = "@(#)klm_lkmgr.c 1.4 89/07/12 SMI";
 #endif
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -44,21 +44,23 @@ static char sccsid[] = "@(#)klm_lkmgr.c 1.11 89/09/22 SMI";
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/uio.h>
+#include <sys/systm.h>
 #include <sys/user.h>
 #include <sys/errno.h>
 #include <sys/cred.h>
 #include <sys/socket.h>
+/* #include <sys/socketvar.h> */
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <sys/systm.h>
-#include <sys/utsname.h>
+#include <rpc/pmap_prot.h>
 #include <sys/cmn_err.h>
-#include <sys/debug.h>
+/*
+#include <sys/procfs.h>
+*/
 
 /* files included by <rpc/rpc.h> */
 #include <rpc/types.h>
@@ -69,18 +71,32 @@ static char sccsid[] = "@(#)klm_lkmgr.c 1.11 89/09/22 SMI";
 #include <rpc/rpc.h>
 
 #include <klm/lockmgr.h>
-#include "klm_prot.h"
+#include <rpcsvc/klm_prot.h>
+/* #include <net/if.h> */
 #include <nfs/nfs.h>
 #include <nfs/nfs_clnt.h>
 #include <nfs/rnode.h>
 
-#define	NC_LOOPBACK		"loopback"	/* XXX */
+#undef  wakeup
 
-static struct knetconfig	config;		/* avoid loopupname next time */
+extern void     wakeup();		/* reference the function, not the */
+					/* macro 			   */
 
-STATIC int			talk_to_lockmgr();
+static struct sockaddr_in lm_sa;	/* talk to portmapper & lock-manager */
+
+static talk_to_lockmgr();
 
 /* Define static parameters for run-time tuning */
+
+#ifdef NOTUSE
+static int backoff_timeout = 1;		/* time to wait on klm_denied_nolocks */
+static int first_retry = 0;		/* first attempt if klm port# known */
+static int first_timeout = 1;
+static int normal_retry = 1;		/* attempts after new port# obtained */
+static int normal_timeout = 1;
+static int working_retry = 0;		/* attempts after klm_working */
+static int working_timeout = 1;
+#endif
 
 static int backoff_timeout = 30;	/* time to wait on klm_denied_nolocks */
 static int first_retry = 0;		/* first attempt if klm port# known */
@@ -115,9 +131,11 @@ klm_lockctl(lh, bfp, cmd, cred, clid)
 	xdrproc_t	xdrreply;
 	int		timeid;
 
-#ifdef LOCKDEBUG
-	cmn_err(CE_CONT, "entering klm_lockctl() : cmd %d clid %d\n", cmd, clid);
-#endif
+	/* initialize sockaddr_in used to talk to local processes */
+	if (lm_sa.sin_port == 0) {
+		lm_sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		lm_sa.sin_family = AF_INET;
+	}
 
 	if (!bfp->l_pid) bfp->l_pid = clid; /* FIXME */
 
@@ -183,8 +201,7 @@ klm_lockctl(lh, bfp, cmd, cred, clid)
 requestloop:
 	/* send the request out to the local lock-manager and wait for reply */
 	error = talk_to_lockmgr(xdrproc, xdrargs, args, xdrreply, &reply, cred);
-	if (error == ENOLCK || error == RPC_UDERROR) {
-		error = ENOLCK;
+	if (error == ENOLCK) {
 		goto ereturn;	/* no way the request could have gotten out */
 	}
 
@@ -274,8 +291,11 @@ requestloop:
 
 /* NOTREACHED */
 nolocks_wait:
-	timeid = timeout(wakeup, (caddr_t)&config, (backoff_timeout * HZ));
-	(void) sleep((caddr_t)&config, PZERO|PCATCH);
+	timeid = timeout(wakeup, (caddr_t)&lm_sa, (backoff_timeout * HZ));
+	(void) sleep((caddr_t)&lm_sa, PZERO|PCATCH);
+#ifdef NOTUSE
+	untimeout(wakeup, (caddr_t)&lm_sa);
+#endif
 	untimeout(timeid);
 	goto requestloop;	/* now try again */
 
@@ -327,7 +347,7 @@ ereturn:
  *	3) A drastic error occurs (e.g., the local lock-manager has never
  *	   been activated OR cannot create a client-handle) (returns ENOLCK).
  */
-STATIC int
+static
 talk_to_lockmgr(xdrproc, xdrargs, args, xdrreply, reply, cred)
 	u_long xdrproc;
 	xdrproc_t xdrargs;
@@ -336,107 +356,151 @@ talk_to_lockmgr(xdrproc, xdrargs, args, xdrreply, reply, cred)
 	klm_testrply *reply;
 	struct cred *cred;
 {
-	struct timeval			tmo;
-        struct netbuf			netaddr;
-	CLIENT				*client;
-	enum clnt_stat			stat;
-	struct vnode			*vp;
-	int				error, timeid;
-	static char			keyname[SYS_NMLN+16];
+	extern int clone_no, udp_no;    /* got from ../io/conf.c */
+	CLIENT *client;
+	struct timeval tmo;
+	register int error;
+	struct knetconfig config;
+        struct netbuf netaddr, addr;
+	int timeid;
 
-#ifdef LOCKDEBUG
-	cmn_err(CE_CONT, "entering talk_to_lockmgr()...\n");
-#endif
-
-	strcpy(keyname, utsname.nodename);
-	netaddr.len = strlen(keyname);
-	strcpy(&keyname[netaddr.len], ".lockd");
-	netaddr.buf = keyname;
-	netaddr.len = netaddr.maxlen = netaddr.len + 6;
+	/* set up a client handle to talk to the local lock manager */
+	netaddr.buf = (char *)&lm_sa;
+        netaddr.len = sizeof(lm_sa);
+        netaddr.maxlen = sizeof(lm_sa);
 
         /* 
 	 * filch a knetconfig structure.
          */
-	if (config.knc_rdev == 0){
-		if ((error = lookupname("/dev/ticlts", UIO_SYSSPACE, FOLLOW,
-			NULLVPP, &vp)) != 0) {
-			cmn_err(CE_CONT, "klm_lkmgr: lookupname: %d\n", error);
-			return (error);
-		}
-		config.knc_rdev = vp->v_rdev;
-		config.knc_protofmly = NC_LOOPBACK;
-		VN_RELE(vp);
-	}
+	if (!udp_no) udp_no = 56;	
+        config.nc_protofmly = AF_INET;
+        config.nc_rdev = makedevice(clone_no, udp_no);
+        config.nc_proto = 17; /*IPPROTO_UDP*/
 
-#ifdef LOCKDEBUG
-	cmn_err(CE_CONT, "calling clnt_tli_kcreate()\n");
-#endif
 	/*
 	 * now call the proper stuff.
 	 */
-	if ((error = clnt_tli_kcreate(&config, &netaddr, (u_long)KLM_PROG,
-		(u_long)KLM_VERS, 0, first_retry, cred, &client)) != 0) {
-		cmn_err(CE_CONT, "klm_lkmgr: clnt_tli_kcreate: %d\n", error);
+	client = (CLIENT *)clnt_tli_kcreate(&config, &netaddr, (u_long)KLM_PROG,
+		(u_long)KLM_VERS, 0, 0, first_retry, cred);
+	if (client == (CLIENT *) NULL) {
 		return (ENOLCK);
 	}
 	tmo.tv_sec = first_timeout;
 	tmo.tv_usec = 0;
 
-retryloop:
-	/* retry the request until completion, timeout, or error */
-	for (;;) {
-		error = (int) CLNT_CALL(client, xdrproc,
-			xdrargs, (caddr_t)args, xdrreply,
-			(caddr_t)reply, tmo);
-#ifdef LOCKDEBUG
-		cmn_err(CE_CONT, "klm_lkmgr: CLNT_CALL: error %d\n", error);
+#ifdef NOTUSE
+	/*
+	 * If cached port number, go right to CLNT_CALL().
+	 * This works because timeouts go back to the portmapper to
+	 * refresh the port number.
+	 */
+	if (lm_sa.sin_port != 0) {
+		goto retryloop;		/* skip first portmapper query */
+	}
 #endif
-		switch (error) {
-		case RPC_SUCCESS:
-		case klm_denied:
-			error = (int) reply->stat;
-			if (error == (int) klm_working) {
-				if (ISSIG(u.u_procp, 0)) {
-					error = EINTR;
-					goto out;
-				}
-				/* lock-mgr is up...can wait longer */
-				/* addr is already set up */
-				clnt_clts_init(client, &netaddr,
-					working_retry, cred);
-				tmo.tv_sec = working_timeout;
-				continue;	/* retry */
-			}
-			goto out;	/* got a legitimate answer */
 
-		case RPC_UDERROR:
-			goto out;
-
-		case RPC_TIMEDOUT:
-			goto retryloop;	/* ask for port# again */
-
-		case klm_denied_nolocks:
-			goto out;
-
-		default:
+	for (;;) {
+remaploop:
+		/*
+		 * go get the port number from the portmapper(rpcbinder)...
+		 * if return 0, the server is not registered
+		 * if return -1, an error in contacting the portmapper
+		 * else, got a port number
+		 */
+		lm_sa.sin_port = htonl(PMAPPORT);
+		lm_sa.sin_port = getport_loop(&netaddr,
+		    	(u_long)KLM_PROG, (u_long)KLM_VERS, &config);
+#ifdef LOCKDEBUG
+		cmn_err(CE_CONT, "lm_sa.sin_port=%d\n",lm_sa.sin_port);
+#endif
+		switch(lm_sa.sin_port) {
+		case 0:
+		case (u_short)-1:
 			cmn_err(CE_CONT,
-				"lock-manager: RPC error: %s\n",
-			clnt_sperrno((enum clnt_stat) error));
+				"fcntl: local NFS lock manager not registered\n");
+			error = ENOLCK;
+			goto out;
+		}
 
-			/* on RPC error, wait a bit and try again */
-			timeid = timeout(wakeup, (caddr_t)&config,
-			    (normal_timeout * HZ));
-			error = sleep((caddr_t)&config, PZERO|PCATCH);
-			untimeout(timeid);
-			if (error) {
-			    error = EINTR;
-			    goto out;
-			}
-			goto retryloop;	/* ask for port# again */
+		/*
+		 * If a signal occurred, pop back out to the higher
+		 * level to decide what action to take.  If we just
+		 * got a port number from the portmapper, the next
+		 * call into this subroutine will jump to retryloop.
+		 */
+		if (ISSIG(u.u_procp, 0)) {
+			error = EINTR;
+			goto out;
+		}
 
-		} /* switch */
+		/* reset the lock-manager client handle */
+		addr.buf = (char *)&lm_sa;
+        	addr.len = sizeof(lm_sa);
+        	addr.maxlen = sizeof(lm_sa);
 
-	} /* for */	/* loop until timeout, error, or completion */
+		clnt_clts_init(client, &addr, normal_retry, cred);
+		tmo.tv_sec = normal_timeout;
+
+retryloop:
+		/* retry the request until completion, timeout, or error */
+		for (;;) {
+			error = (int) CLNT_CALL(client, xdrproc,
+				xdrargs, (caddr_t)args, xdrreply,
+				(caddr_t)reply, tmo);
+			switch (error) {
+			case RPC_SUCCESS:
+			case klm_denied:
+				error = (int) reply->stat;
+				if (error == (int) klm_working) {
+					if (ISSIG(u.u_procp, 0)) {
+						error = EINTR;
+						goto out;
+					}
+					/* lock-mgr is up...can wait longer */
+					addr.buf = (char *)&lm_sa;
+                			addr.len = sizeof(lm_sa);
+                			addr.maxlen = sizeof(lm_sa);
+                			clnt_clts_init(client, &addr,
+						working_retry, cred);
+					tmo.tv_sec = working_timeout;
+					continue;	/* retry */
+				}
+				goto out;	/* got a legitimate answer */
+
+			case RPC_TIMEDOUT:
+				goto remaploop;	/* ask for port# again */
+
+			case klm_denied_nolocks:
+				goto out;
+
+			default:
+				cmn_err(CE_CONT,
+					"lock-manager: RPC error: %s\n",
+				clnt_sperrno((enum clnt_stat) error));
+
+				/* on RPC error, wait a bit and try again */
+#ifdef LOCKDEBUG
+				cmn_err(CE_CONT, "BEFORE TIMEOUT: %d\n",
+                                        normal_timeout * HZ);
+#endif
+				timeid = timeout(wakeup, (caddr_t)&lm_sa,
+				    (normal_timeout * HZ));
+				error = sleep((caddr_t)&lm_sa, PZERO|PCATCH);
+#ifdef NOTUSE
+				untimeout(wakeup, (caddr_t)&lm_sa);
+#endif
+				untimeout(timeid);
+				if (error) {
+				    error = EINTR;
+				    goto out;
+				}
+				goto remaploop;	/* ask for port# again */
+
+			} /* switch */
+
+		} /* for */	/* loop until timeout, error, or completion */
+
+	} /* for */		/* loop until signal or completion */
 
 out:
 	AUTH_DESTROY(client->cl_auth);	/* drop the authenticator */

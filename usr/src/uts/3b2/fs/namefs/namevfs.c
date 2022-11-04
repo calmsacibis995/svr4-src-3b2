@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/namefs/namevfs.c	1.26"
+#ident	"@(#)fs:fs/namefs/namevfs.c	1.21"
 /*
  * This file supports the vfs operations for the NAMEFS file system.
  */
@@ -63,7 +63,7 @@ char nmap 	[NMMAP];
  * Define the routines in this file.
  */
 	int	nm_mount(), nm_unmount(), nm_root();
-	int	nm_sync(),  nm_statvfs();
+	int	nm_statvfs();
 	struct	namenode *namefind();
 	void	nameinsert(), nameremove();
 	void	nmclearid();
@@ -81,7 +81,6 @@ extern int dounmount(),	suser();
 dev_t namedev;
 int	namefstype;
 struct	namenode *namealloc;
-struct	vfs	*namevfsp;
 
 /*
  * Define the vfs operations vector.
@@ -91,7 +90,7 @@ struct vfsops nmvfsops = {
         nm_unmount,
 	nm_root,
 	nm_statvfs,
-	nm_sync,
+	fs_sync,
 	fs_nosys,    /* vget */
 	fs_nosys,    /* mountroot */
 	fs_nosys,    /* swapvp */
@@ -99,30 +98,7 @@ struct vfsops nmvfsops = {
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 };
-struct vfsops dummyvfsops = {
-	fs_nosys,    /* mount */
-        fs_nosys,    /* unmount */
-	fs_nosys,    /* root */
-	nm_statvfs,
-	nm_sync,
-	fs_nosys,    /* vget */
-	fs_nosys,    /* mountroot */
-	fs_nosys,    /* swapvp */
-	fs_nosys,    /* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-};
-
 /*
  * File system initialization routine. Save the file system
  * type, establish a file system device number and initialize 
@@ -143,18 +119,6 @@ nameinit(vswp, fstype)
 	}
 	namedev = makedevice(dev, 0);
 	namealloc = NULL;
-	namevfsp = (struct vfs *)kmem_zalloc(sizeof(struct vfs), KM_SLEEP);
-	namevfsp->vfs_next = NULL;
-	namevfsp->vfs_op = &dummyvfsops;
-	namevfsp->vfs_vnodecovered = NULL;
-	namevfsp->vfs_flag = 0;
-	namevfsp->vfs_bsize = 1024;
-	namevfsp->vfs_fstype = namefstype;
-	namevfsp->vfs_fsid.val[0] = namedev;
-	namevfsp->vfs_fsid.val[1] = namefstype;
-	namevfsp->vfs_data = NULL;
-	namevfsp->vfs_dev = namedev;
-	namevfsp->vfs_bcount = 0;
 	return (0);
 }
 
@@ -181,13 +145,13 @@ nm_mount(vfsp, mvp, uap, crp)
 	struct cred *crp;		/* user credentials */
 {
 	struct namefd namefdp;
-	struct vnode *vp;		/* file descriptor vnode */
-	struct file *fp;
+	struct vnode *fd_vnode;		/* file descriptor vnode */
 	struct vnode *newvp;		/* vnode representing this mount */
 	struct namenode *nodep;		/* namenode for this mount */
-	struct vattr vattr;		/* attributes of file dec.  */
+	struct vattr fd_vattr;		/* attributes of file dec.  */
 	struct vattr *vattrp;		/* attributes of this mount */
 	int error = 0;
+	struct file *filep;
 	static u_short nodeid = 1;
 
 	/*
@@ -207,9 +171,9 @@ nm_mount(vfsp, mvp, uap, crp)
 		return (EINVAL);
 	if (copyin(uap->dataptr, (caddr_t) &namefdp, uap->datalen))
 		return (EFAULT);
-	if (error = getf(namefdp.fd, &fp))
+	if (error = getf(namefdp.fd, &filep))
 		return (error);
-	vp = fp->f_vnode;
+	fd_vnode = filep->f_vnode;
 
 	/*
 	 * Make sure the file descriptor is not the root of some
@@ -217,9 +181,10 @@ nm_mount(vfsp, mvp, uap, crp)
 	 * If it's not, create a reference and allocate a namenode 
 	 * to represent this mount request.
 	 */
-	if (vp->v_flag & VROOT)
+	if (fd_vnode->v_flag & VROOT)
 		return (EBUSY);
 
+	VN_HOLD(fd_vnode);
 	nodep = (struct namenode *) kmem_zalloc(sizeof(struct namenode), 
 		KM_SLEEP);
 
@@ -227,7 +192,7 @@ nm_mount(vfsp, mvp, uap, crp)
 	if (error = VOP_GETATTR(mvp, vattrp, 0, crp))
 		goto out;
 
-	if (error = VOP_GETATTR(vp, &vattr, 0, crp))
+	if (error = VOP_GETATTR(fd_vnode, &fd_vattr, 0, crp))
 		goto out;
 	/*
 	 * Make sure the user is the owner of the mount point with
@@ -248,7 +213,7 @@ nm_mount(vfsp, mvp, uap, crp)
 	 * If the file descriptor has file/record locking, don't
 	 * allow the mount to succeed.
 	 */
-	if (vp->v_filocks) {
+	if (fd_vnode->v_filocks) {
 		error = EACCES;
 		goto out;
 	}
@@ -256,7 +221,8 @@ nm_mount(vfsp, mvp, uap, crp)
 	 * Establish a unique node id to represent the mount.
 	 * If can't, return error.
 	 */
-	if ((nodeid = nmgetid(nodeid)) == 0) {
+	nodeid = nmgetid(nodeid);
+	if (nodeid == 0) {
 		error = ENOMEM;
 		goto out;
 	}
@@ -264,11 +230,9 @@ nm_mount(vfsp, mvp, uap, crp)
 	/*
 	 * Initialize the namenode.
 	 */
-	if (vp->v_stream)
-		vp->v_stream->sd_flag |= STRMOUNT;
-	nodep->nm_filevp = vp;
-	fp->f_count++;
-	nodep->nm_filep = fp;
+	if (fd_vnode->v_stream)
+		fd_vnode->v_stream->sd_flag |= STRMOUNT;
+	nodep->nm_filevp = fd_vnode;
 	nodep->nm_mountpt = mvp;
 
 	/*
@@ -277,28 +241,28 @@ nm_mount(vfsp, mvp, uap, crp)
 	 * the fields of the attributes structure will be overwritten 
 	 * by the attributes from the file descriptor.
 	 */
-	vattrp->va_type    = vattr.va_type;
+	vattrp->va_type    = fd_vattr.va_type;
 	vattrp->va_fsid    = namedev;
 	vattrp->va_nodeid  = nodeid;
 	vattrp->va_nlink   = 1;
-	vattrp->va_size    = vattr.va_size;
-	vattrp->va_rdev    = vattr.va_rdev;
-	vattrp->va_blksize = vattr.va_blksize;
-	vattrp->va_nblocks = vattr.va_nblocks;
-	vattrp->va_vcode   = vattr.va_vcode;
+	vattrp->va_size    = fd_vattr.va_size;
+	vattrp->va_rdev    = fd_vattr.va_rdev;
+	vattrp->va_blksize = fd_vattr.va_blksize;
+	vattrp->va_nblocks = fd_vattr.va_nblocks;
+	vattrp->va_vcode   = fd_vattr.va_vcode;
 
 	/*
 	 * Initialize the new vnode structure for the mounted file
 	 * descriptor.
 	 */
 	newvp = NMTOV(nodep);
-	newvp->v_flag = (vp->v_flag | VROOT);
+	newvp->v_flag = (fd_vnode->v_flag | VROOT);
 	newvp->v_count = 1;
 	newvp->v_op = &nm_vnodeops;
 	newvp->v_vfsp = vfsp;
-	newvp->v_stream = vp->v_stream;
-	newvp->v_type = vp->v_type;
-	newvp->v_rdev = vp->v_rdev;
+	newvp->v_stream = fd_vnode->v_stream;
+	newvp->v_type = fd_vnode->v_type;
+	newvp->v_rdev = fd_vnode->v_rdev;
 	newvp->v_data = (caddr_t) nodep;
 
 	/*
@@ -318,6 +282,7 @@ nm_mount(vfsp, mvp, uap, crp)
 out:
 	kmem_free((caddr_t)nodep, sizeof(struct namenode));
 
+	VN_RELE(fd_vnode);
 	return (error);
 }
 
@@ -337,22 +302,20 @@ nm_unmount(vfsp, crp)
 	struct cred *crp;
 {
 	struct namenode *nodep = (struct namenode *) vfsp->vfs_data;
-	struct vnode *vp;
-	struct file *fp;
-	int error;
+	struct vnode *filevp;
+	int error = 0;
 
-	vp = nodep->nm_filevp;
-	fp = nodep->nm_filep;
-	if (nodep->nm_vattr.va_uid != crp->cr_uid && !suser(crp))
+	filevp = nodep->nm_filevp;
+	if (nodep->nm_vattr.va_uid != u.u_cred->cr_uid && !suser(crp))
 		return (EPERM);
 
 	nameremove(nodep);
-	if (namefind(vp, NULL) == NULL && vp->v_stream)
-		vp->v_stream->sd_flag &= ~STRMOUNT;
-	vfsp->vfs_flag |= ~VFS_UNLINKABLE;
-	NMTOV(nodep)->v_flag |= ~VROOT;
-	NMTOV(nodep)->v_vfsp = namevfsp;
-	error = closef(fp);
+	if (namefind(filevp, NULL) == NULL && filevp->v_stream)
+		filevp->v_stream->sd_flag &= ~STRMOUNT;
+	if (filevp->v_count == 1)
+		error = VOP_CLOSE(filevp, 0, 0, 0, crp);
+
+	VN_RELE(filevp);
 	return (error);
 }
 
@@ -403,25 +366,17 @@ nm_statvfs(vfsp, sp)
  * the VOP_FSYNC operation on the mounted file descriptor.
  */
 int
-nm_sync(vfsp, flag, crp)
+nm_sync(vfsp)
 	struct vfs *vfsp;
-	short flag;
-	struct cred *crp;
 {
 	struct namenode *nodep = (struct namenode *) vfsp->vfs_data;
 
-	if (!vfsp)
-		return(0);
-
-	if (flag == SYNC_CLOSE)
-		return (nm_unmountall(nodep->nm_filevp, crp));
-
-	return (VOP_FSYNC(nodep->nm_filevp, crp));
+	return (VOP_FSYNC(nodep->nm_filevp, u.u_cred));
 }
 
 /*
  * Insert a namenode into the namealloc hash list.
- * namealloc is a doubly linked list that contains namenode
+ * namealloc is a doubly linked list that caontains namenode
  * as links. Each link has a unique namenode with a unique
  * nm_mountvp field. The nm_filevp field of the namenode need not
  * be unique, since a file descriptor may be mounted to multiple
@@ -566,7 +521,7 @@ nm_unmountall(vp, crp)
 	 * call dounmount().
 	 */
 	while ((nodep = namefind(vp, (struct vnode *)NULL)) != NULL) {
-		if ((vfsp = NMTOV(nodep)->v_vfsp) != namevfsp) {
+		if ((vfsp = NMTOV(nodep)->v_vfsp) != NULL) {
 			error = dounmount(vfsp, crp);
 			VN_RELE(NMTOV(nodep));
 		}

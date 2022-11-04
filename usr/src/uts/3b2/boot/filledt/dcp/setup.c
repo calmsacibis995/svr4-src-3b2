@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/setup.c	1.5"
+#ident	"@(#)boot:boot/filledt/dcp/setup.c	1.4"
 
 
 /*
@@ -24,7 +24,6 @@
 #include <sys/lboot.h>
 #include <sys/id.h>
 #include <sys/vtoc.h>
-#include <sys/inline.h>
 
 extern struct inode Dinode;		/* inode of file system root directory */
 extern struct inode Fndinode;		/* inode of file found by findfile() */
@@ -38,6 +37,7 @@ extern int fstype;			/* file system block size	*/
 #define MYVTOC ((struct vtoc *)(BOOTADDR + BLKSIZE))
 #define MYPDINFO ((struct pdinfo *)(BOOTADDR + 2 * BLKSIZE))
 
+extern char *strcpy(), *strcat();
 extern char	IOBASE[];	/* base i/o buffer		*/
 extern char	IND3[];		/* 3rd level indirect block	*/
 extern char 	DATA[];		/* a data block			*/
@@ -319,8 +319,7 @@ if (slot != 0 && FL_CONS->cons_found == ON
 		}
 
 	/* construct pump file path name */
-	strcpy(Dirname,"dgn/C.");
-	strcat(Dirname,EDTP(OPTION)->dev_name);
+	(void) strcat(strcpy(Dirname,"dgn/C."),EDTP(OPTION)->dev_name);
 
 	if (EDTP(OPTION)->cons_file == ON && fw_pump(slot,Dirname) == FAIL)
 		{

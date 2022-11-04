@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.windowing:postinstall	1.7"
+#ident	"@(#)pkg.windowing:postinstall	1.5"
 #
 #	postinstall script for windowing package
 #
@@ -17,17 +17,7 @@ SYSTEM="$BASEDIR/etc/system"
 installf $PKGINST $BOOT/XT f || error
 installf $PKGINST $MASTER/xt f || error
 
-#
-#
-# Change the number of devices in $MASTER/xt
-# Note the string for #D must match.
-# Substitute #D (value 2) with no. of windowing terminals $WTNUM.
-#
-sed -e "s/xt	-	2/xt	-	$WTNUM/" <$MASTER/xt >/tmp/xt.$$
-cp /tmp/xt.$$ $MASTER/xt
-rm -rf /tmp/xt.$$
-
-MAJOR=`/etc/drvinstall -m $MASTER/xt -s $SYSTEM -o $BOOT -v 1.0` || error
+MAJOR=`/etc/drvinstall -m $MASTER/xt -s $SYSTEM -o $BOOT -c $WTNUM -v 1.0` || error
 #
 #	configure windowing terminal devices
 #

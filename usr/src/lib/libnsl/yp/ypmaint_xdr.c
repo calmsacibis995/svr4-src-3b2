@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libyp:ypmaint_xdr.c	1.3"
-
+#ident	"@(#)libyp:ypmaint_xdr.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -33,7 +32,7 @@ static  char sccsid[] = "@(#)ypmaint_xdr.c 1.4 88/02/08 Copyr 1985 Sun Micro";
 #endif
 
 /*
- * This contains xdr routines used by the YP rpc interface
+ * This contains xdr routines used by the yellowpages rpc interface
  * for systems and maintenance programs only.  This is a separate module
  * because most yp clients should not need to link to it.
  */
@@ -47,7 +46,7 @@ static  char sccsid[] = "@(#)ypmaint_xdr.c 1.4 88/02/08 Copyr 1985 Sun Micro";
 static bool xdr_ypmaplist();
 static bool xdr_ypmaplist_wrap_string();
 
-extern char *calloc();
+extern unsigned int xdr_ypreq_newname_string();
 
 /*
  * Serializes/deserializes a ypresp_master structure.
@@ -159,7 +158,7 @@ xdr_ypreq_newxfr(xdrs, ps)
 	return (xdr_ypmap_parms(xdrs, &ps->map_parms) &&
 	    xdr_u_long(xdrs, &ps->transid) &&
 	    xdr_u_long(xdrs, &ps->proto) &&
-	    xdr_string(xdrs, &ps->name, 256) );
+	    xdr_ypreq_newname_string(xdrs, &ps->name) );
 }
 
 /*
@@ -225,37 +224,16 @@ xdr_ypall(xdrs, callback)
 	}
 }
 
+
 bool_t
 xdr_netconfig(xdrs, objp)
 	XDR *xdrs;
 	struct netconfig *objp;
 {
-	char **tmp;
-	int i;
-
-	if (!xdr_string(xdrs, &objp->nc_netid, ~0)) {
-		return (FALSE);
-	}
-	if (!xdr_u_long(xdrs, &objp->nc_semantics)) {
-		return (FALSE);
-	}
-	if (!xdr_u_long(xdrs, &objp->nc_flag)) {
-		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_protofmly, ~0)) {
-		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_proto, ~0)) {
-		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_device, ~0)) {
-		return (FALSE);
-	}
-	if (!xdr_array(xdrs, &objp->nc_lookups, &objp->nc_nlookups, 100, sizeof (char *), xdr_wrapstring)) {
-		return (FALSE);
-	}
-	if (!xdr_vector(xdrs, (char *)objp->nc_unused, 8, sizeof(u_long), xdr_u_long)) {
+	if (!xdr_netconfigx(xdrs, objp)) {
 		return (FALSE);
 	}
 	return (TRUE);
 }
+
+

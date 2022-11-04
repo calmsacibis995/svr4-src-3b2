@@ -1,9 +1,3 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"mcrt0.s"
 	.ident	"@(#)libc-m32:csu/mcrt0.s	1.14.1.9"
 	_section23_(.pesel,i,strtab)

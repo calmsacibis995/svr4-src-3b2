@@ -5,27 +5,17 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/nl_langinfo.c	1.6"
+#ident	"@(#)libc-port:gen/nl_langinfo.c	1.1"
 
-#ifdef __STDC__
-	#pragma weak nl_langinfo = _nl_langinfo
-#endif
-#include "synonyms.h"
 #include <stdlib.h>
-#include <limits.h>
 #include <nl_types.h>
 #include <langinfo.h>
 #include <locale.h>
 #include <time.h>
-#include <string.h>
 
 #define MAX 64
 
-#ifdef __STDC__
-extern char *gettxt(const char *, const char *);
-#else
 extern char *gettxt();
-#endif
 extern size_t strftime();
 extern struct lconv *localeconv();
 
@@ -36,15 +26,11 @@ nl_langinfo( item )
 nl_item      item;
 {
 struct tm tm;
-static char *buf;
-char *buf2;
+static char buf[MAX];
+static char buf2[MAX];
 struct lconv *currency;
 char *s;
 int size;
-const char *rptr;
-
-	if (!buf && (buf = malloc(2 * MAX)) == NULL)
-		return "";
 
 	switch (item) {
 		/*
@@ -56,70 +42,63 @@ const char *rptr;
 			tm.tm_wday=0;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Sunday";
-			break;
+				return "Sunday";
 
 		case DAY_2 :
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=1;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Monday";
-			break;
+				return "Monday";
 
 		case DAY_3 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=2;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Tuesday";
-			break;
+				return "Tuesday";
 
 		case DAY_4 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=3;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Wednesday";
-			break;
+				return "Wednesday";
 
 		case DAY_5 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=4;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Thursday";
-			break;
+				return "Thursday";
 
 		case DAY_6 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=5;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Friday";
-			break;
+				return "Friday";
 
 		case DAY_7 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=6;
 			size = strftime(buf,MAX,"%A",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Saturday";
-			break;
+				return "Saturday";
 
 
 		/*
@@ -130,70 +109,63 @@ const char *rptr;
 			tm.tm_wday=0;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Sun";
-			break;
+				return "Sun";
 
 		case ABDAY_2 :
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=1;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Mon";
-			break;
+				return "Mon";
 
 		case ABDAY_3 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=2;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Tue";
-			break;
+				return "Tue";
 
 		case ABDAY_4 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=3;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Wed";
-			break;
+				return "Wed";
 
 		case ABDAY_5 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=4;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Thur";
-			break;
+				return "Thur";
 
 		case ABDAY_6 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=5;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Fri";
-			break;
+				return "Fri";
 
 		case ABDAY_7 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_wday=6;
 			size = strftime(buf,MAX,"%a",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Sat";
-			break;
+				return "Sat";
 
 
 
@@ -205,120 +177,108 @@ const char *rptr;
 			tm.tm_mon=0;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "January";
-			break;
+				return "January";
 
 		case MON_2 :
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=1;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Feburary";
-			break;
+				return "Feburary";
 
 		case MON_3 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=2;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "March";
-			break;
+				return "March";
 
 		case MON_4 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=3;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "April";
-			break;
+				return "April";
 
 		case MON_5 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=4;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "May";
-			break;
+				return "May";
 
 		case MON_6 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=5;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "June";
-			break;
+				return "June";
 
 		case MON_7 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=6;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "July";
-			break;
+				return "July";
 
 		case MON_8 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=7;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "August";
-			break;
+				return "August";
 
 		case MON_9 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=8;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "September";
-			break;
+				return "September";
 
 		case MON_10 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=9;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "October";
-			break;
+				return "October";
 
 		case MON_11 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=10;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "November";
-			break;
+				return "November";
 
 		case MON_12 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=11;
 			size = strftime(buf,MAX,"%B",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "December";
-			break;
+				return "December";
 
 		/*
 		 * ... and their abbreviated form
@@ -328,140 +288,126 @@ const char *rptr;
 			tm.tm_mon=0;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Jan";
-			break;
+				return "Jan";
 
 		case ABMON_2 :
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=1;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Feb";
-			break;
+				return "Feb";
 
 		case ABMON_3 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=2;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Mar";
-			break;
+				return "Mar";
 
 		case ABMON_4 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=3;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Apr";
-			break;
+				return "Apr";
 
 		case ABMON_5 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=4;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "May";
-			break;
+				return "May";
 
 		case ABMON_6 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=5;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Jun";
-			break;
+				return "Jun";
 
 		case ABMON_7 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=6;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Jul";
-			break;
+				return "Jul";
 
 		case ABMON_8 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=7;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Aug";
-			break;
+				return "Aug";
 
 		case ABMON_9 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=8;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Sep";
-			break;
+				return "Sep";
 
 		case ABMON_10 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=9;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Oct";
-			break;
+				return "Oct";
 
 		case ABMON_11 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=10;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Nov";
-			break;
+				return "Nov";
 
 		case ABMON_12 : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_mon=11;
 			size = strftime(buf,MAX,"%b",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "Dec";
-			break;
+				return "Dec";
 
 		case AM_STR : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_hour=1;
 			size = strftime(buf,MAX,"%p",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "AM";
-			break;
+				return "AM";
 
 		case PM_STR : 
 			memset((void*)&tm,sizeof (struct tm),0);
 			tm.tm_hour=13;
 			size = strftime(buf,MAX,"%p",&tm);
 			if (size)
-				rptr = (const char *) buf;
+				return buf;
 			else
-				rptr = "PM";
-			break;
+				return "PM";
 
 
 		/*
@@ -482,16 +428,8 @@ const char *rptr;
 					return currency->decimal_point;
 
 				case CRNCYSTR : 
-					if (currency->p_cs_precedes == CHAR_MAX || *(currency->currency_symbol) == '\0')
-						return "";
-					if (currency->p_cs_precedes == 1)
-						buf[0] = '-';
-					else
-						buf[0] = '+';
-					strcpy(&buf[1], currency->currency_symbol);
-					return buf;
+					return currency->currency_symbol;
 			}
-			break;
 
 		/*
 		 * Default string used to format date and time
@@ -505,10 +443,9 @@ const char *rptr;
 			s = gettxt("Xopen_info:1","%H:%M:%S");
 			setlocale(LC_MESSAGES,buf);
 			if (strcmp(s,"Message not found!!\n"))
-				rptr = (const char *) s;
+				return s;
 			else 
-				rptr = "%H:%M:%S";
-			break;
+				return "%H:%M:%S";
 
 		case D_FMT :
 			old_locale = setlocale(LC_MESSAGES,(char*)NULL);
@@ -517,22 +454,20 @@ const char *rptr;
 			s = gettxt("Xopen_info:2","%m/%d/%y");
 			setlocale(LC_MESSAGES,buf);
 			if (strcmp(s,"Message not found!!\n"))
-				rptr = (const char *) s;
+				return s;
 			else 
-				rptr = "%m/%d/%y";
-			break;
+				return "%m/%d/%y";
 
 		case D_T_FMT :
 			old_locale = setlocale(LC_MESSAGES,(char*)NULL);
 			strcpy(buf,old_locale);
 			(void)setlocale(LC_MESSAGES,setlocale(LC_TIME,(char*)NULL));
-			s = gettxt("Xopen_info:3","%a %b %d %H:%M:%S %Y");
+			s = gettxt("Xopen_info:3","%a %b %d %T %Z %Y");
 			setlocale(LC_MESSAGES,buf);
 			if (strcmp(s,"Message not found!!\n"))
-				rptr = (const char *) s;
+				return s;
 			else 
-				rptr = "%a %b %d %H:%M:%S %Y";
-			break;
+				return "%a %b %d %T %Z %Y";
 
 		case YESSTR :
 			old_locale = setlocale(LC_MESSAGES,(char*)NULL);
@@ -553,10 +488,9 @@ const char *rptr;
 			s = gettxt("Xopen_info:4","yes");
 			setlocale(LC_MESSAGES,buf);
 			if (strcmp(s,"Message not found!!\n"))
-				rptr = (const char *) s;
+				return s;
 			else 
-				rptr = "yes";
-			break;
+				return "yes";
 
 		case NOSTR :
 			old_locale = setlocale(LC_MESSAGES,(char*)NULL);
@@ -578,16 +512,12 @@ const char *rptr;
 			s = gettxt("Xopen_info:5","no");
 			setlocale(LC_MESSAGES,buf);
 			if (strcmp(s,"Message not found!!\n"))
-				rptr = (const char *) s;
+				return s;
 			else 
-				rptr = "no";
-			break;
+				return "no";
 
 		default :
-			rptr = "";
-			break;
+			return "";
 
 	    }
-
-	return (char *) rptr;
 }

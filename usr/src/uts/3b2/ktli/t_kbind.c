@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kbind.c	1.4"
+#ident	"@(#)ktli:ktli/t_kbind.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kbind.c 1.2 89/01/11 SMI"
 #endif
@@ -35,7 +35,8 @@ static char sccsid[] = "@(#)t_kbind.c 1.2 89/01/11 SMI"
  *	Kernel TLI-like function to bind a transport endpoint
  *	to an address.
  *
- *	Returns 0 on success or positive error code.
+ *	Returns 0 on success and ret is set if non-NULL,
+ *	else -1.
  *
  */
 
@@ -58,21 +59,18 @@ static char sccsid[] = "@(#)t_kbind.c 1.2 89/01/11 SMI"
 
 int 
 t_kbind(tiptr, req, ret)
-	register TIUSER			*tiptr;
-	register struct	t_bind		*req;
-	register struct	t_bind		*ret;
+register TIUSER *tiptr;
+register struct	t_bind *req, *ret;
 {
-	register struct T_bind_req	*bind_req;
-	register struct T_bind_ack	*bind_ack;
-	register int 			bindsz;
-	register struct vnode 		*vp;
-	register struct file 		*fp;
-	register char 			*buf;
-	struct	 strioctl 		strioc;
-	int	 			retval;
-	int				error;
+	register struct T_bind_req *bind_req;
+	register struct T_bind_ack *bind_ack;
+	register int bindsz;
+	register struct vnode *vp;
+	register struct file *fp;
+	register char *buf;
+	struct	 strioctl strioc;
+	int	 retval;
 
-	error = 0;
 	retval = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
@@ -80,10 +78,8 @@ t_kbind(tiptr, req, ret)
 	/* send the ioctl request and wait
 	 * for a reply.
 	 */
-	bindsz = max(TBINDREQSZ, TBINDACKSZ);
-	bindsz += max(req == NULL  ? 0 : req->addr.len , tiptr->tp_info.addr);
+	bindsz = max(TBINDREQSZ, TBINDACKSZ) +(req == NULL ? 0 : req->addr.len);
 	buf = (char *)kmem_alloc(bindsz, KM_SLEEP);
-
 	/* LINTED pointer alignment */
 	bind_req = (struct T_bind_req *)buf;
 	bind_req->PRIM_type = T_BIND_REQ;
@@ -101,40 +97,39 @@ t_kbind(tiptr, req, ret)
 	strioc.ic_dp = buf;
 	strioc.ic_len = TBINDREQSZ+bind_req->ADDR_length;
 
-	error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
+	u.u_error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
 					 (char *)NULL, u.u_cred, &retval);
-	if (error)
+	if (u.u_error)
 		goto badbind;
 	if (retval) {
 		if ((retval & 0xff) == TSYSERR)
-			error = (retval >> 8) & 0xff;
-		else    error = t_tlitosyserr(retval & 0xff);
+			u.u_error = (retval >> 8) & 0xff;
+		else    u.u_error = tlitosyserr(retval & 0xff);
 		goto badbind;
 	}
 
 	/* LINTED pointer alignment */
 	bind_ack = (struct T_bind_ack *)strioc.ic_dp;
 	if (strioc.ic_len < TBINDACKSZ || bind_ack->ADDR_length == 0) {
-		error = EIO;
+		u.u_error = EIO;
 		goto badbind;
 	}
 
 	/* copy bind data into users buffer
 	 */
-	if (ret) {
-		if (ret->addr.maxlen > bind_ack->ADDR_length)
-			ret->addr.len = bind_ack->ADDR_length;
-		else	ret->addr.len = ret->addr.maxlen;
-
+	if (ret && ret->addr.maxlen >= bind_ack->ADDR_length) {
 		bcopy(buf+bind_ack->ADDR_offset, ret->addr.buf,
-			 ret->addr.len);
+			 (int)bind_ack->ADDR_length);
 
+		ret->addr.len = bind_ack->ADDR_length;
 		ret->qlen = bind_ack->CONIND_number;
 	}
 
 badbind:
 	kmem_free(buf, (u_int)bindsz);
-	return error;
+	if (u.u_error)
+		return -1;
+	return 0;
 }
 
 /******************************************************************************/

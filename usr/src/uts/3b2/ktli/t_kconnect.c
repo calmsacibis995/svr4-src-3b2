@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kconnect.c	1.4"
+#ident	"@(#)ktli:ktli/t_kconnect.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kconnect.c 1.2 89/01/11 SMI"
 #endif
@@ -38,9 +38,10 @@ static char sccsid[] = "@(#)t_kconnect.c 1.2 89/01/11 SMI"
  *	before returning.
  *
  *	Returns:
- *		0 on success, and if rcvcall is non-NULL it shall be
- *		filled with the connection confirm data.
- *		Otherwise a positive error code.
+ *		0	on success, and if rcvcall is non-NULL it shall be
+ *			filled with the connection confirm data.
+ *	       -1	on failure.
+ *
  */
 
 #include <sys/param.h>
@@ -60,30 +61,25 @@ static char sccsid[] = "@(#)t_kconnect.c 1.2 89/01/11 SMI"
 
 int
 t_kconnect(tiptr, sndcall, rcvcall)
-	register TIUSER			*tiptr;
-	register struct	t_call		*sndcall;
-	register struct	t_call		*rcvcall;
+register TIUSER *tiptr;
+register struct	t_call *sndcall;
+register struct	t_call *rcvcall;
 
 {
-	register int			len;
-	register int			msgsz;
-	register int			hdrsz;
-	register struct T_conn_req	*creq;
-	register union T_primitives	*pptr;
-	register mblk_t			*nbp;
-	register struct file		*fp;
-	mblk_t				*bp;
-	int				error;
-
-	error = 0;
+	register int len, retval, msgsz, hdrsz;
+	register struct T_conn_req *creq;
+	register union T_primitives *pptr;
+	register mblk_t *nbp;
+	register struct file *fp;
+	mblk_t	 *bp;
 
 	fp = tiptr->fp;
 	msgsz = TCONNREQSZ;
-	while (!(bp = allocb(msgsz, BPRI_LO))) {
+	while (!(bp = allocb(msgsz, BPRI_LO)))
 		if (strwaitbuf(msgsz, BPRI_LO)) {
-			return ENOSR;
+			u.u_error = ENOSR;
+			return -1;
 		}
-	}
 
 	/* LINTED pointer alignment */
 	creq = (struct T_conn_req *)bp->b_wptr;
@@ -112,27 +108,29 @@ t_kconnect(tiptr, sndcall, rcvcall)
 		/* if CO then we would allocate a data block and
  		 * put the users connect data into it.
 		 */
-		KTLILOG(1, "Attempt to send connectionless data on T_CONN_REQ\n", 0);
-		return EPROTO;
+		printf("Attempt to send connectionless data on T_CONN_REQ\n");
+		return -1;
 	}
 
 	/* send it
 	 */
-	if ((error = tli_send(tiptr, bp, fp->f_flag)) != 0)
-		return error;
+	if (tli_send(tiptr, bp, fp->f_flag) < 0)
+		return -1;
 
 	/* wait for acknowledgment
 	 */
-	if ((error = get_ok_ack(tiptr, T_CONN_REQ, fp->f_flag)) != 0)
-		return error;
+	if (get_ok_ack(tiptr, T_CONN_REQ, fp->f_flag) < 0)
+		return -1;
 
 	/* wait for CONfirm
 	 */
-	if ((error = tli_recv(tiptr, &bp, fp->f_flag)) != 0)
-		return error;
+	if (tli_recv(tiptr, &bp, fp->f_flag) < 0)
+		return -1;
 
-	if (bp->b_datap->db_type != M_PROTO)
-		return EPROTO;
+	if (bp->b_datap->db_type != M_PROTO) {
+		u.u_error = EPROTO;
+		return -1;
+	}
 
 	/* LINTED pointer alignment */
 	pptr = (union T_primitives *)bp->b_rptr;
@@ -147,8 +145,7 @@ t_kconnect(tiptr, sndcall, rcvcall)
 			 pptr->conn_con.OPT_offset) ||
 			 hdrsz < (pptr->conn_con.RES_length+
 			 pptr->conn_con.RES_offset) ) {
-				error = EPROTO;
-				break;
+				u.u_error = EPROTO;
 			}
 
 			if (rcvcall != NULL) {
@@ -178,13 +175,15 @@ t_kconnect(tiptr, sndcall, rcvcall)
 				}
 			}
 			else	freemsg(bp);
+			retval = 0;
 			break;
 
 		default:
-			error = EPROTO;
+			u.u_error = EPROTO;
+			retval = -1;
 			break;
 	}
-	return error;
+	return retval;
 }
 /******************************************************************************/
 

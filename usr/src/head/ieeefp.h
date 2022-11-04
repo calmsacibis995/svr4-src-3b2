@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:ieeefp.h	1.17"
+#ident	"@(#)head:ieeefp.h	1.16"
 
 #ifndef _IEEEFP_H
 #define _IEEEFP_H
@@ -406,21 +406,11 @@ extern fp_union	_getfltsw(fp_ftype,fp_op,char *,fp_union *,fp_union *,fp_union *
 static void	(* _p754_1)(int *, int (*)()) = _getflthw;
 static fp_union	(* _p754_2)(fp_ftype,fp_op,char *,fp_union *,fp_union *,fp_union *) =	_getfltsw;
 
-extern void _s2dec(float *, decimal *, int);
-extern void _d2dec(double *, decimal *, int);
-extern void _dec2s(decimal *, float *, int);
-extern void _dec2d(decimal *, double *, int);
-
 #else
 extern void	_getflthw();
 extern fp_union	_getfltsw();
 static void	(* _p754_1)() = _getflthw;
 static fp_union	(* _p754_2)() =	_getfltsw;
-
-extern void _s2dec();
-extern void _d2dec();
-extern void _dec2s();
-extern void _dec2d();
 #endif
 
 #endif  /* ndef P&%$_NOFAULT 1 */

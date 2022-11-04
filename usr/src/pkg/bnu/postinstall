@@ -1,4 +1,4 @@
-#ident	"@(#)bnu:postinstall	1.26.4.15"
+#ident	"@(#)bnu:postinstall	1.26.4.12"
 
 #
 #	Postinstall for "Basic Networking Utilities"
@@ -130,7 +130,7 @@ fi
 echo "
 
 You can use the installed $PKGNAME management menu by typing
-'sysadm' and then descending to the Network Services Management 
+'nsysadm' and then descending to the Network Services Management 
 menu.
 
 As part of the initial installation of $PKGNAME you
@@ -138,15 +138,13 @@ should execute the following management commands within the
 Basic Networking Setup menu.
 (SEE 'Basic Networking Utilities Guide' for more information).
 
-devices:	To provide the $PKGNAME package
+add_devices:	To provide the $PKGNAME package
 		with information about the devices it can
 		use for outgoing traffic.
-polling:	To initiate the polling of other systems
-		by this system, '`uname -n`'.
-setup:		To initialize the $PKGNAME Devices, Systems,
-		and Polling databases.
-systems:	To provide the $PKGNAME package
-		with the names of systems you want to contact."
+add_systems:	To provide the $PKGNAME package
+		with the names of systems you want to contact.
+add_polling:	To initiate the polling of other systems
+		by this system, '`uname`'."
 #
 #
 #

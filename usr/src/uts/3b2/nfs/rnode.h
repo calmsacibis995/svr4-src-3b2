@@ -8,7 +8,7 @@
 #ifndef _NFS_RNODE_H
 #define _NFS_RNODE_H
 
-#ident	"@(#)head.sys:sys/nfs/rnode.h	1.3"
+#ident	"@(#)head.sys:sys/nfs/rnode.h	1.2"
 
 /*      @(#)rnode.h 1.23 88/08/19 SMI      */
 
@@ -123,7 +123,7 @@ printf("RUNLOCK: called from %s, lineno %d\n", file, line); \
 		(rp)->r_flags &= ~RLOCKED; \
 		if ((rp)->r_flags & RWANT) { \
 			(rp)->r_flags &= ~RWANT; \
-			wakeprocs((caddr_t)(rp), PRMPT); \
+			wakeup((caddr_t)(rp)); \
 		} \
 	} \
 }
@@ -137,7 +137,7 @@ printf("RUNLOCK: called from %s, lineno %d\n", file, line); \
 		(rp)->r_flags &= ~RLOCKED; \
 		if ((rp)->r_flags & RWANT) { \
 			(rp)->r_flags &= ~RWANT; \
-			wakeprocs((caddr_t)(rp), PRMPT); \
+			wakeup((caddr_t)(rp)); \
 		} \
 	} \
 }
@@ -167,7 +167,7 @@ printf("RUNLOCK: called from %s, lineno %d\n", file, line); \
 		(rp)->r_flags &= ~RLOCKED; \
 		if ((rp)->r_flags & RWANT) { \
 			(rp)->r_flags &= ~RWANT; \
-			wakeprocs((caddr_t)(rp), PRMPT); \
+			wakeup((caddr_t)(rp)); \
 		} \
 	} \
 }

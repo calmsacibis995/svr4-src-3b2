@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/sysconf.c	1.6"
+#ident	"@(#)libc-port:gen/sysconf.c	1.3"
 
 /* sysconf(3C) - returns system configuration information
 */
@@ -23,7 +23,6 @@
 
 extern int errno;
 
-long
 sysconf(name)
 int name;
 {
@@ -37,7 +36,7 @@ int name;
 			return(ARG_MAX);
 
 		case _SC_CLK_TCK:
-			return(_sysconfig(_CONFIG_CLK_TCK));
+			return(CLOCKS_PER_SEC);
 
 		case _SC_JOB_CONTROL:
 			return(_POSIX_JOB_CONTROL);
@@ -59,15 +58,6 @@ int name;
 
 		case _SC_PAGESIZE:
 			return(_sysconfig(_CONFIG_PAGESIZE));
-	
-		case _SC_XOPEN_VERSION:
-			return(_sysconfig(_CONFIG_XOPEN_VER));
-
-		case _SC_PASS_MAX:
-			return(PASS_MAX);
-
-		case _SC_LOGNAME_MAX:
-			return(LOGNAME_MAX);
 	}
 }
 

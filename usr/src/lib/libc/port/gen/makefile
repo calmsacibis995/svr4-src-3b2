@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libc-port:gen/makefile	1.17.11.12"
+#ident	"@(#)libc-port:gen/makefile	1.17.10.10"
 #
 # makefile for libc/port/gen
 #
@@ -32,9 +32,9 @@ POBJECTS=$(OBJECTS:.o=.p)
 OBJECTS=\
 _ctype.o      _loc_data.o   _locale.o     _set_tab.o    \
 _shrd_data.o  _xftw.o       \
-a64l.o        abort.o       abs.o         \
-assert.o      atexit.o      atof.o        atoi.o        \
-atol.o        bsearch.o	    calloc.o      \
+a64l.o        abort.o       abs.o         aread.o	\
+assert.o      asyncio.o     atexit.o      atof.o        atoi.o        \
+atol.o        awrite.o      bsearch.o	  calloc.o      \
 cat_init.o    catclose.o    catgets.o     catopen.o     \
 cfgetispeed.o cfgetospeed.o cfree.o       cfsetispeed.o cfsetospeed.o	\
 cftime.o      clock.o       closedir.o    \
@@ -42,14 +42,13 @@ colldata.o    crypt.o	\
 ctime.o	      ctype.o	    \
 ctypefcns.o   div.o         drand48.o	\
 dup2.o	      ecvt.o        errlst.o      \
-execvp.o      fattach.o     fdetach.o	\
+events.o      execvp.o      fattach.o     fdetach.o	\
 ffs.o         fmtmsg.o	    \
 frexp.o	      ftok.o        ftw.o         gcvt.o	\
-getcwd.o      getdate.o     getdate_data.o              \
-getdate_gd.o  getenv.o      getgrent.o    \
+getcwd.o      getenv.o      getgrbuf.o    getgrent.o    getgrgid.o	\
 getgrnam.o    gethz.o       getlogin.o    getmntent.o   \
-getopt.o      getpw.o       getpwent.o    getpwnam.o	\
-getsetitimer.o		  \
+getopt.o      getpw.o       getpwbuf.o    getpwent.o    getpwnam.o	\
+getpwuid.o    getsetitimer.o		  \
 getspent.o    getsubopt.o   gettimeofday.o	\
 gettxt.o      getut.o	    getutx.o      getvfsent.o   \
 hrtcftime.o   hrtctime.o    hrtnewres.o   hrtstrftime.o	\
@@ -64,13 +63,13 @@ mlock.o	      mlockall.o    \
 modf.o        modff.o       mon.o         msync.o	\
 munlock.o     munlockall.o  new_list.o    nftw.o	  \
 nl_langinfo.o opendir.o     \
-old_tolower.o old_toupper.o opt_data.o    \
+old_tolower.o old_toupper.o opt_data.o    pathconf.o	\
 perror.o      priocntl.o    psiginfo.o    psignal.o	\
-pt.o          putenv.o      putpwent.o    \
+pt.o          putenv.o      putpwbuf.o    putpwent.o    \
 qsort.o       raise.o       rand.o        readdir.o	\
 realpath.o    rename.o      rewinddir.o   seekdir.o	\
 select.o      setlocale.o   \
-sigflag.o     siglist.o     \
+sigflag.o     siginfolst.o  siglist.o     \
 sigsend.o     sigsetops.o   sleep.o	\
 ssignal.o     str2id.o      str2sig.o     \
 strcat.o      strchr.o      strcmp.o      strcpy.o	\
@@ -92,36 +91,34 @@ waitpid.o     wctomb.o      wcstombs.o
 PIC_OBJECTS=\
 _ctype.P      _loc_data.P   _locale.P     _set_tab.P    _xftw.P       \
 a64l.P        abort.P       abs.P         assert.P      atexit.P      \
-atof.P        atoi.P        atol.P        bsearch.P     calloc.P      \
-cat_init.P    catclose.P    catgets.P     catopen.P     \
-cfgetispeed.P cfgetospeed.P cfsetispeed.P cfsetospeed.P	\
+atof.P        atoi.P        atol.P        bsearch.P     \
+calloc.P      cfgetispeed.P cfgetospeed.P cfsetispeed.P cfsetospeed.P	\
 clock.P       closedir.P    ctime.P       \
-ctypefcns.P   div.P         drand48.P     \
+ctype.P       ctypefcns.P   div.P         drand48.P     \
 dup2.P        ecvt.P        execvp.P      \
 fattach.P     fdetach.P     ffs.P         fmtmsg.P      \
 frexp.P       ftok.P        ftw.P         getcwd.P      \
-getdate.P     getdate_gd.P  getenv.P      getgrent.P    getgrnam.P    \
-gethz.P       getlogin.P    getopt.P      getpwent.P    \
-getpwnam.P    getsubopt.P   gettimeofday.P gettxt.P     getut.P       \
-hsearch.P     import_def.P  initgroups.P  isatty.P      isastream.P   \
-l64a.P        ldexp.P       lfind.P       localeconv.P  lsearch.P     \
+getenv.P      getgrbuf.P    getgrent.P    getgrgid.P    getgrnam.P    \
+gethz.P       getlogin.P    getopt.P      getpwbuf.P    getpwent.P    \
+getpwnam.P    getpwuid.P    getsubopt.P   gettxt.P      getut.P       \
+hsearch.P     import_def.P  initgroups.P  isatty.P      l64a.P        \
+ldexp.P       lfind.P       localeconv.P  lsearch.P     \
 malloc.P      mbstowcs.P    mbtowc.P      memccpy.P     \
 memchr.P      memcmp.P      memcpy.P      memmove.P     \
 memset.P      mkdev.P       mkfifo.P      mktemp.P      \
-mlock.P       modf.P        mon.P         msync.P       munlock.P     \
-nftw.P        nl_langinfo.P \
-opendir.P     opt_data.P    perror.P      \
-priocntl.P    pt.P          putenv.P      \
+mlock.P       mon.P         msync.P       munlock.P     nl_langinfo.P \
+opendir.P     opt_data.P    pathconf.P    perror.P      \
+priocntl.P    pt.P          putenv.P      putpwbuf.P    \
 putpwent.P    qsort.P       \
 raise.P       rand.P        readdir.P     rename.P      \
-rewinddir.P   seekdir.P     select.P      setlocale.P   sigsend.P     \
+rewinddir.P   seekdir.P     setlocale.P   sigsend.P     \
 sigsetops.P   sleep.P       strcat.P      strchr.P      \
 strcmp.P      strcpy.P      strcspn.P     strdup.P      \
 strerror.P    strftime.P    strlen.P      strncat.P     \
 strncmp.P     strncpy.P     strpbrk.P     strrchr.P     \
 strspn.P      strstr.P      strtod.P      strtok.P      \
 strtol.P      strtoul.P     strxfrm.P     swab.P        \
-swapctl.P     sysconf.P     syslog.P      \
+swapctl.P     sysconf.P     \
 tcdrain.P     tcflow.P      tcflush.P     tcgetattr.P	\
 tcgetpgrp.P   tcgetsid.P    tcsendbreak.P tcsetattr.P	\
 tcsetpgrp.P   tell.P        telldir.P     \
@@ -159,7 +156,7 @@ localeconv.o localeconv.p: $(INC)/stdio.h $(INC)/locale.h $(INC)/stddef.h \
 	$(INC)/limits.h
 dup2.o dup2.p _set_tab.o _set_tab.p ctype.o ctype.p \
 	strftime.o strftime.p: $(INC)/fcntl.h
-getgrent.o getgrent.p \
+getgrent.o getgrent.p getgrgid.o getgrgid.p \
 	getgrnam.o getgrnam.p: $(INC)/grp.h
 dup2.o dup2.p strtol.o strtol.p strtoul.o strtoul.p: $(INC)/limits.h
 mon.o mon.p: $(INC)/mon.h $(INCSYS)/sys/types.h $(INC)/stdlib.h $(INC)/stdio.h \
@@ -169,6 +166,7 @@ modf.o modf.p modff.o modff.p raise.o raise.p: $(INCSYS)/sys/types.h \
 ecvt.o ecvt.p frexp.o frexp.p ldexp.o ldexp.p \
 	modf.o modf.p: $(INC)/nan.h
 getpwent.o getpwent.p getpwnam.o getpwnam.p \
+	getpwuid.o getpwuid.p \
 	putpwent.o putpwent.p: $(INC)/search.h
 tsearch.o tsearch.p tfind.o tfind.p: $(INC)/search.h
 abort.o abort.p sleep.o sleep.p \
@@ -215,7 +213,7 @@ _locale.o _locale.p div.o div.p mbtowc.o mbtowc.p \
 strftime.o strftime.p: $(INCSYS)/sys/types.h
 strftime.o strftime.p \
 	strstr.o strstr.p: $(INC)/stddef.h
-_set_tab.o _set_tab.p: $(INC)/unistd.h
+_set_tab.o _set_tab.p: $(INC)/osfcn.h
 _loc_data.o _loc_data.p \
 _locale.o _locale.p _set_tab.o _set_tab.p \
 setlocale.o setlocale.p strftime.o strftime.p \
@@ -286,6 +284,8 @@ select.o select.p: $(INC)/values.h $(INC)/errno.h $(INCSYS)/sys/types.h \
 
 sigflag.o sigflag.p: $(INC)/signal.h
 
+siginfolst.o siginfolst.p: $(INC)/signal.h $(INC)/siginfo.h
+
 siglist.o siglist.p: $(INC)/signal.h
 
 sigsend.o sigsend.p: $(INCSYS)/sys/types.h $(INCSYS)/sys/procset.h
@@ -326,6 +326,10 @@ ttyname.o ttyname.p: $(INC)/stdio.h $(INCSYS)/sys/types.h $ $(INC)/dirent.h\
 
 waitpid.o waitpid.p: $(INCSYS)/sys/types.h $(INCSYS)/sys/procset.h $(INCSYS)/sys/wait.h\
 	$(INC)/errno.h
+
+pathconf.o pathconf.p: $(INCSYS)/sys/types.h $(INC)/errno.h $(INC)/stddef.h\
+	$(INC)/limits.h $(INC)/unistd.h $(INCSYS)/sys/statvfs.h $(INCSYS)/sys/termios.h\
+	$(INCSYS)/sys/sysconfig.h
 
 swapctl.o swapctl.p: $(INCSYS)/sys/uadmin.h
 

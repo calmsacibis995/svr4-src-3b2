@@ -5,15 +5,15 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:utmp.h	1.5.1.7"
+#ident	"@(#)head:utmp.h	1.5.1.6"
 
 #ifndef _UTMP_H
 #define _UTMP_H
 
 #include <sys/types.h>
 
-#define	UTMP_FILE	"/var/adm/utmp"
-#define	WTMP_FILE	"/var/adm/wtmp"
+#define	UTMP_FILE	"/etc/utmp"
+#define	WTMP_FILE	"/etc/wtmp"
 #define	ut_name	ut_user
 
 struct utmp

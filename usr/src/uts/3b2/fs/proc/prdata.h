@@ -8,7 +8,7 @@
 #ifndef _PROC_PRDATA_H
 #define _PROC_PRDATA_H
 
-#ident	"@(#)fs:fs/proc/prdata.h	1.17"
+#ident	"@(#)fs:fs/proc/prdata.h	1.16"
 #define	min(a,b)	((a) <= (b) ? (a) : (b))
 #define	max(a,b)	((a) >= (b) ? (a) : (b))
 #define	round(r)	(((r)+sizeof(int)-1)&(~(sizeof(int)-1)))
@@ -55,7 +55,6 @@ user_t		*prumap(proc_t *);
 void		prunmap(proc_t *);
 void		prgetregs(user_t *, gregset_t);
 void		prsetregs(user_t *, gregset_t);
-int		prgetpc(gregset_t);
 int		prhasfp(void);
 void		prgetfpregs(proc_t *, fpregset_t *);
 void		prsetfpregs(proc_t *, fpregset_t *);
@@ -73,7 +72,6 @@ user_t		*prumap();
 void		prunmap();
 void		prgetregs();
 void		prsetregs();
-int		prgetpc();
 int		prhasfp();
 void		prgetfpregs();
 void		prsetfpregs();

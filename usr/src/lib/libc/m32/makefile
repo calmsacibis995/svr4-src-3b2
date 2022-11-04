@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libc-m32:makefile	1.46.1.41"
+#ident	"@(#)libc-m32:makefile	1.46.1.31"
 #
 #  makefile for libc/m32
 #
@@ -35,44 +35,43 @@ M4DEFS=m4.def $(VERSDEF)
 
 OBJECTS=\
 crt/cerror.o      crt/mcount.o      \
-csu/crt0.o        csu/mcrt0.o       \
-csu/crti.o        csu/crt1.o        csu/mcrt1.o       \
+csu/crt0.o        csu/mcrt0.o	\
+csu/fcrt0.o	  csu/fmcrt0.o	    csu/crti.o \
+csu/crt1.o	  csu/fcrt1.o       csu/fmcrt1.o      csu/mcrt1.o	\
 csu/crtn.o	  csu/pcrt1.o	    csu/pcrti.o       csu/pcrtn.o       \
 fp/decconv.o      fp/scalb.o        \
 gen/abs.o	  gen/atof.o        \
 gen/biglitpow.o	  gen/dtop.o	    gen/ecvt.o        \
+gen/fptrap.o      \
 gen/frexp.o       \
 gen/getctxt.o	  gen/ladd.o	    gen/lconstants.o  gen/ldexp.o	\
 gen/ldivide.o     gen/lexp10.o      gen/llog10.o      gen/lmul.o	\
 gen/lshiftl.o     gen/lsign.o       gen/lsub.o        gen/ltostr.o      \
 gen/makectxt.o	  gen/memcpy.o	    gen/ptod.o 	      gen/setjmp.o	\
-gen/siginfolst.o  \
 gen/sigsetjmp.o   gen/strcpy.o      gen/strcmp.o      gen/strtod.o	\
 gen/strlen.o	  gen/swapctxt.o    print/doprnt.o    print/fprintf.o   \
 gen/cuexit.o      gen/m32_data.o    gen/sh_data.o     \
 print/printf.o    print/sprintf.o   \
 print/vfprintf.o  print/vprintf.o   print/vsprintf.o  print/setpospar.o \
 sys/_rename.o     sys/_sigaction.o  sys/_signal.o     \
-sys/access.o      sys/acct.o        sys/adjtime.o	\
-sys/alarm.o	  \
+sys/acancel.o	  sys/access.o      sys/acct.o        sys/adjtime.o	\
+sys/alarm.o	  sys/brkbase.o     \
 sys/chdir.o       sys/chmod.o       sys/chown.o	      \
 sys/chroot.o	  sys/close.o	    sys/creat.o	      sys/dup.o		\
-sys/execl.o       sys/execle.o      sys/execv.o       \
+sys/evsys.o	  sys/execl.o	    sys/execle.o      sys/execv.o       \
 sys/execve.o	  sys/exit.o	    sys/fchdir.o      sys/fchmod.o	\
-sys/fchown.o	  sys/fcntl.o	    sys/fork.o	\
-sys/fpathconf.o   \
-sys/fstat.o	  sys/fstatvfs.o    sys/fsync.o	      \
+sys/fchown.o	  sys/fcntl.o	    sys/fmount.o      sys/fork.o	\
+sys/fstat.o	  sys/fstatvfs.o    sys/fsync.o	      sys/funmount.o	\
 sys/fxstat.o	  sys/getegid.o	    sys/geteuid.o     sys/getgid.o	\
-sys/getgroups.o	  sys/getmsg.o	    sys/getpid.o	\
+sys/getgroups.o	  sys/getmsg.o	    sys/getpagesize.o sys/getpid.o	\
 sys/getpmsg.o	  sys/getppid.o	    sys/getrlimit.o   sys/getuid.o      \
 sys/gtty.o	  sys/ioctl.o	    sys/kill.o	      sys/lchown.o	\
 sys/link.o	  sys/lseek.o	\
-sys/lstat.o       sys/lxstat.o	    sys/memcntl.o	\
+sys/lstat.o       sys/lxstat.o	    sys/mctl.o	      sys/memcntl.o	\
 sys/mincore.o	  sys/mknod.o	\
 sys/mmap.o        sys/mount.o       sys/mprotect.o    sys/msgsys.o	\
 sys/munmap.o      sys/_nfssys.o	    sys/nice.o	      sys/nuname.o	\
-sys/open.o	  sys/pathconf.o    \
-sys/pause.o       sys/pipe.o        sys/poll.o	\
+sys/open.o	  sys/pause.o	    sys/pipe.o	      sys/poll.o	\
 sys/priocntlset.o sys/profil.o	    sys/plock.o	      sys/ptrace.o	\
 sys/putmsg.o	  sys/putpmsg.o	    sys/read.o	      sys/readlink.o    \
 sys/readv.o	  sys/rfsys.o	    \
@@ -117,9 +116,8 @@ fp/fdtos.P        fp/fltod.P        fp/fltos.P        fp/fmuld.P        \
 fp/fmuls.P        fp/fnegd.P        fp/fnegs.P        fp/fpstart.P      \
 fp/fpstart1.P     fp/fstod.P        fp/ftdtol.P       fp/ftdtou.P       \
 fp/ftstol.P       fp/ftstou.P       fp/getflth1.P     fp/getflts1.P     \
-fp/isnand.P       fp/logb.P         fp/scalb.P        \
-fp/sround.P       fp/sspecial.P     gen/atof.P	\
-gen/biglitpow.P   gen/cuexit.P      gen/dtop.P        gen/ecvt.P        \
+fp/isnand.P       fp/sround.P       fp/sspecial.P     gen/atof.P	\
+gen/biglitpow.P   gen/cuexit.P      gen/dtop.P        \
 gen/frexp.P       gen/getctxt.P     gen/ldexp.P       \
 gen/ltostr.P      gen/m32_data.P    gen/memcpy.P      gen/ptod.P        \
 gen/setjmp.P      gen/sh_data.P     gen/sigsetjmp.P   gen/strcmp.P      \
@@ -131,19 +129,17 @@ sys/acct.P        sys/alarm.P       sys/chdir.P       sys/chmod.P       \
 sys/chown.P       sys/chroot.P      sys/close.P       sys/creat.P       \
 sys/dup.P         sys/execl.P       sys/execle.P      sys/execv.P       \
 sys/execve.P      sys/exit.P        sys/fchdir.P      sys/fchmod.P      \
-sys/fchown.P      sys/fcntl.P       sys/fork.P        \
-sys/fpathconf.P   sys/fstat.P       \
+sys/fchown.P      sys/fcntl.P       sys/fork.P        sys/fstat.P       \
 sys/fstatvfs.P    sys/fsync.P       sys/fxstat.P      sys/getdents.P    \
 sys/getegid.P     sys/geteuid.P     sys/getgid.P      sys/getgroups.P   \
-sys/getmsg.P      sys/getpid.P      sys/getpmsg.P     \
+sys/getmsg.P      sys/getpagesize.P sys/getpid.P      sys/getpmsg.P     \
 sys/getppid.P     \
 sys/getrlimit.P   sys/getuid.P      sys/ioctl.P       sys/kill.P        \
 sys/lchown.P      sys/link.P        sys/lseek.P       sys/lstat.P       \
-sys/lxstat.P      sys/memcntl.P     sys/mincore.P     \
+sys/lxstat.P      sys/mctl.P        sys/memcntl.P     sys/mincore.P     \
 sys/mkdir.P       sys/mknod.P       sys/mmap.P        sys/mount.P       \
 sys/mprotect.P    sys/msgsys.P      sys/munmap.P      sys/nice.P        \
-sys/nuname.P      sys/open.P        sys/pathconf.P    \
-sys/pause.P       sys/pipe.P        \
+sys/nuname.P      sys/open.P        sys/pause.P       sys/pipe.P        \
 sys/plock.P       sys/poll.P        sys/priocntlset.P sys/profil.P      \
 sys/ptrace.P      sys/putmsg.P      sys/putpmsg.P     \
 sys/read.P        sys/readlink.P    sys/readv.P       \
@@ -157,7 +153,6 @@ sys/sysconfig.P   sys/sysinfo.P     \
 sys/time.P        sys/times.P       sys/uadmin.P      \
 sys/ucontext.P    sys/ulimit.P      sys/umask.P       sys/umount.P      \
 sys/uname.P       sys/unlink.P      sys/ustat.P       sys/utime.P       \
-sys/vfork.P       \
 sys/wait.P        sys/waitid.P      sys/write.P       sys/writev.P      \
 sys/xmknod.P      sys/xstat.P
 
@@ -283,18 +278,13 @@ shared:
 	cd shared; \
 		$(LD) -o ../../libc.so.1 -dy -G -e _rt_boot -h /usr/lib/libc.so.1 -ztext -zdefs -Bsymbolic `cat ../../$(MACHINE)/shared_objects | grep -v "\#"`
 	#
-	# get rid of extraneous rtld file
-	-rm rtabiaddr.o
-	#
 	# figure out the correct ordering for all the archive modules
-	mv cerror.o cerror.x
 	mv fpstart0.o fpstart0.x
 	mv getflth0.o getflth0.x
 	mv getflts0.o getflts0.x
 	mv fpsetmask.o fpsetmask.x
 	-rm -f old_toupper.o old_tolower.o
 	ls | grep '\.o$$' | xargs $(LORDER) | tsort >objlist
-	mv cerror.x cerror.o
 	mv fpstart0.x fpstart0.o
 	mv getflth0.x getflth0.o
 	mv getflts0.x getflts0.o
@@ -302,7 +292,7 @@ shared:
 	#
 	# build the archive with the modules in correct order.
 	xargs $(AR) q ../libc.so <objlist
-	$(AR) q ../libc.so cerror.o ../libc.so.1 \
+	$(AR) q ../libc.so ../libc.so.1 \
 		fpstart0.o getflth0.o getflts0.o fpsetmask.o
 	if [ "$(MAC)" = BMAUMAC ] ; then \
 		$(AR) d ../libc.so fpstart0.o ; \
@@ -322,14 +312,12 @@ abi_lib:
 		$(LD) -o ../../ld.so.1 -dy -G -e _rt_boot -h /usr/lib/ld.so.1 -ztext -zdefs -Bsymbolic `cat ../../$(MACHINE)/abi_objects | grep -v "\#"`
 	#
 	# figure out the correct ordering for all the archive modules
-	mv cerror.o cerror.x
 	mv fpstart0.o fpstart0.x
 	mv getflth0.o getflth0.x
 	mv getflts0.o getflts0.x
 	mv fpsetmask.o fpsetmask.x
 	-rm -f old_toupper.o old_tolower.o
 	ls | grep '\.o$$' | xargs $(LORDER) | tsort >objlist
-	mv cerror.x cerror.o
 	mv fpstart0.x fpstart0.o
 	mv getflth0.x getflth0.o
 	mv getflts0.x getflts0.o
@@ -337,7 +325,7 @@ abi_lib:
 	#
 	# build the archive with the modules in correct order.
 	xargs $(AR) q ../libabi.so <objlist
-	$(AR) q ../libabi.so cerror.o ../ld.so.1 \
+	$(AR) q ../libabi.so ../ld.so.1 \
 		fpstart0.o getflth0.o getflts0.o fpsetmask.o
 	if [ "$(MAC)" = BMAUMAC ] ; then \
 		$(AR) d ../libabi.so fpstart0.o ; \

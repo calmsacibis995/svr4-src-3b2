@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:print/doprnt.c	3.29"
+#ident	"@(#)libc-port:print/doprnt.c	3.28"
 
 /*LINTLIBRARY*/
 /*
@@ -297,6 +297,7 @@ register FILE	*iop;
 		case '.':
 			flagword |= DOTSEEN;
 			prec = 0;
+			flagword &= ~PADZERO; /* ignore 0 flag */
 			goto charswitch;
 
 		case '*':
@@ -468,9 +469,6 @@ register FILE	*iop;
 			if (flagword & SHORT)
 				val = (short)val;
 
-			if ((flagword & PADZERO) && (flagword & DOTSEEN))
-				flagword &= ~PADZERO; /* ignore 0 flag */
-
 			/* Set buffer pointer to last digit */
 	                p = bp = buf + MAXDIGS;
 
@@ -532,9 +530,6 @@ register FILE	*iop;
 			if (flagword & SHORT)
 				val = (unsigned short)val;
 
-			if ((flagword & PADZERO) && (flagword & DOTSEEN))
-				flagword &= ~PADZERO; /* ignore 0 flag */
-
 			p = bp = buf + MAXDIGS;
 
 			if (val & HIBITL)
@@ -575,9 +570,6 @@ register FILE	*iop;
 
 			if (flagword & SHORT)
 				val = (unsigned short)val;
-
-			if ((flagword & PADZERO) && (flagword & DOTSEEN))
-				flagword &= ~PADZERO; /* ignore 0 flag */
 
 			/* Set translate table for digits */
 			  tab = (fcode == 'X') ? uc_digs : lc_digs;

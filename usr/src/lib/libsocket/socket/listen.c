@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:listen.c	1.7"
+#ident	"@(#)libsocket:listen.c	1.4"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -29,7 +29,6 @@
  * 	          All rights reserved.
  *  
  */
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -77,18 +76,15 @@ listen(s, qlen)
 	if ((siptr->udata.so_state & SS_ISBOUND) == 0) {
 		int	family;
 
-		/* Must have been explicitly bound in the UNIX domain.
-		 */
-		if ((family = _s_getfamily(siptr)) == AF_UNIX) {
-			errno = EINVAL;
-			return -1;
-		}
-
+		family = _s_getfamily(siptr);
+#ifdef DEBUG
+fprintf(stderr, "listen: family %d\n", family);
+#endif
 		(void)memcpy(buf + bind_req->ADDR_offset, (caddr_t)&family,
 				sizeof(short));
 		bind_req->ADDR_length = sizeof(short);
 	}
-	else	bind_req->ADDR_length = siptr->udata.addrsize;
+	else	bind_req->ADDR_length = siptr->ctlsize;
 
 	sigsave = sigset(SIGPOLL, SIG_HOLD);
 	if (!_s_do_ioctl(s, siptr->ctlbuf, sizeof(*bind_req) +

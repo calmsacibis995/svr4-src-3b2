@@ -1,0 +1,63 @@
+#ident	"@(#)pkg.npack:prototype	1.3"
+#
+#	All files/directories are defined as relocatable. Although
+#	BASENAME is not used at this time (i.e. defaults to /)
+#	doing this may facilitate future development.
+#
+#	installation files:
+#		'postinstall' installs drivers, etc
+#		'preremove' uninstalls drivers, etc
+#
+i pkginfo
+i preinstall
+i postinstall
+i preremove
+i depend
+#
+#	directories: default owner=root group=sys mode=0775
+#
+!default 775 root sys
+d none	/boot	?	?	?
+d none	/dev	?	?	?
+d none	/etc	?	?	?
+d none	/etc/master.d	?	?	?
+d none	/etc/init.d	?	?	?
+d none	/etc/rc0.d	?	?	?
+d none	/etc/rc2.d	?	?	?
+d none	/usr	?	?	?
+d none	/usr/bin	?	?	?
+d none	/usr/lib	?	?	?
+d none	/usr/include	?	?	?
+d none	/usr/include/sys	?	?	?
+#
+#	driver object files: default owner=root group=root mode=0500
+#	use already mkboot-ed files for managability
+#
+!default 0500 root root
+e none	/boot/NPACK=/usr/src/protocols/io/NPACK
+#
+#	configuration files: default owner=root group=root mode=0444
+#
+!default 0444 root root
+e none	/etc/master.d/npack=/usr/src/protocols/master.d/npack
+#
+#	init scripts: default owner=root, group=sys, mode=444
+#
+!default 0444 root sys
+f none	/etc/init.d/npackinit=/usr/src/protocols/cmd/npackinit
+l none	/etc/rc0.d/K69npack=/etc/init.d/npackinit
+l none	/etc/rc2.d/S70npack=/etc/init.d/npackinit
+#
+#	commands: default owner=root, group=sys, mode=0500
+#
+!default 0500 root sys
+f none	/usr/sbin/pckd=/usr/src/protocols/cmd/pckd
+l none	/usr/bin/pckd=/usr/sbin/pckd
+#
+#	header files: default owner=bin group=bin mode=0444
+#
+!default 0444 bin bin
+f none	/usr/include/sys/npack.h=/usr/src/protocols/sys/npack.h
+
+!default 0644 bin bin
+f none	/usr/lib/npack.so

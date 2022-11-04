@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/cmn_err.c	1.17"
+#ident	"@(#)kernel:os/cmn_err.c	1.15.1.12"
 
 #include "sys/param.h"
 #include "sys/types.h"
@@ -130,7 +130,7 @@ int r0() {}
  * Printf should not be used for chit-chat.
  */
 
-STATIC void
+static void
 xprintf(fmtp)
 	char **fmtp;
 {
@@ -185,7 +185,7 @@ loop:
 	goto loop;
 }
 
-STATIC void
+static void
 xpanic(msgp)
 	char **msgp;
 {
@@ -250,8 +250,8 @@ xpanic(msgp)
 	rtnfirm();
 }
 
-void
-xxcmn_err(level, fmtp)
+static void
+xcmn_err(level, fmtp)
 	register int	level;
 	char		**fmtp;
 
@@ -328,6 +328,11 @@ xxcmn_err(level, fmtp)
 				printf("\n");
 				splx(x);
 
+				/*
+				 * If the registers were not saved,
+				 * save them now.
+				 */
+
 				xpanic(fmtp);
 				/* NOTREACHED */
 
@@ -354,35 +359,6 @@ xxcmn_err(level, fmtp)
 			   level, *fmtp);
 	}
 	not_cmn = 0;
-}
-
-STATIC pcb_t regsave_pcb;
-
-STATIC void
-xcmn_err(level, fmtp)
-	register int	level;
-	char		**fmtp;
-{
-
-	if (level == CE_PANIC && save_r0ptr == NULL) {
-		asm("	MOVW %psw, regsave_pcb+0x00");
-		asm("	MOVW %r0,  regsave_pcb+0x1c");
-		asm("	MOVW %r1,  regsave_pcb+0x20");
-		asm("	MOVW %r2,  regsave_pcb+0x24");
-		asm("	MOVW %r3,  regsave_pcb+0x28");
-		asm("	MOVW %r4,  regsave_pcb+0x2c");
-		asm("	MOVW %r5,  regsave_pcb+0x30");
-		asm("	MOVW %r6,  regsave_pcb+0x34");
-		asm("	MOVW %r7,  regsave_pcb+0x38");
-		asm("	MOVW %r8,  regsave_pcb+0x3c");
-		asm("	MOVW -7*4(%fp),  %r0");  /* get fp to r0 */
-		asm("	MOVW -9*4(%r0),  regsave_pcb+0x04"); /* pc */
-		asm("	MOVAW -9*4(%r0), regsave_pcb+0x08"); /* sp */
-		asm("	MOVW -8*4(%r0),  regsave_pcb+0x14"); /* ap */
-		asm("	MOVW -7*4(%r0),  regsave_pcb+0x18"); /* fp */
-		save_r0ptr = &regsave_pcb.regsave[K_R0];
-	}
-	xxcmn_err(level, fmtp);
 }
 
 /*PRINTFLIKE1*/
@@ -455,7 +431,7 @@ panic(msg)
 	char *msg;
 #endif
 {
-	xcmn_err(CE_PANIC, &msg);
+	xpanic(&msg);
 }
 
 /*
@@ -503,12 +479,9 @@ pansave(p)
 	struct	systate	*p;
 {
 	/*
-	 * save_r0ptr is set by nrmx_KK in ttrap.s before krnlflt
-	 * is entered, or in xcmn_err if it was not already set.
-	 * So the registers will be correct for krnflts,
-	 * calls to cmn_err(CE_PANIC,...) and panic().
-	 * By the time we get here, we have save_r0ptr pointing
-	 * at r0 in a pcb that has the registers filled in.
+	 * save_r0ptr is set in trap when trap is entered.
+	 * save_r0ptr points to R0 in the stack after the trap.
+	 * The format of the stack is in ttrap.s.
 	 * ofp gets the fp of the process that caused the trap.
 	 * lfp gets the last frame pointer (of pansave).
 	 */
@@ -527,7 +500,6 @@ pansave(p)
 		p->osp = save_r0ptr[SP];
 		p->ofp = save_r0ptr[FP];
 	}
-
 	MOVW(p->lfp, %fp, int)
 	MOVW(p->isp, %isp, int)
 	MOVW(p->pcbp, %pcbp, int)
@@ -554,6 +526,40 @@ cmn_err(level, fmt)
 	char *fmt;
 #endif
 {
+	pcb_t regsave_pcb;
+	if (level == CE_PANIC) {
+		int *reg;
+		if (save_r0ptr == NULL) {
+			save_r0ptr = &regsave_pcb.regsave[K_R0];
+			MOVW(reg, %fp, int *);
+			save_r0ptr[R0] = reg[0];
+			save_r0ptr[R1] = reg[1];
+			save_r0ptr[R2] = reg[2];
+			MOVAW(reg, -9*4(%fp), int *);
+			save_r0ptr[PC] = reg[0];
+			save_r0ptr[AP] = reg[1];
+			save_r0ptr[FP] = reg[2];
+			save_r0ptr[R3] = reg[3];
+			save_r0ptr[R4] = reg[4];
+			save_r0ptr[R5] = reg[5];
+			save_r0ptr[R6] = reg[6];
+			save_r0ptr[R7] = reg[7];
+			save_r0ptr[R8] = reg[8];
+		} else {
+			reg = save_r0ptr;
+			save_r0ptr = &regsave_pcb.regsave[K_R0];
+			save_r0ptr[PC] = reg[PC];
+			save_r0ptr[PS] = reg[PS];
+			save_r0ptr[AP] = reg[0];
+			save_r0ptr[FP] = reg[1];
+			save_r0ptr[R3] = reg[2];
+			save_r0ptr[R4] = reg[3];
+			save_r0ptr[R5] = reg[4];
+			save_r0ptr[R6] = reg[5];
+			save_r0ptr[R7] = reg[6];
+			save_r0ptr[R8] = reg[7];
+		}
+	}
 
 	xcmn_err(level, &fmt);
 }
@@ -564,6 +570,10 @@ printnvram()
 	struct	xtra_nvr	nvram_copy;
 	register int		oldpri;
 
+	asm("	PUSHW  %r0");
+	asm("	PUSHW  %r1");
+	asm("	PUSHW  %r2");
+
 	oldpri = splhi();
 
 	rnvram(&sbdnvram+XTRA_OFSET, (caddr_t)&nvram_copy, sizeof(nvram_copy));
@@ -571,6 +581,9 @@ printnvram()
 
 	splx(oldpri);
 
+	asm("	POPW  %r2");
+	asm("	POPW  %r1");
+	asm("	POPW  %r0");
 }
 
 void
@@ -782,6 +795,10 @@ printputbuf()
 	int			delay;
 	struct tty		*errlayer();
 
+	asm("	PUSHW  %r0");
+	asm("	PUSHW  %r1");
+	asm("	PUSHW  %r2");
+
 	opl = splhi();
 
 	pbi = putbufrpos % putbufsz;
@@ -804,6 +821,9 @@ printputbuf()
 
 	splx(opl);
 
+	asm("	POPW  %r2");
+	asm("	POPW  %r1");
+	asm("	POPW  %r0");
 }
 
 #endif

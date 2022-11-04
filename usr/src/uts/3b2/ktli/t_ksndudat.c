@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_ksndudat.c	1.5"
+#ident	"@(#)ktli:ktli/t_ksndudat.c	1.4"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_ksndudata.c 1.3 89/01/12 SMI"
 #endif
@@ -36,7 +36,9 @@ static char sccsid[] = "@(#)t_ksndudata.c 1.3 89/01/12 SMI"
  *	transport endpoint.
  *
  *	Returns:
- *		0 on success or positive error code.
+ *		-1	on failure.
+ *		0	on success, no data on receive queue.
+ *		TLOOK	on success, and data pending on receive queue.
  *
  */
 
@@ -58,28 +60,24 @@ static char sccsid[] = "@(#)t_ksndudata.c 1.3 89/01/12 SMI"
 
 int
 t_ksndudata(tiptr, unitdata, frtn)
-	register TIUSER			*tiptr;
-	register struct t_kunitdata	*unitdata;
-	register frtn_t			*frtn;
+register TIUSER *tiptr;
+register struct t_kunitdata *unitdata;
+register frtn_t *frtn;
 {
-	register int			msgsz;
-	register int			minsz;
-	register int			maxsz;
-	register struct file		*fp;
-	register struct vnode		*vp;
-	register struct stdata		*stp;
-	register mblk_t			*bp;
-	register mblk_t			*dbp;
-	register struct T_unitdata_req	*udreq;
-	int				error;
+	register int msgsz, minsz, maxsz;
+	register struct file *fp;
+	register struct vnode *vp;
+	register struct stdata *stp;
+	register mblk_t *bp, *dbp;
+	register struct T_unitdata_req *udreq;
 
-	error = 0;
 	fp = tiptr->fp;
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
 
 	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX))  {
-		return ((stp->sd_flag&STPLEX) ? EINVAL : stp->sd_werror);
+		u.u_error = ((stp->sd_flag&STPLEX) ? EINVAL : stp->sd_werror);
+		return -1;
 	}
 
 	/* check size constraints
@@ -88,13 +86,17 @@ t_ksndudata(tiptr, unitdata, frtn)
 	maxsz = stp->sd_wrq->q_next->q_maxpsz;
 
 	msgsz = unitdata->udata.len;
-	if (msgsz > maxsz || msgsz < minsz)
-		return ERANGE;
+	if (msgsz > maxsz || msgsz < minsz) {
+		u.u_error = ERANGE;
+		return -1;
+	}
 
 	/* now check tsdu
 	 */
-	if (msgsz <= 0 || msgsz > tiptr->tp_info.tsdu)
-		return ERANGE;
+	if (msgsz <= 0 || msgsz > tiptr->tp_info.tsdu) {
+		u.u_error = ERANGE;
+		return -1;
+	}
 
 	/* See if Class 0 is required
 	 */
@@ -104,19 +106,22 @@ t_ksndudata(tiptr, unitdata, frtn)
 		 * up.
 		 */
 		if ((dbp = (mblk_t *)esballoc(unitdata->udata.buf,
-					msgsz, BPRI_LO, frtn)) == NULL)
-			return ENOSR;
-
+					msgsz, BPRI_LO, frtn)) == NULL) {
+			u.u_error = ENOSR;
+			return -1;
+		}
 		dbp->b_datap->db_type = M_DATA;
-		KTLILOG(2, "t_ksndudata: bp %x, ", dbp);
-		KTLILOG(2, "len %d, ", msgsz);
-		KTLILOG(2, "free func %x\n", frtn->free_func);
+#ifdef KTLIDEBUG
+printf("t_ksndudata: bp %x, len %d, free func %x\n",dbp,msgsz,frtn->free_func);
+#endif
 	}
 	else	
 	if (unitdata->udata.buf) {
 		while (!(dbp = allocb(msgsz, BPRI_LO)))
-			if (strwaitbuf(msgsz, BPRI_LO))
-				return ENOSR;
+			if (strwaitbuf(msgsz, BPRI_LO)) {
+				u.u_error = ENOSR;
+				return -1;
+			}
 
 		bcopy(unitdata->udata.buf, dbp->b_wptr, unitdata->udata.len);
 		dbp->b_datap->db_type = M_DATA;
@@ -145,7 +150,8 @@ gotdp:
 		 BPRI_LO)))
 		if (strwaitbuf(msgsz, BPRI_LO)) {
 			freeb(dbp);
-			return ENOSR;
+			u.u_error = ENOSR;
+			return -1;
 		}
 
 	/* LINTED pointer alignment */
@@ -177,12 +183,18 @@ gotdp:
 
 	/* Put it to the transport provider
 	 */
-	 if ((error = tli_send(tiptr, bp, fp->f_flag)) != 0)
-		return error;
+	 if (tli_send(tiptr, bp, fp->f_flag) < 0)
+		return -1;
 
 	unitdata->udata.udata_mp = 0;
 	unitdata->udata.buf = 0;
 	unitdata->udata.len = 0;
+
+	/* before we return, see if there is anything waiting
+	 * on our read queue.
+	 */
+	if (RD(stp->sd_wrq)->q_first)
+		return TLOOK;
 
 	return 0;
 }

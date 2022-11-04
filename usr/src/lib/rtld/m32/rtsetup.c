@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:m32/rtsetup.c	1.15"
+#ident	"@(#)rtld:m32/rtsetup.c	1.12"
 
 /* 3B2 specific setup routine - 
  * relocate ld.so's symbols, setup its environment,
@@ -131,7 +131,7 @@ auxv_t *auxv;
 		 */
 		if (ELF32_R_TYPE(((Elf32_Rel *)reladdr)->r_info) 
 			!= R_M32_RELATIVE) {
-			_rtfprintf(2, "%s: internal error: invalid relocation type %d at 0x%x\n",(char*) _rt_name,ELF32_R_TYPE(((Elf32_Rel *)reladdr)->r_info),off);
+			_rtfprintf(2, "ld.so: internal error: invalid relocation type %d at 0x%x\n",ELF32_R_TYPE(((Elf32_Rel *)reladdr)->r_info),off);
 			(void)_kill(_getpid(), SIGKILL);
 		}
 		symval.c[0] = ((char *)off)[0];
@@ -149,13 +149,13 @@ auxv_t *auxv;
 	_proc_name = pname;
 
 	/* look for environment strings */
-	envdirs = _readenv( (CONST char**) envp, &bmode );
+	envdirs = _readenv( envp, &bmode );
 
 	DPRINTF(LIST,(2, "rtld: _rt_setup(0x%x, 0x%x, %s, 0x%x, 0x%x)\n",ld_base,(unsigned long)ld_dyn,pname,(unsigned long)envp, auxv));
 
 	/* open /dev/zero to use for mapping anonymous memory */
 	if ((_devzero_fd = _open(DEV_ZERO, O_RDONLY)) == -1) {
-		_rtfprintf(2, "%s: %s: can't open %s\n",(char*) _rt_name,_proc_name,(CONST char *)DEV_ZERO);
+		_rtfprintf(2, "ld.so: %s: can't open %s\n",_proc_name,(CONST char *)DEV_ZERO);
 		(void)_kill(_getpid(), SIGKILL);
 	}
 
@@ -312,7 +312,7 @@ unsigned long eflags;
 CONST char *pathname;
 {
 	if ((eflags == EF_M32_MAU) && !_flags) {
-		_rt_lasterr("%s: MAU required for file %s",(char*) _rt_name, pathname);
+		_rt_lasterr("ld.so: MAU required for file %s", pathname);
 		return 1;
 	}
 	else

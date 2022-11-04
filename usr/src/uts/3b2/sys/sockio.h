@@ -8,7 +8,7 @@
 #ifndef	_SYS_SOCKIO_H
 #define	_SYS_SOCKIO_H
 
-#ident	"@(#)head.sys:sys/sockio.h	1.8"
+#ident	"@(#)head.sys:sys/sockio.h	1.6"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)

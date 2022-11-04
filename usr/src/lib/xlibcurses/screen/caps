@@ -1,10 +1,4 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-#ident	"@(#)curses:screen/caps	1.30"
+#ident	"@(#)curses:screen/caps	1.29"
 # Be sure to add new capabilties at the END of the appropriate section!
 --- begin bool
 auto_left_margin,	"bw"	"bw"	cub1 wraps from column 0 to last column
@@ -490,7 +484,7 @@ set3_des_seq,		"s3ds"	"s3"	Shift into codeset 3
 #
 set_lr_margin,		"smglr"	"ML"	Sets both left and right margins
 set_tb_margin,		"smgtb"	"MT"	Sets both top and bottom margins
-bit_image_repeat,	"birep"	"Xy"	Repeat bit-image cell #1 #2 times (use tparm)
+bit_image_repeat,	"birep"	"Zy"	Repeat bit-image cell #1 #2 times (use tparm)
 bit_image_newline,	"binel"	"Zz"	Move to next row of the bit image (use tparm)
 bit_image_carriage_return,	"bicr"	"Yv"	Move to beginning of same row (use tparm)
 color_names,		"colornm"	"Yw"	Give name for color #1

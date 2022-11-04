@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libgen:reg_step.c	1.1.7.3"
+#ident	"@(#)libgen:reg_step.c	1.1.7.2"
 
 #ifdef __STDC__
 	#pragma weak loc1 = _loc1
@@ -30,7 +30,7 @@
 char	*loc1 = (char *)0, *loc2 = (char *)0, *locs = (char *)0;
 char	*braslist[NBRA] = { (char *)0};
 char	*braelist[NBRA] = { (char *)0};
-static unsigned char _bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+static char _bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 static void getrnge();
 static int cclass();
 int strncmp();

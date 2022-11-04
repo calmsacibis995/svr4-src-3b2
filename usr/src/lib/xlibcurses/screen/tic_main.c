@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/tic_main.c	1.11"
+#ident	"@(#)curses:screen/tic_main.c	1.9"
 /*********************************************************************
 *                         COPYRIGHT NOTICE                           *
 **********************************************************************
@@ -213,7 +213,8 @@ char dirletter;
 }
 
 #include <curses.h>
-#if (defined(SYSV) || defined(USG)) && !defined(SIGPOLL)
+#include <signal.h>
+#if (defined(SYSV) || defined(USG)) && !defined(SIG_POLL)
 /*
  *	mkdir(dirname, mode)
  *
@@ -222,9 +223,6 @@ char dirletter;
  */
 
 mkdir(dirname, mode)
-#ifdef __STDC__
-const
-#endif
 char	*dirname;
 int mode;
 {

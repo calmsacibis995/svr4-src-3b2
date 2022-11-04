@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:tputcfent.c	1.7.1.1"
+#ident	"@(#)libpkg:tputcfent.c	1.7"
 
 #include <stdio.h>
 #include <string.h>
@@ -56,10 +56,6 @@ FILE *fp;
 		(void) fputs("named pipe\n", fp);
 		break;
 
-	  case 'i':
-		(void) fputs("installation file\n", fp);
-		break;
-
 	  case 'c':
 	  case 'b':
 		(void) fprintf(fp, "%s special device\n", 
@@ -76,18 +72,12 @@ FILE *fp;
 		(void) fprintf(fp, "Source of link: %s\n", pt);
 		break;
 
-	  case 's':
-		(void) fputs("symbolic link\n", fp);
-		pt = (ept->ainfo.local ? ept->ainfo.local : "(unknown)");
-		(void) fprintf(fp, "Source of link: %s\n", pt);
-		break;
-
 	  default:
 		(void) fputs("unknown\n", fp);
 		break;
 	}
 
-	if(!strchr("lsin", ept->ftype)) {
+	if(!strchr("lin", ept->ftype)) {
 		if(ept->ainfo.mode < 0)
 			(void) fprintf(fp, "Expected mode: ?\n");
 		else
@@ -104,10 +94,6 @@ FILE *fp;
 		(void) fprintf(fp, "Expected last modification: %s", 
 		  (ept->cinfo.modtime > 0) ?
 		  ctime(&(ept->cinfo.modtime))+4 : "?\n");
-	}
-	if(ept->ftype == 'i') {
-		(void) fputc('\n', fp);
-		return;
 	}
 
 	status = count = 0;

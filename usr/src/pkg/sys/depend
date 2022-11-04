@@ -1,4 +1,7 @@
-#ident	"@(#)pkg.sys:depend	1.1.4.1"
-# P indicates a prerequisite for installation
-# I indicates an incompatible package
-# R indicates a reverse depedency
+#ident	"@(#)pkg.sys:depend	1.1"
+R 	terminfo	terminal information
+R	editors     	editing utilities
+R	perf      	performance utilities
+R	windowing 	windowing utilities
+R	ipc         	inter-process commmunication
+

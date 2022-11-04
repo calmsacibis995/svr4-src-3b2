@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:svc_vc.c	1.7"
+#ident	"@(#)librpc:svc_vc.c	1.3"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -18,17 +18,21 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
-*/
+*/ 
+#if !defined(lint) && defined(SCCSIDS)
+static char sccsid[] = "@(#)svc_vc.c 1.15 89/03/14 Copyr 1988 Sun Micro";
+#endif
+
 /*
- * svc_vc.c, Server side for Connection Oriented RPC.
+ * svc_vc.c, Server side for Connection Oriented RPC. 
  *
  * Actually implements two flavors of transporter -
  * a rendezvouser (a listener and connection establisher)
@@ -42,12 +46,12 @@
 #ifdef SYSLOG
 #include <sys/syslog.h>
 #else
-#define	LOG_ERR 3
+#define LOG_ERR 3
 #endif /* SYSLOG */
 #include <rpc/nettype.h>
 
 #ifndef MIN
-#define	MIN(a ,b)	(((a) < (b)) ? (a) : (b))
+#define MIN(a,b)	(((a) < (b)) ? (a) : (b))
 #endif
 
 extern bool_t	abort();
@@ -59,7 +63,7 @@ static void		svc_vc_destroy();
 static int 		read_vc();
 static int 		write_vc();
 static SVCXPRT 		*makefd_xprt();
-extern char 		*strdup(), *malloc();
+extern char 		*strdup();
 
 struct cf_rendezvous { /* kept in xprt->xp_p1 for rendezvouser */
 	u_int sendsize;
@@ -76,7 +80,7 @@ struct cf_conn {	/* kept in xprt->xp_p1 for actual connection*/
 /*
  * Usage:
  *	xprt = svc_vc_create(fd, sendsize, recvsize);
- * Since connection streams do buffered io similar to stdio, the caller
+ * Since connection streams do buffered io similar to stdio, the caller 
  * can specify how big the send and receive buffers are. If recvsize
  * or sendsize are 0, defaults will be chosen.
  * fd should be open and bound.
@@ -91,14 +95,14 @@ svc_vc_create(fd, sendsize, recvsize)
 	SVCXPRT *xprt;
 	struct t_info tinfo;
 
-	xprt = (SVCXPRT *)mem_alloc(sizeof (SVCXPRT));
+	xprt = (SVCXPRT *)mem_alloc(sizeof(SVCXPRT));
 	if (xprt == (SVCXPRT *)NULL) {
 		(void) syslog(LOG_ERR, "svc_vc_create: out of memory");
 		return ((SVCXPRT *)NULL);
 	}
-	memset((char *)xprt, 0, sizeof (SVCXPRT));
+	memset((char *)xprt, 0, sizeof(SVCXPRT));
 
-	r = (struct cf_rendezvous *)mem_alloc(sizeof (*r));
+	r = (struct cf_rendezvous *)mem_alloc(sizeof(*r));
 	if (r == (struct cf_rendezvous *)NULL) {
 		(void) syslog(LOG_ERR, "svc_vc_create: out of memory");
 		(void) mem_free(xprt, sizeof (SVCXPRT));
@@ -106,9 +110,7 @@ svc_vc_create(fd, sendsize, recvsize)
 	}
 	if (t_getinfo(fd, &tinfo) == -1) {
 		if ((sendsize == 0) || (recvsize == 0)) {
-			(void) syslog(LOG_ERR,
-		"svc_vc_create: could not get transport information");
-			(void) mem_free(xprt, sizeof (SVCXPRT));
+			(void) syslog(LOG_ERR, "svc_vc_create: could not get transport information");
 			return ((SVCXPRT *)NULL);
 		}
 	} else {
@@ -121,7 +123,6 @@ svc_vc_create(fd, sendsize, recvsize)
 	r->sendsize = sendsize;
 	r->recvsize = recvsize;
 	xprt->xp_fd = fd;
-	xprt->xp_port = -1;	/* He is the rendezvouser */
 	xprt->xp_p1 = (caddr_t)r;
 	xprt->xp_p2 = NULL;
 	xprt->xp_p3 = NULL;
@@ -145,7 +146,7 @@ svc_fd_create(fd, sendsize, recvsize)
 	if (t_getinfo(fd, &tinfo) == -1) {
 		if ((sendsize == 0) || (recvsize == 0)) {
 			(void) syslog(LOG_ERR,
-		"svc_fd_create: could not get transport information");
+			"svc_fd_create: could not get transport information");
 			return ((SVCXPRT *)NULL);
 		}
 	} else {
@@ -167,17 +168,17 @@ makefd_xprt(fd, sendsize, recvsize)
 {
 	register SVCXPRT *xprt;
 	register struct cf_conn *cd;
-
-	xprt = (SVCXPRT *)mem_alloc(sizeof (SVCXPRT));
+ 
+	xprt = (SVCXPRT *)mem_alloc(sizeof(SVCXPRT));
 	if (xprt == (SVCXPRT *)NULL) {
 		(void) syslog(LOG_ERR, "svc_vc: makefd_xprt: out of memory");
 		return ((SVCXPRT *)NULL);
 	}
-	(void) memset((char *)xprt, 0, sizeof (SVCXPRT));
-	cd = (struct cf_conn *)mem_alloc(sizeof (struct cf_conn));
+	(void) memset((char *)xprt, 0, sizeof(SVCXPRT));
+	cd = (struct cf_conn *)mem_alloc(sizeof(struct cf_conn));
 	if (cd == (struct cf_conn *)NULL) {
 		(void) syslog(LOG_ERR, "svc_vc: makefd_xprt: out of memory");
-		(void) mem_free((char *) xprt, sizeof (SVCXPRT));
+		(void) mem_free((char *) xprt, sizeof(SVCXPRT));
 		return ((SVCXPRT *)NULL);
 	}
 	cd->strm_stat = XPRT_IDLE;
@@ -208,65 +209,37 @@ rendezvous_request(xprt)
 	register SVCXPRT *xprtnew = NULL;
 	register int fd = RPC_ANYFD;
 	struct cf_rendezvous *r;
-	struct t_call *t_call, t_call2;
-	struct t_discon *t_disc;
+	struct t_call *t_call;
 	struct t_info tinfo;
 	struct t_bind *res = NULL;
-	char *tpname = NULL;
-	bool_t alldone = FALSE;
-	struct netconfig *nconf;
-	int nettype;
+	char *tpname;
 	char devbuf[256];
-	extern int errno;
 
 	r = (struct cf_rendezvous *)xprt->xp_p1;
-
-again:
-	switch (t_look(xprt->xp_fd)) {
-	case T_DISCONNECT:
-		t_disc = (struct t_discon *) t_alloc(xprt->xp_fd,
-					T_DIS,  T_ALL);
-		if (t_disc == NULL) {
-			(void) syslog(LOG_ERR, "rendezvous_request: no memory");
-			return (FALSE);
-		}
-		(void) t_rcvdis(xprt->xp_fd, t_disc);
-		(void) t_free(t_disc);
+	t_call = (struct t_call *) t_alloc(xprt->xp_fd, T_CALL, T_ADDR);
+	if (t_call == NULL) {
+		(void) syslog(LOG_ERR, "rendezvous_request: no memory");
 		return (FALSE);
-
-	case T_LISTEN:
-
-		t_call = (struct t_call *) t_alloc(xprt->xp_fd,
-				T_CALL, T_ADDR| T_OPT);
-		if (t_call == NULL) {
-			(void) syslog(LOG_ERR, "rendezvous_request: no memory");
-			return (FALSE);
-		}
-		if (t_listen(xprt->xp_fd, t_call) == -1) {
-			if (errno == EINTR)
-				goto again;
-			(void) t_free((char *)t_call, T_CALL);
-			return (FALSE);
-		}
-		break;
-	default:
+	}
+    again:
+	if (t_listen(xprt->xp_fd, t_call) == -1) {
+		if (errno == EINTR)
+			goto again;
+	 	(void) t_free((char *)t_call, T_CALL);
 		return (FALSE);
 	}
 	/*
 	 * Now create another endpoint, and accept the connection
-	 * on it.
+	 * on it. If xprt->xp_tp is NULL, then try all
+	 * possible transports until one finds the appropriate one.
 	 */
 	if (xprt->xp_tp) {
 		tpname = xprt->xp_tp;
 	} else {
-		/*
-		 * If xprt->xp_tp is NULL, then try all
-		 * possible connection oriented transports until
-		 * one succeeds in finding an appropriate one.
-		 */
+		/* Try all the visible connection oriented transports */
 		struct stat statbuf;
 		struct stat fdstatbuf;
-		void *hndl;
+		int nettype;
 		struct netconfig *nconf;
 
 		if (fstat(xprt->xp_fd, &statbuf) == -1) {
@@ -275,30 +248,28 @@ again:
 			goto err;
 		}
 		
-		hndl = setnetconfig();
-		if (hndl == NULL) {
+		nettype = _rpc_setconf("circuit_v");
+		if (nettype == 0) {
 			(void) syslog(LOG_ERR,
-		"rendezvous_request: cannot read netconfig database");
+			"rendezvous_request: no suitable transport");
 			goto err;
 		}
 		tpname = devbuf;
-		while (nconf = getnetconfig(hndl)) {
-			if ((nconf->nc_semantics != NC_TPI_COTS) &&
-				(nconf->nc_semantics != NC_TPI_COTS_ORD))
-				continue;
+		while (nconf = _rpc_getconf(nettype)) {
 			if (!stat(nconf->nc_device, &fdstatbuf) &&
 				(statbuf.st_dev == fdstatbuf.st_dev)) {
 				strcpy(tpname, nconf->nc_device);
 				break;
 			}
 		}
-		endnetconfig(hndl);
+		_rpc_endconf();
 		if (!nconf) {
 			(void) syslog(LOG_ERR,
 			"rendezvous_request: no suitable transport");
 			goto err;
 		}
 	}
+
 	fd = t_open(tpname, O_RDWR, &tinfo);
 	if (fd == -1) {
 		(void) syslog(LOG_ERR,
@@ -312,6 +283,10 @@ again:
 			"rendezvous_request: illegal transport");
 		goto err;
 	}
+	/*
+	 * One has to do these t_alloc's every time, because
+	 * transports may have different address buffer sizes.
+	 */
 	res = (struct t_bind *) t_alloc(fd, T_BIND, T_ADDR);
 	if (res == NULL) {
 		(void) syslog(LOG_ERR, "rendezvous_request: no memory");
@@ -325,17 +300,7 @@ again:
 	 * This connection is not listening, hence no need to set
 	 * the qlen.
 	 */
-
-	/*
-	 * XXX: The local transport chokes on its own listen
-	 * options so we zero them for now
-	 */
-	t_call2 = *t_call;
-	t_call2.opt.len = 0;
-	t_call2.opt.maxlen = 0;
-	t_call2.opt.buf = NULL;
-
-	if (t_accept(xprt->xp_fd, fd, &t_call2) == -1) {
+	if (t_accept(xprt->xp_fd, fd, t_call) == -1) {
 		(void) syslog(LOG_ERR, 	"cannot accept connection");
 		goto err;
 	}
@@ -350,24 +315,16 @@ again:
 	 */
 	xprtnew->xp_ltaddr = res->addr;
 	res->addr.buf = (char *)NULL;
-	(void) t_free((char *)res, T_BIND);
 	xprtnew->xp_rtaddr = t_call->addr;
+	t_call->addr.buf = (char *)NULL;
 
 	xprtnew->xp_tp = strdup(tpname);
 	xprtnew->xp_netid = strdup(xprt->xp_netid);
 	if ((xprtnew->xp_tp == NULL) || (xprtnew->xp_netid == NULL)) {
-		(void) syslog(LOG_ERR,
-			"rendezvous_request: no memory");
+		(void) syslog(LOG_ERR, 	"rendezvous_request: no memory");
 		goto err;
 	}
-	if (t_call->opt.len > 0) {
-		xprtnew->xp_p2 = malloc(sizeof (struct netbuf));
-		if (xprtnew->xp_p2 != NULL) {
-			*((struct netbuf *) xprtnew->xp_p2)= t_call->opt;
-			t_call->opt.buf = NULL;
-		}
-	}
-	t_call->addr.buf = (char *)NULL;
+	(void) t_free((char *)res, T_BIND);
 	(void) t_free((char *)t_call, T_CALL);
 	return (FALSE); /* there is never an rpc msg to be processed */
 err:
@@ -377,7 +334,7 @@ err:
 	if (xprtnew)
 		svc_vc_destroy(xprtnew);
 	else if (fd != RPC_ANYFD)
-		t_close(fd);
+		 t_close(fd);
 	return (FALSE);
 }
 
@@ -402,7 +359,7 @@ svc_vc_destroy(xprt)
 		/* an actual connection end point */
 		XDR_DESTROY(&(cd->xdrs));
 	}
-	(void) mem_free((caddr_t)cd, sizeof (*cd));
+	(void) mem_free((caddr_t)cd, sizeof(*cd));
 	if (xprt->xp_rtaddr.buf)
 		(void) mem_free(xprt->xp_rtaddr.buf, xprt->xp_rtaddr.maxlen);
 	if (xprt->xp_ltaddr.buf)
@@ -411,14 +368,7 @@ svc_vc_destroy(xprt)
 		(void) free(xprt->xp_tp);
 	if (xprt->xp_netid)
 		(void) free(xprt->xp_netid);
-	(void) mem_free((caddr_t)xprt, sizeof (SVCXPRT));
-
-	if (xprt->xp_p2){
-		(void) mem_free((caddr_t)((struct netbuf *) xprt->xp_p2)->buf,
-			((struct netbuf *) xprt->xp_p2)->len);
-		(void) mem_free((struct netbuf *) xprt->xp_p2,
-			sizeof (struct netbuf));
-	}
+	(void) mem_free((caddr_t)xprt, sizeof(SVCXPRT));
 }
 
 /*
@@ -446,8 +396,8 @@ read_vc(xprt, buf, len)
 	FD_SET(fd, &mask);
 	do {
 		readfds = mask;
-		if (select(_rpc_dtbsize(), &readfds, (fd_set *)NULL,
-			(fd_set *)NULL, &wait_per_try) <= 0) {
+		if (select(_rpc_dtbsize(), &readfds, (fd_set *)NULL, (fd_set *)NULL,
+				&wait_per_try) <= 0) {
 			if (errno == EINTR)
 				continue;
 			goto fatal_err;
@@ -463,7 +413,7 @@ fatal_err:
 /*
  * Receive the required bytes of data, even if it is fragmented.
  */
-static int
+static int 
 t_rcvall(fd, buf, len)
 	int fd;
 	char *buf;
@@ -510,8 +460,7 @@ write_vc(xprt, buf, len)
 		return (-1);
 	}
 	if ((maxsz == 0) || (maxsz == -1)) {
-		if ((len = t_snd(xprt->xp_fd, buf, (unsigned)len,
-				(int)0)) == -1) {
+		if ((len = t_snd(xprt->xp_fd, buf, (unsigned)len, (int)0)) == -1) {
 			((struct cf_conn *)(xprt->xp_p1))->strm_stat = XPRT_DIED;
 		}
 		return (len);
@@ -522,8 +471,7 @@ write_vc(xprt, buf, len)
 	 */
 	for (cnt = len; cnt > 0; cnt -= i, buf += i) {
 		flag = cnt > maxsz ? T_MORE : 0;
-		if ((i = t_snd(xprt->xp_fd, buf,
-			(unsigned)MIN(cnt, maxsz), flag)) == -1) {
+		if ((i = t_snd(xprt->xp_fd, buf, (unsigned)MIN(cnt, maxsz), flag)) == -1) {
 			((struct cf_conn *)(xprt->xp_p1))->strm_stat = XPRT_DIED;
 			return (-1);
 		}

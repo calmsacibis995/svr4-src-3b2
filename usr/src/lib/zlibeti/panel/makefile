@@ -1,4 +1,4 @@
-#	Copyright (c) 1988 AT&T
+#	Copyright (c) 1984 AT&T
 #	  All Rights Reserved
 
 #	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
@@ -6,7 +6,7 @@
 #	actual or intended publication of such source code.
 
 #
-#ident	"@(#)sti:panel/makefile	1.12"
+#ident	"@(#)sti:panel/makefile	1.10"
 #
 
 ROOT=

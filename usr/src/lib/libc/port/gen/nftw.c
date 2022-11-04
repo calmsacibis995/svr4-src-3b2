@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/nftw.c	1.7"
+#ident	"@(#)libc-port:gen/nftw.c	1.4"
 /*LINTLIBRARY*/
 /***************************************************************
  *	nftw - new file tree walk
@@ -65,8 +65,6 @@
 #include	<errno.h>
 #include	<limits.h>
 #include	<ftw.h>
-#include	<stdlib.h>
-#include	<unistd.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX	1023
@@ -79,21 +77,12 @@ extern int errno;
 
 static int walk();
 static int oldclose();
-#ifdef __STDC__
-static int (*statf)(const char *, struct stat *);
-#else
 static int (*statf)();
-#endif
 static char *fullpath;
 static char *tmppath;
 static int curflags;
 static dev_t cur_mount;
-#ifdef DSHLIB
-static struct FTW *state;
-#else
-static struct FTW st_state;
-static struct FTW *state = &st_state;
-#endif
+static struct FTW state;
 
 struct Save
 {
@@ -120,11 +109,6 @@ int (*fn)();
 	const char *savepath = path;
 	home[0] = 0;
 
-#ifdef DSHLIB
-	if (!state && ((state = (struct FTW *)malloc(sizeof(struct FTW))) == NULL))
-		return(-1);
-#endif
-
 	/* If the walk is going to change directory before
 	 * reading it, save current woring directory.
 	 */
@@ -148,7 +132,7 @@ int (*fn)();
 		*dp++ = *path++;
 	}
 	*dp = 0;
-	state->base = base+1-tmppath;
+	state.base = base+1-tmppath;
 	if(*path)
 		return(-1);
 	curflags = flags;
@@ -171,7 +155,7 @@ int (*fn)();
 		else
 			goto done;
 	}
-	state->level = 0;
+	state.level = 0;
 
 	/* Call walk() which does most of the work.
 	 */
@@ -301,15 +285,15 @@ struct Save *last;
 	 */
 	if((curflags&FTW_MOUNT) && type!=FTW_NS && statb.st_dev!=cur_mount)
 		goto quit;
-	state->quit = 0;
+	state.quit = 0;
 
 	/* If current component is not a directory, call user
 	 * specified function and get ready to return.
 	 */
 	if(type!=FTW_D || (curflags&FTW_DEPTH)==0)
-		rc = (*fn)(tmppath, &statb, type, state);
-	skip = (state->quit&FTW_SKD);
-	if(rc != 0 || type !=FTW_D || state->quit&FTW_PRUNE)
+		rc = (*fn)(tmppath, &statb, type, &state);
+	skip = (state.quit&FTW_SKD);
+	if(rc != 0 || type !=FTW_D || state.quit&FTW_PRUNE)
 		goto quit;
 
 	if(tmppath[0] != '\0' && component[-1] != '/')
@@ -339,8 +323,8 @@ struct Save *last;
 	}
 	this.dev = statb.st_dev;
 	this.inode = statb.st_ino;
-	oldbase = state->base;
-	state->base = component-tmppath;
+	oldbase = state.base;
+	state.base = component-tmppath;
 	while(dir = readdir(this.fd))
 	{
 		if(dir->d_ino == 0)
@@ -357,12 +341,12 @@ struct Save *last;
 		while(p < &tmppath[PATH_MAX] && *q != '\0')
 			*p++ = *q++;
 		*p = '\0';
-		state->level++;
+		state.level++;
 
 		/* Call walk() recursively.
 		 */
 		rc = walk(p, fn, depth-1, &this);
-		state->level--;
+		state.level--;
 		if(rc != 0)
 			continue;
 		if(this.fd == 0)
@@ -373,11 +357,11 @@ struct Save *last;
 			seekdir(this.fd, this.here);
 		}
 	}
-	state->base = oldbase;
+	state.base = oldbase;
 	*--component = 0;
 	type = FTW_DP;
 	if((curflags&(FTW_DEPTH)) && !skip)
-		rc = (*fn)(tmppath, &statb, type, state);
+		rc = (*fn)(tmppath, &statb, type, &state);
 quit:
 	if(cdval >= 0 && last)
 	{

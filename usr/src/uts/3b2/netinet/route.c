@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/route.c	1.4"
+#ident	"@(#)netinet:netinet/route.c	1.3"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -365,6 +365,27 @@ rtrequest(req, bp)
 		if (prov == 0 && (entry->rt_flags & RTF_GATEWAY) == 0
 		    && (entry->rt_flags & RTF_HOST))
 			prov = prov_withdstaddr(satosin(&entry->rt_dst)->sin_addr);
+		/* check for pre-existing route to gateway */
+		/* if there is an intermediate gateway, use it instead */
+		if (prov == 0) {
+			struct route    route;
+
+			bzero((caddr_t) & route, sizeof(route));
+			route.ro_dst = entry->rt_gateway;
+			rtalloc(&route, 0);
+			if (route.ro_rt) {
+				if (RT(route.ro_rt)->rt_flags & RTF_SWITCHED) {
+					entry->rt_flags |= (RTF_SWITCHED | RTF_TOSWITCH);
+					prov = loopprov;
+				} else {
+					prov = RT(route.ro_rt)->rt_prov;
+					if (RT(route.ro_rt)->rt_flags & RTF_GATEWAY)
+						entry->rt_gateway =
+							RT(route.ro_rt)->rt_gateway;
+				}
+				rtfree(route.ro_rt);
+			}
+		}
 		if (prov == 0 && (entry->rt_flags & RTF_GATEWAY) == 0)
 			prov = prov_withaddr(satosin(&entry->rt_gateway)->sin_addr);
 		if (prov == 0)
@@ -445,4 +466,3 @@ rtdetach(prov)
 		}
 	}
 }
-

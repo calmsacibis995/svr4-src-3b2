@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/msg.c	1.15"
+#ident	"@(#)kernel:os/msg.c	1.13"
 /*
  * Inter-Process Communication Message Facility.
  */
@@ -108,7 +108,7 @@ msgfree(qp, pmp, mp)
 	qp->msg_qnum--;
 	if (qp->msg_perm.mode & MSG_WWAIT) {
 		qp->msg_perm.mode &= ~MSG_WWAIT;
-		wakeprocs((caddr_t)qp, PRMPT);
+		wakeup((caddr_t)qp);
 	}
 
 	/* Free up message text. */
@@ -118,7 +118,7 @@ msgfree(qp, pmp, mp)
 	/* Free up header */
 	mp->msg_next = msgfp;
 	if (msgfp == NULL)
-		wakeprocs((caddr_t)&msgfp, PRMPT);
+		wakeup((caddr_t)&msgfp);
 	msgfp = mp;
 }
 
@@ -144,7 +144,7 @@ msgconv(id, qpp)
 	if ((qp->msg_perm.mode & IPC_ALLOC) == 0
 	  || id / msginfo.msgmni != qp->msg_perm.seq) {
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		return EINVAL;
 	}
 	*qpp = qp;
@@ -192,9 +192,9 @@ msgctl(uap, rvp)
 		else
 			qp->msg_perm.seq++;
 		if (qp->msg_perm.mode & MSG_RWAIT)
-			wakeprocs((caddr_t)&qp->msg_qnum, PRMPT);
+			wakeup((caddr_t)&qp->msg_qnum);
 		if (qp->msg_perm.mode & MSG_WWAIT)
-			wakeprocs((caddr_t)qp, PRMPT);
+			wakeup((caddr_t)qp);
 		qp->msg_perm.mode = 0;
 		break;
 
@@ -211,10 +211,6 @@ msgctl(uap, rvp)
 		}
 		if (ods.msg_qbytes > qp->msg_qbytes && !suser(u.u_cred)) {
 			error = EPERM;
-			break;
-		}
-		if (ods.msg_perm.uid > MAXUID || ods.msg_perm.gid > MAXUID){
-			error = EINVAL;
 			break;
 		}
 		qp->msg_perm.uid = ods.msg_perm.uid;
@@ -238,11 +234,6 @@ msgctl(uap, rvp)
 		}
 		if (ds.msg_qbytes > qp->msg_qbytes && !suser(u.u_cred)) {
 			error = EPERM;
-			break;
-		}
-		if (ds.msg_perm.uid < (uid_t)0 || ds.msg_perm.uid > MAXUID ||
-			ds.msg_perm.gid < (gid_t)0 || ds.msg_perm.gid > MAXUID){
-			error = EINVAL;
 			break;
 		}
 		qp->msg_perm.uid = ds.msg_perm.uid;
@@ -311,7 +302,7 @@ msgctl(uap, rvp)
 	}
 
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 	return error;
 }
 
@@ -409,14 +400,14 @@ msgrcv(uap, rvp)
 	}
 	smp = spmp = NULL;
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 findmsg:
 	if (msgconv(uap->msqid, &qp1) != 0)
 		return EIDRM;
 	if (qp1 != qp) {
 		lockp = MSGLOCK(qp1);
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		return EIDRM;
 	}
 	pmp = NULL;
@@ -472,7 +463,7 @@ findmsg:
 	}
 	qp->msg_perm.mode |= MSG_RWAIT;
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 	if (sleep((caddr_t)&qp->msg_qnum, PMSG|PCATCH))
 		return EINTR;
 	goto findmsg;
@@ -480,7 +471,7 @@ findmsg:
 msgrcv_out:
 
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 	return error;
 }
 
@@ -520,7 +511,7 @@ msgsnd(uap, rvp)
 		goto msgsnd_out;
 	}
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 getres:
 	/* Be sure that q has not been removed. */
 
@@ -529,7 +520,7 @@ getres:
 	if (qp1 != qp) {
 		lockp = MSGLOCK(qp1);
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		return EIDRM;
 	}
 
@@ -541,7 +532,7 @@ getres:
 		}
 		qp->msg_perm.mode |= MSG_WWAIT;
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		if (sleep((caddr_t)qp, PMSG|PCATCH)) {
 			if (error = msgconv(uap->msqid, &qp1))
 				return error;
@@ -549,11 +540,11 @@ getres:
 			if (qp1 != qp) {
 				lockp = MSGLOCK(qp1);
 				*lockp = 0;
-				wakeprocs(lockp, PRMPT);
+				wakeup(lockp);
 				return error;
 			}
 			qp->msg_perm.mode &= ~MSG_WWAIT;
-			wakeprocs((caddr_t)qp, PRMPT);
+			wakeup((caddr_t)qp);
 			goto msgsnd_out;
 		}
 		goto getres;
@@ -564,7 +555,7 @@ getres:
 			goto msgsnd_out;
 		}
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		if (sleep((caddr_t)&msgfp, PMSG|PCATCH)) {
 			if (error = msgconv(uap->msqid, &qp1))
 				return error;
@@ -572,7 +563,7 @@ getres:
 			if (qp1 != qp) {
 				lockp = MSGLOCK(qp1);
 				*lockp = 0;
-				wakeprocs(lockp, PRMPT);
+				wakeup(lockp);
 				return error;
 			}
 			goto msgsnd_out;
@@ -589,10 +580,10 @@ getres:
 		mapwant(msgmap)++;
 		mp->msg_next = msgfp;
 		if (msgfp == NULL)
-			wakeprocs((caddr_t)&msgfp, PRMPT);
+			wakeup((caddr_t)&msgfp);
 		msgfp = mp;
 		*lockp = 0;
-		wakeprocs(lockp, PRMPT);
+		wakeup(lockp);
 		if (sleep((caddr_t)msgmap, PMSG|PCATCH)) {
 			if (error = msgconv(uap->msqid, &qp1))
 				return error;
@@ -600,7 +591,7 @@ getres:
 			if (qp1 != qp) {
 				lockp = MSGLOCK(qp1);
 				*lockp = 0;
-				wakeprocs(lockp, PRMPT);
+				wakeup(lockp);
 				return error;
 			}
 			goto msgsnd_out;
@@ -632,7 +623,7 @@ getres:
 	}
 	if (qp->msg_perm.mode & MSG_RWAIT) {
 		qp->msg_perm.mode &= ~MSG_RWAIT;
-		wakeprocs((caddr_t)&qp->msg_qnum, PRMPT);
+		wakeup((caddr_t)&qp->msg_qnum);
 
 	}
 	rvp->r_val1 = 0;
@@ -642,13 +633,13 @@ msgsnd_out1:
 
 	mp->msg_next = msgfp;
 	if (msgfp == NULL)
-		wakeprocs((caddr_t)&msgfp, PRMPT);
+		wakeup((caddr_t)&msgfp);
 	msgfp = mp;
 
 msgsnd_out:
 
 	*lockp = 0;
-	wakeprocs(lockp, PRMPT);
+	wakeup(lockp);
 	return error;
 }
 

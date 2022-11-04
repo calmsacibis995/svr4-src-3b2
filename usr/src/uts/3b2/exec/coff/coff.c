@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)exec:exec/coff/coff.c	1.23"
+#ident	"@(#)exec:exec/coff/coff.c	1.18"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -29,6 +29,7 @@
 #include "sys/var.h"
 #include "sys/immu.h"
 #include "sys/proc.h"
+#include "sys/tuneable.h"
 #include "sys/tty.h"
 #include "sys/cmn_err.h"
 #include "sys/debug.h"
@@ -49,13 +50,12 @@ int getcoffshlibs();
 
 /* ARGSUSED */
 int
-coffexec(vp, args, level, execsz, ehdp, setid)
+coffexec(vp, args, level, execsz, ehdp)
 struct vnode *vp;
 struct uarg *args;
 int level;
 long *execsz;
 exhda_t *ehdp;
-int setid;
 {
 	struct execenv exenv;
 	struct exdata edp;
@@ -115,6 +115,8 @@ int setid;
 
 	if ((error = remove_proc(args)) != 0)
 		goto done;
+	vp->v_flag |= VTEXT;
+
 
 	/*
 	 * Load any shared libraries that are needed.
@@ -411,7 +413,7 @@ exhda_t *ehdp;
 	 * against the available memory or upper limit of memory allowed.
 	 */
 
-	if (*execsz > btoc(u.u_rlimit[RLIMIT_VMEM].rlim_cur)) {
+	if (*execsz > tune.t_maxumem) {
 		error = ENOMEM;
 		goto bad;
 	}
@@ -507,6 +509,8 @@ exhda_t *ehdp;
 			goto bad;
 		}
 
+		nvp->v_flag |= VTEXT;
+
 		++dat;
 		++edp->ux_nshlibs;
 		++n;
@@ -584,13 +588,13 @@ coffcore(vp, pp, credp, rlimit, sig)
 	if (error == 0 && up->u_dsize) {
 		base = (caddr_t)up->u_exdata.ux_datorg;
 		count = ctob(up->u_dsize) - PAGOFF(base);
-		error = core_seg(pp, vp, offset, base, count, rlimit, credp);
+		error = core_seg(vp, offset, base, count, rlimit, credp);
 		offset += ctob(btoc(count));
 	}
 
 	if (error == 0 && up->u_ssize)
-		error = core_seg(pp, vp, offset,
-		  pp->p_stkbase, ctob(up->u_ssize), rlimit, credp);
+		error = core_seg(vp, offset,
+		  (caddr_t)pp->p_stkbase, ctob(up->u_ssize), rlimit, credp);
 
 	u.u_sysabort = 0;
 

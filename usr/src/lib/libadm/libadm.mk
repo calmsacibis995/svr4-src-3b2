@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libadm:libadm.mk	1.2"
+#ident	"@(#)libadm:libadm.mk	1.1"
 .c.a:;
 
 INC=$(ROOT)/usr/include
@@ -30,7 +30,7 @@ LINTFILES= \
 	devreserv.c putdev.c putdgrp.c \
 	memory.c
 
-CFLAGS=-I. -I$(INC) $(XFLAGS) $(CCFLAGS)
+CFLAGS=-I . -I $(INC) $(XFLAGS) $(CCFLAGS)
 
 PKGINFO_FILES=\
 	$(LIBADM)(pkginfo.o) $(LIBADM)(pkgnmchk.o) $(LIBADM)(pkgparam.o) 

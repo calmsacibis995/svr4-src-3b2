@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)debug:debug/trace.c	1.14"
+#ident	"@(#)debug:debug/trace.c	1.10"
 #include "sys/types.h"
 #include "sys/sysmacros.h"
 #include "sys/param.h"
@@ -26,9 +26,8 @@
 
 #define MAXARGS		20
 
-int	debugtrace = 0;
-char	tracebuf[320];
-char	debugbuf[320];
+int	debugtrace;
+char	tracebuf[200];
 char	*s3blookup();
 int	strcmp();
 
@@ -40,14 +39,16 @@ int arg;
 	extern proc_t *curproc;
 	proc_t  **argptr;
 	int 	argc;
+	int 	j, flag;
 
-	argc = argcount();		/* get num of args */
-	argptr = (proc_t **) &arg;	/* get ptr to first arg */
+	argc = argcount();	/* get num of args */
+	argptr = (proc_t **) &arg;		/* get ptr to first arg */
 
 	do {
-		if (argc != 0) {
+		if (argc != 0)
 			paddr = *argptr++;
-		} else {
+
+		else {
 			if (opaddr == NULL) {
 				cmn_err(CE_CONT, "^No proc addr set yet\n");
 				return;
@@ -57,17 +58,35 @@ int arg;
 			argc = 1;
 		}
 
-		if (procinval(paddr))
-			return;
-
+		/*
+			Validate the proc table address 
+		*/
+	
+		if ((proc_t **)paddr >= nproc && (proc_t **)paddr < v.ve_proc) {
+			paddr = *((proc_t **)paddr);
+		} else {
+			if ((paddr != curproc) && (paddr != opaddr)) {
+				flag = 0;
+				for (j = 0; j < v.v_proc ; j++)
+					if (paddr == nproc[j]) {
+						++flag;
+						break;
+					}
+				if (flag == 0) {
+					cmn_err(CE_CONT, "^%x is not a proc table address\n", paddr);
+					return;
+				}
+			}
+		}
 		opaddr = paddr;
-		if (paddr->p_stat == 0 || paddr->p_stat == SIDL ||
-		    paddr->p_stat == SZOMB)
+		if (paddr->p_stat == 0 || paddr->p_stat == SIDL
+		  || paddr->p_stat == SZOMB)
 			cmn_err(CE_CONT, "^Inactive Process\n");
 		else if ((paddr->p_flag & SULOAD) == 0)
 			cmn_err(CE_CONT, "^Process was swapped out\n");
-		else
+			else {
 			dotrace(paddr);
+			}
 
 		if (argc > 1)
 			cmn_err(CE_CONT, "^-------------------------------------------------------------------------------\n\n");
@@ -76,72 +95,88 @@ int arg;
 }
 
 dotrace(pp)
-	register proc_t		*pp;
+register proc_t		*pp;
 {
+	register uint	oldubptbl;
+	register sde_t	*sdep;
 	extern proc_t	*curproc;
 
-	register struct user *uptr;
-	register u_int stack_base;
-	register u_int stack_copy;
-	register u_int pcbaddr;
-
-	cmn_err(CE_CONT, "^Procp: %x\n\n", pp);
-
-	if (pp != curproc) {
-		uptr = (struct user *)(pp->p_segu);
-		stack_base = (u_int)0xc0000000;
-		stack_copy = (u_int)uptr;
-		pcbaddr = (u_int)uptr +
-			((u_int)uptr->u_pcbp - (u_int)0xc0000000);
+	if(pp == curproc){
+		oldubptbl = NULL;
 	} else {
-		uptr = (struct user *)&u;
-		stack_base = 0;
-		stack_copy = 0;
-		pcbaddr = (u_int)uptr->u_pcbp;
+		sdep = (sde_t *)*(srama + 3);
+		oldubptbl = sdep->wd2.address;
+		sdep->wd2.address = phys_ubptbl(pp->p_ubptbl);
+		flushmmu((caddr_t)&u, USIZE);
 	}
 
-	if (uptr->u_pcbp == &u.u_pcb) {
-		cmn_err(CE_CONT, "^Can't trace processes in user mode\n");
-		return;
-	}
 
-	tracepcb(pcbaddr, stack_base, stack_copy);
+	tracepcb(pp, u.u_pcbp);
+
+	if(oldubptbl != NULL){
+		sdep->wd2.address = oldubptbl;
+		flushmmu((caddr_t)&u, USIZE);
+	}
 }
 
-tracepcb(pcbaddr, stack_base, stack_copy)
-	pcb_t	*pcbaddr;
-	u_int	stack_base;
-	u_int	stack_copy;
+tracepcb(paddr, pcbaddr)
+proc_t	*paddr;
+pcb_t	*pcbaddr;
 {
-	register u_int ap, fp, sp, pc;
+	register int ap, fp, sp, pc;
 	int *oldpcptr;
 	int *argp;
 	int first;
 	char *s3bsp;
+	struct hat *hatp;
+	uint srama_save;
+	SRAMB sramb_save;
+	sde_t sde_save;
 	int	oldpri;
 	int	arg_count;
 
-	oldpri = splhi();
-
-	if (debugtrace) {
-		sprintf(debugbuf,"pcbaddr %#x stack_base %#x stack_copy %#x",
-			pcbaddr, stack_base, stack_copy);
-		cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
+	if (pcbaddr == &u.u_pcb) {
+		cmn_err(CE_CONT, "^Can't trace processes in user mode\n");
+		return;
 	}
 
-	cmn_err(CE_CONT, "^    AP		    FP		    PC		Function\n\n");
+	oldpri = splhi();
+
+	if (paddr != NULL) {
+		srama_save = srama[SCN3];
+		sramb_save = sramb[SCN3];
+		sde_save = *((sde_t *)srama_save);
+
+		if (paddr->p_as == (struct as *)NULL) {
+			register int s;
+
+			s = spl7();
+			((sde_t *)dflt_sdt_p)->wd2.address =
+				phys_ubptbl(paddr->p_ubptbl);
+			srama[SCN3] = dflt_sdt_p;
+			((int *)sramb)[SCN3] = 0;
+			splx(s);
+		} else {
+			register struct hat *hatp = &paddr->p_as->a_hat;
+			register sde_t *sde3;
+
+			sde3 = (sde_t *)hatp->hat_srama[1];
+			sde3->wd2.address = phys_ubptbl(paddr->p_ubptbl);
+			loadmmu(hatp, SCN3);
+		}
+	}
 
 	ap = pcbaddr->regsave[K_AP];
 	fp = pcbaddr->regsave[K_FP];
 	pc = (int)pcbaddr->pc;
 	sp = (int)pcbaddr->sp;
+	cmn_err(CE_CONT, "^    AP		    FP		    PC		Function	Procp: %x\n\n", paddr);
 
 	if (debugtrace) {
-		sprintf(debugbuf,"ap %#x fp %#x pc %#x", ap, fp, pc);
-		cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-		sprintf(debugbuf,"sp %#x slb %#x sup %#x",
-			sp, pcbaddr->slb, pcbaddr->sub);
-		cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
+		sprintf(tracebuf,"%#x	%#x	%#x	%s(", ap, fp, pc, "start");
+		cmn_err(CE_CONT, "^%s)\n", tracebuf);
+		sprintf(tracebuf,"					%#x	%#x", sp, oldpcptr);
+		cmn_err(CE_CONT, "^%s\n", tracebuf);
 		dodmddelay();
 	}
 
@@ -158,58 +193,36 @@ tracepcb(pcbaddr, stack_base, stack_copy)
 
 		if (strcmp(s3bsp, "nrmx_KK") == 0) {
 			if (debugtrace) {
-				sprintf(debugbuf,"ap %#x fp %#x pc %#x %s()", 
+				sprintf(tracebuf,"%#x	%#x	%#x	%s(", 
 					ap, fp, pc, s3bsp);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-				sprintf(debugbuf,"sp %#x oldpcptr %#x",
-					sp, oldpcptr);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
+				cmn_err(CE_CONT, "^%s)\n", tracebuf);
+				sprintf(tracebuf,"					%#x	%#x", sp, oldpcptr);
+				cmn_err(CE_CONT, "^%s\n", tracebuf);
 				dodmddelay();
 			}
 
+			pc = *((int *)(sp) - 4);
 			sp = (int)((int *)sp - 6);
-			pc = *((int *)(stack_copy + sp - stack_base));
 			s3bsp = s3blookup(pc);
 			if (debugtrace) {
-				sprintf(debugbuf,"nsp %#x npc %#x", sp, pc);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
+				sprintf(tracebuf,"				npc	%#x	nsp	%#x", pc, sp);
+				cmn_err(CE_CONT, "^%s\n", tracebuf);
 				dodmddelay();
 			}
 
 		}
 
-		sprintf(tracebuf,"%#x	%#x	%#x	%s(",
-			ap, fp, pc, s3bsp);
+		sprintf(tracebuf,"%#x	%#x	%#x	%s(", ap, fp, pc, s3bsp);
 		
-		if (fp > ap) {
+		if (fp > ap) 
 			oldpcptr = (int *)(fp - 9 * sizeof(char *));
-			if (debugtrace) {
-				sprintf(debugbuf,"fp > ap : oldpcptr %#x",
-					oldpcptr);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-			}
-		} else {
+		else {
 			oldpcptr = (int *)(sp - 2 * sizeof(char *));
-			if (debugtrace) {
-				sprintf(debugbuf,"fp <= ap : oldpcptr %#x",
-					oldpcptr);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-			}
+			if (debugtrace)
+				sprintf(tracebuf, "%s!", tracebuf);
 		}
 
-		/*
-		 * Adjust oldpcptr to the actual stack we are traversing.
-		 */
-		oldpcptr = (int *)(stack_copy + ((u_int)oldpcptr - stack_base));
-		argp = (int * )(stack_copy + (ap - stack_base));
-
-		if (debugtrace) {
-			sprintf(debugbuf,"argp %#x oldpcptr %#x",
-				argp, oldpcptr);
-			cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-		}
-
-		for (arg_count = 1; argp < oldpcptr; argp++) {
+		for (argp = (int * )ap, arg_count = 1; argp < oldpcptr; argp++) {
 			if (arg_count != 1)
 				sprintf(tracebuf, "%s, ", tracebuf);
 
@@ -219,12 +232,6 @@ tracepcb(pcbaddr, stack_base, stack_copy)
 			}
 
 			sprintf(tracebuf, "%s%#x", tracebuf, *argp);
-
-			if (debugtrace) {
-				sprintf(debugbuf,"argp %#x *argp %#x",
-					argp, *argp);
-				cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-			}
 
 			if (++arg_count > MAXARGS) {
 				cmn_err(CE_CONT, "^Trace Error, Too Many Args\n");
@@ -237,8 +244,8 @@ tracepcb(pcbaddr, stack_base, stack_copy)
 		dodmddelay();
 
 		if (debugtrace) {
-			sprintf(debugbuf,"%#x	%#x", sp, oldpcptr);
-			cmn_err(CE_CONT, "DEBUG: ^%s\n", tracebuf);
+			sprintf(tracebuf,"					%#x	%#x", sp, oldpcptr);
+			cmn_err(CE_CONT, "^%s\n", tracebuf);
 			dodmddelay();
 		}
 
@@ -251,16 +258,15 @@ tracepcb(pcbaddr, stack_base, stack_copy)
 
 		if (fp > sp)
 			fp = *oldpcptr;
-
-		if (debugtrace) {
-			sprintf(debugbuf,"ap %#x fp %#x pc %#x sp %#x oldpcptr %#x",
-				ap, fp, pc, sp, oldpcptr);
-			cmn_err(CE_CONT, "DEBUG: ^%s\n", debugbuf);
-			dodmddelay();
-		}
 	}
 
 out:
+	if (paddr != NULL) {
+		*((sde_t *)srama_save) = sde_save;
+		srama[SCN3] = srama_save;
+		sramb[SCN3] = sramb_save;
+	}
+
 	splx(oldpri);
 }
 
@@ -269,12 +275,12 @@ ptrc()
 	register pcb_t *pcbaddr;
 
 	asm("	MOVW	%pcbp,%r8");
-	tracepcb(pcbaddr, 0, 0);
+	tracepcb(NULL, pcbaddr);
 }
 
 uptrc()
 {
-	tracepcb(u.u_pcbp, 0, 0);
+	tracepcb(NULL, u.u_pcbp);
 }
 
 prtpcbp()

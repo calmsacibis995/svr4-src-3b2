@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:disp/rt.c	1.22"
+#ident	"@(#)kernel:disp/rt.c	1.20"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -49,9 +49,8 @@ extern short	rt_maxpri;	/* maximum real-time priority */
 
 void		rt_init();
 STATIC int	rt_admin(), rt_enterclass(), rt_fork(), rt_getclinfo();
-STATIC int	rt_nosys(), rt_parmsin(), rt_parmsout(), rt_parmsset();
-STATIC int	rt_proccmp();
-STATIC void	rt_exitclass(), rt_forkret(), rt_getglobpri(), rt_nullsys();
+STATIC int	rt_parmsin(), rt_parmsout(), rt_parmsset(), rt_proccmp();
+STATIC void	rt_exitclass(), rt_forkret(), rt_getglobpri(), rt_nullclass();
 STATIC void	rt_parmsget(), rt_preempt(), rt_setrun(), rt_sleep();
 STATIC void	rt_stop(), rt_swapin(), rt_swapout(), rt_tick(), rt_wakeup();
 
@@ -81,19 +80,19 @@ STATIC struct classfuncs rt_classfuncs = {
 	rt_swapin,
 	rt_swapout,
 	rt_tick,
-	rt_nullsys,
+	rt_nullclass,
 	rt_wakeup,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys,
-	rt_nosys
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass,
+	rt_nullclass
 };
 
 
@@ -473,15 +472,8 @@ int		*globprip;
 }
 
 
-STATIC int
-rt_nosys()
-{
-	return(ENOSYS);
-}
-
-
 STATIC void
-rt_nullsys()
+rt_nullclass()
 {
 }
 
@@ -827,13 +819,13 @@ boolean_t	*unloadokp;
 	minpri = rt_maxpri + 1;
 	for (rtpp = rt_plisthead.rt_next; rtpp != &rt_plisthead;
 	    rtpp = rtpp->rt_next) {
-		if (*rtpp->rt_pstatp == SZOMB || *rtpp->rt_pstatp == SIDL)
-			continue;
+		ASSERT(*rtpp->rt_pflagp & SULOAD);
 		if ((rtpp->rt_flags & RTRAN) == 0)
+			continue;
+		if (*rtpp->rt_pstatp == SZOMB)
 			continue;
 		if (*rtpp->rt_pflagp & (SSYS|SLOCK|SPROCIO|SSWLOCKS))
 			continue;
-		ASSERT(*rtpp->rt_pflagp & SULOAD);
 		if (rtpp->rt_pri < minpri) {
 			minpripp = rtpp;
 			minpri = rtpp->rt_pri;

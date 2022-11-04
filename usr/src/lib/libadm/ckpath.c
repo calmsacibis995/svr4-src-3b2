@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckpath.c	1.3"
+#ident	"@(#)libadm:ckpath.c	1.1"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -131,7 +131,7 @@ int	pflags;
 	   ((pflags & P_CREAT) && (pflags & (P_EXIST|P_NEXIST|P_BLK|P_CHR))) ||
 	   ((pflags & P_BLK) && (pflags & (P_CHR|P_REG|P_DIR|P_NONZERO))) ||
 	   ((pflags & P_CHR) && (pflags & (P_REG|P_DIR|P_NONZERO))) ||
-	   ((pflags & P_DIR) && (pflags & P_REG))) {
+	   ((pflags & P_DIR) && (pflags & (P_REG|P_NONZERO)))) {
 		return(1);
 	}
 	return(0);
@@ -205,7 +205,7 @@ int	pflags;
 		return(1);
 	}
 	if((pflags & P_WRITE) && !(status.st_mode & S_IWRITE)) {
-		errstr = E_WRITE;
+		errstr = E_READ;
 		return(1);
 	}
 	if((pflags & P_EXEC) && !(status.st_mode & S_IEXEC)) {
@@ -226,12 +226,12 @@ char	*error, *input;
 	if(input) {
 		if(ckpath_val(input, pflags)) {
 			(void) sprintf(buffer, "Pathname %s.", errstr);
-			puterror(stdout, buffer, error);
+			puterror(stderr, buffer, error);
 			return;
 		}
 	}
 	defhlp = sethlp(pflags);
-	puterror(stdout, defhlp, error);
+	puterror(stderr, defhlp, error);
 	free(defhlp);
 }
 
@@ -243,7 +243,7 @@ char	*help;
 	char	*defhlp;
 
 	defhlp = sethlp(pflags);
-	puthelp(stdout, defhlp, help);
+	puthelp(stderr, defhlp, help);
 	free(defhlp);
 }
 

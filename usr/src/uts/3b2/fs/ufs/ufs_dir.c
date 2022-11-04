@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_dir.c	1.15"
+#ident	"@(#)fs:fs/ufs/ufs_dir.c	1.12"
 
 /*
  * Directory manipulation routines.
@@ -1326,13 +1303,21 @@ ufs_dirremove(dp, namep, oip, cdir, op, cr)
 			goto out;
 	} else if (op == DR_REMOVE)  {
 		/*
-		 * unlink(2) requires a different check: allow only
-		 * the super-user to unlink a directory.
+		 * unlink(2) requires different checks:
+		 * (a) Allow only the super-user to unlink a directory.
+		 * (b) Don't allow a busy text file to be removed.	
 		 */
 		struct vnode *vp = ITOV(ip);
 		if (vp->v_type == VDIR && !suser(cr)) {
 			error = EPERM;
 			goto out;
+		}
+		if (vp->v_flag & VTEXT) {
+			xrele(vp);
+			if ((vp->v_flag & VTEXT) && ip->i_nlink ==1) {
+				error = ETXTBSY;
+				goto out;
+			}
 		}
 	}
 	/*
@@ -1626,7 +1611,7 @@ out:
 	 * Unserialize before relocking target to avoid a race.
 	 */
 	if (serialize_flag & RENAME_WAITING)
-		wakeprocs((caddr_t)&serialize_flag, PRMPT);
+		wakeup((caddr_t)&serialize_flag);
 	serialize_flag = 0;
 
 	if (ip) {

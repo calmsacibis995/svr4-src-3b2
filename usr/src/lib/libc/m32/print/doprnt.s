@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"doprnt.s"
-.ident	"@(#)libc-m32:print/doprnt.s	1.9.1.21"
+.ident	"@(#)libc-m32:print/doprnt.s	1.9.1.20"
 
 #-----------------------------------------------------------------------#
 #									#
@@ -456,8 +450,6 @@ _m4_ifdef_(`DSHLIB',
 	cmpw	starflg(%fp),&0
 	je	.dollar6
 	subw2	&4,argp(%fp)
-	xorw2	&1,starflg(%fp)	# determine if FMINUS was incorrectly set
-	xorw2	starflg(%fp),flags	# undo effects of incorrect FMINUS
 	movw	&0,starflg(%fp)
 	bitw	&DOTSEEN,flags
 	jz	.dollar7
@@ -465,10 +457,6 @@ _m4_ifdef_(`DSHLIB',
 	jmp	.form_sw
 .dollar7:
 	movw	(%r0),width(%fp)
-	cmpw	width(%fp),&0
-	jnneg	.form_sw
-	mnegw	width(%fp),width(%fp)	# Negative width--make it positive
-	xorw2	&FMINUS,flags		# and set flag for '-'.
 	jmp	.form_sw
 .dollar6:
 	movw	%r0,argp(%fp)
@@ -535,6 +523,7 @@ _m4_ifdef_(`DSHLIB',
 .dot:
 	orw2	&DOTSEEN,flags
 	movw	&0,prec(%fp)
+	andw2	&CPADZERO,flags		# turn off '0' flag
 	jmp	.form_sw
 
 #
@@ -554,7 +543,6 @@ _m4_ifdef_(`DSHLIB',
 	jnneg	.form_sw
 	mnegw	width(%fp),width(%fp)	# Negative width--make it positive
 	xorw2	&FMINUS,flags		# and set flag for '-'.
-	orw2	&FMINUS,starflg(%fp)	# Save '-' info; might have to undo it
 	jmp	.form_sw
 
 .starprc:
@@ -665,12 +653,6 @@ _m4_ifdef_(`DSHLIB',
 	movaw	sbuf+MAXDIGS(%fp),p	# Get pointer to end of cvt buffer.
 	movw	p,bp
 	movw	*argp(%fp),%r3		# Pick up value to convert.
-	bitw	&DOTSEEN,flags		# Turn off PADZERO if DOTSEEN
-	jz	.d_padzero
-	bitw	&PADZERO,flags
-	jz	.d_padzero
-	andw2	&CPADZERO,flags
-.d_padzero:
 	bitw	&SHORT,flags		# Is number to be converted to a short?
 	jz	.d_nshort
 	movbhw	%r3,%r3			# Convert number to signed short.
@@ -807,12 +789,6 @@ _m4_ifdef_(`DSHLIB',
 	movaw	sbuf+MAXDIGS(%fp),p	# Get pointer to end of cvt buffer.
 	movw	p,bp
 	movw	*argp(%fp),%r3		# Pick up value to convert.
-	bitw	&DOTSEEN,flags		# Turn off PADZERO if DOTSEEN
-	jz	.u_padzero
-	bitw	&PADZERO,flags
-	jz	.u_padzero
-	andw2	&CPADZERO,flags
-.u_padzero:
 	bitw	&SHORT,flags		# Is number to be converted to a short?
 	jz	.u_nshort
 	movzhw	%r3,%r3			# Convert number to an unsigned short.
@@ -861,12 +837,6 @@ _m4_ifdef_(`DSHLIB',
 	movw	%r5,tab(%fp)		# Save ptr to digit conversion table.
 	movaw	sbuf+MAXDIGS(%fp),bp	# Get pointer to end of cvt buffer.
 	movw	*argp(%fp),%r3		# Pick up value to convert.
-	bitw	&DOTSEEN,flags		# Turn off PADZERO if DOTSEEN
-	jz	.x_padzero
-	bitw	&PADZERO,flags
-	jz	.x_padzero
-	andw2	&CPADZERO,flags
-.x_padzero:
 	bitw	&SHORT,flags		# Is number to be converted to a short?
 	jz	.x_nshort
 	movzhw	%r3,%r3			# Convert number to an unsigned short.

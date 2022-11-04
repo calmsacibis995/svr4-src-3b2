@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/tirdwr.c	1.4"
+#ident	"@(#)kernel:io/tirdwr.c	1.2.2.1"
 /*
  * Transport Interface Library read/write module - issue 1
  */

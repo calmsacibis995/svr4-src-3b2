@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libcrypt:des_crypt.c	1.9"
+#ident	"@(#)libcrypt:des_crypt.c	1.8"
 
 #ifdef __STDC__
 	#pragma weak des_crypt = _des_crypt
@@ -15,7 +15,7 @@
 #include "synonyms.h"
 
 #if INTERNATIONAL
-#include 	<errno.h>
+#include 	<stdio.h>
 #endif
 
 /*LINTLIBRARY*/
@@ -263,7 +263,7 @@ int	edflag;
 	extern void	des_encrypt1();
 #if INTERNATIONAL
 	if(edflag)
-		errno = ENOSYS;
+		fputs("Decryption unavailable in international version.\n", stderr);
 #else
 	extern void	des_decrypt1();
 	

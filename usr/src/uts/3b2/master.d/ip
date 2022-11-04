@@ -1,4 +1,4 @@
-*#ident	"@(#)kernel:master.d/ip	1.4"
+*#ident	"@(#)kernel:master.d/ip	1.1"
 *
 *
 *  		PROPRIETARY NOTICE (Combined)
@@ -27,12 +27,6 @@ fs 	-	ip	-	-	-
 						provider[IPPROVCNT](%116)
 						ipcnt(%i) = {IPCNT}
 						ipprovcnt(%i) = {IPPROVCNT}
-						ipforwarding(%i) = {IPFORWARDING}
-						ipsendredirects(%i) = {IPSENDREDIRECTS}
 $$
 IPCNT = 8
 IPPROVCNT = 16
-* if IPFORWARDING is set, hosts will act as gateways
-IPFORWARDING = 0
-* if IPSENDREDIRECTS is set, gateways may send ICMP redirects
-IPSENDREDIRECTS = 0

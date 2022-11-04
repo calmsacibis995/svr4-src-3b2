@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:strcasecmp.c	1.2"
+#ident	"@(#)libresolv:strcasecmp.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -29,8 +29,6 @@
  * 	          All rights reserved.
  *  
  */
-
-#include "res.h"
 
 /*
  * This array is designed for mapping upper and lower case letter

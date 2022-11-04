@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)kernel:ml/misc.s	1.23"
+#ident	"@(#)kernel:ml/misc.s	1.19"
 
 #	The following sets are used in icode.
 
@@ -16,7 +16,7 @@
 	.set	u_caddrflt,0x130 # Offset to u_caddrflt in u-block.
 	.set	u_procp, 0x4e4	# Offset to u_procp in u-block.
 	.set	u_flist, 0x6e4	# Offset to u_flist in u-block.
-	.set	p_sysid, 0x88	# Offset to p_sysid in proc table.
+	.set	p_sysid, 0x8c	# Offset to p_sysid in proc table.
 
 	.text
 #
@@ -305,7 +305,7 @@ kzero:
 	MOVAW	bzeroflt,u+u_caddrflt	# set up ours
 	MOVW	0(%ap),%r1		# %r1 = addr
 	MOVW	4(%ap),%r0		# %r0 = len
-	BEH	bzdone
+#	BEH	bzdone			# shouldn't be needed
 bzalgn:					# align addr to word boundary
 	BITW	&3,%r1			# if (addr is word aligned)
 	BEB	bzwrds			#	goto word zero section;
@@ -1440,7 +1440,7 @@ kplenerr:
 
 #
 # This code is the init process; it is copied to user text space
-# and it then does exec( "/sbin/init", "/sbin/init", 0 );
+# and it then does exec( "/etc/init", "/etc/init", 0 );
 #
 	.data
 	.align 4
@@ -1464,7 +1464,7 @@ icode:
 	MOVW	%sp,%fp		# Init frame pointer to empty stack.
 	MOVAW	u+u_pcb,u+u_pcbp # Set ptr to current pcb.
 
-	PUSHAW	sbin_off(%r0)	# address of sbin_init
+	PUSHAW	etc_off(%r0)	# address of etc_init
 	PUSHAW	argv_off(%r0)	# argv[] array
 
 	CALL	-8(%sp),icode1_off(%r0)	# call icode1
@@ -1472,19 +1472,19 @@ icode1:
 	.set	icode1_off,.-icode
 	MOVW	&4,%r0
 	MOVW	&_exec,%r1
-	GATE			# exec( "/sbin/init", argv )
+	GATE			# exec( "/etc/init", argv )
 icode2:
 	BRB	icode2
 
 	.align 4
 argv:		# argv area
 	.set	argv_off,.-icode
-	.word	UVTEXT+sbin_off
+	.word	UVTEXT+etc_off
 	.word	0
 
-sbin_init:	# /sbin/init
-	.set	sbin_off,.-icode
-	.byte	0x2f,0x73,0x62,0x69,0x6e,0x2f,0x69,0x6e,0x69,0x74,0
+etc_init:	# /etc/init
+	.set	etc_off,.-icode
+	.byte	0x2f,0x65,0x74,0x63,0x2f,0x69,0x6e,0x69,0x74,0
 icode_end:
 
 	.data
@@ -1857,19 +1857,3 @@ uslbaddr:
 	MOVW	&-1, %r0		# return error (-1) on 
 	ret	&0
 
-#
-#	void
-#	setintret(pc)
-#		tmp = isp - 4;
-#		(struct pcb *)(*tmp)->pc = pc;
-#
-#
-
-.set	pcb_pc, 4	# Offset to pc in pcb
-
-.globl	setintret
-
-setintret:
-	MOVW	-4(%isp), %r0
-	MOVW	0(%ap), pcb_pc(%r0)
-	RET

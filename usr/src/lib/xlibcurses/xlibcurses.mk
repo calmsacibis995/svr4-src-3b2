@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)curses:libcurses.mk	1.20"
+#ident	"@(#)curses:libcurses.mk	1.19"
 #
 #	Curses Library High Level Makefile.
 #
@@ -126,4 +126,3 @@ bsd:
 	cd screen; make rmident
 	@echo "Curses has been converted for BSD"
 # this has only been tested on 4.2BSD, but we assume libc has getopt.
-

@@ -1,11 +1,4 @@
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)fs:fs/rfs/rfcl_subr.c	1.15"
+#ident	"@(#)fs:fs/rfs/rfcl_subr.c	1.6.1.1 UNOFFICIAL"
 #include "sys/list.h"
 #include "sys/types.h"
 #include "sys/param.h"
@@ -42,16 +35,14 @@
 #include "sys/kmem.h"
 #include "sys/mount.h"
 #include "sys/systm.h"
+#include "rf_cache.h"
 #include "sys/mode.h"
 #include "sys/pathname.h"
 #include "vm/page.h"
 #include "vm/seg_map.h"
 #include "vm/pvn.h"
-#include "rf_cache.h"
 
-/* imports */
 extern int	rf_state;
-extern void	bp_mapin();
 
 union rq_arg	init_rq_arg;
 
@@ -128,15 +119,8 @@ rfcl_xac(bpp, size, rdp, vcver, retrans, nackp)
 	register sndd_t		*chansdp = rdp->rd_sdp;
 
 	*nackp = 0;			/* only reset when appropriate */
-
-	if (RF_SERVER()) {
-		rf_freemsg(*bpp);
+	if ((error = rf_sndmsg(chansdp, *bpp, size, rdp, retrans)) != 0) {
 		*bpp = NULL;
-		return EMULTIHOP;
-	}
-	error = rf_sndmsg(chansdp, *bpp, size, rdp, retrans);
-	*bpp = NULL;
-	if (error) {
 		return error;
 	}
 	if ((error = rf_rcvmsg(rdp, bpp)) != 0) {
@@ -159,18 +143,15 @@ rfcl_xac(bpp, size, rdp, vcver, retrans, nackp)
 	}
 	if (!error && *nackp) {
 		if (rp->rp_cache & RP_MNDLCK) {
-
 			/*
 			 * somebody turned on locking behind our back;
 			 * disable caching for the file.
 			 */
-
-			if (vcver == RFS1DOT0) {
-				chansdp->sd_stat |= SDMNDLCK;
-				/* CONSTCOND */
-				rfc_disable(chansdp, 0);
-			} else {
-				gdp_j_accuse("rfcl_xac mandlock NACK",
+			chansdp->sd_stat |= SDMNDLCK;
+			/* CONSTCOND */
+			rfc_disable(chansdp, 0);
+			if (vcver != RFS1DOT0) {
+				gdp_discon("rfcl_xac mandlock NACK",
 				  QPTOGP(chansdp->sd_queue));
 				error = EPROTO;
 				*nackp = FALSE;
@@ -207,8 +188,6 @@ rfcl_reqsetup(bp, chansdp, crp, opcode, ulim)
 	cop->co_gid = crp->cr_gid;
 	cop->co_mntid = chansdp->sd_mntid;
 
-	reqp->rq_ulimit = ulim >> ULIMSHIFT;
-
 	/*
 	 * Copy as many as the agreed maximum number of groups into
 	 * the request, if the server supports multi-groups.
@@ -221,34 +200,34 @@ rfcl_reqsetup(bp, chansdp, crp, opcode, ulim)
 		for (gn = 0; gn < (ushort)reqp->rq_ngroups; gn++) {
 			reqp->rq_groups[gn] = crp->cr_groups[gn];
 		}
+	}
+	reqp->rq_ulimit = ulim >> ULIMSHIFT;
+
+	/*
+	 * Since a single sndd represents a given file, another process
+	 * may have set SDMNDLCK in ours, thus each request contains an
+	 * indication of MNDLCK status.
+	 */
+
+	if (chansdp->sd_stat & SDMNDLCK) {
+		reqp->rq_flags |= RQ_MNDLCK;
 	} else {
-
-		/*
-		 * Since a single sndd represents a given file, another process
-		 * may have set SDMNDLCK in ours, thus each request contains an
-		 * indication of MNDLCK status.
-		 */
-
-		if (chansdp->sd_stat & SDMNDLCK) {
-			reqp->rq_flags |= RQ_MNDLCK;
-		} else {
-			reqp->rq_flags &= ~RQ_MNDLCK;
-		}
+		reqp->rq_flags &= ~RQ_MNDLCK;
 	}
 }
 
 /*
- * *giftsdpp is assumed to point to a send descriptor whose sd_gift and
+ * *giftsdpp is assumed to point to a send descriptor whose sd_connid and
  * sd_queue are well-defined, whose associated vnode has its type and vfsp
  * defined, and that was allocated only to hold a new reference to a
  * remote file.	 *giftsdp must be unlocked.  bp must contain a well-defined
  * response, and vfsp be the vfs in which the file reference resides.
  *
- * Either completes the definition of *giftsdpp, if it is the
+ * If a protocol misuse is detected, NULLs *giftsdp and returns EPROTO.
+ * Otherwise either completes the definition of *giftsdp, if it is the
  * first sndd to refer to a particular file, or frees *giftsdp and
- * replaces it with an existing sdp referring to the file.
- *
- * In error cases, NULLs *giftsdpp and returns error.
+ * replaces it with an existing sdp referring to the file.  In these
+ * cases, returns 0.
  *
  * Global side-effects: updates sdfreelist.
  */
@@ -265,6 +244,7 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 	register rf_response_t	*rp = RF_RESP(bp);
 	register sndd_t		*sdp;			/* candidate */
 	register sndd_t		*endsndd = sndd + nsndd;
+	register int		connid = giftsdp->sd_connid; /* server rd */
 	register vnode_t	*vp;
 	rf_common_t		*cop = RF_COM(bp);
 	int			vcver = QPTOGP(giftsdp->sd_queue)->version;
@@ -288,16 +268,15 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 	 */
 
 	if ((error = rfcl_vn_init(giftsdp, vfsp)) != 0) {
+		ASSERT(error == EPROTO);
 		sndd_free(giftsdpp);
 		return error;
 	}
-
 	vp = SDTOV(giftsdp);
 	sdp = sndd;
 	while (sdp != endsndd) {
-		if (sdp->sd_gift.gift_id == giftsdp->sd_gift.gift_id &&
-		  SDTOV(sdp)->v_vfsp == vfsp &&
-		  sdp->sd_stat & SDUSED && !(sdp->sd_stat & SDINTER)) {
+		if (sdp->sd_connid == connid && SDTOV(sdp)->v_vfsp == vfsp &&
+		    sdp->sd_stat & SDUSED && !(sdp->sd_stat & SDINTER)) {
 
 			/* found the sd */
 
@@ -309,16 +288,6 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 				(void)sleep((caddr_t)sdp, PSNDD);
 				sdp = sndd;
 				continue;
-
-			} else if (sdp->sd_gift.gift_gen !=
-			  giftsdp->sd_gift.gift_gen) {
-
-				gdp_j_accuse("rfcl_findsndd bad file reference",
-				  QPTOGP(giftsdp->sd_queue));
-				sndd_free(giftsdpp);
-				--VFTORF(vfsp)->rfvfs_refcnt;
-				return EPROTO;
-
 			} else {
 				break;
 			}
@@ -334,16 +303,14 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 
 		vp = SDTOV(sdp);
 		ASSERT(vp->v_vfsp == vfsp);
-		ASSERT(sdp->sd_queue == giftsdp->sd_queue);
-
+		ASSERT(ISRFSVP(vp));
 		if (vp->v_type != SDTOV(giftsdp)->v_type) {
-                        gdp_j_accuse("rfcl_findsndd unexpected v_type",
+                        gdp_discon("rfcl_findsndd  unexpected v_type",
 			  QPTOGP(sdp->sd_queue));
 			sndd_free(giftsdpp);
-                        --VFTORF(vfsp)->rfvfs_refcnt;
                         return EPROTO;
 		}
-
+		ASSERT(sdp->sd_queue == giftsdp->sd_queue);
 		sdp->sd_size = cop->co_size;
 		VN_HOLD(vp);
 
@@ -357,7 +324,7 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
                         SDTOV(giftsdp)->v_count = 0;
                         rfcl_sdrele(giftsdpp, crp, 1);
 		} else {
-			--VFTORF(vfsp)->rfvfs_refcnt;
+                        --VFTORF(vfsp)->rfvfs_refcnt;
                         sdp->sd_remcnt++;
                         sndd_free(giftsdpp);
 		}
@@ -365,7 +332,7 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 
 	} else if ((vcver >= RFS2DOT0 || VFTORF(vfsp)->rfvfs_flags & MCACHE) &&
 	  (sdp =
-	  rfc_sdsearch(VFTORF(vfsp), rp, giftsdp->sd_queue, &giftsdp->sd_gift))
+	  rfc_sdsearch(VFTORF(vfsp), rp, giftsdp->sd_queue, giftsdp->sd_connid))
 	  != NULL) {
 
 		/*
@@ -386,7 +353,6 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 		sdp->sd_remcnt = 1;
 		*giftsdpp = sdp;
 		vp = SDTOV(sdp);
-
 	} else {
 
 		/*
@@ -402,8 +368,7 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 		sdp->sd_remcnt = 1;
 		vp = SDTOV(sdp);
 	}
-
-	if (vcver < RFS2DOT0 || rp->rp_v2giftinfo.flags & RPG_NOMAP) {
+	if (vcver < RFS2DOT0 || rp->rp_v2gift.flags & RPG_NOMAP) {
 
 		/*
 		 * Pre-SVR4 servers can't handle page faults.
@@ -414,17 +379,10 @@ rfcl_findsndd(giftsdpp, crp, bp, vfsp)
 
 		vp->v_flag |= VNOMAP;
 	}
-
-	/*
-	 * If remote swap space were used, disconnects, for example, would
-	 * spell disaster for the client.  A future, more robust kernel may
-	 * be able to handle this.
-	 */
-	vp->v_flag |= VNOSWAP;
-
 	if (VFTORF(vfsp)->rfvfs_flags & MCACHE &&
 	  vp->v_type == VREG && 
 	  (error = rfcl_ckgiftrp(sdp, bp)) != 0) {
+		ASSERT(error == EPROTO);
 		VN_RELE(vp);
 		*giftsdpp = NULL;
 	}
@@ -452,7 +410,7 @@ rfcl_giftfree(bp, giftsdpp, crp)
 		 * set up to give up reference
 		 */
 		cop = RF_COM(bp);
-		sndd_set(sdp, msgp->m_queue, &msgp->m_gift);
+		sndd_set(sdp, (queue_t *)msgp->m_queue, msgp->m_giftid);
 		sdp->sd_mntid = cop->co_mntid;
 		sdp->sd_size = cop->co_size;
 		SDTOV(sdp)->v_count = 0;
@@ -488,12 +446,11 @@ rfcl_readmove(inbpp, uiop, reply_sdp, uio_errorp)
 	long		copysync = resp->rp_copyout.copysync;
 	rf_message_t	*mp = RF_MSG(bp);
 	queue_t		*qp = (queue_t *)mp->m_queue;
-	rf_gift_t	gift;
+	long		giftid = mp->m_giftid;
 	uio_t		ruio;
 	iovec_t		*iovp;
 	int		niov;
 
-	gift = mp->m_gift;
 	if (!*uio_errorp &&
 	  (bp = rf_dropbytes(bp, RF_MIN_RESP(QPTOGP(qp)->version))) != NULL) {
 		ruio.uio_offset = 0;
@@ -520,7 +477,7 @@ rfcl_readmove(inbpp, uiop, reply_sdp, uio_errorp)
 
 	if (opcode == RFCOPYOUT && copysync) {
 		/* Send a response so the server will not hang */
-		error = rfcl_copysync(reply_sdp, qp, &gift);
+		error = rfcl_copysync(reply_sdp, qp, giftid);
 	}
 	return error;
 }
@@ -556,10 +513,10 @@ rfcl_signal(sdp)
  * Return nonzero errno for fatal communications error, 0 otherwise.
  */
 int
-rfcl_copysync(sdp, qp, giftp)
+rfcl_copysync(sdp, qp, giftid)
 	register sndd_t		*sdp;
 	queue_t			*qp;
-	rf_gift_t		*giftp;
+	long			giftid;
 {
 	register size_t		respsize = RF_MIN_RESP(QPTOGP(qp)->version);
 	mblk_t			*bp;
@@ -569,12 +526,20 @@ rfcl_copysync(sdp, qp, giftp)
 	  NULLFRP, &bp);
 	ASSERT(bp);
 	cop = RF_COM(bp);
-	sndd_set(sdp, qp, giftp);
+	sndd_set(sdp, qp, giftid);
 	cop->co_type = RF_RESP_MSG;
 	cop->co_opcode = RFCOPYOUT;
 	return rf_sndmsg(sdp, bp, respsize, (rcvd_t *)NULL, FALSE);
 }
 
+/* Passed off to rf_async to handle VOP_INACTIVEs that go remote. */
+
+typedef struct rfcl_rele {
+	rfa_work_t	work;
+	sndd_t		*sdp;
+	cred_t		*crp;
+} rfcl_rele_t;
+	
 /*
  * Give up last reference to remote file.
  * Call only when denoted vnode has v_count == 0.  SDINTER may or may not
@@ -590,6 +555,7 @@ rfcl_sdrele(sdpp, crp, goremote)
 {
 	register sndd_t		*sdp = *sdpp;
 	register vnode_t	*vp = SDTOV(sdp);
+	register rfcl_rele_t	*rep;
 
 	ASSERT(sdp->sd_stat & SDUSED);
 	ASSERT(!vp->v_count);
@@ -606,16 +572,16 @@ rfcl_sdrele(sdpp, crp, goremote)
 	 */
 
 	if (vp->v_vfsp) {
-
 		/*
 		 * Ugh.  Under some circumstances, we can get into
 		 * this function with a partly-defined sndd.
 		 */
-
 		--VFTORF(vp->v_vfsp)->rfvfs_refcnt;
 	}
 
 	if (goremote) {
+
+		/* Lock BEFORE we hand this off to rf_async, to avoid races. */
 
                 ASSERT(!(sdp->sd_stat & SDLOCKED));
 
@@ -631,7 +597,26 @@ rfcl_sdrele(sdpp, crp, goremote)
 
 			sdp->sd_stat |= SDINTER;
 		}
-		rfcl_dorele(sdp, crp);
+
+		/*
+		 * rf_async will call rfcl_dorele, which will free its arg
+		 * structure and go remote to give up the reference.
+		 */
+
+		rep = (rfcl_rele_t *)kmem_alloc(sizeof(rfcl_rele_t), KM_SLEEP);
+		rep->sdp = sdp;
+		rep->crp = crp;
+		crhold(crp);
+		rep->work.rfaw_func = rfcl_dorele;
+		rep->work.rfaw_farg = (caddr_t)rep;
+		rep->work.rfaw_canfail = TRUE;
+		LS_INIT(&rep->work.rfaw_elt);
+		if (rfa_workenq(&rep->work) != 0) {
+
+			/* enqueue failed - do it ourselves */
+
+			rfcl_dorele(&rep->work);
+		}
 	} else if (vp->v_pages) {
 
 		/*
@@ -663,7 +648,7 @@ rfcl_vn_init(giftsdp, vfsp)
 	register vnode_t *vp = SDTOV(giftsdp);
 
 	if (vp->v_type <= VNON || vp->v_type >= VBAD) {
-		gdp_j_accuse("rfcl_vn_init unexpected vtype",
+		gdp_discon("rfcl_vn_init unexpected vtype",
 		  QPTOGP(giftsdp->sd_queue));
 		return EPROTO;
 	}
@@ -699,21 +684,6 @@ rfcl_ckgiftrp(sdp, bp)
 	ASSERT(VFTORF(vp->v_vfsp)->rfvfs_flags & MCACHE);
 
 	if (QPTOGP(sdp->sd_queue)->version < RFS2DOT0) {
-		struct a {
-			char	*fname;
-			int	mode;
-			int	crtmode;
-		} *uap = (struct a *)u.u_ap;
-
-		if ((sdp->sd_stat & SDCACHE ||
-		   rp->rp_cache & DU_CACHE_ENABLE) &&
-		  (cop->co_opcode == RFCREATE ||
-		   cop->co_opcode == RFCREATE && uap->mode & FTRUNC) &&
-		  sdp->sd_vcode != rp->rp_rval) {
-			rfc_pageabort(sdp, (off_t)0, (off_t)0);
-			rfc_disable(sdp, (ulong)rp->rp_rval);
-			sdp->sd_size = 0;
-		}
 		if (rp->rp_cache & DU_CACHE_ENABLE) {
 			sdp->sd_size = (size_t)cop->co_size;
 			rfc_enable(sdp, (ulong)rp->rp_rval, rp->rp_fhandle);
@@ -954,7 +924,7 @@ int
 rfcl_write_op(chansdp, crp, op, rf_rwap)
 	sndd_t		*chansdp;
 	cred_t		*crp;
-	int		op;
+	int		op;		/* RFREAD, RFGETPAGE, etc. */
 	rf_rwa_t	*rf_rwap;
 {
 	uio_t		*uiop = rf_rwap->uiop;
@@ -989,17 +959,6 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 	base = uiop->uio_iov->iov_base;
 
 	if (rf_rwap->wr_kern) {
-
-		if (prewrite < uiop->uio_resid) {
-
-			/*
-			 * page-align to increase write cache hits and avoid
-			 * blocking on page locks in RFCOPYIN responses.
-			 */
-
-			prewrite -= uiop->uio_offset + prewrite & PAGEOFFSET;
-		}
-
 		opoff = uiop->uio_offset;
 	}
 
@@ -1053,7 +1012,7 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 
 		if (ntries == 1) {
 			if (rf_rwap->wr_kern) {
-				error = rfcl_esbwrmsg(chansdp, rf_rwap, hdrsz,
+				error = rfcl_esbwrmsg(chansdp, uiop, hdrsz,
 				  prewrite, BPRI_LO, TRUE, &bp);
 				if (error) {
 					break;
@@ -1068,6 +1027,14 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 				}
 			}
 
+			if ((dupbp = dupmsg(bp)) == NULL) {
+				error = EAGAIN;
+				break;
+			}
+
+			rfcl_reqsetup(bp, chansdp, crp, op,
+			  (ulong)uiop->uio_limit);
+
 			/* set up op specific fields in req message */
 			reqp = RF_REQ(bp);
 			reqp->rq_xfer.offset = offset;
@@ -1076,20 +1043,10 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 			reqp->rq_xfer.fmode = uiop->uio_fmode;
 			reqp->rq_xfer.prewrite = prewrite;
 
-			if ((dupbp = dupmsg(bp)) == NULL) {
-				error = EAGAIN;
-				break;
-			}
-
 		} else if ((bp = dupmsg(dupbp)) == NULL) {
 			error = EAGAIN;
 			break;
 		}
-
-		/*
-		 * Repeat this per retry because MANDLOCK status may change.
-		 */
-		rfcl_reqsetup(bp, chansdp, crp, op, (ulong)uiop->uio_limit);
 
 		error = rfcl_xac(&bp, hdrsz + prewrite, rdp, vcver,
 		  ntries == 1 ? FALSE : TRUE, &nacked);
@@ -1098,6 +1055,16 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 
 	rf_freemsg(dupbp);
 	dupbp = NULL;
+
+	if (rf_rwap->wr_kern && error) {
+
+		/*
+		 * Here we handle error occurring in the initial transmission.
+		 * rfcl_write_pass must abort pages in case of later errors.
+		 */
+
+		rfc_pageabort(chansdp, opoff, uiop->uio_offset);
+	}
 
 	if (rf_rwap->cached && !(chansdp->sd_stat & SDCACHE)) {
 
@@ -1109,19 +1076,11 @@ rfcl_write_op(chansdp, crp, op, rf_rwap)
 		chansdp->sd_crwlock.writer = FALSE;
 		if (chansdp->sd_crwlock.want) {
 		  	chansdp->sd_crwlock.want = FALSE;
-			wakeprocs((caddr_t)&chansdp->sd_crwlock, PRMPT);
+			wakeup((caddr_t)&chansdp->sd_crwlock);
 		}
 		rf_rwap->cached = FALSE;
 		rf_rwap->wr_kern = FALSE;
 		rfc_pageabort(chansdp, opoff, rf_rwap->cwruio.uio_offset);
-	} else if (rf_rwap->wr_kern && error) {
-
-		/*
-		 * Here we handle error occurring in the initial transmission.
-		 * rfcl_write_pass must abort pages in case of later errors.
-		 */
-
-		rfc_pageabort(chansdp, opoff, uiop->uio_offset);
 	}
 
 	if (!error && (error = RF_RESP(bp)->rp_errno) == 0) {
@@ -1265,7 +1224,7 @@ rfcl_writemove(in_bpp, rf_rwap, reply_sdp, req_sdp, uio_errorp)
 	int			uio_error = *uio_errorp;
 	int			error = 0;
 
-	sndd_set(reply_sdp, msgp->m_queue, &msgp->m_gift);
+	sndd_set(reply_sdp, (queue_t *)msgp->m_queue, msgp->m_giftid);
 	rf_freemsg(*in_bpp);
 	*in_bpp = NULL;
 
@@ -1309,12 +1268,11 @@ rfcl_writemove(in_bpp, rf_rwap, reply_sdp, req_sdp, uio_errorp)
 		mblk_t			*wbp;
 		register rf_response_t	*nresp;
 		register rf_common_t	*cop;
-		size_t			msgsz;
 
 		if (!uio_error) {
 			if (rf_rwap->wr_kern) {
-				uio_error = rfcl_esbwrmsg(req_sdp, rf_rwap,
-				  hdrsz, nwritten, BPRI_MED, FALSE, &wbp);
+				uio_error = rfcl_esbwrmsg(req_sdp, uiop, hdrsz,
+				  nwritten, BPRI_MED, FALSE, &wbp);
 				ASSERT(!uio_error != !wbp);
 				if (uio_error) {
 					(void)rf_allocmsg(hdrsz, (size_t)0,
@@ -1339,25 +1297,21 @@ rfcl_writemove(in_bpp, rf_rwap, reply_sdp, req_sdp, uio_errorp)
 		nresp = RF_RESP(wbp);
 		cop->co_type = RF_RESP_MSG;
 		cop->co_opcode = RFCOPYIN;
-		msgsz = hdrsz;
-
 		if (*uio_errorp || (*uio_errorp = uio_error) != 0) {
-			nresp->rp_count = 0;
 			nresp->rp_errno = *uio_errorp;
+			nresp->rp_count = 0;
 		} else {
-			msgsz += nwritten;
 			nresp->rp_count = nwritten;
 			nresp->rp_errno = 0;
 		}
 
-		if ((error = rf_sndmsg(reply_sdp, wbp, msgsz, (rcvd_t *)NULL,
-		  FALSE)) != 0 ||
-		  *uio_errorp) {
+		if ((error = rf_sndmsg(reply_sdp, wbp, hdrsz + nwritten,
+		  (rcvd_t *)NULL, FALSE)) != 0) {
 			break;
 		}
 	}
 
-	if (rf_rwap->wr_kern && (error || uio_error && !*uio_errorp)) {
+	if (rf_rwap->wr_kern && (error || uio_error & !*uio_errorp)) {
 
 		/*
 		 * We don't fill the cache once an error has occurred (see
@@ -1411,7 +1365,7 @@ rfcl_strategy(bp, crp, residp)
 	iovec.iov_len = bp->b_bcount;
 	uio.uio_iov = &iovec;
 	uio.uio_iovcnt = 1;
-	uio.uio_offset = bp->b_pages->p_offset;
+	uio.uio_offset = RF_BLKTOOFF(bp->b_blkno);
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_resid = bp->b_bcount;
 	uio.uio_limit = ULIMIT;
@@ -1438,37 +1392,17 @@ rfcl_strategy(bp, crp, residp)
 			bzero(bp->b_un.b_addr + (bp->b_bcount - uio.uio_resid),
 			  (size_t)uio.uio_resid);
 		}
-
-		if ((bp->b_error = error) != 0) {
-			bp->b_flags |= B_ERROR;
-		}
-	
-		/*
-		 * pvn_done removes translations to pages, so they are
-		 * NOT ADDRESSABLE after this call.  Also removes pages
-		 * from b_pages, clears p_intrans and p_pagein, does
-		 * PAGE_RELE and unlocks pages.
-		 */
-	
-		pvn_done(bp);
-
-		/*
-		 * Throw away the buffer header; calling here assumes
-		 * synchronous IO.  Otherwise, the bp would have been
-		 * tossed by pvn_done.
-		 */
-
-		pageio_done(bp);
-
 		rfcl_fsinfo.fsireadch += bp->b_bcount - uio.uio_resid;
 	} else {
-		unsigned	bcount = bp->b_bcount;
+
+		/*
+		 * Set up cwruio for restarting nacked requests.
+		 * TO DO:  take advantage of buffer rather than having
+		 * rfcl_write_op do an fbread.
+		 */
 
 		rf_rwa.wr_ioflag = 0;
 		rf_rwa.wr_kern = TRUE;
-		rf_rwa.wr_bufp = bp;
-
-		bp->b_flags |= B_ASYNC;
 
 		error = rfcl_uioclone(&uio, &rf_rwa, &iovsize);
 
@@ -1477,26 +1411,33 @@ rfcl_strategy(bp, crp, residp)
 
 			error = rfcl_write_op(chansdp, crp, RFPUTPAGE, &rf_rwa);
 
-			bp = NULL;	/* bp now a dangling reference */
-
-			if (rf_rwa.wr_bufp) {
-
-				ASSERT(error);	/* B_ASYNC */
-
-				rf_rwa.wr_bufp->b_flags |= B_ERROR;
-				pvn_done(rf_rwa.wr_bufp);
-			}
-
 			if (iovsize > sizeof(iovec_t)) {
 				kmem_free(iovp, iovsize);
 			}
-			rfcl_fsinfo.fsiwritech += bcount - uio.uio_resid;
-		} else {
-			bp->b_flags |= B_ERROR;
-			pvn_done(bp);
+			rfcl_fsinfo.fsiwritech += bp->b_bcount - uio.uio_resid;
 		}
 	}
 	*residp = uio.uio_resid;
+	if ((bp->b_error= error) != 0) {
+		bp->b_flags |= B_ERROR;
+	}
+
+	/*
+	 * pvn_done removes translations to pages, so they are
+	 * NOT ADDRESSABLE after this call.  Also removes pages
+	 * from b_pages, clears p_intrans and p_pagein, does
+	 * PAGE_RELE and unlocks pages.
+	 */
+
+	pvn_done(bp);
+
+	/*
+	 * Throw away the buffer header; calling here assumes
+	 * synchronous IO.  Otherwise, the buffer header would
+	 * be needed for a subsequent call to pvn_done.
+	 */
+
+	pageio_done(bp);
 
 	return error;
 }
@@ -1537,7 +1478,7 @@ rfcl_uioclone(uiop, rf_rwap, iovszp)
 
 /*
  * Build an RFS message containing
- *	0 < resid <= rf_rwap->uiop->uio_resid <= gdp datasz
+ *	0 < resid <= uiop->uio_resid <= gdp datasz
  * bytes of write data, using resident pages as externally supplied
  * STREAMS data buffers where possible.
  *
@@ -1546,193 +1487,172 @@ rfcl_uioclone(uiop, rf_rwap, iovszp)
  * NULL *bpp.
  */
 STATIC int
-rfcl_esbwrmsg(sdp, rf_rwap, hdrsz, resid, pri, canfail, bpp)
-	sndd_t		*sdp;
-	rf_rwa_t	*rf_rwap;
-	size_t		hdrsz;
-	size_t		resid;
-	uint		pri;
-	int		canfail;
-	mblk_t		**bpp;
+rfcl_esbwrmsg(sdp, uiop, hdrsz, resid, pri, canfail, bpp)
+	sndd_t	*sdp;
+	uio_t	*uiop;
+	size_t	hdrsz;
+	size_t	resid;
+	uint	pri;
+	int	canfail;
+	mblk_t	**bpp;
 {
-	uio_t		*uiop = rf_rwap->uiop;
-	vnode_t		*vp = SDTOV(sdp);
-	mblk_t		*bp = NULL;
-	mblk_t		*lastbp = NULL;
-	mblk_t		*nextbp = NULL;
-	int		error = 0;
-	off_t		poff;		/* page-aligned IO offset */
-	off_t		pend;		/* page-aligned IO end */
-	off_t		opoff;
-	page_t		*pl;		/* IO list */
-	buf_t		*bufp;		/* for IO list */
-	int		resident;	/* current state */
-	int		nextresident;	/* next state */
-	size_t		pchunk;		/* page-aligned message block size */
-	size_t		iochunk;	/* actual message block size */
+	vnode_t	*vp = SDTOV(sdp);
+	mblk_t	*bp = NULL;
+	mblk_t	*lastbp = NULL;
+	mblk_t	*nextbp = NULL;
+	int	error = 0;
 
+	ASSERT(resid);
 	ASSERT(resid <= uiop->uio_resid);
 	ASSERT(resid <= QPTOGP(sdp->sd_queue)->datasz);
 
-	*bpp = NULL;
+	/* The first loop trims off any prefix that is not MAXBSIZE aligned. */
 
-	if (rf_rwap->wr_bufp) {
+	while (!error && resid) {
 
-		/* rf_putpage has the pages ready for us. */
+		page_t	**plp;		/* cursor in page list pl */
+		page_t	**firstpp;	/* intervals of (non)resident pages */
+		page_t	**lastpp;	/* intervals of (non)resident pages */
+		int	resident;	/* state var */
+		int	nextresident;	/* next state var */
+		page_t	*pl[MAXBSIZE/PAGESIZE];
+		page_t	**endpl;
+		off_t	poff;		/* page-aligned file offset */
+		off_t	mbon;		/* MAXBSIZE-unaligned offset */
+		off_t	nbytes;		/* rfesb request */
 
-		ASSERT(rf_rwap->wr_bufp->b_bcount <=
-		  QPTOGP(sdp->sd_queue)->datasz);
-		ASSERT(rf_rwap->wr_bufp->b_flags &
-		  (B_REMAPPED | B_ASYNC | B_WRITE));
-		ASSERT(!(uiop->uio_offset & PAGEOFFSET));
-		ASSERT(!(rf_rwap->wr_bufp->b_bcount & PAGEOFFSET));
+		poff = uiop->uio_offset & PAGEMASK;
+		mbon = uiop->uio_offset & MAXBOFFSET;
+		nbytes = MIN(MAXBSIZE - mbon, resid);
+		resid -= nbytes;
 
-		error = rfesb_pageio_setup(rf_rwap->wr_bufp, hdrsz,
-		  (off_t)0, rf_rwap->wr_bufp->b_bcount, pri, canfail, &bp);
-
-		if (error) {
-
-			/*
-			 * B_ASYNC provokes pvn_done to call pageio_done which,
-			 * seeing B_REMAPPED, will call bp_mapout.
-			 */
-
-			rf_rwap->wr_bufp->b_flags |= B_ERROR;
-			pvn_done(rf_rwap->wr_bufp);
-		}
-		rf_rwap->wr_bufp = NULL;
-		*bpp = bp;
-		return error;
-	}
-
-	/*
-	 * Find intervals of resident pages.  Allocate a separate
-	 * message block for each contiguous chunk of pages, a separate
-	 * one for each nonresident chunk.  Hook the chain of blocks
-	 * into a single RFS message.
-	 *
-	 * In error cases, we dispose of current IO list, depend on caller
-	 * to abort pages that are already in streams message.
-	 *
-	 * Notice extra trip through loop to scavenge last page.
-	 */
-
-	poff = uiop->uio_offset & PAGEMASK;
-	pend = ptob(btopr(uiop->uio_offset + resid));
-	pl = NULL;
-	bufp = NULL;
-
-	error = rf_allocmsg(hdrsz, (size_t)0, pri, canfail, NULLCADDR, NULLFRP,
-	 &bp);
-	if (error) {
-		return error;
-	}
-	lastbp = bp;
-
-	nextresident = resident = rfc_page_lookup(vp, poff, &pl) != NULL;
-	opoff = poff;
-	poff += PAGESIZE;
-	for ( ; poff <= pend; poff += PAGESIZE) {
-		off_t	pon;
-
-		ASSERT(!bufp);
-		ASSERT(!pl == !resident);
-		ASSERT(!lastbp->b_cont);
-
-		if (poff < pend) {
-			nextresident = rfc_page_lookup(vp, poff, &pl) != NULL;
-		}
-
-		if (nextresident == resident && poff < pend) {
-			continue;
-		}
-
-		/* End of chunk. */
-
-		pon = uiop->uio_offset & PAGEOFFSET;
-		pchunk = poff - opoff;
-		iochunk = MIN(pchunk - pon, resid);
-
-		if (resident) {
-
-			/* end resident chunk */
-
-			bufp = pageio_setup(pl, pchunk, vp, B_WRITE | B_ASYNC);
-			if (!bufp) {
-				error = ENOMEM;
-				break;
-			}
-
-			bp_mapin(bufp);
-
-			bufp->b_blkno = 0;
-			bufp->b_dev = 0;
-			bufp->b_edev = 0;
-
-			error = rfesb_pageio_setup(bufp, (size_t)0,
-			  uiop->uio_offset & PAGEOFFSET, iochunk,
-			  pri, canfail, &nextbp);
-			if (!error) {
-				bufp = NULL;
-				pl = NULL;
-			}
-		} else {
-
-			/* end nonresident chunk */
-
-			error = rf_allocmsg((size_t)0, iochunk, pri, canfail,
-			  NULLCADDR, NULLFRP, &nextbp);
-		}
-
-		if (error) {
-			break;
-		}
-
-		lastbp = lastbp->b_cont = nextbp;
-		nextbp = NULL;
-
-		if (resident) {
-			uioskip(uiop, iochunk);
-		} else {
-			error = uiomove((caddr_t)lastbp->b_rptr, (long)iochunk,
-			  UIO_WRITE, uiop);
-		}
-
-		if (error) {
-			break;
-		}
-
-		resid -= iochunk;
-		resident = nextresident;	/* state change */
+		endpl = pl + btopr(nbytes);
 
 		/*
-		 * opoff becomes the offset of the first page in the new chunk.
+		 * Find and hold all resident pages containing write data.  We
+		 * do this to avoid faulting in pages from the server!!!
 		 */
 
-		opoff = poff;
+		for (plp = pl; plp < endpl; plp++, poff += PAGESIZE) {
+		  	if ((*plp = page_lookup(vp, poff)) != NULL) {
 
-	} /* for */
+				/* page_lookup doesn't hold the page. */
 
-	if (error) {
-		if (bufp) {
-
-			/*
-			 * Turn B_WRITE off and B_READ on so pageout doesn't
-			 * try to write this later.  B_ASYNC provokes pvn_done
-			 * to call pageio_done which, seeing B_REMAPPED, will
-			 * call bp_mapout.
-			 */
-
-			ASSERT(bufp->b_flags &
-			  (B_REMAPPED | B_ASYNC | B_WRITE));
-
-			bufp->b_flags &= ~B_WRITE;
-			bufp->b_flags |= (B_ERROR | B_READ);
-			pvn_done(bp);
-		} else if (pl) {
-			pvn_fail(pl, 0);
+				PAGE_HOLD(*plp);
+				ASSERT((*plp)->p_keepcnt > 0);
+			}
 		}
 
+		/*
+		 * Find intervals of resident pages.  Allocate a separate
+		 * message block for each contiguous chunk of pages, a separate
+		 * one for each nonresident chunk.  The chain of blocks will
+		 * be hooked into a single RFS message.  At end, release all
+		 * pages held in loop above.
+		 *
+		 * Notice extra trip through loop to scavenge last pages.
+		 */
+
+		for (firstpp = lastpp = plp = pl,
+		   resident = nextresident = *firstpp != NULL;
+		  !error && plp <= endpl;
+		  lastpp = plp++) {
+			size_t	chunksz;
+
+			if (plp < endpl) {
+
+				/*
+				 * else retain previous value and process last
+				 * chunk.
+				 */
+
+				nextresident = *plp != NULL;
+			}
+
+			if (resident != nextresident || plp == endpl) {
+
+				/*
+				 * End of chunk.  Otherwise, just update
+				 * lastpp and keep working on chunk.
+				 */
+
+				ASSERT(lastpp == plp - 1);
+
+				if (!bp) {
+
+					/*
+					 * This is the first message block.
+					 * We allocate header separately to
+					 * suppress piggybacking, so we can
+					 * copy data in easily.
+					 */ 
+
+					error = rf_allocmsg(hdrsz, (size_t)0,
+					  pri, canfail, NULLCADDR, NULLFRP,
+					  &bp);
+					if (error) {
+						break;
+					}
+					lastbp = bp;
+				}
+
+				chunksz = MIN((lastpp - firstpp + 1) * PAGESIZE,
+				  nbytes);
+				if (resident) {
+
+					/* end resident chunk */
+
+					error = rfesb_fbread(vp,
+					  uiop->uio_offset, chunksz, S_OTHER,
+					  (size_t)0, pri, canfail, &nextbp);
+				} else {
+
+					/* end nonresident chunk */
+
+					error = rf_allocmsg((size_t)0, chunksz,
+					  pri, canfail, NULLCADDR, NULLFRP,
+					  &nextbp);
+				}
+
+				if (error) {
+					break;
+				}
+
+				lastbp = lastbp->b_cont = nextbp;
+				nextbp = NULL;
+				if (lastbp->b_cont) {
+
+					/* rfesb_fbread does not chain */
+
+					lastbp = lastbp->b_cont;
+				}
+				ASSERT(!lastbp->b_cont);
+
+				if (resident) {
+					uioskip(uiop, chunksz);
+				} else {
+					error = uiomove((caddr_t)lastbp->b_rptr,
+					  (long)chunksz, UIO_WRITE, uiop);
+				}
+				nbytes -= chunksz;
+
+				firstpp = plp;
+				resident = nextresident;
+
+			} /* if end chunk */
+
+		} /* for */
+
+		for (firstpp = pl ; firstpp < endpl; firstpp++) {
+			if (*firstpp) {
+				ASSERT((*firstpp)->p_keepcnt > 0);
+				PAGE_RELE(*firstpp);
+			}
+		}
+
+	} /* while */
+
+	if (error) {
 		rf_freemsg(bp);
 		bp = NULL;
 	}
@@ -1742,13 +1662,16 @@ rfcl_esbwrmsg(sdp, rf_rwap, hdrsz, resid, pri, canfail, bpp)
 }
 
 /*
- * Give up the vnode reference in rep->sdp.  sdp must be locked.
+ * Give up the vnode reference in rep->sdp, using rep->crp; also give up
+ * the reference to rep->crp and free *rep.  sdp must be locked.
  */
 STATIC void
-rfcl_dorele(sdp, crp)
-	sndd_t		*sdp;
-	cred_t		*crp;
+rfcl_dorele(wp)
+	rfa_work_t	*wp;
 {
+	
+	sndd_t		*sdp = ((rfcl_rele_t *)wp->rfaw_farg)->sdp;
+	cred_t		*crp = ((rfcl_rele_t *)wp->rfaw_farg)->crp;
 	int		error = 0;
 	vnode_t		*vp = SDTOV(sdp);
 	mblk_t		*bp = NULL;
@@ -1762,42 +1685,38 @@ rfcl_dorele(sdp, crp)
 	ASSERT(sdp->sd_stat & SDLOCKED);
 	ASSERT(!(vp->v_flag & VROOT));
 
+	kmem_free((caddr_t)wp, sizeof(*wp));
+
+	if (QPTOGP(sdp->sd_queue)->version > RFS1DOT0) {
+		rqarg.rqrele.vcount = sdp->sd_remcnt;
+	}
+
 	(void)rcvd_create(FALSE, RDSPECIFIC, &rdp);
 	ASSERT(rdp);
 	rdp->rd_sdp = sdp;
 
-	if (vcver > RFS1DOT0) {
-		rqarg.rqrele.vcount = sdp->sd_remcnt;
+	do {
 		(void)rf_allocmsg(RF_MIN_REQ(vcver), (size_t)0, BPRI_LO,
 		  FALSE, NULLCADDR, NULLFRP, &bp);
 		ASSERT(bp);
 
 		rfcl_reqsetup(bp, sdp, crp, RFINACTIVE, ULIMIT);
 		RF_REQ(bp)->rq_arg = rqarg;
-		(void)rf_sndmsg(sdp, bp, RF_MIN_REQ(vcver), rdp, FALSE);
-	} else {
-		do {
-			(void)rf_allocmsg(RF_MIN_REQ(vcver), (size_t)0, BPRI_LO,
-			  FALSE, NULLCADDR, NULLFRP, &bp);
-			ASSERT(bp);
 
-			rfcl_reqsetup(bp, sdp, crp, RFINACTIVE, ULIMIT);
-			RF_REQ(bp)->rq_arg = rqarg;
+		if ((error = rfcl_xac(&bp, RF_MIN_REQ(vcver), rdp, vcver, FALSE,
+		  &nacked)) == 0) {
+			rf_freemsg(bp);
+			bp = NULL;
+		}
 
-			if ((error = rfcl_xac(&bp, RF_MIN_REQ(vcver), rdp,
-			  vcver, FALSE, &nacked)) == 0) {
-				rf_freemsg(bp);
-				bp = NULL;
-			}
-
-		} while (nacked);
-	}
+	} while (nacked);
 
 	sdp->sd_stat &= ~SDINTER;
 
 	SDUNLOCK(sdp);
 
 	rcvd_free(&rdp);
+	crfree(crp);
 	if (!error && vp->v_pages) {
 
 		/*

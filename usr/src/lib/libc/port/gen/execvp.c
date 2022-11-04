@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/execvp.c	1.20"
+#ident	"@(#)libc-port:gen/execvp.c	1.16"
 /*LINTLIBRARY*/
 /*
  *	execlp(name, arg,...,0)	(like execl, but does path search)
@@ -46,7 +46,7 @@ execlp(name, va_alist) char *name; va_dcl
 
 int
 execvp(name, argv)
-char	*name, *const *argv;
+char	*name, **argv;
 {
 	const char	*pathstr;
 	char	fname[128];
@@ -56,12 +56,8 @@ char	*name, *const *argv;
 	register unsigned etxtbsy=1;
 	register int eacces=0;
 
-	if (*name == '\0') {
-		errno = ENOENT;
-		return(-1);
-	}
 	if((pathstr = getenv("PATH")) == NULL)
-		pathstr = "/sbin:/usr/bin:";
+		pathstr = "/bin:/usr/bin:";
 	cp = strchr(name, '/')? (const char *)"": pathstr;
 
 	do {
@@ -78,7 +74,7 @@ char	*name, *const *argv;
 					return(-1);
 				}
 			}
-			(void) execv((const char *)"/sbin/sh", newargs);
+			(void) execv((const char *)"/bin/sh", newargs);
 			return(-1);
 		case ETXTBSY:
 			if(++etxtbsy > 5)

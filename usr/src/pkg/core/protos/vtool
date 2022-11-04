@@ -1,59 +1,63 @@
-#ident	"@(#)pkgcore:protos/vtool	1.4"
+#ident	"@(#)pkgcore:protos/vtool	1.2"
 
 d vtool /usr/sadm/bin 755 bin bin
 f vtool /usr/sadm/bin/puttext 555 bin bin
 
 f vtool /usr/bin/ckint 555 bin bin
-f vtool /usr/sadm/bin/valint 555 bin bin
-f vtool /usr/sadm/bin/helpint 555 bin bin
-f vtool /usr/sadm/bin/errint 555 bin bin
+s vtool /usr/sadm/bin/valint=/usr/bin/ckint
+s vtool /usr/sadm/bin/helpint=/usr/bin/ckint
+s vtool /usr/sadm/bin/errint=/usr/bin/ckint
 
 f vtool /usr/bin/ckitem 555 bin bin
-f vtool /usr/sadm/bin/helpitem 555 bin bin
-f vtool /usr/sadm/bin/erritem 555 bin bin
+s vtool /usr/sadm/bin/valitem=/usr/bin/ckitem
+s vtool /usr/sadm/bin/helpitem=/usr/bin/ckitem
+s vtool /usr/sadm/bin/erritem=/usr/bin/ckitem
 
 f vtool /usr/bin/ckpath 555 bin bin
-f vtool /usr/sadm/bin/valpath 555 bin bin
-f vtool /usr/sadm/bin/helppath 555 bin bin
-f vtool /usr/sadm/bin/errpath 555 bin bin
+s vtool /usr/sadm/bin/valpath=/usr/bin/ckpath
+s vtool /usr/sadm/bin/helppath=/usr/bin/ckpath
+s vtool /usr/sadm/bin/errpath=/usr/bin/ckpath
 
 f vtool /usr/bin/ckrange 555 bin bin
-f vtool /usr/sadm/bin/valrange 555 bin bin
-f vtool /usr/sadm/bin/helprange 555 bin bin
-f vtool /usr/sadm/bin/errange 555 bin bin
+s vtool /usr/sadm/bin/valrange=/usr/bin/ckrange
+s vtool /usr/sadm/bin/helprange=/usr/bin/ckrange
+s vtool /usr/sadm/bin/errange=/usr/bin/ckrange
 
 f vtool /usr/bin/ckstr 555 bin bin
-f vtool /usr/sadm/bin/valstr 555 bin bin
-f vtool /usr/sadm/bin/helpstr 555 bin bin
-f vtool /usr/sadm/bin/errstr 555 bin bin
+s vtool /usr/sadm/bin/valstr=/usr/bin/ckstr
+s vtool /usr/sadm/bin/helpstr=/usr/bin/ckstr
+s vtool /usr/sadm/bin/errstr=/usr/bin/ckstr
 
 f vtool /usr/bin/ckyorn 555 bin bin
-f vtool /usr/sadm/bin/valyorn 555 bin bin
-f vtool /usr/sadm/bin/helpyorn 555 bin bin
-f vtool /usr/sadm/bin/erryorn 555 bin bin
+s vtool /usr/sadm/bin/valyorn=/usr/bin/ckyorn
+s vtool /usr/sadm/bin/helpyorn=/usr/bin/ckyorn
+s vtool /usr/sadm/bin/erryorn=/usr/bin/ckyorn
 
 f vtool /usr/bin/ckkeywd 555 bin bin
+s vtool /usr/sadm/bin/valkeywd=/usr/bin/ckkeywd
+s vtool /usr/sadm/bin/helpkeywd=/usr/bin/ckkeywd
+s vtool /usr/sadm/bin/errkeywd=/usr/bin/ckkeywd
 
 f vtool /usr/bin/cktime 555 bin bin
-f vtool /usr/sadm/bin/valtime 555 bin bin
-f vtool /usr/sadm/bin/helptime 555 bin bin
-f vtool /usr/sadm/bin/errtime 555 bin bin
+s vtool /usr/sadm/bin/valtime=/usr/bin/cktime
+s vtool /usr/sadm/bin/helptime=/usr/bin/cktime
+s vtool /usr/sadm/bin/errtime=/usr/bin/cktime
 
 f vtool /usr/bin/ckdate 555 bin bin
-f vtool /usr/sadm/bin/valdate 555 bin bin
-f vtool /usr/sadm/bin/helpdate 555 bin bin
-f vtool /usr/sadm/bin/errdate 555 bin bin
+s vtool /usr/sadm/bin/valdate=/usr/bin/ckdate
+s vtool /usr/sadm/bin/helpdate=/usr/bin/ckdate
+s vtool /usr/sadm/bin/errdate=/usr/bin/ckdate
 
 f vtool /usr/bin/ckuid 555 bin bin
-f vtool /usr/bin/dispuid 555 bin bin
-f vtool /usr/sadm/bin/valuid 555 bin bin
-f vtool /usr/sadm/bin/helpuid 555 bin bin
-f vtool /usr/sadm/bin/erruid 555 bin bin
-f vtool /usr/sadm/bin/dispuid 555 bin bin
+l vtool /usr/bin/dispuid=/usr/bin/ckuid
+s vtool /usr/sadm/bin/valuid=/usr/bin/ckuid
+s vtool /usr/sadm/bin/helpuid=/usr/bin/ckuid
+s vtool /usr/sadm/bin/erruid=/usr/bin/ckuid
+s vtool /usr/sadm/bin/dispuid=/usr/bin/ckuid
 
 f vtool /usr/bin/ckgid 555 bin bin
-f vtool /usr/bin/dispgid 555 bin bin
-f vtool /usr/sadm/bin/valgid 555 bin bin
-f vtool /usr/sadm/bin/helpgid 555 bin bin
-f vtool /usr/sadm/bin/errgid 555 bin bin
-f vtool /usr/sadm/bin/dispgid 555 bin bin
+l vtool /usr/bin/dispgid=/usr/bin/ckgid
+s vtool /usr/sadm/bin/valgid=/usr/bin/ckgid
+s vtool /usr/sadm/bin/helpgid=/usr/bin/ckgid
+s vtool /usr/sadm/bin/errgid=/usr/bin/ckgid
+s vtool /usr/sadm/bin/dispgid=/usr/bin/ckgid

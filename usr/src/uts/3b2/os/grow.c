@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/grow.c	1.35"
+#ident	"@(#)kernel:os/grow.c	1.33"
 #include "sys/types.h"
 #include "sys/bitmasks.h"
 #include "sys/param.h"
@@ -75,7 +75,7 @@ db_brk(size)
 
 	if (nva > (caddr_t) UVUBLK 
 	  || size < 0
-	  || (size > p->p_brksize && size > u.u_rlimit[RLIMIT_DATA].rlim_cur))
+	  || size > u.u_rlimit[RLIMIT_DATA].rlim_cur)
 		return ENOMEM;
 
 	change = nva - ova;
@@ -132,7 +132,7 @@ grow(sp)
 	register int	ssize;
 	register int 	lckflag = 0;
 
-	ssize = btoc(p->p_stksize);
+	ssize = btoc(p->p_stksize*sizeof(int *));
 	si = btoc((u_int)sp - (u_int)p->p_stkbase) - ssize + SINCR;
 
 	if (si == 0 || (u_int) sp >= UVSHM)
@@ -148,7 +148,7 @@ grow(sp)
 				 lckflag = 1;
 			}
 		}
-		if (as_map(p->p_as, p->p_stkbase + ctob(ssize),
+		if (as_map(p->p_as, (caddr_t)p->p_stkbase + ctob(ssize),
 		    (u_int)ctob(si), segvn_create, zfod_argsp) != 0) {
 			if (lckflag)
 				p->p_as->a_paglck = 0;
@@ -161,11 +161,11 @@ grow(sp)
 		 * Release mapping to shrink UNIX stack segment
 		 */
 		(void) as_unmap(p->p_as, 
-		  p->p_stkbase + ctob(ssize+si), (u_int)ctob(-si));
+		  (caddr_t)p->p_stkbase + ctob(ssize+si), (u_int)ctob(-si));
 	}
 
-	p->p_stksize += ctob(si);
-	u.u_pcb.sub = (int *)(_VOID *)(p->p_stkbase + p->p_stksize);
+	p->p_stksize += howmany(ctob(si), sizeof(int *));
+	u.u_pcb.sub = p->p_stkbase + p->p_stksize;
 
 	return (1);
 

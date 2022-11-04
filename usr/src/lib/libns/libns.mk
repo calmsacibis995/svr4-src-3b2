@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libns:libns.mk	1.10.5.1"
+#ident	"@(#)libns:libns.mk	1.10.4.1"
 # This makefile makes libns.a, which is the library for
 # the name server library.
 # NOTE: this library is not for general use.  It is put
@@ -116,8 +116,6 @@ $(LIBNAME)(swtab.o): $(INC)/sys/nserve.h $(INC)/sys/rf_cirmgr.h\
 $(LIBNAME)(uidmap.o): idload.h $(INC)/sys/types.h $(INC)/sys/rf_sys.h\
 	$(INC)/errno.h $(INC)/nserve.h
 $(LIBNAME)(rfs_up.o): $(INC)/nserve.h $(INC)/sys/types.h $(INC)/sys/nserve.h\
-	$(INC)/sys/list.h $(INC)/sys/vnode.h $(INC)/sys/rf_messg.h\
-	$(INC)/sys/rf_comm.h $(INC)/errno.h $(INC)/sys/rf_sys.h\
-	$(INC)/stdio.h nslog.h
+	$(INC)/sys/rf_sys.h
 $(LIBNAME)(ns_syntax.o): $(INC)/nserve.h
 $(LIBNAME)(rfrcv.o): $(INC)/tiuser.h

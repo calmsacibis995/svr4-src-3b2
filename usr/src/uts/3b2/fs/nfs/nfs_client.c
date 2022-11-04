@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_client.c	1.11"
+#ident	"@(#)fs:fs/nfs/nfs_client.c	1.10"
 
 /*	@(#)nfs_client.c 1.9 88/08/02 SMI 	*/
 
@@ -118,13 +118,13 @@ nfs_attrcache(vp, na)
 {
 
 #ifdef	VNOCACHE
-	/* LINTED pointer alignment */
-	if ((vp->v_flag & VNOCACHE) || vtomi(vp)->mi_noac)
+	if ((vp->v_flag & VNOCACHE) || vtomi(vp)->mi_noac) {
 #else
 	/* LINTED pointer alignment */
-	if (vtomi(vp)->mi_noac)
+	if (vtomi(vp)->mi_noac) {
 #endif
 		return;
+	}
 	/* LINTED pointer alignment */
 	nattr_to_vattr(vp, na, &vtor(vp)->r_attr);
 	set_attrcache_time(vp);
@@ -140,13 +140,13 @@ nfs_attrcache_va(vp, va)
 {
 
 #ifdef	VNOCACHE
-	/* LINTED pointer alignment */
-	if ((vp->v_flag & VNOCACHE) || vtomi(vp)->mi_noac)
+	if ((vp->v_flag & VNOCACHE) || vtomi(vp)->mi_noac) {
 #else
 	/* LINTED pointer alignment */
-	if (vtomi(vp)->mi_noac)
+	if (vtomi(vp)->mi_noac) {
 #endif
 		return;
+	}
 	/* LINTED pointer alignment */
 	vtor(vp)->r_attr = *va;
 	vp->v_type = va->va_type;

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:ml/cdump.c	1.10"
+#ident	"@(#)kernel:ml/cdump.c	1.9"
 
 #include "sys/sbd.h"
 #include "sys/types.h"
@@ -426,8 +426,9 @@ cdump()
 	
 	/* SPMEM is start of kernel text */
 
-	crash_iptr = (int *)SPMEM - howmany(CHDR_OFFSET, sizeof(int *));
-	*((struct crash_hdr *) crash_iptr) = crash_hdr;	/* structure copy */
+	bcopy((caddr_t)&crash_hdr,
+		(char *)SPMEM - CHDR_OFFSET, 
+		sizeof(struct crash_hdr));
 
 	crash_iptr = (int *)SPMEM 
 		- howmany(CHDR_OFFSET, sizeof(int *))

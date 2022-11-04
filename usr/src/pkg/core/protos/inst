@@ -1,4 +1,4 @@
-#ident	"@(#)pkgcore:protos/inst	1.3"
+#ident	"@(#)pkgcore:protos/inst	1.2"
 
 !PKGADM=/var/sadm/install
 !PKGBIN=/usr/sadm/install/bin
@@ -21,7 +21,7 @@ f inst /usr/sbin/pkgadd 500 root sys
 l inst /usr/sbin/pkgask=/usr/sbin/pkgadd
 f inst /usr/bin/pkginfo 0555 bin sys
 f inst /usr/bin/pkgparam 0555 root sys
-f inst /usr/sbin/pkgchk 500 root sys
+f inst /usr/sbin/pkgchk 0555 root sys
 f inst /usr/sbin/pkgrm 500 root sys
 x inst $PKGADM 555 bin bin
 x inst $PKGADM/admin 555 bin bin

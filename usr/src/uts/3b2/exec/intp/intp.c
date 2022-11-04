@@ -5,12 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)exec:exec/intp/intp.c	1.10"
+#ident	"@(#)exec:exec/intp/intp.c	1.8"
 
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
-#include "sys/systm.h"
 #include "sys/signal.h"
 #include "sys/psw.h"
 #include "sys/pcb.h"
@@ -52,16 +51,19 @@ struct intpdata {
 	char	*intp_arg;
 };
 
+
 /*
  * Crack open a '#!' line.
  */
 STATIC int
-getintphead(idatap, ehdp)
+getintphead(vp, idatap, ehdp)
+	struct vnode *vp;
 	register struct intpdata *idatap;
 	exhda_t *ehdp;
 {
 	register int error;
 	register char *cp, *linep;
+	int resid;
 	int rdsz;
 	int ssz = 0;
 
@@ -131,27 +133,28 @@ getintphead(idatap, ehdp)
 	return 0;
 }
 
+
 int
-intpexec(vp, args, level, execsz, ehdp, setid)
-	struct vnode *vp;
-	struct uarg *args;
-	int level;
-	long *execsz;
-	exhda_t *ehdp;
-	int setid;
+intpexec(vp, args, level, execsz, ehdp)
+struct vnode *vp;
+struct uarg *args;
+int level;
+long *execsz;
+exhda_t *ehdp;
 {
 	vnode_t *nvp;
-	int num, error = 0;
-	char devfd[14];
-	int fd = -1;
+	int num,c,i;
+	int error=0;
+	int *from,*to;
 	struct intpdata idata;
 	struct pathname intppn;
+	extern int userstack[];
 
 	if (level) {		/* Can't recurse */
 		error = ENOEXEC;
 		goto bad;
 	}
-	if ((error = getintphead(&idata, ehdp)) != 0)
+	if ((error = getintphead(vp, &idata, ehdp)) != 0)
 		goto bad;
 	/*
 	 * Look the new vnode up.
@@ -168,31 +171,13 @@ intpexec(vp, args, level, execsz, ehdp, setid)
 	if (idata.intp_arg)
 		num++;
 	args->prefixc = num;
-	args->prefixp = &idata.intp_name;
+	args->prefixp = (&idata.intp_name);
 	args->prefixsize = idata.intp_ssz;
 	
-	if (setid) { /* close security hole */
-		strcpy(devfd, "/dev/fd/");
-		if (error = execopen(&vp, &fd)) {
-			VN_RELE(nvp);
-			goto bad;
-		}
-		numtos(fd, &devfd[8]);
-		args->fname = devfd;
-	}
-	
-	error = gexec(&nvp, args, ++level, execsz);
+	error = gexec(nvp, args, ++level, execsz);
+
 	VN_RELE(nvp);
-
-	if (error)
-		goto bad;
-
-	return 0;
-
 bad:
-	if (fd != -1)
-		(void)execclose(fd);
 	return error;
+
 }
-
-

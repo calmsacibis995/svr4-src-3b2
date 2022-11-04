@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/fs_subr.c	1.22"
+#ident	"@(#)fs:fs/fs_subr.c	1.16"
 
 /*
  * Generic vnode operations.
@@ -17,9 +17,7 @@
 #include "sys/errno.h"
 #include "sys/fcntl.h"
 #include "sys/flock.h"
-#include "sys/statvfs.h"
 #include "sys/uio.h"
-#include "sys/unistd.h"
 #include "sys/vfs.h"
 #include "sys/vnode.h"
 #include "sys/file.h"
@@ -35,7 +33,6 @@
 #include "sys/cmn_err.h"
 #include "sys/list.h"
 #include "sys/stream.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "fs/fs_subr.h"
 
@@ -110,31 +107,25 @@ fs_frlock(vp, cmd, bfp, flag, offset, cr)
 	case F_O_GETLK: 
 		bfp->l_pid = u.u_procp->p_epid;
 		bfp->l_sysid = u.u_procp->p_sysid;
-		frcmd = 0;
-		break;
-
+		/* FALLTHROUGH */
 	case F_RGETLK: 
-		frcmd = RCMDLCK;
+		frcmd = 0;
 		break;
 
 	case F_SETLK: 
 		bfp->l_pid = u.u_procp->p_epid;
 		bfp->l_sysid = u.u_procp->p_sysid;
-		frcmd = SETFLCK;
-		break;
-
+		/* FALLTHROUGH */
 	case F_RSETLK: 
-		frcmd = SETFLCK|RCMDLCK;
+		frcmd = SETFLCK;
 		break;
 
 	case F_SETLKW: 
 		bfp->l_pid = u.u_procp->p_epid;
 		bfp->l_sysid = u.u_procp->p_sysid;
-		frcmd = SETFLCK|SLPFLCK;
-		break;
-
+		/* FALLTHROUGH */
 	case F_RSETLKW: 
-		frcmd = SETFLCK|SLPFLCK|RCMDLCK;
+		frcmd = SETFLCK|SLPFLCK;
 		break;
 		
 	default:
@@ -221,77 +212,5 @@ fs_vcode(vp, vcp)
 			}
 		}
 	}
-	return error;
-}
-
-/*
- * POSIX pathconf() support.
- */
-/* ARGSUSED */
-int
-fs_pathconf(vp, cmd, valp, cr)
-	struct vnode *vp;
-	int cmd;
-	u_long *valp;
-	struct cred *cr;
-{
-	register u_long val;
-	register int error = 0;
-	struct statvfs vfsbuf;
-
-	switch (cmd) {
-
-	case _PC_LINK_MAX:
-		val = MAXLINK;
-		break;
-
-	case _PC_MAX_CANON:
-		val = MAX_CANON;
-		break;
-
-	case _PC_MAX_INPUT:
-		val = MAX_INPUT;
-		break;
-
-	case _PC_NAME_MAX:
-		struct_zero((caddr_t)&vfsbuf, sizeof(vfsbuf));
-		if (error = VFS_STATVFS(vp->v_vfsp, &vfsbuf))
-			break;
-		val = vfsbuf.f_namemax;
-		break;
-
-	case _PC_PATH_MAX:
-		val = MAXPATHLEN;
-		break;
-
-	case _PC_PIPE_BUF:
-		val = PIPE_BUF;
-		break;
-
-	case _PC_NO_TRUNC:
-		if (vp->v_vfsp->vfs_flag & VFS_NOTRUNC)
-			val = 1;	/* NOTRUNC is enabled for vp */
-		else
-			val = (u_long)-1;
-		break;
-
-	case _PC_VDISABLE:
-		val = _POSIX_VDISABLE;
-		break;
-
-	case _PC_CHOWN_RESTRICTED:
-		if (rstchown)
-			val = rstchown;		/* chown restricted enabled */
-		else
-			val = (u_long)-1;
-		break;
-
-	default:
-		error = EINVAL;
-		break;
-	}
-
-	if (error == 0)
-		*valp = val;
 	return error;
 }

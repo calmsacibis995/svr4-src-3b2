@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/ip_main.c	1.9"
+#ident	"@(#)netinet:netinet/ip_main.c	1.7"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -129,7 +129,6 @@ extern struct ip_provider provider[];
 extern int ipcnt;
 extern int ipprovcnt;
 
-static int	ipversprinted;
 
 /* ARGSUSED */
 ipopen(q, dev, flag, sflag)
@@ -139,10 +138,6 @@ ipopen(q, dev, flag, sflag)
 	mblk_t         *bp;
 	struct stroptions *sop;
 
-	if (!ipversprinted) {
-		ipversion();
-		ipversprinted = 1;
-	}
 	if (!ipinited && (ipinit(), !ipinited))
 		return (OPENFAIL);
 	dev = minor(dev);

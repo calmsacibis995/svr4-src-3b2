@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/mon.c	2.23"
+#ident	"@(#)libc-port:gen/mon.c	2.18"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -16,20 +16,13 @@
  *		  where name consists of argv[0] suitably massaged.
  *
  *
- *	Routines:
- *		(global) _monitor	init, cleanup for prof(1)iling
- *		(global) _mcount	function call counter
- *		(global) _mcount_newent	call count entry manager
- *		(static) _mnewblock	call count block allocator
  *
- *
- *	Monitor(), coordinating with mcount(), mcount_newent() and mnewblock(), 
+ *	Monitor(), in coordination with mcount() and mnewblock(), 
  *	maintains a series of one or more blocks of prof-profiling 
  *	information.  These blocks are added in response to calls to
- *	monitor() (explicitly or via mcrt[01]'s _start) and, via mcount()'s
- *	calls to mcount_newent() thence to mnewblock().
- *	The blocks are tracked via a linked list of block anchors,
- *	which each point to a block.
+ *	monitor(), explicitly or via mcrt0's _start, and, via mcount()'s
+ *	calls to mnewblock().  The blocks are tracked via a linked list 
+ *	of block anchors, which each point to a block.
  *
  *
  *	An anchor points forward, backward and 'down' (to a block).
@@ -58,27 +51,22 @@
  *		+           +
  *		+ execution +	// data collected by system call,
  *		+ profile   +	// profil(2) (assumed ALWAYS specified
- *		+ histogram +	// by monitor()-caller, even if small;
- *		+           +	// never specified by mnewblock() ).
+ *		+ histogram +	// by monitor()-caller; never specified
+ *		+           +	// by mnewblock() ).
  *		+-----------+
  *
  *	The first time monitor() is called, it sets up the chain
- *	by allocating an anchor and initializing countbase and countlimit
- *	to zero.  Everyone assumes that they start out zeroed.
+ *	by allocating an anchor and initializing countbase/limit.
+ *	Jes aboot EVERYONE assumes that they start out 0ed.
  *
- *	When a user (or _start from mcrt[01]) calls monitor(), they
+ *	When a user (or _start from mcrt0) calls monitor(), they
  *	register a buffer which contains the third region (either with
  *	a meaningful size, or so short that profil-ing is being shut off).
- *
- *	For each fcn, the first time it calls mcount(), mcount calls
- *	mcount_newent(), which parcels out the fcn call count entries
- *	from the current block, until they are exausted; then it calls
- *	mnewblock().
- *
- *	Mnewbloc() allocates a block Without a third region, and
- *	links in a new associated anchor, adding a new anchor&block pair
- *	to the linked list.  Each new mnewblock() block or user block,
- *	is added to the list as it comes in, FIFO.
+ *	Mcount() parcels out the fcn call count entries from the
+ *	current block, until they are exausted; then it calls mnewblock().
+ *	Mnewbloc() allocates a block Without the third region, and
+ *	links in a new associated anchor.  Each new mnewblock() or
+ *	user block, is added to the list as it comes in.
  *
  *	When monitor() is called to close up shop, it writes out
  *	a summarizing header, ALL the fcn call counts from ALL
@@ -87,23 +75,26 @@
  *	This preserves all call count information, even when
  *	new blocks are specified.
  *
- *	NOTE - no block passed to monitor() may be freed, until
+ *	NB - no block passed to monitor() may be freed, until
  *	it is called to clean up!!!!
  *
+ *	NB - Only monitor(), mcount() and mnewblock() may change
+ *	countbase and countlimit!!!!
  */
 #ifdef __STDC__
 	#pragma weak monitor = _monitor
 #endif
 #include "synonyms.h"
-#include "shlib.h"
 #include <sys/types.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <mon.h>
 #define PROFDIR	"PROFDIR"
 
 
+#ifdef DEBUG
+	void dumpAnchors(), showArray();
+#endif
 
 
 char **___Argv = NULL; /* initialized to argv array by mcrt0 (if loaded) */
@@ -114,14 +105,9 @@ char **___Argv = NULL; /* initialized to argv array by mcrt0 (if loaded) */
 	 * that function is called.
 	 * When countbase reaches countlimit, mcount() calls
 	 * mnewblock() to link in a new block.
-	 *
-	 * Only monitor/mcount/mcount_newent/mnewblock() should change these!!
-	 * Correct that: only these routines are ABLE to change these;
-	 * countbase/countlimit are now STATIC!
+	 * Only monitor/mcount/mnewblock() should change these!!
 	 */
-static
 char *countbase;	/* address of next pc,count cell to use in this block */
-static
 char *_countlimit;	/* address limit for cells (addr after last cell)  */
 
 
@@ -145,9 +131,22 @@ static ANCHOR    firstAnchor;		/* the first anchor to use - hopefully */
 					/* a speedup for most cases. */
 
 
-static char *mon_out;
+static char mon_out[100];
+static char progname[15];
 
-
+
+#ifdef DEBUG
+# define MNLISTMAX	(64)
+	extern int _mcountcalls;
+	extern int _mc__cells;
+	extern int _mc__mnews;
+	static int mnewblkcalls =  0;
+	/* used by mnewblkcalls to track areas allocated - for debugging! */
+	static ANCHOR *mnewlist[MNLISTMAX];
+
+	int monitorCalls = 0;	/* #times monitor called */
+	int monitorActive = 0;	/* 1-if active, 0-if inactive */
+#endif
 
 void
 monitor(alowpc, ahighpc, buffer, bufsize, nfunc)
@@ -159,23 +158,65 @@ int	nfunc;		/* max no. of functions whose calls are counted
 {
 	int scale;
 	long text;
-	register char *s;
+	register char *s, *name = mon_out;
 	struct hdr *hdrp;
 	ANCHOR  *newanchp;
 	int ssiz;
 	char	*lowpc = (char *)alowpc;
 	char	*highpc = (char *)ahighpc;
 
+#ifdef DEBUG
+	monitorCalls++; monitorActive=1;
+
+	printf("\t***>\nentering monitor(): low/hipc=%x/%x (hex).\n", lowpc,highpc);
+	printf("entering for %s-type call.\n",
+		((lowpc==NULL) ? "EndCleanup" : "InitialSetup" )  );
+	printf("number of calls to mcount,mnewblock so far, %d,%d\n",
+		_mcountcalls, mnewblkcalls );
+	printf("number of cells taken, calls to mnewblock, %d,%d\n", 
+		_mc__cells, _mc__mnews );
+	showArray();
+	printf(" buffer %x, bufsize %d, nfunc %d\n", buffer, bufsize, nfunc );
+#endif
 
 
 	if (lowpc == NULL) {		/* true only at the end */
 		if (curAnchor != NULL) { /* if anything was collected!.. */
+			register pid_t pid;
+			register int  n;
 
+#ifdef DEBUG
+			aNewReport();
+#endif
+			if (progname[0] != '\0') { /* finish constructing
+						    "PROFDIR/pid.progname" */
+			    /* set name to end of PROFDIR */
+			    name = strrchr(mon_out, '\0');  
+			    if ((pid = getpid()) <= 0) /* extra test just in case */
+				pid = 1; /* getpid returns something inappropriate */
+			    for (n = 10000; n > pid; n /= 10)
+				; /* suppress leading zeros */
+			    for ( ; ; n /= 10) {
+				*name++ = pid/n + '0';
+				if (n == 1)
+				    break;
+				pid %= n;
+			    }
+			    *name++ = '.';
+			    (void)strcpy(name, progname);
+			}
+#ifdef DEBUG
+	printf("write to file: %s\n", name);
+	dumpAnchors();
+#endif
 
 			profil((char *)NULL, 0, 0, 0);
 			if ( !writeBlocks() )
 				perror(mon_out);
 		}
+#ifdef DEBUG
+		monitorActive=0;
+#endif
 		return;
 	}
 	/*
@@ -199,44 +240,20 @@ int	nfunc;		/* max no. of functions whose calls are counted
 		return;
 
 	if ((s = getenv(PROFDIR)) == NULL) /* PROFDIR not in environment */
-		mon_out = MON_OUT; /* use default "mon.out" */
+		(void)strcpy(name, MON_OUT); /* use default "mon.out" */
 	else if (*s == '\0') /* value of PROFDIR is NULL */
 		return; /* no profiling on this run */
-	else { /* construct "PROFDIR/pid.progname" */
-		register int n;
-		register pid_t pid;
-		register char *name;
-		size_t len;
+	else { /* set up mon_out and progname to construct
+		  "PROFDIR/pid.progname" when done profiling */
 
-		len = strlen(s);
-		/* 15 is space for /pid.mon.out\0, if necessary */
-		if ((mon_out = malloc(len + strlen(___Argv[0]) + 15)) == NULL) {
-			perror("");
-			return;
-		}
-		strcpy(mon_out, s);
-		name = mon_out + len;
+		while (*s != '\0') /* copy PROFDIR value (path-prefix) */
+			*name++ = *s++;
 		*name++ = '/'; /* two slashes won't hurt */
-
-		if ((pid = getpid()) <= 0) /* extra test just in case */
-			pid = 1; /* getpid returns something inappropriate */
-		for (n = 10000; n > pid; n /= 10)
-			; /* suppress leading zeros */
-		for ( ; ; n /= 10) {
-			*name++ = pid/n + '0';
-			if (n == 1)
-			    break;
-			pid %= n;
-		}
-		*name++ = '.';
-
 		if (___Argv != NULL) /* mcrt0.s executed */
 			if ((s = strrchr(___Argv[0], '/')) != NULL)
-				strcpy(name, s + 1);
+			    strcpy(progname, s + 1);
 			else
-				strcpy(name, ___Argv[0]);
-		else
-			strcpy(name, MON_OUT);
+			    strcpy(progname, ___Argv[0]);
 	}
 
 
@@ -271,6 +288,11 @@ int	nfunc;		/* max no. of functions whose calls are counted
 						/* (set size of region 3) */
 	newanchp->histSize = bufsize*sizeof(WORD) - (_countlimit-(char*)buffer);
 
+#ifdef DEBUG
+	printf("anchor %x:\n\tbuffer at %x\n\thistsize == %d (dec)\n", 
+		newanchp, newanchp->monBuffer, newanchp->histSize);
+	printf("countbase/limit: %x/%x\n", countbase, _countlimit );
+#endif
 
 					/* done w/regions 1 + 2: setup 3 */
 					/* to activate profil processing. */
@@ -297,9 +319,12 @@ int	nfunc;		/* max no. of functions whose calls are counted
 
 	curAnchor = newanchp;		/* make latest addition, the cur anchor */
 
+#ifdef DEBUG
+		monitorActive=0;
+#endif
 }
 
-
+
 	/* writeBlocks() - write accumulated profiling info, std fmt.
 	 *
 	 * This routine collects the function call counts, and the
@@ -309,7 +334,8 @@ int	nfunc;		/* max no. of functions whose calls are counted
 	 */
 static
 int
-writeBlocks() {
+writeBlocks()
+{
 	int fd;
 	int ok;
 
@@ -341,6 +367,10 @@ writeBlocks() {
 
 	ok = (write(fd, (char *)&sum, sizeof(sum)) == sizeof(sum)) ;
 
+#ifdef DEBUG
+	printf("lowpc, highpc = 0x%x, 0x%x - nfunc = %d\n", 
+		sum.lpc, sum.hpc, sum.nfns );
+#endif
 
 
 	if (ok)			/* if the hdr went out ok.. */
@@ -355,6 +385,17 @@ writeBlocks() {
 			p	= (char *)ap->monBuffer + sizeof(struct hdr);
 
 			ok = (write(fd, p, amt) == amt);
+#ifdef DEBUG
+			{int *pi; int i=0;
+			printf("==>a count array, at addr %08x:\n", p);
+			for(pi=(int *)p; amt>0; amt -= sizeof(int), pi++)
+			{
+				printf("  0x%08x", *pi);
+				if( ++i == 4 )
+				{ putchar('\n'); i=0; }
+			}
+			}
+#endif
 		}
 
 				/* count arrays out; write out histgm area */
@@ -366,6 +407,17 @@ writeBlocks() {
 
 			ok = (write(fd, p, amt) == amt);
 
+#ifdef DEBUG
+			{int *pi; int i=0;
+			printf("==>the histgm area, at addr %08x:\n", p);
+			for(pi=(int *)p; amt>0; amt -= sizeof(int), pi++)
+			{
+				printf("  0x%08x", *pi);
+				if( ++i == 4 )
+				{ putchar('\n'); i=0; }
+			}
+			}
+#endif
 		}
 	}
 	
@@ -376,21 +428,15 @@ writeBlocks() {
 
 
 
-
+
 	/* mnewblock() - allocate and link in a new region1&2 block.
 	 *
-	 * This routine, called by mcount_newent(), allocates a new block
+	 * This routine, called by mcount(), allocates a new block
 	 * containing only regions 1 & 2 (hdr and fcn call count array),
 	 * and an associated anchor (see header comments), inits the
 	 * header (region 1) of the block, links the anchor into the
 	 * list, and resets the countbase/limit pointers.
-	 *
-	 * This routine cannot be called recursively, since (each) mcount
-	 * has a local lock which prevents recursive calls to mcount_newent.
-	 * See mcount_newent for more details.
-	 * 
 	 */
-
 #define THISMANYFCNS	(MPROGS0*2)
 
 		/* call malloc() to get an anchor & a regn1&2 block, together */
@@ -400,8 +446,10 @@ writeBlocks() {
 			 )			/* but No region 3 */\
 			)
 
+#ifdef DEBUG
+	static int depth = 0;
+#endif
 
-static
 void
 _mnewblock()
 {
@@ -410,11 +458,26 @@ _mnewblock()
 	char *p;
 
 
+#ifdef DEBUG
+	if( ++depth > 1 )
+		{
+		puts("awwwk!\n"); exit();
+		}
+
+	mnewblkcalls++;		/* bump # of times called */
+#endif
+
+
+	countbase = NULL;	/* turn off profile data collection, */
+				/* while we get space. Resetting base */
+				/* below will turn it back 'on'. */
+
+
 					/* get anchor And block, together */
 	p = (char *)malloc( GETTHISMUCH );
 	if (p == NULL)
 	{
-		perror("mcount(mnewblock)");
+		perror("mnewblock");
 		return;
 	}
 
@@ -438,84 +501,151 @@ _mnewblock()
 	countbase  = (char *)hdrp + sizeof(struct hdr);
 	_countlimit = countbase + (THISMANYFCNS * sizeof(struct cnt));
 
-	newanchp->histSize = 0 ;	/* (set size of region 3.. to 0) */
+						/* (set size of region 3.. to 0) */
+	newanchp->histSize = 0 ;
 
+#ifdef DEBUG
+	mnewlist[ mnewblkcalls-1 ] = newanchp;
+#endif
 
 	curAnchor = newanchp;		/* make latest addition, the cur anchor */
+#ifdef DEBUG
+	depth--;
+#endif
 }
 
 
-
-/* * * * * *
- * mcount_newent() -- call to get a new mcount call count entry.
- * 
- * this function is called by _mcount to get a new call count entry
- * (struct cnt, in the region allocated by _monitor()), or to return
- * zero if profiling is off.
- *
- * This function acts as a funnel, an access function to make sure
- * that all instances of mcount (the one in the a.out, and any in
- * any shared objects) all get entries from the same array, and
- * all know when profiling is off.
- * 
- * NOTE: when mcount calls this function, it sets a private flag
- * so that it does not call again until this function returns,
- * thus preventing recursion.
- * 
- * At Worst, the mcount in either a shared object or the a.out
- * could call once, and then the mcount living in the shared object
- * with monitor could call a second time (i.e. libc.so.1, although
- * presently it does not have mcount in it).  This worst case
- * would involve Two active calls to mcount_newent, which it can
- * handle, since the second one would find a already-set value
- * in countbase.
- * 
- * The only unfortunate result is that No new call counts
- * will be handed out until this function returns.
- * Thus if malloc or other routines called inductively by
- * this routine have not yet been provided with a call count entry,
- * they will not get one until this function call is completed.
- * Thus a few calls to library routines during the course of
- * profiling setup, may not be counted.
- *
- * NOTE: countbase points at the next available entry, and
- * countlimit points past the last valid entry, in the current
- * function call counts array.
- * 
- * 
- * if profiling is off		// countbase==0
- *   just return 0
- *
- * else
- *   if need more entries	// because countbase points last valid entry
- *     link in a new block, resetting countbase and countlimit
- *   endif
- *   if Got more entries
- *     return pointer to the next available entry, and
- *     update pointer-to-next-slot before you return.
- *
- *   else			// failed to get more entries
- *     just return 0
- *
- *   endif
- * endif
- */
 
-struct cnt *
-_mcount_newent()
+#ifdef DEBUG
+
+void
+dumpAnchors()
 {
-	if ( countbase == 0 )
-		return ((struct cnt *) 0 );
+	int nanch,histno;
+	ANCHOR *ap,*histp;
 
-	if ( countbase  >= _countlimit )
-		_mnewblock();		/* get a new block; set countbase */
-
-	if ( countbase != 0 )
+	if( curAnchor==NULL )
 	{
-		struct cnt *cur_countbase = (struct cnt *) countbase;
+		printf("No anchors initialized (curAnchor is NULL).\n");
+		return;
+	}
 
-		countbase += sizeof(struct cnt);
-		return ( cur_countbase );
-	} else
-		return ((struct cnt *) 0 );
+	nanch=0;
+	histno=0; histp=NULL;
+	for( ap = &firstAnchor; ap!=NULL; ap = ap->next )
+	{
+		printf("anchor at %x, next is at %x.\n", ap, ap->next );
+		nanch++;
+		if( ap->flags & HAS_HISTOGRAM )
+		{
+			histno=nanch;
+			histp=ap;
+		}
+	}
+	printf("%d anchor(s), %dTH has last histogram.\n", nanch, histno);
 }
+
+void
+showArray()
+{
+	int i;
+	ANCHOR *p, *lastp;
+
+	printf("\nShowing values of curAnchor set by mnewblock..\n");
+	lastp= NULL;
+	for(i=0;i<mnewblkcalls;i++)
+	{
+		if( mnewlist[i] == NULL )
+			printf("\t<%dTH entry, curAnchor set to null(?).>\n",i);
+		else
+		{
+		   printf("\tanch @ %08x: nx %08x pr %08x dn %08x fl %d\n", 
+				mnewlist[i],	mnewlist[i]->next,
+						mnewlist[i]->prior,
+						mnewlist[i]->monBuffer,
+				mnewlist[i]->flags );
+
+			  /* if not right, go lastp->forward, and here->back */
+			if(lastp==NULL ||  (
+			     (lastp != mnewlist[i]->prior)||
+			     (lastp->next != mnewlist[i] )  
+					   )
+			   )
+			{
+				printf("Current PR != last NX!! Dump chains.\n");
+				printf("\ttrack from prior, forward...\n");
+				for( p=lastp; p!=mnewlist[i] && p!=NULL; p=p->next)
+				  printf(
+				     "\t\t@ %08x nx %08x pr %08x dn %08x fl %d\n",
+					p, p->next, p->prior, p->monBuffer, 
+					p->flags );
+				printf("\ttrack from here, backward..\n");
+				for( p=mnewlist[i]; p!=lastp && p!=NULL; p=p->prior)
+				  printf(
+				     "\t\t@ %08x nx %08x pr %08x dn %08x fl %d\n",
+					p, p->next, p->prior, p->monBuffer, 
+					p->flags );
+			}
+		}
+		lastp= mnewlist[i];
+	}
+}
+
+
+
+
+static int aNewCount = 0;
+struct nu
+{
+	char *b, *l, *a;
+	short curcalls, curactivity;
+};
+
+struct nu aNewList[128];
+
+aNewBase(awp)
+char *awp;	/* pointer to fcn's a_word */
+{
+	extern char *countbase, *_countlimit;
+
+	aNewList[aNewCount].b = countbase ;
+	aNewList[aNewCount].l = _countlimit ;
+	aNewList[aNewCount].a = awp ;
+	aNewList[aNewCount].curcalls = monitorCalls ;
+	aNewList[aNewCount].curactivity = monitorActive ;
+
+	aNewCount++;
+
+}
+
+
+aNewReport()
+{
+	extern char *countbase, *_countlimit;
+	char *t1;
+	int i;
+
+	t1 = countbase;
+	countbase = 0;
+
+	printf("count is %d..\n\t-    countbase, countlimit, callerRetAd, #MonCalls, MonStatus\n",
+			aNewCount);
+	for(i=0;i<aNewCount;i++)
+	{
+		char *bp, *lp, *ap;
+		int cl, ac;
+
+		bp=aNewList[i].b;
+		lp=aNewList[i].l;
+		ap=aNewList[i].a;
+		cl=aNewList[i].curcalls;
+		ac=aNewList[i].curactivity;
+		printf("\t- %2d %08x %08x %08x %2d %s\n", i, bp, lp, ap,
+			cl, (ac==0 ? "Inactive":"Active!!")  );
+	}
+
+
+	countbase = t1;
+}
+
+#endif

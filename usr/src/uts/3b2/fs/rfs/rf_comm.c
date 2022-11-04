@@ -5,9 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_comm.c	1.20.1.15"
+#ident	"@(#)fs:fs/rfs/rf_comm.c	1.20.3.1"
+
 /*
- * Communications routines (and some other subroutines) for RFS.
+ * Communications routines for RFS (and some other subroutines
+ * common to client and server.)
  */
 
 #include "sys/list.h"
@@ -46,68 +48,23 @@
 #include "sys/fs/rf_acct.h"
 #include "sys/fs/rf_vfs.h"
 #include "sys/file.h"
-#include "sys/buf.h"
+#include "rf_cache.h"
 #include "sys/kmem.h"
 #include "sys/fbuf.h"
 #include "vm/page.h"
-#include "vm/pvn.h"
-#include "rf_cache.h"
-
-/*
- * Structure passed into esballoc to have freeb queue up work for rf_daemon.
- *
- * These are allocated and freed by rffr_alloc() and RFFR_FREE(), respectively.
- *
- *	frtn.free_func == rfa_workenq
- *	frtn.free_arg == &work.rfaw_elt
- *	work.rfaw_func == func passed into rffr_alloc
- *	work.rfaw_farg == pointer passed into rffr_alloc
- *
- *	freeb will call rfa_workenq(&work.rfaw_elt)
- *	rf_daemon will call rfaw_func(&work)
- */
-typedef struct rf_frtn {
-	frtn_t		frtn;
-	rfa_work_t	work;
-} rf_frtn_t;
-
-/* Convert address of rffr_work to address of enclosing structure */
-#define WTOFR(wp)	\
-	((rf_frtn_t *)((caddr_t)(wp) - (caddr_t)&((rf_frtn_t *)NULL)->work))
-
-#define RFFR_FREE(rffrp)	kmem_free((rffrp), sizeof(rf_frtn_t))
-
-/*
- * Arg structure passed by rfesb_fbread into rffr_alloc for rfesb_fbrelse, 
- * which we use with esballoc().  We go to this trouble because we don't
- * want the provider to sleep in fbrelse.
- *
- *	fbp == &fbuf returned by fbread, to be passed to fbrelse
- *	rw == seg arg for fbrelse
- */
-typedef struct rf_fba {
-	struct fbuf	*fbp;
-	enum seg_rw	rw;
-} rf_fba_t;
-
-STATIC void		rdu_free();
-STATIC int		rf_allocb();
-STATIC void		rfesb_fbrelse();
-STATIC void		rfesb_pagerele();
-STATIC rf_frtn_t	*rffr_alloc();
-STATIC void		rfesb_pvn_done();
-STATIC void		rf_savesigs();
 
 /* imports */
 extern void	dst_clean();
+extern void	strunbcall();
 extern void	delay();
 
-/* Gift templates. */
-rf_gift_t	rf_daemon_gift	= {DAEMON_RD, 0};
-rf_gift_t	rf_null_gift;
+STATIC void	rdu_free();
+STATIC int	rf_allocb();
+STATIC void	rfesb_fbrelse();
+STATIC void	rfesb_pagerele();
 
-rcvd_t		*mountrd;		/* rd for mounts */
 rcvd_t		*sigrd;			/* rd for signals */
+STATIC rcvd_t	*mountrd;		/* rd for mounts */
 STATIC rcvd_t  	*reserved_rd;		/* For critical allocations */
 STATIC sndd_t  	*reserved_sd;		/* For critical allocations */
 
@@ -116,9 +73,9 @@ STATIC ls_elt_t 	sd_freelist;	/* list of free sndds */
 STATIC int		rd_nfree;	/* number of free receive descriptors */
 STATIC rd_user_t	*rdu_freelist;	/* free rd_user structures */
 STATIC rcvd_t  		*rd_freelist;	/* free recv desc link list */
+STATIC ushort		connid;		/* preserved for compatability */
 
-/*
- * Create a send descriptor.  Only if canfail, returns ENOMEM for failure,
+/* Create a send descriptor.  Only if canfail, returns ENOMEM for failure,
  * NULLING *sdpp.
  * Returns 0 for success, updating *sdpp with pointer to initialized sd.
  * NOTE:  sndd_create creates reserved_sd, that call must use canfail.
@@ -138,7 +95,7 @@ sndd_create(canfail, sdpp)
 		NULL,	/* sd_free.ls_prev */
 		-1,	/* sd_size */
 		SDUSED, /* sd_stat */
-		{0, 0},	/* sd_gift */
+		-1,	/* sd_connid */
 		-1	/* sd_mntid */
 	};
 	/*
@@ -162,6 +119,7 @@ sndd_create(canfail, sdpp)
 		}
 		ASSERT(!canfail);
 		if (!(reserved_sd->sd_stat & SDLOCKED)) {
+			reserved_sd->sd_stat |= SDLOCKED;
 			retsndd = reserved_sd;
 			break;
 		} else {
@@ -176,9 +134,6 @@ sndd_create(canfail, sdpp)
 		}
 	}
 	retsndd[0] = initsd;
-	if (retsndd == reserved_sd) {
-		reserved_sd->sd_stat |= SDLOCKED;
-	}
 	LS_INIT(&retsndd->sd_free);
 	LS_INIT(&retsndd->sd_hash);
 	*sdpp = retsndd;
@@ -198,7 +153,7 @@ sndd_hash(sdp)
 	ASSERT(LS_ISEMPTY(&sdp->sd_hash));
 	ASSERT(LS_ISEMPTY(&sdp->sd_free));
 	sdp->sd_stat &= ~SDUSED;
-	sdp->sd_gift = rf_null_gift;
+	sdp->sd_connid = 0;
 	dst_clean(sdp);
 	LS_INS_AFTER(&VFTORF(SDTOV(sdp)->v_vfsp)->rfvfs_sdhash, &sdp->sd_hash);
 	LS_INSQUE(&sd_freelist, &sdp->sd_free);
@@ -237,10 +192,10 @@ sndd_free(sdpp)
 		ASSERT(LS_ISEMPTY(&sdp->sd_hash));
 		ASSERT(LS_ISEMPTY(&sdp->sd_free));
 		if (sdp == reserved_sd && sdp->sd_stat & SDWANT) {
-			wakeprocs((caddr_t)&reserved_sd, PRMPT);
+			wakeup((caddr_t)&reserved_sd);
 		}
 		sdp->sd_stat = SDUNUSED;
-		sdp->sd_gift = rf_null_gift;
+		sdp->sd_connid = 0;
 		*sdpp = NULL;
 		if (sdp != reserved_sd) {
 			if (SDTOV(sdp)->v_pages != NULL) {
@@ -302,57 +257,50 @@ rf_sndmsg(sd, bp, bytes, gift, retrans)
 			(void)rf_rhfcanon(bp, tgdp);
 #endif
 		}
-	}
-
-	/*
-	 * Message allocation earlier set up header block write
-	 * pointers.  Here we set up other write pointers as a service
-	 * to callers.  Note that, as we set up messages on the send
-	 * end, if any data is not piggybacked with headers, none will
-	 * be.  On the receive end, however, no such assumption can be
-	 * made, because transport providers may munge the message
-	 * arbitrarily.
-	 */
-
-	if (!bp->b_cont) {
-
-		/* Data is piggybacked in header block */
-
-		ASSERT(bp->b_datap->db_lim - bp->b_datap->db_base >= bytes);
-
-		bp->b_wptr = bp->b_rptr + bytes;
 	} else {
-		register mblk_t		*databp;
-		register mblk_t		*predatabp;
-		register size_t		sz;
-		size_t			bpsz;
-		dblk_t			*dp;
 
-		predatabp = bp;
-		databp = bp->b_cont;
-		for (sz = bytes - (bp->b_wptr - bp->b_rptr);
-		  /* LINTED - stupid lint says bpsz is uninitialized */
-		  sz; sz -= bpsz) {
+		/*
+		 * Message allocation earlier set up header block write
+		 * pointers.  Here we set up other write pointers as a service
+		 * to callers.  Note that, as we set up messages on the send
+		 * end, if any data is not piggybacked with headers, none will
+		 * be.  On the receive end, however, no such assumption can be
+		 * made, because transport providers may munge the message
+		 * arbitrarily.
+		 */
 
-			ASSERT(databp);	/* but may have extra mblks */
-			dp = databp->b_datap;
-			bpsz = MIN(sz, dp->db_lim - dp->db_base);
-			databp->b_wptr = databp->b_rptr + bpsz;
-			predatabp = databp;
-			databp = predatabp->b_cont;
-		}
+		if (!bp->b_cont) {
 
-		if (databp) {
-			ASSERT(predatabp->b_cont == databp);
-			freemsg(databp);
-			predatabp->b_cont = NULL;
+			/* Data is piggybacked in header block */
+
+			ASSERT(bp->b_datap->db_lim - bp->b_datap->db_base >=
+			  bytes);
+			bp->b_wptr = bp->b_rptr + bytes;
+		} else {
+			register mblk_t		*databp;
+			register size_t		sz;
+			size_t			bpsz;
+			dblk_t			*dp;
+
+			databp = bp->b_cont;
+			/* LINTED - stupid lint says bpsz is uninitialized */
+			for (sz = bytes - (bp->b_wptr - bp->b_rptr);
+			  sz; sz -= bpsz) {
+
+				ASSERT(databp);	/* but may have extra mblks */
+				dp = databp->b_datap;
+				bpsz = MIN(sz, dp->db_lim - dp->db_base);
+				databp->b_wptr = databp->b_rptr + bpsz;
+				databp = databp->b_cont;
+			}
 		}
 	}
-
 	cop = RF_COM(bp);
 	if (tgdp->version >= RFS2DOT0 && cop->co_type == RF_REQ_MSG) {
 
-		/* If 4.0 server, send time in every request. */
+		/*
+ 		 * If 4.0 server, send time in every request.
+		 */
 
 		rf_request_t *req = RF_REQ(bp);
 
@@ -368,29 +316,23 @@ rf_sndmsg(sd, bp, bytes, gift, retrans)
 	cop->co_pid = u.u_procp->p_pid;
 
 	msg = RF_MSG(bp);
-	msg->m_dest = sd->sd_gift;
+	msg->m_dest = sd->sd_connid;
 	msg->m_stat |= RF_VER1;
 	msg->m_size = bytes;
 	if (gift) {
-		ASSERT(gift->rd_stat != RDUNUSED);
-
 		msg->m_stat |= RF_GIFT;
-		msg->m_gift.gift_id = gift - rcvd;
-		msg->m_gift.gift_gen = gift->rd_gen;
+		msg->m_giftid = RDTOINX(gift);
+		ASSERT(gift->rd_stat != RDUNUSED);
 
 		/*
 		 * Keep track of who gets gift.
 		 * (Keep track of RDGENERAL RDs in make_gift.)
 		 */
 
-		if (gift->rd_qtype & RDSPECIFIC && gift != rf_daemon_rd) {
+		if (gift->rd_qtype & RDSPECIFIC) {
 			/* TO DO:  union */
 			gift->rd_user_list = (rd_user_t *)rq;
 		}
-
-		ASSERT(gift->rd_qtype == RDSPECIFIC ||
-		  gift == mountrd || gift == sigrd ||
-		  gift->rd_vp);
 	}
 
 	/*
@@ -417,9 +359,7 @@ rf_sndmsg(sd, bp, bytes, gift, retrans)
 			return ENOLINK;
 		}
 	}
-#ifdef DEBUG
-	msg->filler0 = tgdp->outseq++;
-#endif
+
 	putq(wq, bp);
 	return 0;
 }
@@ -471,13 +411,12 @@ rf_rcvmsg(rcvdp, bufpp)
 
 			/*
 			 * Found something on the rd.  Even if link is down,
-			 * do this first to strip copyin responses, e.g.
+			 * do this first to strip all copyin responses, e.g.
 			 */
 
 			rfc_info.rfci_rcv_msg++;
 			break;
 		}
-
 		if (rcvdp->rd_stat & RDLINKDOWN) {
 			error = ECOMM;
 			break;
@@ -495,19 +434,59 @@ rf_rcvmsg(rcvdp, bufpp)
 			 * and what isn't.
 			 */
 
-			rf_savesigs(&cursig, &curinfo, &sigqueue, &sig);
+			if (!cursig) {
 
+				/*
+				 * Remember the first current signal context
+				 * to restore later.
+				 */
+
+				cursig = p->p_cursig;
+				curinfo = p->p_curinfo;
+			} else {
+
+				/*
+				 * Put subsequent current signal contexts into
+				 * pending signal context.
+				 */
+
+				sigaddset(&p->p_sig, cursig);
+				if (p->p_curinfo) {
+					p->p_curinfo->sq_next = p->p_sigqueue;
+					p->p_sigqueue = p->p_curinfo;
+				}
+			}
+
+			/*
+			 * Clear current signal context.  Save and clear
+			 * pending signal context.
+			 */
+
+			p->p_cursig = 0;
+			p->p_curinfo = NULL;
+			if (!sigisempty(&p->p_sig)) {
+
+				/*
+				 * Preserve time-ordering by appending new
+				 * pending context to that already saved.
+				 */
+
+				sigqueue = sigappend(&sig, sigqueue,
+				   &p->p_sig, p->p_sigqueue);
+				sigemptyset(&p->p_sig);
+				p->p_sigqueue = NULL;
+			}
 			if (!RF_SERVER() && !sigsent && RDTOSD(rcvdp)) {
 
 				/*
 				 * We haven't signalled the server yet, so
-				 * send the signal.  If the signal message
+				 * send the signal.   If the signal message
 				 * is not sent because the link is down, our
 				 * rcvd will be marked LINKDOWN.
 				 *
-				 * The above check on RDTOSD(rcvdp) prevents 
-				 * calls to rfcl_signal() for fumount and cache
-				 * disable messages.
+				 * The check on RDTOSD(rcvdp) prevents calls to
+				 * rfcl_signal() for fumount and cache disable
+				 * messages.
 				 */
 
 				rfcl_signal(RDTOSD(rcvdp));
@@ -516,16 +495,11 @@ rf_rcvmsg(rcvdp, bufpp)
 		}
 
 	}
-
 	if (!error) {
 		*bufpp = rf_dequeue(rcvdp);
 		ASSERT(*bufpp);
 	}
-
-	if (p->p_cursig) {
-		rf_savesigs(&cursig, &curinfo, &sigqueue, &sig);
-	}
-
+	ASSERT(!p->p_cursig && !p->p_curinfo);
 	if (cursig) {
 
 		/*
@@ -536,12 +510,11 @@ rf_rcvmsg(rcvdp, bufpp)
 		p->p_cursig = cursig;
 		p->p_curinfo = curinfo;
 	}
-
 	if (!sigisempty(&sig)) {
 
 		/*
-		 * Preserve time-ordering by prepending saved pending context
-		 * to new.
+		 * Preserve time-ordering by prepending saved
+		 * pending context to new.
 		 */
 
 		p->p_sigqueue =
@@ -552,80 +525,20 @@ rf_rcvmsg(rcvdp, bufpp)
 	return error;
 }
 
-STATIC void
-rf_savesigs(cursigp, curinfop, sigqp, ksigp)
-	char		*cursigp;
-	sigqueue_t	**curinfop;
-	sigqueue_t	**sigqp;
-	k_sigset_t	*ksigp;
-{
-	char		cursig = *cursigp;
-	sigqueue_t	*curinfo = *curinfop;
-	sigqueue_t	*sigqueue = *sigqp;
-	proc_t		*p = u.u_procp;
-
-	if (!cursig) {
-
-		/*
-		 * Remember the first current signal context
-		 * to restore later.
-		 */
-
-		cursig = p->p_cursig;
-		curinfo = p->p_curinfo;
-	} else {
-
-		/*
-		 * Put subsequent current signal contexts into
-		 * pending signal context.
-		 */
-
-		sigaddset(&p->p_sig, cursig);
-		if (p->p_curinfo) {
-			p->p_curinfo->sq_next = p->p_sigqueue;
-			p->p_sigqueue = p->p_curinfo;
-		}
-	}
-
-	/*
-	 * Clear current signal context.  Save and clear
-	 * pending signal context.
-	 */
-
-	p->p_cursig = 0;
-	p->p_curinfo = NULL;
-	if (!sigisempty(&p->p_sig)) {
-
-		/*
-		 * Preserve time-ordering by appending new
-		 * pending context to that already saved.
-		 */
-
-		sigqueue = sigappend(ksigp, sigqueue,
-		   &p->p_sig, p->p_sigqueue);
-		sigemptyset(&p->p_sig);
-		p->p_sigqueue = NULL;
-	}
-
-	*cursigp = cursig;
-	*curinfop = curinfo;
-	*sigqp = sigqueue;
-}
-
 /*
- * Make datasz bytes contiguous in message denoted by bp.  Message
- * must contain hdrsz bytes of headers.  Returns errno.
+ * Pull up datasz bytes of data into message denoted by bp.  Message
+ * must contain hdrsz bytes of headers.  Returns errno or EPROTO.
  * NOTE: can sleep.
  */
 int
 rf_pullupmsg(bp, hdrsz, datasz)
-	register mblk_t		*bp;
-	register size_t		hdrsz;
-	register size_t		datasz;
+	register mblk_t	*bp;
+	register size_t	hdrsz;
+	register size_t	datasz;
 {
-	register mblk_t		*pullupbp;
-	register mblk_t		*dup = NULL;
-	register rf_message_t	*msg = RF_MSG(bp);
+	register mblk_t	*pullupbp;
+	register mblk_t	*dup = NULL;
+	rf_message_t	*msg = RF_MSG(bp);
 
 	if (msg->m_size != hdrsz + datasz) {
 
@@ -633,6 +546,8 @@ rf_pullupmsg(bp, hdrsz, datasz)
 		 * Circuit manager guarantees that m_size == gdp_msgsize(bp).
 		 */
 
+		gdp_discon("rf_pullupmsg bad size",
+		  QPTOGP((queue_t *)msg->m_queue));
 		return EPROTO;
 	}
 
@@ -649,14 +564,19 @@ rf_pullupmsg(bp, hdrsz, datasz)
 
 	if (bp->b_wptr - bp->b_rptr == hdrsz) {
 
-		/* All data is in continuation block(s). */
+		/*
+		 * All data is in continuation block(s).
+		 */
 
 		pullupbp = bp->b_cont;
 	} else {
 
-		/* Some data is in first block. */
+		/*
+		 * Some data is in first block.
+		 */
 
-		ASSERT(bp->b_wptr - bp->b_rptr > hdrsz); /* circuit manager */
+		/* circuit manager pulls up headers */
+		ASSERT(bp->b_wptr - bp->b_rptr > hdrsz);
 
 		while ((dup = dupb(bp)) == NULL) {
 			delay(10);
@@ -667,8 +587,8 @@ rf_pullupmsg(bp, hdrsz, datasz)
 		 * interpose dup between bp and b_cont.
 		 */
 
+		bp->b_wptr -= hdrsz;
 		dup->b_rptr += hdrsz;
-		bp->b_wptr = dup->b_rptr;
 		dup->b_cont = bp->b_cont;
 		bp->b_cont = dup;
 
@@ -831,85 +751,6 @@ rf_msgdata(bp, hdrsz)
 }
 
 /*
- * Convert *giftp to denoted rd, or NULL if *giftp is invalid.  vcver
- * is the RFS version number of the virtual circuit over which the
- * gift was given.
- */
-rcvd_t	*
-rf_gifttord(giftp, vcver)
-	rf_gift_t	*giftp;
-	int		vcver;
-{
-	long		id;
-	long		gen;
-	rcvd_t		*rd;
-
-	id = giftp->gift_id;
-	gen = giftp->gift_gen;
-	rd = NULL;
-
-	/*
-	 * We depend on the fact that old clients use MOUNT_RD and DAEMON_RD
-	 * as the gens for those rds, and that new machines never change from
-	 * 0 the gens for them, and that gens (connids in the old protocol)
-	 * are otherwise passed transparently.
-	 */
-
-	if (id < 0 || id >= nrcvd) {
-		return NULL;
-	}
-
-	if (vcver < RFS2DOT0 &&
-	  ((id == MOUNT_RD || id == DAEMON_RD) && id == gen ||
-	   RF_SERVER() && u.u_syscall == RFLINK)) {
-
-		/*
-		 * Knowledge of original RFS implementation embedded
-		 * here.  The server/syscall hook is grotesque,
-		 * but preferable to widening the interface for this
-		 * special case in the syscall protocol.  (Old clients
-		 * don't include gen in the link message, so we take
-		 * our chances.
-		 */
-
-		rd = rcvd + id;
-		if (rd && rd->rd_stat != RDUNUSED) {
-			return rd;
-		}
-		return NULL;
-	}
-
-	rd = rcvd + id;	
-	if (rd->rd_gen != giftp->gift_gen) {
-		rd = NULL;
-	}
-	if (rd && rd->rd_stat != RDUNUSED) {
-		return rd;
-	}
-	return NULL;
-}
-
-/*
- * Convert *giftp to a vp, or NULL if *giftp does not denote a receive
- * descriptor with a vp.  vcver is the RFS version number of the virtual
- * circuit over which the gift was given.
- */
-vnode_t	*
-rf_gifttovp(giftp, vcver)
-	rf_gift_t	*giftp;
-	int		vcver;
-{
-	rcvd_t		*rd;
-
-	/*
-	 * We don't worry about distinguished rds (e.g. DAEMON_RD) and their
-	 * vps, because those vps are always NULL.
-	 */
-
-	return (rd = rf_gifttord(giftp, vcver)) == NULL ? NULL : rd->rd_vp;
-}
-
-/*
  * Allocate and intialize iovecs and uio_iovcnt, uio_iov, and uio_resid
  * describing data in message starting in bp.  Assumes bp contains only
  * data, no headers.
@@ -940,13 +781,12 @@ rf_iov_alloc(uiop, bp)
 		iovp->iov_base = (caddr_t)databp->b_rptr;
 		uiop->uio_resid +=
 		  (iovp->iov_len = databp->b_wptr - databp->b_rptr);
-		ASSERT(iovp <= uiop->uio_iov + (niov - 1) * sizeof(iovec_t));
 	}
 	return;
 }
 
 /*
- * Drop nbytes out of bp.  Return balance or NULL if nbytes >= content of bp.
+ * Drop nbytes out of bp.  Return balance or NULL if no empty.
  */
 mblk_t *
 rf_dropbytes(bp, nbytes)
@@ -976,11 +816,13 @@ rf_dropbytes(bp, nbytes)
  * Return reference to an initialized rf_frtn structure. Can sleep.
  *	work.rfaw_func == func
  *	work.rfaw_farg == farg
+ *	work.rfaw_canfail == canfail
  */
 rf_frtn_t *
-rffr_alloc(func, farg)
+rffr_alloc(func, farg, canfail)
 	void			(*func)();
 	caddr_t			farg;
+	int			canfail;
 {
 	register rf_frtn_t	*frp;
 
@@ -988,6 +830,7 @@ rffr_alloc(func, farg)
 	LS_INIT(&frp->work.rfaw_elt);
 	frp->work.rfaw_func = func;
 	frp->work.rfaw_farg = farg;
+	frp->work.rfaw_canfail = canfail;
 	frp->frtn.free_func = (void (*)())rfa_workenq;
 	frp->frtn.free_arg = (caddr_t)&frp->work.rfaw_elt;
 	return frp;
@@ -1016,14 +859,13 @@ rfesb_fbread(vp, off, len, rw, hdrsz, pri, canfail, bpp)
 
 	int		onepage;
 	off_t		poff;
-	struct fbuf	*fbp = (struct fbuf *)NULL;
+	struct fbuf	*fbp;
 	rf_frtn_t	*rfrp;
 	int		error;
 	rf_fba_t	*rfbap;
 	page_t		*pp;
 	caddr_t		addr;
 
-	*bpp = (mblk_t *)NULL;
 	poff = off & PAGEMASK;
 	onepage = poff + PAGESIZE >= off + len;
 
@@ -1036,7 +878,7 @@ rfesb_fbread(vp, off, len, rw, hdrsz, pri, canfail, bpp)
 
 		PAGE_HOLD(pp);
 		ASSERT(pp->p_keepcnt > 0);
-		rfrp = rffr_alloc(rfesb_pagerele, (caddr_t)pp);
+		rfrp = rffr_alloc(rfesb_pagerele, (caddr_t)pp, FALSE);
 		addr = rfc_pptokv(pp) + (off & PAGEOFFSET);
 
 	} else if ((error = fbread(vp, off, len, rw, &fbp)) == 0) {
@@ -1047,15 +889,13 @@ rfesb_fbread(vp, off, len, rw, hdrsz, pri, canfail, bpp)
 		 * fbrelsed later.
 		 */
 
-		rfrp = rffr_alloc(rfesb_fbrelse, kmem_alloc(sizeof(rf_fba_t),
-		  KM_SLEEP));
+		rfrp = rffr_alloc(rfesb_fbrelse,
+		  kmem_alloc(sizeof(rf_fba_t), KM_SLEEP), FALSE);
 		rfbap = (rf_fba_t *)rfrp->work.rfaw_farg;
- 		ASSERT(fbp);
 		rfbap->fbp = fbp;
 		rfbap->rw = rw;
 		addr = fbp->fb_addr;
 	} else {
- 		ASSERT(!fbp);
 		return error;
 	}
 
@@ -1066,7 +906,7 @@ rfesb_fbread(vp, off, len, rw, hdrsz, pri, canfail, bpp)
 	if (error) {
 		if (onepage) {
 			ASSERT(pp->p_keepcnt > 0);
-			PAGE_RELE(pp); 
+			PAGE_RELE(pp);
 		} else {
 			fbrelse(rfbap->fbp, rfbap->rw);
 			kmem_free(rfrp->work.rfaw_farg, sizeof(rf_fba_t));
@@ -1099,44 +939,58 @@ rfesb_pagerele(wp)
 }
 
 /*
- * Return a pointer to an esballoc-ed streams message block covering
- * the addresses [bufp->b_un.b_addr + off .. bufp->b_un.b_addr + off + len).
- * The message is set up to free the pages when it is freed.  If hdrsz is
- * 0, no header part will be allocated.
+ * TO DO: move this into os/move.c
+ * Move MIN(ruio->uio_resid, wuio->uio_resid) bytes from addresses described
+ * by ruio to those described by wuio.  Both uio structures are updated to
+ * reflect the move. Returns 0 on success or a non-zero errno on failure.
  */
-
 int
-rfesb_pageio_setup(bufp, hdrsz, off, len, pri, canfail, bpp)
-	buf_t	*bufp;
-	size_t	hdrsz;
-	off_t	off;
-	size_t	len;
-	uint	pri;
-	int	canfail;
-	mblk_t	**bpp;
+uiomvuio(ruio, wuio)
+	register uio_t *ruio;
+	register uio_t *wuio;
 {
-	rf_frtn_t	*rfrp;
-	int		error;
+	register iovec_t *riov;
+	register iovec_t *wiov;
+	register long n;
+	uint cnt;
+	int kerncp;
 
-	ASSERT(bufp->b_flags & (B_ASYNC | B_REMAPPED | B_WRITE));
-	rfrp = rffr_alloc(rfesb_pvn_done, (caddr_t)bufp);
-	error = rf_allocmsg(hdrsz, len, pri, canfail, bufp->b_un.b_addr + off,
-	  &rfrp->frtn, bpp);
-	ASSERT(!error != !*bpp);
-	if (error) {
-		RFFR_FREE(rfrp);
+	n = MIN(ruio->uio_resid, wuio->uio_resid);
+	kerncp = ruio->uio_segflg == UIO_SYSSPACE &&
+	  wuio->uio_segflg == UIO_SYSSPACE;
+
+	riov = ruio->uio_iov;
+	wiov = wuio->uio_iov;
+	while (n) {
+		while (!wiov->iov_len) {
+			wiov = ++wuio->uio_iov;
+			wuio->uio_iovcnt--;
+		}
+		while (!riov->iov_len) {
+			riov = ++ruio->uio_iov;
+			ruio->uio_iovcnt--;
+		}
+		cnt = MIN(wiov->iov_len, MIN(riov->iov_len, n));
+
+		if (kerncp)
+			bcopy(riov->iov_base, wiov->iov_base, cnt);
+		else if (ruio->uio_segflg == UIO_SYSSPACE) {
+			if (copyout(riov->iov_base, wiov->iov_base, cnt))
+				return EFAULT;
+		} else if (copyin(riov->iov_base, wiov->iov_base, cnt))
+			return EFAULT;
+
+		riov->iov_base += cnt;
+		riov->iov_len -= cnt;
+		ruio->uio_resid -= cnt;
+		ruio->uio_offset += cnt;
+		wiov->iov_base += cnt;
+		wiov->iov_len -= cnt;
+		wuio->uio_resid -= cnt;
+		wuio->uio_offset += cnt;
+		n -= cnt;
 	}
-	return error;
-}
-
-STATIC void
-rfesb_pvn_done(wp)
-	rfa_work_t	*wp;
-{
-	ASSERT(((buf_t *)wp->rfaw_farg)->b_flags &
-	  (B_ASYNC | B_REMAPPED | B_WRITE));
-	pvn_done((buf_t *)wp->rfaw_farg);
-	RFFR_FREE(WTOFR(wp));
+	return 0;
 }
 
 /*
@@ -1156,7 +1010,6 @@ rf_allocb(size, bpri, canfail, base, frp, bpp)
 	mblk_t	*bp = NULL;
 	int	pri = canfail ?  (PREMOTE | PCATCH | PNOSTOP) : PZERO;
 	int	error = 0;
-	int	strid;
 
 	ASSERT(!base == !frp);
 
@@ -1165,8 +1018,8 @@ rf_allocb(size, bpri, canfail, base, frp, bpp)
 			if ((bp = allocb((int)size, bpri)) != NULL) {
 				break;
 			}
-			if (!(strid = bufcall(size, bpri, (int(*)())setrun,
-			  (long)u.u_procp))) {
+			if (!bufcall(size, bpri, (int(*)())setrun,
+			  (long)u.u_procp)) {
 				if (canfail) {
 					error = ENOMEM;
 					break;
@@ -1179,7 +1032,7 @@ rf_allocb(size, bpri, canfail, base, frp, bpp)
 			  != NULL) {
 				break;
 			}
-			if (!(strid = esbbcall(bpri, setrun, (long)u.u_procp))) {
+			if (!esbbcall(bpri, setrun, (long)u.u_procp)) {
 				if (canfail) {
 					error = ENOMEM;
 					break;
@@ -1190,7 +1043,7 @@ rf_allocb(size, bpri, canfail, base, frp, bpp)
 		}
 		if (sleep((caddr_t)&(u.u_procp->p_flag), pri)) {
 			ASSERT(canfail);
-			unbufcall(strid);
+			strunbcall((int)size, u.u_procp);
 			error = EINTR;
 			break;
 		}
@@ -1230,6 +1083,7 @@ rcvd_create(canfail, type, rdpp)
 			cmn_err(CE_NOTE, "rcvd_create: not enough rcvds\n");
 			return ENOMEM;
 		} else if (!(reserved_rd->rd_stat & RDLOCKED)) {
+			reserved_rd->rd_stat |= RDLOCKED;
 			rdp = reserved_rd;
 			break;
 		} else {
@@ -1238,20 +1092,19 @@ rcvd_create(canfail, type, rdpp)
 		}
 	}
 	*rdpp = rdp;
-	rdp->rd_stat = RDUSED;
 	if (rdp != reserved_rd) {
 		rd_freelist = rdp->rd_next;
 		rdp->rd_next = NULL;
 		rd_nfree--;
-	} else {
-		rdp->rd_stat |= RDLOCKED;
 	}
 	rdp->rd_qcnt = 0;
 	rdp->rd_vp = NULL;
 	rdp->rd_refcnt = 1;
 	rdp->rd_qtype = (char)type;
 	rdp->rd_user_list = NULL;
+	rdp->rd_connid = connid++;
 	LS_INIT(&rdp->rd_rcvdq);
+	rdp->rd_stat = RDUSED;
 	rdp->rd_qslp = 0;
 	rdp->rd_mtime = 0;
 	if (type == RDSPECIFIC) {
@@ -1263,7 +1116,7 @@ rcvd_create(canfail, type, rdpp)
 }
 
 /*
- * Give up nrefs references to the denoted receive descriptor, freeing it and
+ * Give up a reference to the denoted receive descriptor, freeing it and
  * NULLing *rdpp when it becomes unused.
  *
  * mntid is non-negative iff there is an rduser structure associated
@@ -1274,11 +1127,10 @@ rcvd_create(canfail, type, rdpp)
  * do so AFTER the call here.
  */
 void
-rcvd_delete(rdpp, sysid, mntid, nrefs)
+rcvd_delete(rdpp, sysid, mntid)
 	rcvd_t			**rdpp;
 	register sysid_t	sysid;
  	long			mntid;
-	int			nrefs;
 {
 	register rcvd_t		*rdp = *rdpp;
 
@@ -1290,10 +1142,11 @@ rcvd_delete(rdpp, sysid, mntid, nrefs)
 		 * Otherwise no rduser structure associated with
 		 * the reference.
 		 */
-		rdu_del(rdp, sysid, mntid, nrefs);
+		rdu_del(rdp, sysid, mntid);
 	}
-	if (!(rdp->rd_refcnt -= nrefs)) {
+	if (!--rdp->rd_refcnt) {
 		rcvd_free(rdpp);
+		*rdpp = NULL;
 	}
 }
 
@@ -1306,26 +1159,12 @@ rcvd_free(rdpp)
 	rcvd_t		**rdpp;
 {
 	register rcvd_t	*rdp = *rdpp;
-	mblk_t		*straybp;
 
 	if (rdp) {
 		ASSERT(rdp->rd_stat != RDUNUSED);
-		rdp->rd_gen++;
-
-		/* Take care of races with rf_deliver */
-
-		while ((straybp = rf_dequeue(rdp)) != NULL) {
-			rfd_stray(straybp);
-		}
-
-		if (rdp->rd_qtype == RDGENERAL && rdp->rd_vp) {
-			VN_RELE(rdp->rd_vp);
-			rdp->rd_vp = NULL;
-		}
-
 		if (rdp == reserved_rd) {
 			if (rdp->rd_stat & RDWANT) {
-				wakeprocs((caddr_t)&reserved_rd, PRMPT);
+				wakeup((caddr_t)&reserved_rd);
 			}
 		} else {
 			rd_nfree++;
@@ -1334,6 +1173,7 @@ rcvd_free(rdpp)
 		}
 		rdp->rd_stat = RDUNUSED;
 		rdp->rd_user_list = NULL;
+		rdp->rd_vp = NULL;
 		*rdpp = NULL;
 	}
 }
@@ -1433,7 +1273,8 @@ rdu_get(rd, sysid, mntid, qp)
 		rduptr->ru_srmntid = mntid;
 		rduptr->ru_vcount = 1;
 		rduptr->ru_queue = qp;
-		rduptr->ru_frwcnt = rduptr->ru_frcnt = rduptr->ru_fwcnt = 0;
+		rduptr->ru_fcount = rduptr->ru_frcnt = 0;
+		rduptr->ru_fwcnt = 0;
 		rduptr->ru_cflag = 0;
 		rdu_freelist = rdu_freelist->ru_next;
 		rduptr->ru_next = rd->rd_user_list;
@@ -1487,76 +1328,86 @@ rdu_find(rd, sysid, mntid, prev_rdupp)
 
 /*
  * rdu_open() increments file, read and write counts for the given rd,
- * sysid, mntid, and fmode.
+ * sysid, mntid, op, and fmode.
  */
 void
-rdu_open(rd, sysid, mntid, fmode)
-	register rcvd_t		*rd;
-	register sysid_t	sysid;
-	register long		mntid;
-	register int		fmode;
+rdu_open(rd, sysid, mntid, op, fmode)
+	register rcvd_t	*rd;
+	register sysid_t sysid;
+	register long mntid;
+	register int op;
+	register int fmode;
 {
-	rd_user_t		*rdup;
-
-	ASSERT(fmode & (FREAD | FWRITE));
+	rd_user_t *rdup;
 
 	rdup = rdu_find(rd, sysid, mntid, (rd_user_t **)NULL);
 	ASSERT(rdup);
-
-	if ((fmode & (FREAD | FWRITE)) == (FREAD | FWRITE)) {
-		rdup->ru_frwcnt++;
-	} else if (fmode & FREAD) {
-		rdup->ru_frcnt++;
-	} else {
+	rdup->ru_fcount++;
+	if (op == RFOPEN) {
+		/*
+		 * for fifo case, bump reader/writer counts
+		 */
+		if (rd->rd_vp->v_type == VFIFO) {
+			if (fmode & FREAD) {
+				rdup->ru_frcnt++;
+			}
+			if (fmode & FWRITE) {
+				rdup->ru_fwcnt++;
+			}
+		}
+	} else if (op == RFCREATE && rd->rd_vp->v_type == VFIFO) {
 		rdup->ru_fwcnt++;
 	}
 }
 
 /*
- * A client is giving up nrefs references to this RD in srmount structure
- * denoted by sysid and mntid;  decrement count in rd_user struct by nrefs.
- * If it goes to zero, free it.
+ * rdu_close() decrements file, read and write counts for the given
+ * rd, rduser, and file mode.
  */
 void
-rdu_del(rdp, sysid, mntid, nrefs)
+rdu_close(rd, sysid, mntid, fmode)
+	register rcvd_t	*rd;
+	register sysid_t sysid;
+	register long mntid;
+	register long fmode;
+{
+	rd_user_t *rdup;
+
+	rdup = rdu_find(rd, sysid, mntid, (rd_user_t **)NULL);
+	ASSERT(rdup);
+	rdup->ru_fcount--;
+	if (rd->rd_vp->v_type == VFIFO) {
+		if (fmode & FREAD) {
+			rdup->ru_frcnt--;
+		}
+		if (fmode & FWRITE) {
+			rdup->ru_fwcnt--;
+		}
+	}
+	return;
+}
+
+/*
+ * A client is giving up a reference to this RD in srmount structure
+ * denoted by sysid and mntid;  decrement count in rd_user struct.
+ * If count in rd_user struct goes to zero, free it.
+ */
+void
+rdu_del(rdp, sysid, mntid)
 	register rcvd_t		*rdp;
 	register sysid_t	sysid;
 	register long		mntid;
-	register int		nrefs;
 {
 	rd_user_t		*rdup;
 	rd_user_t		*pred_rdup;
-	vnode_t			*vp = rdp->rd_vp;
 
-	ASSERT(rdp->rd_user_list);
+	ASSERT(rdp->rd_user_list);	/* no users to delete */
 	rdup = rdu_find(rdp, sysid, mntid, &pred_rdup);
-	ASSERT(rdup);
-	if ((rdup->ru_vcount -= nrefs)) {
+	ASSERT(rdup);			/* no users to delete */
+	if (--rdup->ru_vcount) {
 		return;
 	}
-        /*
-         * Undo any outstanding opens.
-	 */
-	while (rdup->ru_frwcnt--) {
-		VOP_CLOSE(vp, FWRITE | FREAD, 1, 0, u.u_cred);
-	}
-        while (rdup->ru_frcnt--) {
-		VOP_CLOSE(vp, FREAD, 1, 0, u.u_cred);
-	}
-        while (rdup->ru_fwcnt--) {
-		VOP_CLOSE(vp, FWRITE, 1, 0, u.u_cred);
-	}
-
-        /*
-         * Remove any remaining mappings.
-	 */
-	rfm_lock(rdup);
-	if (!LS_ISEMPTY(&rdup->ru_mapdlist)) {
-		rfm_empty(rdup, vp);
-	}
-        rfm_unlock(rdup);
-
-	/* last reference - get rid of rd_user */
+	/* last reference - get rid of rd_user struct */
 	if (rdup == rdp->rd_user_list) {
 		rdp->rd_user_list = rdup->ru_next;
 	} else {
@@ -1670,8 +1521,6 @@ rf_dequeue(rd)
 	mblk_t		*result;
 
 	slevel = splstr();
-	ASSERT(!rd->rd_qslp++);
-
 	result = (mblk_t *)LS_REMQUE(&rd->rd_rcvdq);
 	rd->rd_qcnt--;
 	if (RCVDEMP(rd) && rd->rd_qtype & RDGENERAL) {
@@ -1680,8 +1529,6 @@ rf_dequeue(rd)
 		 */
 		rfsr_rmmsg(rd);
 	}
-
-	ASSERT(!--rd->rd_qslp);
 	splx(slevel);
 	return result;
 }
@@ -1708,7 +1555,6 @@ rf_comminit()
 		  maxserve);
 	}
 	for (nrd = 0; nrd < nrduser - 1; nrd++) {
-		LS_INIT(&rd_user[nrd].ru_mapdlist);
 		rd_user[nrd].ru_next = &rd_user[nrd+1];
 	}
 	if (nrduser >= 1) {
@@ -1722,7 +1568,6 @@ rf_comminit()
 		cmn_err(CE_WARN,
 		  "minserve changed to %d  (maxserve)\n", minserve);
 	}
-
 	LS_INIT(&sd_freelist);
 	{
 		register sndd_t *endsndd = sndd + nsndd;
@@ -1735,13 +1580,12 @@ rf_comminit()
 		}
 	}
 	sd_nfree = nsndd;
-
 	{
 		register rcvd_t *endrcvd = rcvd + nrcvd;
 
 		for (rd = rcvd; rd < endrcvd; rd++) {
 			rd->rd_stat = RDUNUSED;
-			rd->rd_gen = 0;
+			rd->rd_connid = 0;
 			rd->rd_next = rd + 1;
 		}
 	}
@@ -1750,19 +1594,17 @@ rf_comminit()
 	rd_nfree = nrcvd;
 
 	/* create well-known RDs & SDs */
-
 	(void)rcvd_create(TRUE, RDGENERAL, &mountrd);
 	(void)rcvd_create(TRUE, RDGENERAL, &sigrd); /* signals */
-	(void)rcvd_create(TRUE, RDSPECIFIC, &rf_daemon_rd);  /* rf_daemon */
-
+	(void)rcvd_create(TRUE, RDSPECIFIC, &rf_daemon_rd);  /* rf_recovery */
 	/*
          * Use a tmp so that rcvd_create correctly updates rd_freelist and
 	 * rd_nfree.
 	 */
-
 	(void)rcvd_create(TRUE, RDSPECIFIC, &tmprdp);
 	reserved_rd = tmprdp;
 	(void)sndd_create(TRUE, &reserved_sd);
+	connid = 0;
 	return 0;
 }
 
@@ -1782,10 +1624,8 @@ rf_commdinit()
 	rcvd_free(&mountrd);
 	rcvd_free(&sigrd);
 	rcvd_free(&rf_daemon_rd);
-	reserved_rd->rd_stat = RDUSED;
 	reserved_rd = NULL;
 	rcvd_free(&tmp_res_rd);
-	reserved_sd->sd_stat = SDUSED;
 	reserved_sd = NULL;
 	sndd_free(&tmp_res_sd);
 
@@ -1810,8 +1650,8 @@ rf_commdinit()
 
 /*
  * Put arriving message in right rcvd queue.
- * Because it is sometimes called out of streams queue scheduling,
- * it protects itself with splstr().
+ * This assumes it is called out of streams queue scheduling, therefore
+ * protects itself with splstr().
  */
 void
 rf_deliver(bp)
@@ -1819,22 +1659,17 @@ rf_deliver(bp)
 {
 	register rf_message_t	*msgp = RF_MSG(bp);
 	register rcvd_t		*rd;
-	int			s;
-
 	extern rcvd_t		*sigrd;
 	extern int		rf_daemon_flag;
+	int			s;
 
-	s = splstr();
-
-#if defined(u3b2) && !defined(lint) && !defined(CXREF)
-	ASSERT(ipl() >= (s & 0x1e000));
-#endif
-
-	if ((rd = rf_gifttord(&msgp->m_dest, QPTOGP(msgp->m_queue)->version)) ==
-	   NULL ||
-	  rd->rd_stat == RDUNUSED) {
-		rfd_stray(bp);
-		splx(s);
+	if (msgp->m_dest < 0 || msgp->m_dest >= nrcvd ||
+	  (rd = INXTORD(msgp->m_dest))->rd_stat == RDUNUSED) {
+		if (!msgp->m_stat & RF_SIGNAL) {
+			gdp_discon("rf_deliver bad file id in header",
+			  QPTOGP((queue_t *)msgp->m_queue));
+		}
+		rf_freemsg(bp);
 		return;
 	}
 	if (msgp->m_stat & RF_SIGNAL) {
@@ -1842,19 +1677,17 @@ rf_deliver(bp)
 		ASSERT(rd->rd_stat != RDUNUSED);
 	}
 
-	ASSERT(!rd->rd_qslp++);
+	s = splstr();
 
 	LS_INIT(bp);
 	LS_INSQUE(&rd->rd_rcvdq, bp);
 	rd->rd_qcnt++;
 	if (rd->rd_qtype & RDSPECIFIC) {
-		wakeprocs((caddr_t)&rd->rd_qslp, PRMPT);
+		wakeup((caddr_t)&rd->rd_qslp);
 	} else {
 		proc_t	*found = rfsr_idle_procp;
 
 		ASSERT(rfsr_nidle == rfsr_listcount(rfsr_idle_procp));
-		ASSERT(!rfsr_idle_lock++);
-
 		/*
 		 * put message where it can be found and dispatch server
 		 */
@@ -1873,54 +1706,13 @@ rf_deliver(bp)
 			rfsr_idle_procp = found->p_rlink;
 			found->p_rlink = NULL;
 			rfsr_nidle--;
-			wakeprocs((caddr_t)&found->p_srwchan, PRMPT);
+			wakeup((caddr_t)&found->p_srwchan);
 		} else if (rfsr_nservers < maxserve) {
 			rf_daemon_flag |= RFDSERVE;
-			wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
+			wakeup((caddr_t)&rf_daemon_rd->rd_qslp);
 		}
-
-		ASSERT(!--rfsr_idle_lock);
 		ASSERT(rfsr_nidle == rfsr_listcount(rfsr_idle_procp));
 	}
 
-	ASSERT(!--rd->rd_qslp);
 	splx(s);
 }
-
-#ifdef DEBUG
-/* Starting at sdp, print n sndds */
-void
-sndd_print(sdp, n)
-	register sndd_t	*sdp;
-	unsigned	n;
-{
-	register sndd_t	*end = sdp + n - 1;
-
-	if (sdp < sndd ||
-	  ((caddr_t)sdp - (caddr_t)sndd) % sizeof(sndd_t) ||
-	  sdp >= end) {
-		cmn_err(CE_CONT, "bad args\n");
-		return;
-	}
-	for (; sdp < end; sdp++) {
-		cmn_err(CE_CONT, "\nhash\t\t\t\tfree\n");
-		cmn_err(CE_CONT, "0x%x\t0x%x\t0x%x\t0x%x\n",
-		  sdp->sd_hash.ls_next, sdp->sd_hash.ls_prev,
-		  sdp->sd_free.ls_next, sdp->sd_free.ls_prev);
-		cmn_err(CE_CONT, "size\t\tstat\t\tgift\n");
-		cmn_err(CE_CONT, "0x%x\t0x%x\t0x%x\t0x%x\n",
-		  sdp->sd_size, sdp->sd_stat,
-		  sdp->sd_gift.gift_id, sdp->sd_gift.gift_gen);
-		cmn_err(CE_CONT, "mntid\t\tsrvproc\t\tqueue\t\tfhandle\n");
-		cmn_err(CE_CONT, "0x%x\t0x%x\t0x%x\t0x%x\n",
-		  sdp->sd_mntid, sdp->sd_srvproc,
-		  sdp->sd_queue,   sdp->sd_fhandle);
-		cmn_err(CE_CONT,"vcode\t\tmapcnt\t\tnextr\t\tstashp\n");
-		cmn_err(CE_CONT, "0x%x\t0x%x\t0x%x\n",
-		  sdp->sd_vcode, sdp->sd_nextr, sdp->sd_stashp);
-		cmn_err(CE_CONT, "remcnt\t\tcrwlock\t\tv_count\n");
-		cmn_err(CE_CONT, "0x%x\t0x%x\t0x%x\t0x%x\n",
-		  sdp->sd_remcnt, sdp->sd_crwlock, sdp->sd_vn.v_count);
-	}
-}
-#endif

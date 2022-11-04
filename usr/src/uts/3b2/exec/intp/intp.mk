@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)exec:exec/intp/intp.mk	1.4"
+#ident	"@(#)exec:exec/intp/intp.mk	1.3"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -39,7 +39,6 @@ intp.o: intp.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/param.h \
 	$(INC)/sys/sysmacros.h \
-	$(INC)/sys/systm.h \
 	$(INC)/sys/sbd.h \
 	$(INC)/sys/systm.h \
 	$(INC)/sys/map.h \

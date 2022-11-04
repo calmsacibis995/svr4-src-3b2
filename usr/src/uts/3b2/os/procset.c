@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/procset.c	1.25"
+#ident	"@(#)kernel:os/procset.c	1.23"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -66,7 +66,7 @@ dotoprocs(psp, funcp, arg)
 	int			(*funcp)();
 	char			*arg;
 {
-	register proc_t	*prp;	/* A process from the set */
+	register proc_t	**prp;	/* A process from the set */
 	register int	error;
 	register int	nfound;	/* Nbr of processes found.	*/
 	register proc_t	*lastprp;	/* Last proc found.	*/
@@ -97,31 +97,31 @@ dotoprocs(psp, funcp, arg)
 	nfound = 0;
 	error  = 0;
 
-	for (prp = practive; prp != NULL; prp = prp->p_next) {
-		if (prp->p_stat == SIDL || prp->p_stat == SZOMB)
+	for (prp = &nproc[0]; prp < v.ve_proc; prp++) {
+		if (*prp == NULL || (*prp)->p_stat == SZOMB)
 			continue;
-		if(procinset(prp, psp)){
+		if(procinset(*prp, psp)){
 			nfound++;
-			lastprp = prp;
-			if (funcp != NULL && prp != proc_init) {
-				error = (*funcp)(prp, arg);
-				if (error == -1)
+			lastprp = *prp;
+			if (funcp != NULL && (*prp)->p_pid != P_INITPID) {
+				error = (*funcp)(*prp, arg);
+				if (error == -1) {
 					return 0;
-				else if (error)
+				} else if (error) {
 					return error;
+				}
 			}
 		}
 	}
-
-	if (nfound == 0)
+	if (nfound == 0) {
 		return ESRCH;
+	}
 
-	if (nfound == 1 && lastprp == proc_init && funcp != NULL)
+	if (nfound == 1 && lastprp->p_pid == P_INITPID && funcp != NULL) {
 		error = (*funcp)(lastprp, arg);
-
+	}
 	if (error == -1)
 		error = 0;
-
 	return error;
 }
 

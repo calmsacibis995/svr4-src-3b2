@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/specfs/specvnops.c	1.67.1.32"
+#ident	"@(#)fs:fs/specfs/specvnops.c	1.67.1.10"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/systm.h"
@@ -83,6 +60,7 @@ STATIC int spec_access();
 STATIC int spec_fsync();
 STATIC void spec_inactive();
 STATIC int spec_fid();
+STATIC int spec_link();
 STATIC int spec_seek();
 STATIC int spec_frlock();
 STATIC int spec_realvp();
@@ -108,7 +86,7 @@ struct vnodeops spec_vnodeops = {
 	fs_nosys,	/* lookup */
 	fs_nosys,	/* create */
 	fs_nosys,	/* remove */
-	fs_nosys,	/* link */
+	spec_link,
 	fs_nosys,	/* rename */
 	fs_nosys,	/* mkdir */
 	fs_nosys,	/* rmdir */
@@ -132,32 +110,7 @@ struct vnodeops spec_vnodeops = {
 	spec_delmap,
 	spec_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -180,10 +133,12 @@ spec_open(vpp, flag, cr)
 	register unsigned int maj;
 	register dev_t dev;
 	dev_t newdev;
-	o_pid_t *oldttyp;
+	pid_t *oldttyp;
 	struct vnode *nvp;
 	struct vnode *vp = *vpp;
 	struct vnode *cvp = VTOS(vp)->s_commonvp;
+	struct stdata *tmpsp;
+	int newdriver = 0;
 	int error = 0;
 	label_t	saveq;
 
@@ -210,22 +165,24 @@ spec_open(vpp, flag, cr)
 			u.u_qsav = saveq;
 			return ENXIO;
 		}
+		if (!(*cdevsw[getmajor(dev)].d_flag & D_OLD))
+			newdriver = 1;
 		oldttyp = u.u_ttyp; 	/* used only by old tty drivers */
 		if (cdevsw[maj].d_str) {
 			if ((error = stropen(cvp, &newdev, flag, cr)) == 0) {
-				struct stdata *stp = cvp->v_stream;
-				if (dev != newdev) {
+				if (dev != newdev && newdriver) {
 					/*
 					 * Clone open.
 					 */
+					tmpsp = cvp->v_stream;
+					vp->v_stream = NULL;
+					cvp->v_stream = NULL;
 					if ((nvp = makespecvp(newdev, VCHR))
 					  == NULL) {
 						strclose(vp, flag, cr);
 						error = ENOMEM;
 						break;
 					}
-					vp->v_stream = NULL;
-					cvp->v_stream = NULL;
 					/*
 					 * STREAMS clones inherit fsid and
 					 * stream.
@@ -233,47 +190,37 @@ spec_open(vpp, flag, cr)
 					VTOS(nvp)->s_fsid = VTOS(vp)->s_fsid;
 					VTOS(vp)->s_count--;
 					VTOS(cvp)->s_count--;
-					nvp->v_vfsp = vp->v_vfsp;
-					nvp->v_stream = stp;
+					nvp->v_stream = tmpsp;
 					cvp = VTOS(nvp)->s_commonvp;
-					cvp->v_stream = stp;
-					stp->sd_vnode = cvp;
-					stp->sd_strtab =
+					cvp->v_stream = nvp->v_stream;
+					nvp->v_stream->sd_vnode = cvp;
+					nvp->v_stream->sd_strtab =
 					  cdevsw[getmajor(newdev)].d_str;
 					VN_RELE(vp);
 					VTOS(nvp)->s_count++;
 					VTOS(cvp)->s_count++;
 					*vpp = nvp;
+					if (!(newdriver) && oldttyp == NULL
+					  && u.u_ttyp != oldttyp)
+						/*
+						 * ctty was allocated, and the
+						 * vnode changed; reallocate
+						 * the ctty.
+						 */
+						realloctty(cvp);
 				} else {
 					/*
 					 * Normal open.
 					 */
-					vp->v_stream = stp;
-				}
-        			if (oldttyp == NULL && u.u_ttyp != NULL) {
-					/* 
-					 * pre SVR4 driver has allocated the
-					 * stream as a controlling terminal -
-					 * check against SVR4 criteria and
-					 * deallocate it if it fails
-					 */
-					if ((flag&FNOCTTY) 
-					  || !strctty(u.u_procp, stp)) {
-						*u.u_ttyp = 0;
-						u.u_ttyp = NULL;
-					}
-				} else if (stp->sd_flag & STRISTTY) {
-					/*
-					 * this is a post SVR4 tty driver -
-					 * try to allocate it as a
-					 * controlling terminal
-					 */	
-					if (!(flag&FNOCTTY))
-						(void)strctty(u.u_procp, stp);
+					vp->v_stream = cvp->v_stream;
 				}
 			}
 		} else {
-			if ((error = (*cdevsw[maj].d_open)
+			if (*cdevsw[maj].d_flag & D_OLD) {
+				(void)(*cdevsw[maj].d_open)
+				  (cmpdev(dev), flag, OTYP_CHR);
+				error = u.u_error;	/* XXX */
+			} else if ((error = (*cdevsw[maj].d_open)
 			  (&newdev, flag, OTYP_CHR, cr)) == 0
 			    && dev != newdev) {
 				/*
@@ -290,24 +237,12 @@ spec_open(vpp, flag, cr)
 				 * Character clones inherit fsid.
 				 */
 				VTOS(nvp)->s_fsid = VTOS(vp)->s_fsid;
-				nvp->v_vfsp = vp->v_vfsp;
 				VN_RELE(vp);
 				VTOS(nvp)->s_count++;
 				*vpp = nvp;
 			}
-			if (oldttyp == NULL && u.u_ttyp != NULL) {
-                                register proc_t *pp = u.u_procp;
-                                register sess_t *sp = pp->p_sessp;
-				if ((flag&FNOCTTY) || pp->p_pid != sp->s_sid) {
-                                        *u.u_ttyp = 0;
-                                        u.u_ttyp = NULL;
-                                } else {
-					extern vnode_t *makectty();
-                                        alloctty(pp, 
-					  makectty(VTOS(*vpp)->s_commonvp));
-                                        u.u_ttyd = (o_dev_t)cmpdev(sp->s_dev);
-                                }
-                        }
+			if (!(newdriver) && oldttyp == NULL && u.u_ttyp != oldttyp)
+				realloctty(VTOS(*vpp)->s_commonvp);
 		}
 		break;
 
@@ -317,7 +252,11 @@ spec_open(vpp, flag, cr)
 			u.u_qsav = saveq;
 			return ENXIO;
 		}
-		if ((error = (*bdevsw[maj].d_open)(&newdev, flag,
+		if (*bdevsw[maj].d_flag & D_OLD) {
+			(void)(*bdevsw[maj].d_open)
+			  (cmpdev(dev), flag, OTYP_BLK);
+			error = u.u_error;	/* XXX */
+		} else if ((error = (*bdevsw[maj].d_open)(&newdev, flag,
 		    OTYP_BLK, cr)) == 0 && dev != newdev) {
 			/*
 			 * Clone open.
@@ -421,6 +360,8 @@ spec_read(vp, uiop, ioflag, cr)
 
 	if (uiop->uio_resid == 0)
 		return 0;
+	if (uiop->uio_offset < 0)
+		return EINVAL;
 
 	ASSERT(vp->v_type == VCHR || vp->v_type == VBLK);
 
@@ -428,7 +369,24 @@ spec_read(vp, uiop, ioflag, cr)
 		smark(sp, SACC);
 		if (cdevsw[getmajor(dev)].d_str)
 			error = strread(vp, uiop, cr);
-		else 
+		else if (*cdevsw[getmajor(dev)].d_flag & D_OLD) {
+			/*
+			 * For old device drivers we have to unpack the
+			 * uio information into the u-block and believe
+			 * what it says when it comes back.
+			 */
+			u.u_offset = uiop->uio_offset;
+			u.u_base = uiop->uio_iov->iov_base;
+			u.u_count = uiop->uio_resid;
+			u.u_segflg = uiop->uio_segflg;
+			u.u_fmode = uiop->uio_fmode;
+
+			(void)(*cdevsw[getmajor(dev)].d_read)(cmpdev(dev));
+
+			uiop->uio_resid = u.u_count;
+			uiop->uio_offset = u.u_offset;
+			error = u.u_error;		/* XXX */
+		} else
 			error = (*cdevsw[getmajor(dev)].d_read)(dev, uiop, cr);
 		return error;
 	}
@@ -448,8 +406,11 @@ spec_read(vp, uiop, ioflag, cr)
 		n = MIN(MAXBSIZE - on, uiop->uio_resid);
 		diff = bdevsize - uiop->uio_offset;
 
-		if (diff <= 0) 
+		if (diff <= 0) {
+			if (diff < 0)
+				error = ENXIO;
 			break;
+		}
 		if (diff < n)
 			n = diff;
 
@@ -498,14 +459,30 @@ spec_write(vp, uiop, ioflag, cr)
 	off_t off;
 	struct vnode *blkvp;
 
+	if (uiop->uio_offset < 0)
+		return EINVAL;
+
 	ASSERT(vp->v_type == VCHR || vp->v_type == VBLK);
 
 	if (vp->v_type == VCHR) {
 		smark(sp, SUPD|SCHG);
 		if (cdevsw[getmajor(dev)].d_str)
 			error = strwrite(vp, uiop, cr);
-		else
+		else if (*cdevsw[getmajor(dev)].d_flag & D_OLD) {
+			u.u_offset = uiop->uio_offset;
+			u.u_base = uiop->uio_iov->iov_base;
+			u.u_count = uiop->uio_resid;
+			u.u_segflg = uiop->uio_segflg;
+			u.u_fmode = uiop->uio_fmode;
+
+			(void)(*cdevsw[getmajor(dev)].d_write)(cmpdev(dev));
+
+			uiop->uio_resid = u.u_count;
+			uiop->uio_offset = u.u_offset;
+			error = u.u_error;		/* XXX */
+		} else
 			error = (*cdevsw[getmajor(dev)].d_write)(dev, uiop, cr);
+
 		return error;
 	}
 
@@ -543,7 +520,7 @@ spec_write(vp, uiop, ioflag, cr)
 		 */
 		if (n == MAXBSIZE || (on == 0 && (off + n) == bdevsize)) {
 			SNLOCK(sp);
-			segmap_pagecreate(segkmap, base + on, (u_int)n, 0);
+			segmap_pagecreate(segkmap, base + on, (u_int)n, 0, 0, 0);
 			SNUNLOCK(sp);
 			pagecreate = 1;
 		}
@@ -613,28 +590,28 @@ spec_ioctl(vp, cmd, arg, mode, cr, rvalp)
 	dev = VTOS(vp)->s_dev;
 	if (cdevsw[getmajor(dev)].d_str)
 		error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
-	else
-		error = (*cdevsw[getmajor(dev)].d_ioctl)(dev, cmd, arg, 
-			mode, cr, rvalp);
+	else if (*cdevsw[getmajor(dev)].d_flag & D_OLD) {
+		(void)(*cdevsw[getmajor(dev)].d_ioctl)(cmpdev(dev), cmd, arg, mode);
+		error = u.u_error;		/* XXX */
+		*rvalp = u.u_rval1;		/* XXX */
+	} else
+		error =
+		  (*cdevsw[getmajor(dev)].d_ioctl)(dev, cmd, arg, mode, cr, rvalp);
 	return error;
 }
 
 /* ARGSUSED */
 STATIC int
 spec_getattr(vp, vap, flags, cr)
-	register struct vnode *vp;
+	struct vnode *vp;
 	register struct vattr *vap;
 	int flags;
 	struct cred *cr;
 {
 	int error;
-	register struct snode *sp;
+	register struct snode *sp = VTOS(vp);
 	register struct vnode *realvp;
 
-	if (flags & ATTR_COMM && vp->v_type == VBLK)
-		vp = VTOS(vp)->s_commonvp;
-	
-	sp = VTOS(vp);
 	if ((realvp = sp->s_realvp) == NULL) {
 		/*
 		 * No real vnode behind this one.  Fill in the fields
@@ -652,7 +629,7 @@ spec_getattr(vp, vap, flags, cr)
 		vap->va_size = sp->s_size;
 		vap->va_rdev = sp->s_dev;
 		vap->va_blksize = MAXBSIZE;
-		vap->va_nblocks = btod(vap->va_size);
+		vap->va_nblocks = (vap->va_size + MAXBSIZE - 1) / MAXBSIZE;
 	} else if (error = VOP_GETATTR(realvp, vap, flags, cr))
 		return error;
 
@@ -716,6 +693,21 @@ spec_access(vp, mode, flags, cr)
 		return 0;	/* Allow all access. */
 }
 
+STATIC int
+spec_link(tdvp, vp, tnm, cr)
+	struct vnode *tdvp;
+	struct vnode *vp;
+	char *tnm;
+	struct cred *cr;
+{
+	register struct vnode *realvp;
+
+	if ((realvp = VTOS(vp)->s_realvp) != NULL)
+		return VOP_LINK(tdvp, realvp, tnm, cr);
+	else
+		return ENOENT;
+}
+
 /*
  * In order to sync out the snode times without multi-client problems,
  * make sure the times written out are never earlier than the times
@@ -730,21 +722,11 @@ spec_fsync(vp, cr)
 	register struct vnode *realvp;
 	struct vattr va, vatmp;
 
-	/*
-	 * If times didn't change, don't flush anything.
-	 */
-	if ((sp->s_flag & (SACC|SUPD|SCHG)) == 0 && vp->v_type != VBLK)
+	/* If times didn't change, don't flush anything. */
+	if ((sp->s_flag & (SACC|SUPD|SCHG)) == 0)
 		return 0;
 
-	sp->s_flag &= ~(SACC|SUPD|SCHG);
-
-	if (vp->v_type == VBLK && sp->s_commonvp != vp
-	  && sp->s_commonvp->v_pages != NULL)
-		(void) VOP_PUTPAGE(sp->s_commonvp, 0, 0, 0, (struct cred *) 0);
-
-	/*
-	 * If no real vnode to update, don't flush anything.
-	 */
+	/* If no real vnode to update, don't flush anything. */
 	if ((realvp = sp->s_realvp) == NULL)
 		return 0;
 
@@ -820,7 +802,7 @@ spec_seek(vp, ooff, noffp)
 	off_t ooff;
 	off_t *noffp;
 {
-	return 0;
+	return *noffp < 0 ? EINVAL : 0;
 }
 
 /* ARGSUSED */
@@ -976,6 +958,9 @@ reread:
 		bp->b_dev = cmpdev(vp->v_rdev);
 		bp->b_edev = vp->v_rdev;
 		bp->b_blkno = btodt(io_off);
+#if 1
+		bp->b_un.b_addr = (caddr_t)pfntokv(page_pptonum(pp)); /* XXX */
+#endif
 
 		/*
 		 * Zero part of page which we are not
@@ -1020,6 +1005,9 @@ reread:
 			bp2->b_dev = cmpdev(vp->v_rdev);
 			bp2->b_edev = vp->v_rdev;
 			bp2->b_blkno = btodt(io_off);
+#if 1
+	/* XXX */	bp2->b_un.b_addr = (caddr_t)pfntokv(page_pptonum(pp2));
+#endif
 			/*
 			 * Zero part of page which we are not
 			 * going to be reading from disk now.
@@ -1140,6 +1128,9 @@ spec_wrtblk(vp, pp, off, len, flags)
 	bp->b_dev = cmpdev(vp->v_rdev);
 	bp->b_edev = vp->v_rdev;
 	bp->b_blkno = btodt(off);
+#if 1
+	bp->b_un.b_addr = (caddr_t) pfntokv(page_pptonum(pp)); /* XXX */
+#endif
 
 	(*bdevsw[getmajor(vp->v_rdev)].d_strategy)(bp);
 
@@ -1203,7 +1194,7 @@ again:
 		 * We refuse to act on behalf of the pageout daemon to push
 		 * out a page to an snode which is currently locked.
 		 */
-		if ((sp->s_flag & SLOCKED) && u.u_procp == proc_pageout) {
+		if ((sp->s_flag & SLOCKED) && u.u_procp == nproc[2]) {
 			err = EAGAIN;		/* XXX EWOULDBLOCK */
 			goto out;
 		}
@@ -1479,11 +1470,11 @@ spec_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 }
 
 STATIC int
-spec_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
+spec_addmap(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;
@@ -1500,11 +1491,11 @@ spec_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
 }
 
 STATIC int
-spec_delmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
+spec_delmap(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;

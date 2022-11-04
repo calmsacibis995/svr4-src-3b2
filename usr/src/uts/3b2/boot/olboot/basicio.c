@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/olboot/basicio.c	11.10"
+#ident	"@(#)boot:boot/olboot/basicio.c	11.9"
 
 #include	"sys/param.h"
 #include	"sys/types.h"
@@ -390,24 +390,10 @@ int numbytes;
 	long nbytes,size,sbyte;
 	char *mem,*bp;
 	int tc, i;
-	int fssize;
 
 	/*
-	**PRINTF("debug: reading %x %x %x %x bytes\n",ip, offset, buf,numbytes);
+	PRINTF("debug: reading %x %x %x %x bytes\n",ip, offset, buf,numbytes);
 	*/
-
-	switch(fstype) {
-	case Fs4b:
-		fssize = (SECTSIZE * 4);
-		break;
-	case Fs2b:
-		fssize = (SECTSIZE * 2);
-		break;
-	case Fs1b:
-	default:
-		fssize = SECTSIZE;
-		break;
-	}
 
 	mem= (char *)buf;
 	size = numbytes;
@@ -417,11 +403,11 @@ int numbytes;
 		 * read in the entire sector and copy part of it to memory. 
 		 */
 
-		if ((offset % fssize) != 0){
-			nbytes = fssize - (offset % fssize);
+		if ((offset % SECTSIZE) != 0){
+			nbytes = SECTSIZE - (offset % SECTSIZE);
 			if (nbytes > size)
 				nbytes = size;
-			sbyte = offset % fssize;
+			sbyte = offset % SECTSIZE;
 			bp = DATA + sbyte;
 			if (!rb((paddr_t)&DATA, offset, ip))
 				return(CFAIL);
@@ -437,7 +423,7 @@ int numbytes;
 		 * and copy part of it. 
 		 */
 
-		if (size < fssize){
+		if (size < SECTSIZE){
 			if (!rb((paddr_t)&DATA, offset, ip))
 				return(CFAIL);
 			tc = FsBSIZE(fstype) - (offset % FsBSIZE(fstype));
@@ -449,12 +435,12 @@ int numbytes;
 
 		/* Now attempt to read in all the whole sectors */
 
-		while (size >= fssize) {
+		while (size >= SECTSIZE) {
 			if (!rb((paddr_t)mem, offset, ip))
 				return(CFAIL);
-			size -= fssize;
-			mem += fssize;
-			offset += fssize;
+			size -= SECTSIZE;
+			mem += SECTSIZE;
+			offset += SECTSIZE;
 		}
 	}
 	return(CPASS);

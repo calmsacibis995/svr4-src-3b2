@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:rpcb_clnt.c	1.8"
+#ident	"@(#)librpc:rpcb_clnt.c	1.4"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -19,9 +18,9 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
@@ -57,7 +56,7 @@ static struct timeval rmttimeout = { 3, 0 };
 
 extern int errno;
 extern int t_errno;
-extern char *strdup(), *malloc();
+extern char *strdup(), *calloc();
 
 static char nullstring[] = "\000";
 
@@ -88,7 +87,7 @@ getclnthandle(host, nconf)
 	rpcbind_hs.h_serv = "rpcbind";
 #ifdef ND_DEBUG
 	fprintf(stderr, "rpcbind client routines: diagnostics :\n");
-	fprintf(stderr, "\tGetting address for (%s, %s, %s) ... \n",
+	fprintf(stderr, "	Getting address for (%s,%s,%s) ... \n",
 		rpcbind_hs.h_host, rpcbind_hs.h_serv, nconf->nc_netid);
 #endif
 
@@ -114,9 +113,9 @@ getclnthandle(host, nconf)
 	{
 		int i;
 
-		fprintf(stderr, "\tnetbuf len = %d, maxlen = %d\n",
+		fprintf(stderr, "	netbuf len = %d, maxlen = %d\n",
 			addr->len, addr->maxlen);
-		fprintf(stderr, "\tAddress is");
+		fprintf(stderr, "	Address is");
 		for (i = 0; i < addr->len; i++)
 			fprintf(stderr, "%ud.", addr->buf[i]);
 		fprintf(stderr, "\n");
@@ -124,7 +123,7 @@ getclnthandle(host, nconf)
 #endif
 	client = clnt_tli_create(fd, nconf, addr, RPCBPROG,
 				RPCBVERS, 0, 0);
-	if (! client) {
+	if (! client ) {
 #ifdef ND_DEBUG
 		fprintf(stderr, "rpcbind clnt interface:");
 		clnt_pcreateerror();
@@ -132,7 +131,10 @@ getclnthandle(host, nconf)
 		t_close(fd);
 	} else {
 		/* close the fd when we destroy the handle */
-		CLNT_CONTROL(client, CLSET_FD_CLOSE, NULL);
+		CLNT_CONTROL(client, CLSET_FD_CLOSE, NULL);		
+#ifdef ND_DEBUG
+		fprintf(stderr, "rpcb_clnt : returned connection to rpcbind.\n");
+#endif
 	}
 	netdir_free((char *)nas, ND_ADDRLIST);
 	return (client);
@@ -187,7 +189,7 @@ local_rpcb()
 	return (client);
 }
 /*
- * Set a mapping between program, version and address.
+ * Set a mapping between program,version and address.
  * Calls the rpcbind service remotely to do the mapping.
  */
 bool_t
@@ -200,7 +202,6 @@ rpcb_set(program, version, nconf, address)
 	register CLIENT *client;
 	bool_t rslt = FALSE;
 	RPCB parms;
-	char uidbuf[32];
 
 	/* parameter checking */
 	if (nconf == (struct netconfig *)NULL) {
@@ -212,7 +213,7 @@ rpcb_set(program, version, nconf, address)
 		return (FALSE);
 	}
 	client = local_rpcb();
-	if (! client)
+	if (! client )
 		return (FALSE);
 
 	parms.r_addr = taddr2uaddr(nconf, address); /* convert to universal */
@@ -223,19 +224,17 @@ rpcb_set(program, version, nconf, address)
 	parms.r_prog = program;
 	parms.r_vers = version;
 	parms.r_netid = nconf->nc_netid;
-	(void) sprintf(uidbuf, "%d", geteuid());
-	parms.r_owner = uidbuf;
 
 	CLNT_CALL(client, RPCBPROC_SET, xdr_rpcb, &parms,
 			xdr_bool, &rslt, tottimeout);
-
+	
 	CLNT_DESTROY(client);
 	free(parms.r_addr);
 	return (rslt);
 }
 
 /*
- * Remove the mapping between program, version and netbuf address.
+ * Remove the mapping between program,version and netbuf address.
  * Calls the rpcbind service to do the un-mapping.
  * If netbuf is NULL, unset for all the transports, otherwise unset
  * only for the given transport.
@@ -249,11 +248,10 @@ rpcb_unset(program, version, nconf)
 	register CLIENT *client;
 	bool_t rslt = FALSE;
 	RPCB parms;
-	char uidbuf[32];
 
 	client = local_rpcb();
 
-	if (! client)
+	if (! client )
 		return (FALSE);
 
 	parms.r_prog = program;
@@ -261,20 +259,18 @@ rpcb_unset(program, version, nconf)
 	if (nconf)
 		parms.r_netid = nconf->nc_netid;
 	else
-		parms.r_netid = nullstring; /* unsets  all*/
+		parms.r_netid = NULL;	/* This unsets all of them */
 	parms.r_addr = nullstring;
-	(void) sprintf(uidbuf, "%d", geteuid());
-	parms.r_owner = uidbuf;
 
 	CLNT_CALL(client, RPCBPROC_UNSET, xdr_rpcb, &parms,
 			xdr_bool, &rslt, tottimeout);
-
+	
 	CLNT_DESTROY(client);
 	return (rslt);
 }
 
 /*
- * Find the mapped address for program, version.
+ * Find the mapped address for program,version.
  * Calls the rpcbind service remotely to do the lookup.
  * Uses the transport specified in nconf.
  * Returns FALSE (0) if no map exists, else returns 1.
@@ -314,7 +310,6 @@ rpcb_getaddr(program, version, nconf, address, host)
 	parms.r_vers = version;
 	parms.r_netid = nconf->nc_netid;	/* not needed */
 	parms.r_addr = nullstring;	/* not needed; just for xdring */
-	parms.r_owner = nullstring;	/* not needed; just for xdring */
 
 	ua = uaddress;
 	clnt_st = CLNT_CALL(client, RPCBPROC_GETADDR, xdr_rpcb, &parms,
@@ -328,9 +323,9 @@ rpcb_getaddr(program, version, nconf, address, host)
 
 		na = uaddr2taddr(nconf, uaddress);
 #ifdef ND_DEBUG
-		fprintf(stderr, "\tRemote address is [%s].\n", uaddress);
-		if (!na)
-			fprintf(stderr, "\tCouldn't resolve remote address!\n");
+		fprintf(stderr, "	Remote address is [%s].\n", uaddress);
+		if (!na) 
+			fprintf(stderr, "	Couldn't resolve remote address!\n");
 #endif
 		if (! na) {
 			/* We don't know about your universal address */
@@ -353,13 +348,12 @@ rpcb_getaddr(program, version, nconf, address, host)
 		 * rpcbind/portmapper do not return PROGVERSMISMATCH because
 		 * of svc_versquiet, and hence this
 		 */
-		if (((clnt_st == RPC_PROGVERSMISMATCH) ||
-			   (clnt_st == RPC_PROGUNAVAIL)) &&
-		     (strcmp(nconf->nc_protofmly, NC_INET) == 0)) {
+		if (((clnt_st == RPC_PROGVERSMISMATCH) || (clnt_st == RPC_PROGUNAVAIL))
+			&& (strcmp(nconf->nc_protofmly, NC_INET) == 0)) {
 			/*
 			 * version 3 not available. Try version 2
-			 * The assumption here is that the netbuf
-			 * is arranged in the sockaddr_in
+			 * XXX: The assumption here is
+			 * that the netbuf is arranged in the sockaddr_in
 			 * style for IP cases.
 			 */
 			u_short port;
@@ -370,12 +364,11 @@ rpcb_getaddr(program, version, nconf, address, host)
 			protocol = strcmp(nconf->nc_proto, NC_TCP) ?
 					IPPROTO_UDP : IPPROTO_TCP;
 			port = (u_short)pmap_getport((struct sockaddr_in *)remote.buf,
-					program, version, protocol);
+						program, version, protocol);
 			if (port && (address->maxlen <= remote.len)) {
-				memcpy(address->buf, remote.buf,
-						remote.len);
-				memcpy((char *)&address->buf[sizeof (short)],
-					(char *)&port, sizeof (short));
+				memcpy(address->buf, remote.buf, remote.len);
+				memcpy((char *)&address->buf[sizeof(short)],
+					(char *)&port, sizeof(short));
 				address->len = remote.len;
 			} else {
 				rpc_createerr.cf_stat = RPC_PMAPFAILURE;
@@ -399,11 +392,12 @@ rpcb_getaddr(program, version, nconf, address, host)
 	}
 error:
 	CLNT_DESTROY(client);
-#ifdef ND_DEBUG
+#ifdef ND_DEBUG	
 	if (status)
-		fprintf(stderr, "\tSUCCESS.\n");
+		fprintf(stderr, "	SUCCESS.\n");
 	else
-		fprintf(stderr, "\tFAILED.\n");
+		fprintf(stderr, "	FAILED.\n");
+	fprintf(stderr, "rpcb_clnt (getaddr) : End diagnostics.\n");
 #endif
 	return (status);
 }
@@ -423,7 +417,8 @@ rpcb_getmaps(nconf, host)
 	RPCBLIST *head = (RPCBLIST *)NULL;
 	register CLIENT *client;
 
-	client = getclnthandle(host, nconf);
+	/* Here one can safely call higher level rpc routines */
+	client = clnt_tp_create(host, RPCBPROG, RPCBVERS, nconf);
 	if (client != (CLIENT *)NULL) {
 		if (CLNT_CALL(client, RPCBPROC_DUMP, xdr_void, NULL,
 			xdr_rpcblist, &head, tottimeout) != RPC_SUCCESS) {
@@ -457,13 +452,13 @@ rpcb_rmtcall(nconf, host, prog, vers, proc, xdrargs, argsp,
 	enum clnt_stat stat = RPC_FAILED;
 	struct netbuf *na = NULL;
 
-	client = getclnthandle(host, nconf);
+	client = clnt_tp_create(host, RPCBPROG, RPCBVERS, nconf);
 	if (client != (CLIENT *)NULL) {
 		struct rpcb_rmtcallargs a;
 		struct rpcb_rmtcallres r;
 		char addrbuf[1024]; /* should be enough for all addresses */
 
-		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, &rmttimeout);
+		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, rmttimeout);
 		a.prog = prog;
 		a.vers = vers;
 		a.proc = proc;
@@ -478,12 +473,13 @@ rpcb_rmtcall(nconf, host, prog, vers, proc, xdrargs, argsp,
 		if (stat == RPC_SUCCESS) {
 			na = uaddr2taddr(nconf, addrbuf);
 			if (! na) {
+				/* We don't know about your universal address */
 				stat = RPC_N2AXLATEFAILURE;
 				goto error;
 			}
 			if (na->len > addr_ptr->maxlen) {
 				/* Too long address */
-				stat = RPC_FAILED; /* XXX A better errorno */
+				stat = RPC_FAILED; /* XXX A better error number */
 				goto error;
 			}
 			memcpy(addr_ptr->buf, na->buf, (int)na->len);
@@ -516,7 +512,7 @@ rpcb_gettime(host, timep)
 		time(timep);
 		return (TRUE);
 	}
-	client = clnt_create(host, RPCBPROG, RPCBVERS, "netpath");
+	client = clnt_create(host, RPCBPROG, RPCBVERS, "visible");
 	if (client) {
 		enum clnt_stat st;
 
@@ -550,7 +546,7 @@ rpcb_taddr2uaddr(nconf, taddr)
 		return (NULL);
 	}
 	client = local_rpcb();
-	if (! client)
+	if (! client )
 		return (NULL);
 
 	CLNT_CALL(client, RPCBPROC_TADDR2UADDR, xdr_netbuf, taddr,
@@ -581,24 +577,19 @@ rpcb_uaddr2taddr(nconf, uaddr)
 		return (NULL);
 	}
 	client = local_rpcb();
-	if (! client)
+	if (! client )
 		return (NULL);
 
-	memset((char *)&nbuf, 0, sizeof (struct netbuf));
+	memset((char *)&nbuf, 0, sizeof(struct netbuf));
 	if (CLNT_CALL(client, RPCBPROC_UADDR2TADDR, xdr_wrapstring, &uaddr,
-		xdr_netbuf, &nbuf, tottimeout) == RPC_SUCCESS) {
+			xdr_netbuf, &nbuf, tottimeout) == RPC_SUCCESS) {
 		taddr = (struct netbuf *)malloc(sizeof (struct netbuf));
-		if (!taddr)
-			goto end;
 		taddr->len = nbuf.len;
 		taddr->maxlen = nbuf.maxlen;
-		if ((taddr->buf = malloc(nbuf.maxlen)) == NULL) {
-			free (taddr);
-			goto end;
-		}
+		taddr->buf = calloc(nbuf.maxlen, 1);
 		memcpy(taddr->buf, nbuf.buf, nbuf.len);
 	}
-end:
 	CLNT_DESTROY(client);
 	return (taddr);
 }
+

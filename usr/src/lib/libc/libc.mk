@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libc:libc.mk	1.27.3.3"
+#ident	"@(#)libc:libc.mk	1.27.1.16"
 #
 # makefile for libc
 #
@@ -34,7 +34,7 @@ MAKE=make
 ROOT=
 CCSLIB=$(ROOT)/usr/ccs/lib
 USRLIB=$(ROOT)/usr/lib
-LIBP=$(CCSLIB)/libp
+LIBP=$(CCSLIB)
 ABILIB=$(CCSLIB)/minabi
 ABILIBP=$(CCSLIB)/minabi/libp
 DONE=
@@ -149,7 +149,7 @@ archive_lib:
 	mkdir object
 	find port $(MACHINE) -name '*.o' -print | \
 	xargs sh -sc 'cp "$$@" object'
-	$(PROF)find port $(MACHINE) -name '*.p' -print | \
+	$(PROF)find port $(MACHINE) -name '*.o' -print | \
 	xargs sh -sc 'cp "$$@" object'
 	#
 	# delete temporary libraries
@@ -157,7 +157,7 @@ archive_lib:
 	$(PROF)-rm -f libp.libc
 	#
 	# set aside run-time modules, which don't go in library archive!
-	cd object; for i in *crt?.o values-Xt.o values-Xa.o values-Xc.o; do mv $$i ..; done
+	cd object; for i in *crt?.o values-Xa.o values-Xc.o; do mv $$i ..; done
 	#
 	# build archive out of the remaining modules.
 	cd object; $(MAKE) -e -f ../$(MACHINE)/makefile archive \
@@ -187,8 +187,7 @@ shared_lib:
 	-rm -f libc.so
 	#
 	# set aside run-time modules, which don't go in library archive!
-	cd object; for i in *crt?.o values-Xa.o values-Xc.o; do mv $$i ..; done; \
-	cp values-Xt.o ..
+	cd object; for i in *crt?.o values-Xa.o values-Xc.o; do mv $$i ..; done
 	#
 	# build archive out of the remaining modules.
 	cd object; $(MAKE) -e -f ../$(MACHINE)/makefile shared \
@@ -218,7 +217,7 @@ abi_lib:
 	-rm -f libabi.so
 	#
 	# set aside run-time modules, which don't go in library archive!
-	cd object; for i in *crt?.o values-Xt.o values-Xa.o values-Xc.o; do mv $$i ..; done
+	cd object; for i in *crt?.o values-Xa.o values-Xc.o; do mv $$i ..; done
 	#
 	# build archive out of the remaining modules.
 	cd object; $(MAKE) -e -f ../$(MACHINE)/makefile abi_lib \
@@ -252,7 +251,7 @@ move:	move_archive
 move_archive:
 	#
 	# move the library or libraries into the correct directory
-	for i in *crt?.o values-Xt.o values-Xa.o values-Xc.o;  \
+	for i in *crt?.o values-Xa.o values-Xc.o;  \
 	do sh $(SGSBASE)/sgs.install 644 $(OWN) $(GRP) $(CCSLIB)/$(SGS)$$i $$i; \
 	rm -f $$i ; done
 	sh $(SGSBASE)/sgs.install 644 $(OWN) $(GRP) $(CCSLIB)/lib$(VARIANT)c.a lib.libc ; \

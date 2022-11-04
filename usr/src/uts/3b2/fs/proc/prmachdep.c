@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/proc/prmachdep.c	1.8"
+#ident	"@(#)fs:fs/proc/prmachdep.c	1.7"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/cred.h"
@@ -125,16 +125,6 @@ prsetregs(up, rp)
 	 */
 	((psw_t *)(&reg[PS]))->NZVC = ((psw_t *)&rp[R_PS])->NZVC;
 	((psw_t *)(&reg[PS]))->TE = ((psw_t *)&rp[R_PS])->TE;
-}
-
-/*
- * Return the value of the PC from the supplied register set.
- */
-int
-prgetpc(rp)
-	gregset_t rp;
-{
-	return rp[R_PC];
 }
 
 /*

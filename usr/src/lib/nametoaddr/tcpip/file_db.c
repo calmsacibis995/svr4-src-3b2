@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)nametoaddr:tcpip/file_db.c	1.3"
+#ident	"@(#)nametoaddr:tcpip/file_db.c	1.2"
 
 /*
  * This is the C library "getXXXbyYYY" routines after they have been stripped
@@ -207,7 +207,7 @@ he_interpret()
 	/* Now check for whitespace */
 	cp = strpbrk(p, " \t");
 	if (cp == NULL)
-		return (_gethostent());
+		return (NULL);
 	*cp++ = '\0'; /* This breaks the line into name/address components */
 
 	/* return one address */

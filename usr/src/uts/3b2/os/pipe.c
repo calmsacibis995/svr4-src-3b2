@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/pipe.c	1.11"
+#ident	"@(#)kernel:os/pipe.c	1.10"
 #include "sys/types.h"
 #include "sys/sysmacros.h"
 #include "sys/param.h"
@@ -45,11 +45,9 @@ pipe(uap, rvp)
 	extern int strclose();
 	extern struct vnode *makepipe();
 	struct vnode *vp1, *vp2;
-	extern ushort fifogetid();
 	struct file *fp1, *fp2;
 	register int error = 0;
 	int fd1, fd2;
-	static ushort pipeino = 1;
 
 	/*
 	 * Allocate and initialize two vnodes. 
@@ -95,9 +93,6 @@ pipe(uap, rvp)
 	 */
 	VTOF(vp1)->fn_mate = vp2;
 	VTOF(vp2)->fn_mate = vp1;
-	pipeino = fifogetid(pipeino);
-	VTOF(vp1)->fn_ino = VTOF(vp2)->fn_ino = pipeino;
-
 	/*
 	 * Return the file descriptors to the user. They now
 	 * point to two different vnodes which have different

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/line.c	1.2"
+#ident	"@(#)libnsl:dial/line.c	1.1"
 
 /* This is a new line.c, which consists of line.c and culine.c
  * merged together.
@@ -55,14 +55,7 @@ GLOBAL int
 
 GLOBAL int donap;	/* for speedup hook in pk1.c */
 static int Saved_line;		/* was savline() successful?	*/
-GLOBAL int
-	Oddflag = 0,	/* Default is no parity */
-	Evenflag = 0,	/* Default is no parity */
-	Duplex = 1,	/* Default is full duplex */
-	Terminal = 0,	/* Default is no terminal */
-	term_8bit = -1,	/* Default to terminal setting or 8 bit */
-	line_8bit = -1;	/* Default is same as terminal */
-
+GLOBAL int Oddflag, Evenflag, Duplex, Terminal, line_8bit;
 static char *P_PARITY  = "Parity option error\r\n";
 
 #ifdef ATTSV

@@ -9,8 +9,11 @@
 **	High resolution version of strftime.c
 **
  */
-#ident	"@(#)libc-port:gen/hrtstrftime.c	1.4"
+#ident	"@(#)libc-port:gen/hrtstrftime.c	1.2"
 
+#ifdef __STDC__
+	#pragma weak hrtstrftime = _hrtstrftime
+#endif
 #include	"synonyms.h"
 #include	<fcntl.h>
 #include	<time.h>
@@ -23,7 +26,7 @@
 #include 	<sys/dl.h>
 #include 	<sys/evecb.h>
 #include 	<sys/hrtcntl.h>
-#include 	<unistd.h>
+#include 	<osfcn.h>
 #include 	<stdlib.h>
 #include	"_locale.h"
 
@@ -56,7 +59,7 @@ static char * _time[] = {
 
 
 size_t
-_hrtstrftime(s, maxsize, format, tm, rem, res)
+hrtstrftime(s, maxsize, format, tm, rem, res)
 char *s;
 size_t maxsize;
 const char *format;

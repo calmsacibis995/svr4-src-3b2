@@ -5,14 +5,15 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)boot:boot/olboot/olboot.mk	11.17"
+#ident	"@(#)boot:boot/olboot/olboot.mk	11.13"
 
 ROOT =
-INC = $(ROOT)/usr/include
+LIB = $(ROOT)/lib
+INCSYS = $(ROOT)/usr/include
 UINC = $(ROOT)/usr/include
 INCLOC = ..
 DASHO = -O
-CFLAGS = $(DASHO) -I$(INCLOC) -I$(INC) -I$(UINC) $(DBO)
+CFLAGS = $(DASHO) -I$(INCLOC) -I$(INCSYS) -I$(UINC) $(DBO)
 STRIP = strip
 LIBNAME = libfm.a
 INS = install
@@ -52,16 +53,15 @@ olboot: lbld\
 	misc.o\
 	lboot.o\
 	loadprog.o\
-	../boot/strncat.o\
 	$(LIBNAME)\
 	$(FRC)
 	if [ x$(CCSTYPE) = xCOFF ] ; \
 	then \
-		$(LD) $(LDFLAGS) lbld misc.o lboot.o loadprog.o \
-			../boot/strncat.o -o olboot $(LIBNAME) ; \
+		$(LD) $(LDFLAG) lbld misc.o lboot.o loadprog.o \
+			-o olboot $(LIBNAME) -L$(LIB) -lc ; \
 	else \
-		$(LD) $(LDFLAGS) -M olboot.map misc.o lboot.o loadprog.o \
-			../boot/strncat.o -o olboot $(LIBNAME) -dn ; \
+		$(LD) $(LDFLAG) -M olboot.map misc.o lboot.o loadprog.o \
+			-o olboot $(LIBNAME) -L$(CCSLIB) -dn -lc ; \
 	fi
 
 flboot: lbld\
@@ -69,16 +69,15 @@ flboot: lbld\
 	misc.o\
 	flboot.o\
 	loadprog.o\
-	../boot/strncat.o\
 	$(LIBNAME)\
 	$(FRC)
 	if [ x$(CCSTYPE) = xCOFF ] ; \
 	then \
-		$(LD) $(LDFLAGS) lbld misc.o flboot.o loadprog.o \
-			../boot/strncat.o -o flboot $(LIBNAME) ; \
+		$(LD) $(LDFLAG) lbld misc.o flboot.o loadprog.o \
+			-o flboot $(LIBNAME) -L$(LIB) -lc ; \
 	else \
-		$(LD) $(LDFLAGS) -M olboot.map misc.o flboot.o loadprog.o \
-			../boot/strncat.o -o flboot $(LIBNAME) -dn ; \
+		$(LD) $(LDFLAG) -M olboot.map misc.o flboot.o loadprog.o \
+			-o flboot $(LIBNAME) -L$(CCSLIB) -dn -lc ; \
 	fi
 
 $(LIBNAME): $(LFILES)
@@ -107,144 +106,144 @@ FRC:
 #
 
 lboot.o: lboot.c \
-	$(INC)/a.out.h \
-	$(INC)/aouthdr.h \
-	$(INC)/filehdr.h \
-	$(INC)/linenum.h \
-	$(INC)/nlist.h \
-	$(INC)/reloc.h \
-	$(INC)/scnhdr.h \
-	$(INC)/storclass.h \
-	$(INC)/syms.h \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/csr.h \
-	$(INC)/sys/elog.h \
-	$(INC)/sys/firmware.h \
-	$(INC)/sys/id.h \
-	$(INC)/sys/immu.h \
+	$(UINC)/a.out.h \
+	$(UINC)/aouthdr.h \
+	$(UINC)/filehdr.h \
+	$(UINC)/linenum.h \
+	$(UINC)/nlist.h \
+	$(UINC)/reloc.h \
+	$(UINC)/scnhdr.h \
+	$(UINC)/storclass.h \
+	$(UINC)/syms.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/csr.h \
+	$(INCSYS)/sys/elog.h \
+	$(INCSYS)/sys/firmware.h \
+	$(INCSYS)/sys/id.h \
+	$(INCSYS)/sys/immu.h \
 	$(INCLOC)/sys/inode.h \
 	$(INCLOC)/sys/iobuf.h \
-	$(INC)/sys/lboot.h \
-	$(INC)/sys/nvram.h \
+	$(INCSYS)/sys/lboot.h \
+	$(INCSYS)/sys/nvram.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/sbd.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/psw.h \
+	$(INCSYS)/sys/sbd.h \
+	$(INCSYS)/sys/types.h \
+	$(INCSYS)/sys/psw.h \
 	$(FRC)
 
 flboot.o: flboot.c \
-	$(INC)/a.out.h \
-	$(INC)/aouthdr.h \
-	$(INC)/filehdr.h \
-	$(INC)/linenum.h \
-	$(INC)/nlist.h \
-	$(INC)/reloc.h \
-	$(INC)/scnhdr.h \
-	$(INC)/storclass.h \
-	$(INC)/syms.h \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/csr.h \
-	$(INC)/sys/elog.h \
-	$(INC)/sys/firmware.h \
-	$(INC)/sys/id.h \
-	$(INC)/sys/immu.h \
+	$(UINC)/a.out.h \
+	$(UINC)/aouthdr.h \
+	$(UINC)/filehdr.h \
+	$(UINC)/linenum.h \
+	$(UINC)/nlist.h \
+	$(UINC)/reloc.h \
+	$(UINC)/scnhdr.h \
+	$(UINC)/storclass.h \
+	$(UINC)/syms.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/csr.h \
+	$(INCSYS)/sys/elog.h \
+	$(INCSYS)/sys/firmware.h \
+	$(INCSYS)/sys/id.h \
+	$(INCSYS)/sys/immu.h \
 	$(INCLOC)/sys/inode.h \
 	$(INCLOC)/sys/iobuf.h \
-	$(INC)/sys/lboot.h \
-	$(INC)/sys/nvram.h \
+	$(INCSYS)/sys/lboot.h \
+	$(INCSYS)/sys/nvram.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/sbd.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/psw.h \
+	$(INCSYS)/sys/sbd.h \
+	$(INCSYS)/sys/types.h \
+	$(INCSYS)/sys/psw.h \
 	$(FRC)
 
 $(LIBNAME)(basicio.o): basicio.c \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/elog.h \
-	$(INC)/sys/firmware.h \
-	$(INC)/sys/ino.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/elog.h \
+	$(INCSYS)/sys/firmware.h \
+	$(INCSYS)/sys/ino.h \
 	$(INCLOC)/sys/inode.h \
 	$(INCLOC)/sys/iobuf.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/sysmacros.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/sbd.h \
-	$(INC)/sys/psw.h \
-	$(INC)/sys/immu.h \
-	$(INC)/sys/nvram.h \
+	$(INCSYS)/sys/sysmacros.h \
+	$(INCSYS)/sys/types.h \
+	$(INCSYS)/sys/sbd.h \
+	$(INCSYS)/sys/psw.h \
+	$(INCSYS)/sys/immu.h \
+	$(INCSYS)/sys/nvram.h \
 	$(FRC)
 
 $(LIBNAME)(findfile.o): findfile.c \
 	$(INCLOC)/sys/dir.h \
-	$(INC)/sys/firmware.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/inode.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
+	$(INCSYS)/sys/types.h \
 	$(FRC)
 
 $(LIBNAME)(findfs.o): findfs.c \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/elog.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/elog.h \
 	$(INCLOC)/sys/filsys.h \
-	$(INC)/sys/firmware.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/inode.h \
 	$(INCLOC)/sys/iobuf.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
+	$(INCSYS)/sys/types.h \
 	$(FRC)
 
 $(LIBNAME)(loadfile.o): loadfile.c \
-	$(INC)/a.out.h \
-	$(INC)/aouthdr.h \
-	$(INC)/filehdr.h \
-	$(INC)/linenum.h \
-	$(INC)/nlist.h \
-	$(INC)/reloc.h \
-	$(INC)/scnhdr.h \
-	$(INC)/storclass.h \
-	$(INC)/syms.h \
-	$(INC)/sys/firmware.h \
+	$(UINC)/a.out.h \
+	$(UINC)/aouthdr.h \
+	$(UINC)/filehdr.h \
+	$(UINC)/linenum.h \
+	$(UINC)/nlist.h \
+	$(UINC)/reloc.h \
+	$(UINC)/scnhdr.h \
+	$(UINC)/storclass.h \
+	$(UINC)/syms.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/inode.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
+	$(INCSYS)/sys/types.h \
 	$(FRC)
 
 $(LIBNAME)(oloadp.o): oloadp.c \
-	$(INC)/a.out.h \
-	$(INC)/aouthdr.h \
-	$(INC)/filehdr.h \
-	$(INC)/linenum.h \
-	$(INC)/nlist.h \
-	$(INC)/reloc.h \
-	$(INC)/scnhdr.h \
-	$(INC)/storclass.h \
-	$(INC)/syms.h \
-	$(INC)/sys/firmware.h \
+	$(UINC)/a.out.h \
+	$(UINC)/aouthdr.h \
+	$(UINC)/filehdr.h \
+	$(UINC)/linenum.h \
+	$(UINC)/nlist.h \
+	$(UINC)/reloc.h \
+	$(UINC)/scnhdr.h \
+	$(UINC)/storclass.h \
+	$(UINC)/syms.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/inode.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
+	$(INCSYS)/sys/types.h \
 	$(FRC)
 
 loadprog.o: loadprog.c \
-	$(INC)/a.out.h \
-	$(INC)/aouthdr.h \
-	$(INC)/filehdr.h \
-	$(INC)/linenum.h \
-	$(INC)/nlist.h \
-	$(INC)/reloc.h \
-	$(INC)/scnhdr.h \
-	$(INC)/storclass.h \
-	$(INC)/syms.h \
-	$(INC)/sys/firmware.h \
+	$(UINC)/a.out.h \
+	$(UINC)/aouthdr.h \
+	$(UINC)/filehdr.h \
+	$(UINC)/linenum.h \
+	$(UINC)/nlist.h \
+	$(UINC)/reloc.h \
+	$(UINC)/scnhdr.h \
+	$(UINC)/storclass.h \
+	$(UINC)/syms.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/inode.h \
-	$(INC)/sys/lboot.h \
+	$(INCSYS)/sys/lboot.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
+	$(INCSYS)/sys/types.h \
 	$(FRC)
 
 misc.o: misc.s \

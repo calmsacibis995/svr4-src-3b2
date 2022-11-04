@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:ckvolseq.c	1.6.1.1"
+#ident	"@(#)libpkg:ckvolseq.c	1.6"
 
 #include <stdio.h>
 #include <limits.h>
@@ -82,7 +82,7 @@ int	part, nparts;
 		if(access(path, 0) == 0)
 			return(0);
 		if(part == 1) {
-			(void) sprintf(path, "%s/install", dir, part);
+			(void) sprintf(path, "%s/install.%d", dir, part);
 			if(access(path, 0) == 0)
 				return(0);
 		} 
@@ -91,5 +91,19 @@ int	part, nparts;
 			return(2);
 		}
 	}
-	return(0);
+
+	/* look for single volume specification */
+	(void) sprintf(path, "%s/root", dir, part);
+	if(access(path, 0) == 0)
+		return(0);
+	(void) sprintf(path, "%s/reloc", dir, part);
+	if(access(path, 0) == 0)
+		return(0);
+	if(part == 1) {
+		(void) sprintf(path, "%s/install", dir);
+		if(access(path, 0) == 0)
+			return(0);
+	}
+	logerr(MSG_SEQ);
+	return(2);
 }

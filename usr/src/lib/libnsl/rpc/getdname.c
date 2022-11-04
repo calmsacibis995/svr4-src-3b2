@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 
-#ident	"@(#)librpc:getdname.c	1.7"
+#ident	"@(#)librpc:getdname.c	1.4"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -42,12 +42,7 @@ static char sccsid[] = "@(#)getdname.c 1.5 89/04/18 Copyr 1989 Sun Micro";
 #include <sys/utsname.h>
 #include <sys/systeminfo.h>
 
-#ifdef _NSL_RPC_ABI
-/* For internal use only when building the libnsl RPC routines */
-#define sysinfo	_abi_sysinfo
-#endif
-
-#ifndef SI_SRPC_DOMAIN
+#ifndef SI_GET_INET_DOMAIN
 #define use_file
 #endif
 
@@ -95,7 +90,7 @@ getdomainname(name, namelen)
 	(void) strncpy(name, line, namelen);
 	return (0);
 #else
-	int sysinfostatus = sysinfo(SI_SRPC_DOMAIN, name, namelen);
+	int sysinfostatus = sysinfo(SI_GET_INET_DOMAIN, name, namelen);
 
 	return ((sysinfostatus < 0) ? -1 : 0);
 #endif
@@ -115,7 +110,7 @@ setdomainname(domain, len)
 	fclose(domain_fd);
 	return(0);
 #else
-	int sysinfostatus = sysinfo(SI_SET_SRPC_DOMAIN, domain, len + 1); /*add null*/
+	int sysinfostatus = sysinfo(SI_SET_INET_DOMAIN, domain, len + 1); /*add null*/
 
 	return ((sysinfostatus < 0) ? -1 : 0);
 #endif

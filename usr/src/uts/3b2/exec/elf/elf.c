@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)exec:exec/elf/elf.c	1.31"
+#ident	"@(#)exec:exec/elf/elf.c	1.25"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -29,6 +29,7 @@
 #include "sys/var.h"
 #include "sys/immu.h"
 #include "sys/proc.h"
+#include "sys/tuneable.h"
 #include "sys/tty.h"
 #include "sys/cmn_err.h"
 #include "sys/debug.h"
@@ -51,21 +52,22 @@ short elfmagic = 0x7f45;		/* magic number for cunix */
 
 extern int mau_present;
 
+STATIC int elfclosedl(); 
+STATIC int elfopendl();
 STATIC int getelfhead();
 
 int
-elfexec(vp, args, level, execsz, ehdp, setid)
+elfexec(vp, args, level, execsz, ehdp)
 struct vnode *vp;
 struct uarg *args;
 int level;
 long *execsz;
 exhda_t *ehdp;
-int setid;
 {
 	Elf32_Ehdr	*ehdrp;
 	Elf32_Phdr	*phdr;
 	caddr_t		phdrbase = 0;
-	caddr_t 	base = 0;
+	caddr_t 	base;
 	char		*dlnp;
 	int		dlnsize, fd, *aux, resid, error;
 	long		voffset;
@@ -163,7 +165,7 @@ int setid;
 			*aux++ = ehdrp->e_entry + voffset;	
 			postfixsize += 8 * NBPW;
 		} else {
-			if (error = execopen(&vp, &fd))
+			if (error = elfopendl(&vp, &fd))
 				goto bad;
 
 			*aux++ = AT_EXECFD;
@@ -194,7 +196,7 @@ int setid;
 			goto bad;
 
 		*aux++ = AT_BASE;
-		*aux++ = voffset & ~(ELF_M32_MAXPGSZ - 1);
+		*aux++ = voffset;
 		*aux++ = AT_FLAGS;
 		*aux++ = mau_present ? EF_M32_MAU : 0;
 		*aux++ = AT_PAGESZ;
@@ -206,7 +208,7 @@ int setid;
 		
 	}
 	
-	if (*execsz > btoc(u.u_rlimit[RLIMIT_VMEM].rlim_cur)) {
+	if (*execsz > tune.t_maxumem){
 		error = ENOMEM;
 		goto bad;
 	}
@@ -238,7 +240,7 @@ int setid;
 
 bad:
 	if (fd != -1)		/* did we open the a.out yet */
-		(void)execclose(fd);
+		(void)elfclosedl(fd);
 
 	psignal(pp,SIGKILL);
 
@@ -382,6 +384,60 @@ bad:
 	return error;
 }
 
+STATIC int
+elfopendl(vpp,fd)
+struct vnode **vpp;
+int *fd;
+{
+	struct vnode *vp= *vpp;
+	struct cred *credp;
+	file_t *fp;
+	int error =0;
+	int filemode = FREAD;
+
+	VN_HOLD(vp);		/* the dynamic linkers reference */
+
+	if (error = falloc((struct vnode *)NULL, filemode,&fp,fd)){
+		VN_RELE(vp);
+		*fd = -1;	/* just in case falloc changed value */
+		return error;
+	}
+
+	credp = crdup(u.u_cred);
+	credp->cr_uid = 0; 	/* make sure we can open file */
+	credp->cr_gid = 0;
+	
+	if (error = VOP_OPEN(&vp,filemode,credp)){
+		VN_RELE(vp);
+		setf(*fd,NULLFP);
+		unfalloc(fp);
+		*fd = -1;		
+		return error;
+	}
+
+	(void) crfree(credp);
+
+	*vpp = vp;		/* vnode should not have changed */
+
+	fp->f_vnode = vp;
+
+	return 0;
+}
+
+STATIC int
+elfclosedl(fd)
+int fd;
+{
+	int error;
+	file_t *fp;
+
+	if (error = getf(fd, &fp))
+		return error;
+	setf(fd,NULLFP);
+
+	return closef(fp);
+}
+
 
 STATIC int
 elf_coffshlib(vp, stphdr, execsz, ehdp)
@@ -400,7 +456,7 @@ exhda_t *ehdp;
 	edp.ux_loffset = stphdr->p_offset;
 
 	shlb_scnsz = (edp.ux_lsize + NBPW) & (~(NBPW - 1));
-	shlb_datsz = shlbinfo.shlbs * sizeof(struct exdata);
+	shlb_datsz = edp.ux_nshlibs * sizeof(struct exdata);
 	
 	shlb_dat = (struct exdata *)kmem_alloc(shlb_datsz, KM_SLEEP);
 
@@ -507,7 +563,7 @@ elfcore(vp, pp, credp, rlimit, sig)
 	ehdr.e_type = ET_CORE;
 	ehdr.e_machine = EM_M32;
 	if (mau_present)
-		ehdr.e_flags |= EF_M32_MAU;
+		ehdr.e_type |= EF_M32_MAU;
 	ehdr.e_version = EV_CURRENT;
 	ehdr.e_phoff = sizeof(Elf32_Ehdr);
 	ehdr.e_ehsize = sizeof(Elf32_Ehdr);
@@ -587,7 +643,7 @@ elfcore(vp, pp, credp, rlimit, sig)
 	for (i = 1; !error && i < nhdrs; i++) {
 		if (v[i].p_filesz == 0)
 			continue;
-		error = core_seg(pp, vp, v[i].p_offset, (caddr_t)v[i].p_vaddr, 
+		error = core_seg(vp, v[i].p_offset, (caddr_t)v[i].p_vaddr, 
 		  v[i].p_filesz, rlimit, credp);
 	}
 

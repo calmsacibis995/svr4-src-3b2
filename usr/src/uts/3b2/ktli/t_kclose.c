@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kclose.c	1.3"
+#ident	"@(#)ktli:ktli/t_kclose.c	1.2"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kclose.c 1.1 88/12/12 SMI"
 #endif
@@ -35,7 +35,7 @@ static char sccsid[] = "@(#)t_kclose.c 1.1 88/12/12 SMI"
  *	Much like closef().
  *
  *	Returns:
- *		0
+ *		errno or 0
  */
 
 #include <sys/param.h>
@@ -54,10 +54,10 @@ static char sccsid[] = "@(#)t_kclose.c 1.1 88/12/12 SMI"
 
 int
 t_kclose(tiptr, callclosef)
-	register TIUSER		*tiptr;
-	register int		callclosef;
+register TIUSER *tiptr;
+register int callclosef;
 {
-	register struct file	*fp;
+	register struct file *fp;
 
 	fp = tiptr->fp;
 

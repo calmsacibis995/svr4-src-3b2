@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:mon.h	1.8.2.2"
+#ident	"@(#)head:mon.h	1.8.2.1"
 
 #ifndef _MON_H
 #define _MON_H
@@ -30,8 +30,6 @@ typedef unsigned short WORD;
 
 #if defined(__STDC__)
 extern void monitor(int (*)(), int (*)(), WORD *, int, int);
-#else
-extern void monitor();
 #endif
 
 #endif /* _MON_H */

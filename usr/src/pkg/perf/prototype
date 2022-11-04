@@ -3,7 +3,6 @@
 # packaging files
 i pkginfo
 i postinstall
-i preremove
 
 # directories
 d none	/boot		?	?	?

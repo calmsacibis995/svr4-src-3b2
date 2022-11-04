@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)ktli:ktli/ktli.mk	1.3"
+#ident	"@(#)ktli:ktli/ktli.mk	1.2"
 #
 #	@(#)ktli.mk 1.2 89/01/11 SMI
 #
@@ -42,8 +42,8 @@ DEFLIST =
 FRC =
 
 KTLIOBJ = t_kclose.o t_kgtstate.o t_ksndudat.o t_kutil.o t_kalloc.o \
-	  t_kconnect.o t_kopen.o t_kspoll.o t_kbind.o t_kunbind.o t_kfree.o \
-	  t_krcvudat.o
+	  t_kconnect.o t_kopen.o t_kspoll.o t_kbind.o t_kfree.o \
+	  t_krcvudat.o 
 
 all:	KTLI
 
@@ -81,8 +81,7 @@ t_kalloc.o: t_kalloc.c \
 	$(INC)/sys/errno.h \
 	$(INC)/sys/signal.h \
 	$(INC)/sys/t_kuser.h \
-	$(INC)/sys/kmem.h \
-	$(FRC)
+	$(INC)/sys/kmem.h
 
 t_kbind.o: t_kbind.c \
 	$(INC)/sys/param.h \
@@ -100,27 +99,7 @@ t_kbind.o: t_kbind.c \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
 	$(INC)/sys/t_kuser.h \
-	$(INC)/sys/kmem.h \
-	$(FRC)
-
-t_kunbind.o: t_kunbind.c \
-	$(INC)/sys/param.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/proc.h \
-	$(INC)/sys/file.h \
-	$(INC)/sys/user.h \
-	$(INC)/sys/errno.h \
-	$(INC)/sys/stream.h \
-	$(INC)/sys/strsubr.h \
-	$(INC)/sys/ioctl.h \
-	$(INC)/sys/stropts.h \
-	$(INC)/sys/vnode.h \
-	$(INC)/sys/tihdr.h \
-	$(INC)/sys/timod.h \
-	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(INC)/sys/kmem.h \
-	$(FRC)
+	$(INC)/sys/kmem.h
 
 t_kclose.o: t_kclose.c \
 	$(INC)/sys/param.h \
@@ -134,8 +113,7 @@ t_kclose.o: t_kclose.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kconnect.o: t_kconnect.c \
 	$(INC)/sys/param.h \
@@ -150,8 +128,7 @@ t_kconnect.o: t_kconnect.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kfree.o: t_kfree.c \
 	$(INC)/sys/param.h \
@@ -165,8 +142,7 @@ t_kfree.o: t_kfree.c \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
 	$(INC)/sys/errno.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kgtstate.o: t_kgtstate.c \
 	$(INC)/sys/param.h \
@@ -183,8 +159,7 @@ t_kgtstate.o: t_kgtstate.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kopen.o: t_kopen.c \
 	$(INC)/sys/param.h \
@@ -202,9 +177,7 @@ t_kopen.o: t_kopen.c \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
 	$(INC)/sys/t_kuser.h \
-	$(INC)/sys/kmem.h \
-	$(INC)/sys/cmn_err.h \
-	$(FRC)
+	$(INC)/sys/kmem.h
 
 t_krcvudat.o: t_krcvudat.c \
 	$(INC)/sys/param.h \
@@ -219,8 +192,7 @@ t_krcvudat.o: t_krcvudat.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_ksndudat.o: t_ksndudat.c \
 	$(INC)/sys/param.h \
@@ -236,8 +208,7 @@ t_ksndudat.o: t_ksndudat.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kspoll.o: t_kspoll.c \
 	$(INC)/sys/param.h \
@@ -254,8 +225,7 @@ t_kspoll.o: t_kspoll.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h
 
 t_kutil.o: t_kutil.c \
 	$(INC)/sys/param.h \
@@ -272,5 +242,4 @@ t_kutil.o: t_kutil.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/timod.h \
 	$(INC)/sys/tiuser.h \
-	$(INC)/sys/t_kuser.h \
-	$(FRC)
+	$(INC)/sys/t_kuser.h

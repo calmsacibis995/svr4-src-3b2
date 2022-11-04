@@ -1,4 +1,4 @@
-*#ident	"@(#)kernel:master.d/stubs	1.30"
+*#ident	"@(#)kernel:master.d/stubs	1.29"
 *
 *  STUBS
 *      Used to define all functions referenced in the kernel
@@ -103,4 +103,3 @@ ox
 						nfssys(){nopkg}
 						getcoffshlibs(){nopkg}
 						coffexec_err(){}
-						nm_unmountall(){nopkg}

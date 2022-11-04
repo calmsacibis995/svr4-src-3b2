@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckgid.c	1.2"
+#ident	"@(#)libadm:ckgid.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -66,19 +66,16 @@ int	disp;
 	return(msg);
 }
 
-int
+void
 ckgid_dsp()
 {
 	struct group *grpptr;
 
 	/* if display flag is set, then list out group file */
-	if (ckgrpfile() == 1)
-		return(1);
 	setgrent();
 	while (grpptr = getgrent())
 		(void) printf("%s\n", grpptr->gr_name);
 	endgrent();
-	return(0);
 }
 
 int
@@ -91,20 +88,6 @@ char	*grpnm;
 	valid = (getgrnam(grpnm) ? 0 : 1);
 	endgrent ();
 	return(valid);
-}
-
-int
-ckgrpfile() /* check to see if group file there */
-{
-	struct group *grpptr;
-
-	setgrent ();
-	if (!(grpptr = getgrent())) {
-		endgrent ();
-		return(1);
-	}
-	endgrent ();
-	return(0);
 }
 
 void

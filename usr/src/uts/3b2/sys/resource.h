@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/resource.h	1.12"
+#ident	"@(#)head.sys:sys/resource.h	1.11"
 
 #ifndef _SYS_RESOURCE_H
 #define _SYS_RESOURCE_H
@@ -30,7 +30,6 @@
 #define	RLIMIT_CORE	4		/* core file size */
 #define RLIMIT_NOFILE	5		/* file descriptors */
 #define RLIMIT_VMEM	6		/* maximum mapped memory */
-#define RLIMIT_AS	RLIMIT_VMEM
 
 #define	RLIM_NLIMITS	7		/* number of resource limits */
 

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/mkfifo.c	1.3"
+#ident	"@(#)libc-port:gen/mkfifo.c	1.1"
 /*
  * mkfifo(3c) - create a named pipe (FIFO). This code provides
  * a POSIX mkfifo function.
@@ -16,13 +16,11 @@
 	#pragma weak mkfifo = _mkfifo
 #endif
 #include "synonyms.h"
-#include <sys/types.h>
-#include <sys/stat.h>
 mkfifo(path,mode)
-const char *path;
+char *path;
 int mode;
 {
 	mode &= 0777;		/* only allow file access permissions */
-	mode |= S_IFIFO;	/* creating a FIFO 		      */
+	mode |= 0010000;	/* creating a FIFO 		      */
 	return(mknod(path,mode,0));
 }

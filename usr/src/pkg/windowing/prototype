@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.windowing:prototype	1.8"
+#ident	"@(#)pkg.windowing:prototype	1.6"
 #
 #	All files/directories are defined a relocatable. Although
 #	BASENAME is explicitly set to / (root) in pkginfo,
@@ -45,9 +45,9 @@ f none	/usr/bin/jterm
 f none	/usr/bin/jwin
 f none	/usr/bin/xts
 f none	/usr/bin/xtt
-f none	/usr/sbin/lnxts	0744	root	root
+f none	/usr/sbin/lnxts	744	bin	bin
 #	setuid-root program
-f none	/usr/bin/layers 4755 root sys
+f none	/usr/bin/layers 4111 root sys
 #
 #	header files: default owner=bin group=bin mode=0444
 #

@@ -5,16 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libmalloc:malloc.c	1.12.2.2"
+#ident	"@(#)libmalloc:malloc.c	1.12.2.1"
 
 #ifdef __STDC__
         #pragma weak mallopt = _mallopt
         #pragma weak mallinfo = _mallinfo
         #pragma weak cfree = _cfree
-
-#define VOID void
-#else
-#define VOID char
 #endif
 #include <stdlib.h>
 #include <string.h>
@@ -118,7 +114,7 @@ static int grain = ALIGNSZ;
 /*
 	malloc(nbytes) - give a user nbytes to use
 */
-VOID *
+void *
 malloc(nbytes)
 size_t nbytes;
 {
@@ -425,7 +421,7 @@ size_t nbytes;
 
 void
 free(ptr)
-VOID *ptr;
+void *ptr;
 {
 	register struct holdblk *holdblk;       /* block holding blk */
 	register struct holdblk *oldhead;       /* former head of the hold 
@@ -488,9 +484,9 @@ VOID *ptr;
 /*      realloc(ptr,size) - give the user a block of size "size", with
 			    the contents pointed to by ptr.  Free ptr.
 */
-VOID *
+void *
 realloc(ptr,size)
-VOID *ptr;		    /* block to change size of */
+void *ptr;		    /* block to change size of */
 size_t size;	    /* size to change to */
 {
 	register struct header *blk;    /* block ptr is contained in */
@@ -499,13 +495,7 @@ size_t size;	    /* size to change to */
 	register unsigned cpysize;      /* amount to copy */
 	register struct header *next;   /* block after blk */
 
-	if (ptr == NULL)
-		return malloc(size);
-
-	if (size == 0) {
-		free(ptr);
-		return NULL;
-	}
+	if(size == 0) return NULL;
 
 	if (TESTSMAL(((struct lblk *)((char *)ptr - MINHEAD))->header.holder))  {
 		/* we have a special small block which can't be expanded */
@@ -582,7 +572,7 @@ size_t size;	    /* size to change to */
 */
 
 
-VOID *
+void *
 calloc(num, size)
 register size_t num, size;
 {

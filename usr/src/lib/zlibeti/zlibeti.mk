@@ -1,4 +1,4 @@
-#	Copyright (c) 1988 AT&T
+#	Copyright (c) 1984 AT&T
 #	  All Rights Reserved
 
 #	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
@@ -6,7 +6,7 @@
 #	actual or intended publication of such source code.
 
 #
-#ident	"@(#)libeti:libeti.mk	1.7"
+#ident	"@(#)libeti:libeti.mk	1.6"
 #
 
 ROOT=

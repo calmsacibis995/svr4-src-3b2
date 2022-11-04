@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/sysent.c	1.51"
+#ident	"@(#)kernel:os/sysent.c	1.44"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/systm.h"
@@ -47,7 +47,7 @@ int	hrtsys();
 int	priocntlsys();
 int	waitsys();
 int	sigsendsys();
-int	mincore(), mmap(), mprotect(), munmap(), vfork();
+int	mctl(), mincore(), mmap(), mprotect(), munmap(), getpagesize(), vfork();
 int	xstat(), lxstat(), fxstat();
 int	xmknod();
 int	nuname(), lchown();
@@ -59,18 +59,18 @@ int	adjtime();
 int	systeminfo();
 int	setegid(), seteuid();
 int	nfssys();
-int	pathconf(), fpathconf();
 
 #ifdef MEGA
 int	uexch();
 #endif /* MEGA */
 
-struct sysent sysent[] = {
+struct sysent sysent[] =
+{
 	0, 0, nosys,			/*  0 = indir */
 	1, 0, (int(*)())rexit,		/*  1 = exit */
 	0, 0, fork,			/*  2 = fork */
-	3, SETJUMP|ASYNC|IOSYS, read,	/*  3 = read */
-	3, SETJUMP|ASYNC|IOSYS, write,	/*  4 = write */
+	3, SETJUMP | ASYNC |IOSYS, read,	/*  3 = read */
+	3, SETJUMP | ASYNC |IOSYS, write,	/*  4 = write */
 	3, SETJUMP, open,		/*  5 = open */
 	1, SETJUMP, close,		/*  6 = close */
 	0, SETJUMP, wait,		/*  7 = wait */
@@ -106,7 +106,7 @@ struct sysent sysent[] = {
 	2, 0, kill,			/* 37 = kill */
 	4, 0, fstatfs,			/* 38 = fstatfs */
 	3, 0, setpgrp,			/* 39 = setpgrp */
-	0, SETJUMP, cxenix,		/* 40 = cxenix */
+	0, SETJUMP, cxenix,			/* 40 = cxenix */
 	1, 0, dup,			/* 41 = dup */
 	0, SETJUMP, pipe,		/* 42 = pipe */
 	1, 0, times,			/* 43 = times */
@@ -134,30 +134,31 @@ struct sysent sysent[] = {
 	1, 0, chroot,			/* 61 = chroot */
 	3, SETJUMP, fcntl,		/* 62 = fcntl */
 	2, 0, ulimit,			/* 63 = ulimit */
+
 	/*
 	 * The following 6 entries were reserved for the UNIX PC.
 	 */
-	0, 0, nosys,			/* 64 = unused */
-	0, 0, nosys,			/* 65 = unused */
-	0, 0, nosys,			/* 66 = unused */
+	0, 0, nosys,			/* 64 = nosys */
+	0, 0, nosys,			/* 65 = nosys */
+	0, 0, nosys,			/* 66 = nosys */
 	0, 0, nosys,			/* 67 = file locking call */
 	0, 0, nosys,			/* 68 = local system calls */
 	0, 0, nosys,			/* 69 = inode open */
 
 	0, 0, nosys,			/* 70 = was advfs */
 	0, 0, nosys,			/* 71 = was unadvfs */
-	0, 0, nosys,			/* 72 = unused */
-	0, 0, nosys,			/* 73 = unused */
+	0, 0, nosys,			/* 72 = was notused */
+	0, 0, nosys,			/* 73 = was notused */
 	0, 0, nosys,			/* 74 = was rfstart */
-	0, 0, nosys,			/* 75 = unused */
+	0, 0, nosys,			/* 75 = not used */
 	0, 0, nosys,			/* 76 = was rdebug */
 	0, 0, nosys,			/* 77 = was rfstop */
 	6, SETJUMP, rfsys,		/* 78 = rfsys */
 	1, 0, rmdir,			/* 79 = rmdir */
 	2, 0, mkdir,			/* 80 = mkdir */
 	3, 0, getdents,			/* 81 = getdents */
-	0, 0, nosys,			/* 82 = was libattach */
-	0, 0, nosys,			/* 83 = was libdetach */
+	0, 0, nosys,			/* 82 = libattach - removed */
+	0, 0, nosys,			/* 83 = libdetach - removed */
 	3, 0, sysfs,			/* 84 = sysfs */
 	4, SETJUMP, getmsg,		/* 85 = getmsg */
 	4, SETJUMP, putmsg,		/* 86 = putmsg */
@@ -179,29 +180,30 @@ struct sysent sysent[] = {
 	0, 0, ev_evtrapret,		/* 102 = evtrapret */
 	2, 0, statvfs,			/* 103 = statvfs */
 	2, 0, fstatvfs,			/* 104 = fstatvfs */
-	0, 0, nosys,			/* 105 = reserved */
-	2, 0, nfssys,			/* 106 = nfssys */
+	0, 0, nosys,			/* 105 = not used */
+	0, 0, nosys,			/* 106 = not used */
 	4, SETJUMP, waitsys,		/* 107 = waitset */
 	2, 0, sigsendsys,		/* 108 = sigsendset */
 	5, SETJUMP, hrtsys,		/* 109 = hrtsys */
 	3, 0, async_cancel,		/* 110 = acancel */
 	3, 0, async,			/* 111 = async */
 	4, 0, priocntlsys,		/* 112 = priocntlsys */
-	2, 0, pathconf,			/* 113 = pathconf */
+	4, 0, mctl,			/* 113 = mctl */
 	3, 0, mincore,			/* 114 = mincore */
 	6, 0, mmap,			/* 115 = mmap */
 	3, 0, mprotect,			/* 116 = mprotect */
 	2, 0, munmap,			/* 117 = munmap */
-	2, 0, fpathconf,		/* 118 = fpathconf */
+	0, 0, getpagesize,		/* 118 = getpagesize */
 	0, 0, vfork,			/* 119 = vfork */
 	1, 0, fchdir,			/* 120 = fchdir */
 	3, 0, readv,			/* 121 = readv */
 	3, 0, writev,			/* 122 = writev */
-	3, 0, xstat,			/* 123 = xstat */
-	3, 0, lxstat,			/* 124 = lxstat */
-	3, 0, fxstat,			/* 125 = fxstat */
-	4, 0, xmknod,			/* 126 = xmknod */
-	5, SETJUMP, clocal,		/* 127 = clocal */
+	3, 0, xstat,			/* 123 = xstat expanded stat*/
+	3, 0, lxstat,			/* 124 = lxstat expanded symbolic
+						** link stat */
+	3, 0, fxstat,			/* 125 = fxstat expanded fd stat */
+	4, 0, xmknod,			/* 126 = xmknod for dev_t expansion */
+	5, SETJUMP, clocal,			/* 127 = clocal */
 	2, 0, setrlimit,		/* 128 = setrlimit */
 	2, 0, getrlimit,		/* 129 = getrlimit */
 	3, 0, lchown,			/* 130 = lchown */
@@ -210,12 +212,24 @@ struct sysent sysent[] = {
 	5, SETJUMP, putpmsg,		/* 133 = putpmsg */
 	2, 0, rename,			/* 134 = rename */
 	1, 0, nuname,			/* 135 = nuname */
-	1, 0, setegid,			/* 136 = setegid */
+	0, 0, nosys,			/* 136 (not reserved) */
 	1, 0, sysconfig,		/* 137 = sysconfig */
 	2, 0, adjtime,			/* 138 = adjtime */
 	3, 0, systeminfo,		/* 139 = systeminfo */
-	0, 0, nosys,			/* 140 = reserved */
+	1, 0, setegid,			/* 140 = setegid */
 	1, 0, seteuid,			/* 141 = seteuid */
+	/*	141-151 reserved for 3b4000	*/
+	0, 0, nosys,			/* 142 */
+	0, 0, nosys,			/* 143 */
+	0, 0, nosys,			/* 144 */
+	0, 0, nosys,			/* 145 */
+	0, 0, nosys,			/* 146 */
+	0, 0, nosys,			/* 147 */
+	0, 0, nosys,			/* 148 */
+	0, 0, nosys,			/* 149 */
+	0, 0, nosys,			/* 150 */
+	0, 0, nosys,			/* 151 */
+	2, 0, nfssys,			/* 152 = nfssys */
 };
 
 unsigned sysentsize = sizeof(sysent)/sizeof(struct sysent);

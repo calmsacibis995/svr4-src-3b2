@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/auth_des.c	1.8"
+#ident	"@(#)krpc:krpc/auth_des.c	1.7"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)auth_des.c 1.2 89/01/11 SMI"
 #endif
@@ -51,6 +51,12 @@ static char sccsid[] = "@(#)auth_des.c 1.2 89/01/11 SMI"
 #include <sys/syslog.h>
 #endif
 
+/*
+ *	#ifndef DEBUG
+ *	#define cmn_err(type, msg)
+ *	#endif
+ */
+
 #define MILLION		1000000L
 #define RTIME_TIMEOUT 5		/* seconds to wait for sync */
 
@@ -76,8 +82,6 @@ struct ad_private {
 	u_int ad_window;	  	/* client specified window */
 	bool_t ad_dosync;		/* synchronize? */		
 	struct netbuf ad_syncaddr;	/* remote host to synch with */
-	dev_t ad_synctp;		/* Maj/Min of host transport device */
-	int   ad_calltype;		/* use rpc or straight call for sync */
 	struct timeval ad_timediff;	/* server's time - client's time */
 	u_long ad_nickname;		/* server's nickname for client */
 	struct authdes_cred ad_cred;	/* storage for credential */
@@ -92,13 +96,11 @@ struct ad_private {
  */	
 /*ARGSUSED*/
 AUTH *
-authdes_create(servername, window, syncaddr, synctp, ckey, calltype)
+authdes_create(servername, window, syncaddr, ckey)
 	char *servername;		/* network name of server */
 	u_int window;			/* time to live */
 	struct netbuf *syncaddr;	/* optional addr of host to sync with */
 	des_block *ckey;		/* optional conversation key to use*/
-	dev_t synctp;			/* Device of tp to sync with. */
-	int   calltype;
 {
 
 	AUTH *auth;
@@ -134,16 +136,16 @@ authdes_create(servername, window, syncaddr, synctp, ckey, calltype)
 	 */
 	bcopy(namebuf, ad->ad_fullname, (int)(ad->ad_fullnamelen + 1));
 	bcopy(servername, ad->ad_servername, (int)(ad->ad_servernamelen + 1));
+#ifdef nosyncyet
 	if (syncaddr != NULL) {
 		ad->ad_syncaddr = *syncaddr;
-		ad->ad_synctp = synctp;
 		ad->ad_dosync = TRUE;
-		ad->ad_calltype = calltype;
 	} else {
-		ad->ad_timediff.tv_sec = 0;
-		ad->ad_timediff.tv_usec = 0;
 		ad->ad_dosync = FALSE;
 	}
+#else
+		ad->ad_dosync = FALSE; /*in case this is crashing it*/
+#endif
 	ad->ad_window = window;
 	if (ckey == NULL) {
 		if (key_gendes(&auth->ah_key) < 0) {
@@ -375,9 +377,10 @@ authdes_refresh(auth)
 	struct ad_private *ad = AUTH_PRIVATE(auth);
 	struct authdes_cred *cred = &ad->ad_cred;
 
+	if (!ad->ad_dosync)
+		ad->ad_timediff.tv_sec = ad->ad_timediff.tv_usec = 0;
 	if (ad->ad_dosync && 
-			!synchronize(ad->ad_synctp, &ad->ad_syncaddr,
-					ad->ad_calltype, &ad->ad_timediff)) {
+			!synchronize(&ad->ad_syncaddr, &ad->ad_timediff)) {
 		/*
 		 * Hope the clocks are synced!
 		 */
@@ -391,9 +394,9 @@ authdes_refresh(auth)
 	ad->ad_xkey = auth->ah_key;
 	if (key_encryptsession(ad->ad_servername, &ad->ad_xkey) < 0) {
 #ifdef	_KERNEL
-		cmn_err(CE_NOTE, "authdes_refresh: unable to encrypt conversation key");
+		cmn_err(CE_NOTE, "authdes_create: unable to encrypt conversation key");
 #else
-		(void) syslog(LOG_ERR, "authdes_refresh: unable to encrypt conversation key");
+		(void) syslog(LOG_ERR, "authdes_create: unable to encrypt conversation key");
 #endif
 		return (FALSE);
 	}
@@ -427,18 +430,16 @@ authdes_destroy(auth)
  * adjust timep to reflect the delta between our clocks
  */
 STATIC bool_t
-synchronize(synctp, syncaddr, calltype, timep)
-	dev_t	       synctp;
-	struct netbuf  *syncaddr;
+synchronize(syncaddr, timep)
+	struct netbuf *syncaddr;
 	struct timeval *timep;
-	int		calltype;
 {
 	struct timeval mytime;
 	struct timeval timeout;
 
 	timeout.tv_sec = RTIME_TIMEOUT;
 	timeout.tv_usec = 0;
-	if (rtime(synctp, syncaddr, calltype, timep, &timeout) < 0) {
+	if (rtime(syncaddr, timep, &timeout) < 0) {
 		return (FALSE);
 	}
 	(void) gettimeofday(&mytime, (struct timezone *)NULL);

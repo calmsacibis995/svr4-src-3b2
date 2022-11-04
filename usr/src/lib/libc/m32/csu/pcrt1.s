@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file "pcrt1.s"
-	.ident	"@(#)libc-m32:csu/pcrt1.s	1.20"
+	.ident	"@(#)libc-m32:csu/pcrt1.s	1.18"
 	_section23_(.pesel,i,strtab)
 	.text
 # C runtime startoff
@@ -93,7 +87,9 @@ _prof_dynamic_ptr:			# see lprof:soqueue.c
 _dgdef_(_CAproc):
 	.word	0
 
-	.globl __longdouble_used
 _dgdef_(__longdouble_used):
+	.globl __longdouble_used
+
+_dwdef_(`environ'):
 	.word	0
 

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_rsrc.c	1.3"
+#ident	"@(#)fs:fs/rfs/rf_rsrc.c	1.2"
 /*
  * utility routines dealing with sr_mount and rf_resource lists
  */
@@ -280,19 +280,18 @@ srm_free(srpp)
 }
 
 /*
- * srm_remove removes the sr_mount structure referenced by *srpp from the
- * r_mountp list of the rf_resource structure referenced by *rpp and frees
- * its memory.  If doing so removes the last mount of an unadvertised 
- * resource, that resource structure is also freed.
+ * srm_remove removes the sr_mount structure referenced by srp from the r_mountp
+ * list of the rf_resource structure referenced by *rpp and frees its memory.
+ * If doing so removes the last mount of an unadvertised resource, that resource
+ * structure is also freed.
  * Returns 0 for success or a non-zero errno for failure.
  */
 int
-srm_remove(rpp, srpp)
-	rf_resource_t	**rpp;	/* which resource */
-	sr_mount_t	**srpp;	/* which mount */
+srm_remove(rpp, srp)
+	rf_resource_t **rpp;	/* which resource */
+	sr_mount_t *srp;	/* which mount */
 {
 	register struct rf_resource *rp = *rpp;
-	sr_mount_t	*srp = *srpp;
 
 	if ((rp == NULL) || (srp == NULL))
 		return ENODEV;	
@@ -318,6 +317,6 @@ srm_remove(rpp, srpp)
 			ASSERT(rp->r_queuep != NULL);
 		}
 	}
-	srm_free(srpp);
+	srm_free(&srp);
 	return 0;
 }

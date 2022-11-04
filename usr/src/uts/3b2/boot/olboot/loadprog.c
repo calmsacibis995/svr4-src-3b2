@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/olboot/loadprog.c	11.14"
+#ident	"@(#)boot:boot/olboot/loadprog.c	11.13"
 
 #include	"sys/param.h"
 #include	"sys/types.h"
@@ -25,7 +25,6 @@
 #include	"a.out.h"
 #include	"sys/elftypes.h"
 #include	"sys/elf.h"
-#include	"sys/inline.h"
 
 
 /*
@@ -238,7 +237,7 @@ do_edt()
 		char buffer[40];
 
 
-		if (!STRCMP(s3bc->name, "SBD"))
+		if (!strcmp(s3bc->name, "SBD"))
 		{
 			if (s3bc->timestamp > SIZOFMEM)
 			{
@@ -405,7 +404,7 @@ xconfirm()
                  		*/
                 		for (i=0; i<sys3bconfig->count; ++i){
 					s3bc = &sys3bconfig->driver[i];
-					if (0 != STRCMP(xtcp->name,s3bc->name)
+					if (0 != strcmp(xtcp->name,s3bc->name)
 					     || s3bc->flag & S3BC_IGN)
 						continue;
 		

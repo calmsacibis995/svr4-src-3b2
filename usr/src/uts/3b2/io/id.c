@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/id.c	1.18"
+#ident	"@(#)kernel:io/id.c	1.17"
 /*
  * 3B2 UNIX Integral Winchester Disk Driver
  */
@@ -30,6 +30,7 @@
 #include "sys/vtoc.h"
 #include "sys/hdelog.h"
 #include "sys/open.h"
+#include "sys/inline.h"
 #include "sys/cred.h"
 #include "sys/uio.h"
 #ifdef KPERF

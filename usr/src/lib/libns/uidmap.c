@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libns:uidmap.c	1.7.6.1"
+#ident	"@(#)libns:uidmap.c	1.7.5.1"
 #include <stdio.h>
 #include "idload.h"
 #include <sys/utsname.h>
@@ -356,8 +356,6 @@ int    n_update;
 		parse_err(P_INVTOK, token, NULL);
 		error = 1;
 	}
-
-	fclose(fp);
 
 	if (error) {
 		LOG2(L_TRACE, "(%5d) leave: uidmap\n", Logstamp);
@@ -985,7 +983,6 @@ char *mach;
 	}
 
 	*(buf + sbuf.st_size) = '\0';
-	close(fd);
 	LOG2(L_TRACE, "(%5d) leave: read_file\n", Logstamp);
 	return(buf);
 }

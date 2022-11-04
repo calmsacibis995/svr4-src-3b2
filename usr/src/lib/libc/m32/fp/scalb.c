@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-m32:fp/scalb.c	1.5"
+#ident	"@(#)libc-m32:fp/scalb.c	1.4"
 /*LINTLIBRARY
 
 /* SCALB(X,N)
@@ -22,7 +22,6 @@
 #include <math.h>
 #include <errno.h>
 #include "fpparts.h"
-#include <limits.h>
 
 double scalb(x,n)
 double	x, n;
@@ -34,25 +33,5 @@ double	x, n;
 		return (x + 1.0); /* signaling NaN - raise exception */
 	}
 #endif
-	if (x == 0.0)
-		return x;
-	if ((n >= (double)INT_MAX) || (n <= (double)INT_MIN)) {
-	/* over or underflow */
-		double d;
-		errno = ERANGE;
-		if (x < 0.0)
-			d = -x;
-		else
-			d = x;
-		if (((d < 1.0)  && (n > 0)) ||
-			((d >= 1.0) && (n < 0)))
-			return 0.0;  /* underflow */
-		else {
-			if (_lib_version == c_issue_4)
-				return(x > 0.0 ? HUGE : -HUGE);
-			else
-				return(x > 0.0 ? HUGE_VAL : -HUGE_VAL);
-		}
-	}
 	return(ldexp(x, (int)n));
 }

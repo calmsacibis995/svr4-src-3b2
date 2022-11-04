@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_export.c	1.7"
+#ident	"@(#)fs:fs/nfs/nfs_export.c	1.6"
 
 /*      @(#)nfs_export.c 1.11 88/02/08 SMI      */
 
@@ -90,7 +90,6 @@ exportfs(uap)
 	struct exportinfo *tmp;
 	struct fid *fid;
 	struct vfs *vfs;
-	int mounted_ro;
 	int error;
 
 	if (! suser(u.u_cred))
@@ -105,7 +104,6 @@ exportfs(uap)
 		return (error);	
 	error = VOP_FID(vp, &fid);
 	vfs = vp->v_vfsp;
-	mounted_ro = vp->v_vfsp->vfs_flag & VFS_RDONLY;
 	VN_RELE(vp);
 	if (error)
 		return (error);	
@@ -123,26 +121,20 @@ exportfs(uap)
 	/*
 	 * Load in everything, and do sanity checking
 	 */	
-	if (copyin((caddr_t) uap->uex, (caddr_t) kex, 
-		(u_int) sizeof(struct export))) {
-		error = EFAULT;
+	error = copyin((caddr_t) uap->uex, (caddr_t) kex, 
+		(u_int) sizeof(struct export));
+	if (error) {
 		goto error_return;
 	}
-	if (kex->ex_flags & ~EX_ALL) {
+	if (kex->ex_flags & ~(EX_RDONLY | EX_RDMOSTLY)) {
 		error = EINVAL;
 		goto error_return;
 	}
-	if (!(kex->ex_flags & EX_RDONLY) && mounted_ro) {
-		error = EROFS;
-		goto error_return;
-	}
-	if (kex->ex_flags & EX_EXCEPTIONS) {
-		error = loadaddrs(&kex->ex_roaddrs);
-		if (error)
+	if (kex->ex_flags & EX_RDMOSTLY) {
+		error = loadaddrs(&kex->ex_writeaddrs);
+		if (error) {
 			goto error_return;
-		error = loadaddrs(&kex->ex_rwaddrs);
-		if (error)
-			goto error_return;
+		}
 	}
 	switch (kex->ex_auth) {
 	case AUTH_UNIX:
@@ -216,10 +208,17 @@ struct nfs_getfh_args {
 /*
  * Get file handle system call.
  * Takes file name and returns a file handle for it.
+ * Also recognizes the old getfh() which takes a file 
+ * descriptor instead of a file name, and does the 
+ * right thing. This compatibility will go away in 5.0.
+ * It goes away because if a file descriptor refers to
+ * a file, there is no simple way to find its parent 
+ * directory.  
  */
 nfs_getfh(uap)
 	register struct nfs_getfh_args *uap;
 {
+	/* register struct file *fp; */
 	fhandle_t fh;
 	struct vnode *vp;
 	struct vnode *dvp;
@@ -256,9 +255,8 @@ nfs_getfh(uap)
 	if (!error) {
 		error = makefh(&fh, vp, exi);
 		if (!error) {
-			if (copyout((caddr_t)&fh, (caddr_t)uap->fhp, 
-					sizeof(fh)))
-				error = EFAULT;
+			error =	copyout((caddr_t)&fh, (caddr_t)uap->fhp, 
+					sizeof(fh));
 		}
 	}
 	VN_RELE(vp);
@@ -269,6 +267,8 @@ nfs_getfh(uap)
 }
 
 /*
+ * Common code for both old getfh() and new getfh(). 
+ * If old getfh(), then dvp is NULL.
  * Strategy: if vp is in the export list, then
  * return the associated file handle. Otherwise, ".."
  * once up the vp and try again, until the root of the
@@ -354,7 +354,8 @@ makefh(fh, vp, exi)
 		return (EREMOTE);
 	}
 	if (fidp->fid_len + exi->exi_fid->fid_len + sizeof(fsid_t) 
-		> NFS_FHSIZE) {
+		> NFS_FHSIZE) 
+	{
 		freefid(fidp);
 		return (EREMOTE);
 	}
@@ -395,7 +396,7 @@ findexport(fsid, fid)
 }
 
 /*
- * Load from user space a list of exception addresses and masks
+ * Load from user space, a list of internet addresses into kernel space
  */
 loadaddrs(addrs)
 	struct exaddrlist *addrs;
@@ -403,31 +404,35 @@ loadaddrs(addrs)
 	char *tmp;
 	int allocsize;
 	register int i;
+#ifdef	SYSV
 	struct netbuf *uaddrs;
-	struct netbuf *umasks;
+#else
+	struct sockaddr *uaddrs;
+#endif
 
 	if (addrs->naddrs > EXMAXADDRS)
 		return (EINVAL);
+#ifdef	SYSV
 	if (addrs->naddrs == 0)
 		return (0);
 
 	allocsize = addrs->naddrs * sizeof(struct netbuf);
+#else
+	allocsize = addrs->naddrs * sizeof(struct sockaddr);
+#endif
 	uaddrs = addrs->addrvec;
-	umasks = addrs->addrmask;
 
+#ifdef	SYSV
 	addrs->addrvec = (struct netbuf *) mem_alloc(allocsize);
+#else
+	addrs->addrvec = (struct sockaddr *) mem_alloc(allocsize);
+#endif
 	if (copyin((caddr_t)uaddrs, (caddr_t)addrs->addrvec, (u_int)allocsize)) {
 		mem_free((char *)addrs->addrvec, allocsize);
 		return (EFAULT);
 	}
 
-	addrs->addrmask = (struct netbuf *) mem_alloc(allocsize);
-	if (copyin((caddr_t)umasks, (caddr_t)addrs->addrmask, (u_int)allocsize)) {
-		mem_free((char *)addrs->addrmask, allocsize);
-		mem_free((char *)addrs->addrvec, allocsize);
-		return (EFAULT);
-	}
-
+#ifdef	SYSV
 	for (i = 0; i < addrs->naddrs; i++) {
 		tmp = (char *) mem_alloc(addrs->addrvec[i].len);
 		if (copyin(addrs->addrvec[i].buf, tmp, (u_int) addrs->addrvec[i].len)) {
@@ -436,31 +441,13 @@ loadaddrs(addrs)
 			for (j = 0; j < i; j++)
 				mem_free((char *) addrs->addrvec[j].buf, addrs->addrvec[j].len);
 			mem_free(tmp, addrs->addrvec[i].len);
-			mem_free((char *)addrs->addrmask, allocsize);
 			mem_free((char *)addrs->addrvec, allocsize);
 			return (EFAULT);
 		}
 		else
 			addrs->addrvec[i].buf = tmp;
 	}
-
-	for (i = 0; i < addrs->naddrs; i++) {
-		tmp = (char *) mem_alloc(addrs->addrmask[i].len);
-		if (copyin(addrs->addrmask[i].buf, tmp, (u_int) addrs->addrmask[i].len)) {
-			register int j;
-
-			for (j = 0; j < i; j++)
-				mem_free((char *) addrs->addrmask[j].buf, addrs->addrmask[j].len);
-			mem_free(tmp, addrs->addrmask[i].len);
-			for (j = 0; j < addrs->naddrs; j++)
-				mem_free((char *) addrs->addrvec[j].buf, addrs->addrvec[j].len);
-			mem_free((char *)addrs->addrmask, allocsize);
-			mem_free((char *)addrs->addrvec, allocsize);
-			return (EFAULT);
-		}
-		else
-			addrs->addrmask[i].buf = tmp;
-	}
+#endif
 	return (0);
 }
 
@@ -478,17 +465,23 @@ loadrootnames(kex)
 	char netname[MAXNETNAMELEN+1];
 	u_int allocsize;
 
-	if (kex->ex_des.nnames > EXMAXROOTNAMES)
+	if (kex->ex_des.nnames > EXMAXROOTNAMES) {
 		return (EINVAL);
-	if (kex->ex_des.nnames == 0)
+	}
+
+	if (kex->ex_des.nnames == 0) {
 		return (0);
+	}
 
 	/*
 	 * Get list of names from user space
 	 */
 	allocsize =  kex->ex_des.nnames * sizeof(char *);
-	if (copyin((char *)kex->ex_des.rootnames, (char *)exnames, allocsize))
-		return (EFAULT);
+	error = copyin((char *)kex->ex_des.rootnames, (char *)exnames,
+		allocsize);
+	if (error) {
+		return (error);
+	}
 	kex->ex_des.rootnames = (char **) mem_alloc(allocsize);
 	bzero((char *) kex->ex_des.rootnames, allocsize);
 
@@ -544,43 +537,32 @@ exportfree(exi)
 	ex = &exi->exi_export;
 	switch (ex->ex_auth) {
 	case AUTH_UNIX:
-		for (i = 0; i < ex->ex_unix.rootaddrs.naddrs; i++) {
+#ifdef	SYSV
+		for (i = 0; i < ex->ex_unix.rootaddrs.naddrs; i++)
 			mem_free(ex->ex_unix.rootaddrs.addrvec[i].buf, ex->ex_unix.rootaddrs.addrvec[i].len);
-			mem_free(ex->ex_unix.rootaddrs.addrmask[i].buf, ex->ex_unix.rootaddrs.addrmask[i].len);
-		}
 		mem_free((char *)ex->ex_unix.rootaddrs.addrvec,
 			 (ex->ex_unix.rootaddrs.naddrs *
 			  sizeof(struct netbuf)));
-		mem_free((char *)ex->ex_unix.rootaddrs.addrmask,
-			 (ex->ex_unix.rootaddrs.naddrs *
-			  sizeof(struct netbuf)));
+#else
+		mem_free((char *)ex->ex_unix.rootaddrs.addrvec, 
+			 (ex->ex_unix.rootaddrs.naddrs * 
+			  sizeof(struct sockaddr)));
+#endif
 		break;
 	case AUTH_DES:
 		freenames(ex);
 		break;
 	}
-	if (ex->ex_flags & EX_EXCEPTIONS) {
-		for (i = 0; i < ex->ex_roaddrs.naddrs; i++) {
-			mem_free(ex->ex_roaddrs.addrvec[i].buf,
-				 ex->ex_roaddrs.addrvec[i].len);
-			mem_free(ex->ex_roaddrs.addrmask[i].buf,
-				 ex->ex_roaddrs.addrmask[i].len);
-		}
-		mem_free((char *)ex->ex_roaddrs.addrvec,
-			 ex->ex_roaddrs.naddrs * sizeof(struct netbuf));
-		mem_free((char *)ex->ex_roaddrs.addrmask,
-			 ex->ex_roaddrs.naddrs * sizeof(struct netbuf));
-
-		for (i = 0; i < ex->ex_rwaddrs.naddrs; i++) {
-			mem_free(ex->ex_rwaddrs.addrvec[i].buf,
-				 ex->ex_rwaddrs.addrvec[i].len);
-			mem_free(ex->ex_rwaddrs.addrmask[i].buf,
-				 ex->ex_rwaddrs.addrmask[i].len);
-		}
-		mem_free((char *)ex->ex_rwaddrs.addrvec,
-			 ex->ex_rwaddrs.naddrs * sizeof(struct netbuf));
-		mem_free((char *)ex->ex_rwaddrs.addrmask,
-			 ex->ex_rwaddrs.naddrs * sizeof(struct netbuf));
+	if (ex->ex_flags & EX_RDMOSTLY) {
+#ifdef	SYSV
+		for (i = 0; i < ex->ex_writeaddrs.naddrs; i++)
+			mem_free(ex->ex_writeaddrs.addrvec[i].buf, ex->ex_writeaddrs.addrvec[i].len);
+		mem_free((char *)ex->ex_writeaddrs.addrvec,
+			 ex->ex_writeaddrs.naddrs * sizeof(struct netbuf));
+#else
+		mem_free((char *)ex->ex_writeaddrs.addrvec,
+			 ex->ex_writeaddrs.naddrs * sizeof(struct sockaddr));
+#endif
 	}
 	freefid(exi->exi_fid);
 	mem_free(exi, sizeof(struct exportinfo));

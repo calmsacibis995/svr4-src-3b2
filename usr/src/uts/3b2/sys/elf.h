@@ -8,7 +8,7 @@
 #ifndef _SYS_ELF_H
 #define _SYS_ELF_H
 
-#ident	"@(#)head.sys:sys/elf.h	1.4"
+#ident	"@(#)head.sys:sys/elf.h	1.3"
 
 
 #include <sys/elftypes.h>
@@ -82,9 +82,6 @@ typedef struct {
 #define ET_CORE		4
 #define ET_NUM		5
 
-#define	ET_LOPROC	0xff00		/* processor specific range */
-#define	ET_HIPROC	0xffff
-
 #define EM_NONE		0		/* e_machine */
 #define EM_M32		1		/* AT&T WE 32100 */
 #define EM_SPARC	2		/* Sun SPARC */
@@ -94,7 +91,6 @@ typedef struct {
 #define EM_486		6		/* Intel 80486 */
 #define EM_860		7		/* Intel i860 */
 #define EM_NUM		8
-
 
 #define EV_NONE		0		/* e_version, EI_VERSION */
 #define EV_CURRENT	1
@@ -124,14 +120,9 @@ typedef struct {
 #define PT_PHDR		6
 #define PT_NUM		7
 
-#define PT_LOPROC	0x70000000	/* processor specific range */
-#define PT_HIPROC	0x7fffffff
-
 #define PF_R		0x4		/* p_flags */
 #define PF_W		0x2
 #define PF_X		0x1
-
-#define PF_MASKPROC	0xf0000000	/* processor specific values */
 
 
 /*	Section header
@@ -166,23 +157,15 @@ typedef struct {
 #define SHT_LOUSER	0x80000000
 #define SHT_HIUSER	0xffffffff
 
-#define	SHT_LOPROC	0x70000000	/* processor specific range */
-#define	SHT_HIPROC	0x7fffffff
-
 #define SHF_WRITE	0x1		/* sh_flags */
 #define SHF_ALLOC	0x2
 #define SHF_EXECINSTR	0x4
-
-#define SHF_MASKPROC	0xf0000000	/* processor specific values */
 
 #define SHN_UNDEF	0		/* special section numbers */
 #define SHN_LORESERVE	0xff00
 #define SHN_ABS		0xfff1
 #define SHN_COMMON	0xfff2
 #define SHN_HIRESERVE	0xffff
-
-#define SHN_LOPROC	0xff00		/* processor specific range */
-#define SHN_HIPROC	0xff1f
 
 
 /*	Symbol table
@@ -215,18 +198,12 @@ typedef struct {
 #define STB_WEAK	2
 #define STB_NUM		3
 
-#define STB_LOPROC	13		/* processor specific range */
-#define STB_HIPROC	15
-
 #define STT_NOTYPE	0		/* TYPE */
 #define STT_OBJECT	1
 #define STT_FUNC	2
 #define STT_SECTION	3
 #define STT_FILE	4
 #define STT_NUM		5
-
-#define STT_LOPROC	13		/* processor specific range */
-#define STT_HIPROC	15
 
 
 /*	Relocation

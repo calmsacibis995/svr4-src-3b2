@@ -8,7 +8,7 @@
 #ifndef	_NETINET_IN_H
 #define	_NETINET_IN_H
 
-#ident	"@(#)head.sys:sys/netinet/in.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/in.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -191,17 +191,14 @@ struct sockaddr_in {
 };
 
 /*
- * The transport providers allow any address length between
- * IN_MINADDRLEN and IN_MAXADDRLEN.  The minimum length corresponds to
- * a sockaddr_in without the sin_zero field.  The maximum length is
- * the size of the sockaddr_in structure.
- *
- * in_chkaddrlen returns true if the given length is valid.
+ * Internet address structure used by transport provider
+ * (use this format with TLI)
  */
-
-#define IN_MINADDRLEN	(sizeof(struct sockaddr_in) - 8)
-#define IN_MAXADDRLEN	(sizeof(struct sockaddr_in))
-#define in_chkaddrlen(x) ((x) >= IN_MINADDRLEN && (x) <= IN_MAXADDRLEN)
+struct taddr_in {
+	short	sin_family;
+	u_short	sin_port;
+	struct	in_addr sin_addr;
+};
 
 /*
  * Options for use with [gs]etsockopt at the IP level.

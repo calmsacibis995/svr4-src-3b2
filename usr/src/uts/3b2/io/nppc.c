@@ -8,7 +8,7 @@
 /*
  * PPC Peripheral (3B2) STREAMS PORT Controller Driver
  */
-#ident	"@(#)kernel:io/nppc.c	1.34"
+#ident	"@(#)kernel:io/nppc.c	1.28"
 
 #include "sys/param.h"
 #include "sys/types.h"
@@ -44,9 +44,6 @@
 extern int	npp_bnbr;
 clock_t npp_tm_delay = 30; /* Time delay for terminal to settle after self test */
 int nppdevflag = 0;	/* Indicates new interface for open and close to cunix */
-int npp_max_input = 1024; /* Maximum number of input chars. on the queue before
-they are discarded */
-
 
 /*
  * function return codes
@@ -93,7 +90,6 @@ char	nppc_speeds[16] = {
 
 SG_DBLK nsg_dblk;	/* Data block for sysgen. See queue.h */
 
-int npp_dbg = 0;
 int	pmpopen = 0;	/* global pump flag */
 int	nversflag;
 int	nloadflag;
@@ -107,7 +103,7 @@ int	nloadflag;
 #define TP(b,p)	&npp_tty[b*5+p] 	/* tp from board and port */
 
 /*
- * npp_setparm slpnd values
+ * nppsetparm slpind values
  */
 #define	CANSLEEP	1	/* Sleep possible because of user context */
 #define	DONTSLEEP	0	/* Sleep impossible because of lack of user context */
@@ -125,19 +121,18 @@ extern int nlla_cqueue();
 extern int splx();
 extern int splstr();
 extern paddr_t kvtophys();
+extern int bufawake();
 extern void nlla_express();
 
-STATIC int npp_putioc();
-STATIC int npp_srvioc();
-STATIC int npp_setparm();
-STATIC void npp_flush();
-STATIC int npp_versreq();
+STATIC int putioc();
+STATIC int srvioc();
+STATIC int nppsetparm();
+STATIC void nttflush();
+STATIC int nversreq();
 STATIC int npp_ba_mctl();
-STATIC int npp_abuf_to_ppc();
-STATIC int npp_copy_to_lbuf();
-STATIC int npp_bufawake();
-STATIC void npp_nodrain();
-STATIC int npp_getoblk();
+STATIC int abuf_to_ppc();
+STATIC int copy_to_lbuf();
+STATIC int getoblk();
 
 /************************
  * Streams Declarations *
@@ -147,7 +142,7 @@ STATIC int	nppopen(), nppclose(), nppoput(), npposrv(), nppisrv();
 struct module_info ppc_info = { 99, "pp", 0, 512, 512, 256};
 
 /* init: put	srv	open	close	admin stat */
-STATIC struct qinit npprinit = { NULL, nppisrv, nppopen, nppclose, NULL, &ppc_info, NULL};
+STATIC struct qinit npprinit = { putq, nppisrv, nppopen, nppclose, NULL, &ppc_info, NULL};
 STATIC struct qinit nppwinit = { nppoput, npposrv, NULL, NULL, NULL, &ppc_info, NULL};
 
 struct streamtab nppinfo = { &npprinit, &nppwinit, NULL, NULL};
@@ -173,9 +168,10 @@ cred_t	*credp;
 	mblk_t *mop;
 
 	int	sx;
+	int	nbufs;		/* number of buffers allocated on PPC */
 	int	mdev;		/* the minor device number */
 	int	i;		/* for loop variable */
-	int	npp_ret;	/* return from npp_setparm() */
+	int	npp_ret;	/* return from nppsetparm() */
 	int	lmaj;		/* lastmajor, used in itoemajor */ 
 
 
@@ -257,7 +253,7 @@ cred_t	*credp;
 		 * controlling terminal.
 		 */
 		while (( mop = allocb( sizeof( struct stroptions), BPRI_HI)) == NULL) {
-			bufcall( sizeof( struct stroptions), BPRI_MED, npp_bufawake, (long)tp);
+			bufcall( sizeof( struct stroptions), BPRI_MED, bufawake, (long)tp);
 			if ( sleep( (caddr_t)&tp->t_cc[3], TTIPRI | PCATCH)) {
 				splx( sx);
 				return( EINTR);
@@ -291,7 +287,7 @@ cred_t	*credp;
 
 		tp->t_ioctlp = NULL;
 		splx( sx);
-		if ( npp_ret = npp_setparm( tp, CANSLEEP))
+		if ( npp_ret = nppsetparm( tp, CANSLEEP))
 			return( npp_ret);
 	} else {
 		/*
@@ -314,7 +310,7 @@ cred_t	*credp;
 			if ( sleep( (caddr_t)&tp->t_line, TTIPRI | PCATCH)) {
 				/*
 				 * Free the message buffer that was
-				 * allocated in npp_setparm()
+				 * allocated in nppsetparm()
 				 */
 				if ( tp->t_in.bu_bp != NULL) {
 					freeb( tp->t_in.bu_bp);
@@ -334,9 +330,13 @@ cred_t	*credp;
 	/*
 	 * set up to allocate receive buffers
 	 */
-	if (( ppcp->qcb < MAX_RBUF) && nppcpid[mdev] != CENTRONICS) {
+	if ( !( tp->t_dstat & SUPBUF) && nppcpid[mdev] != CENTRONICS) {
 
-		ppcp->dcb = MAX_RBUF;
+		if ( ppcp->dcb == 0)	/* first open */
+			ppcp->dcb += INITCB;
+		ppcp->dcb += CB_PER_PPC;
+
+		tp->t_dstat |= SUPBUF;
 
 		tp->t_in.bu_ptr = NULL;
 		tp->t_in.bu_cnt = 0;
@@ -344,41 +344,53 @@ cred_t	*credp;
 		/*
 		 * Allocate some recv blocks and send the buf ptrs to the PPC.
 		 */
+		nbufs = 0;
 		while ( ppcp->dcb > ppcp->qcb) {
 			if (( bp = allocb( PPBUFSIZ, BPRI_MED)) == NULL) {
 				/*
 				 * wait until a buffer becomes available
 				 */
 				tp->t_state |= TTIOW;
-				bufcall( PPBUFSIZ, BPRI_MED, npp_bufawake, (long)tp);
+				bufcall( PPBUFSIZ, BPRI_MED, bufawake, (long)tp);
 				if ( sleep( (caddr_t)&tp->t_cc[3], TTIPRI | PCATCH)) {
 					tp->t_state &= ~TTIOW;
+					tp->t_dstat &= ~SUPBUF;
 						
 					/*
 					 * Flush and disconnect the PPC.
 					 */
-					nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)0, GR_DTR|GR_CREAD);
+					nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)nbufs, GR_DTR|GR_CREAD);
+
+					ppcp->dcb -= CB_PER_PPC;
+					if ( ppcp->dcb == INITCB)
+						ppcp->dcb -= INITCB;
 
 					splx( sx);
 					return( EINTR);
 				}
 			}
-			tp->t_lbuf = NULL;
-			if ( npp_abuf_to_ppc( tp, bp) == E_LLA_QUEUE) {
+			if ( abuf_to_ppc( tp, bp) == E_LLA_QUEUE) {
 				/*
 				 * Hardware failure
+				 */
+				tp->t_dstat &= ~SUPBUF;
+					
+				/*
 				 * Flush and disconnect the PPC.
 				 */
-				nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)0, GR_DTR|GR_CREAD);
+				nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)nbufs, GR_DTR|GR_CREAD);
 
+				ppcp->dcb -= CB_PER_PPC;
+				if ( ppcp->dcb == INITCB)
+					ppcp->dcb -= INITCB;
 				splx( sx);
 				return( EIO);
 			}
+		nbufs++;
 		ppcp->qcb++;
 		}
 	}
 	tp->t_state |= ISOPEN;  /* Mark TTY as open. */
-	noenable( WR( tp->t_rdqp));
 	splx( sx);
 	return( 0);
 }
@@ -387,12 +399,12 @@ cred_t	*credp;
 /*
  * Awakens an open waiting for receive buffers to become available.
  */
-STATIC int
-npp_bufawake( tp)
+int
+bufawake( tp)
 register struct strtty *tp;
 {
-	tp->t_state &= ~TTIOW;
-	wakeup( (caddr_t)&tp->t_cc[3]);
+	tp->t_state &= ~(TTIOW);
+	wakeup( (caddr_t) & tp->t_cc[3]);
 }
 
 
@@ -410,29 +422,18 @@ register cred_t	*credp;
 	register struct ppcboard *ppcp;
 
 	int	sx;
-	int	tid;
+	int	eflush;
 
 	char	dcode;
 
 
-	sx = splstr();
 	/*
 	 * Get the tty structure for the terminal
 	 */
 	tp = (struct strtty *)qp->q_ptr;
 
-	if ( !( tp->t_state & ISOPEN)) { /* Check if it's closed already. */
-		splx( sx);
+	if ( !( tp->t_state & ISOPEN))	/* See if it's closed already. */
 		return( 0);
-	}
-
-	/*
-	 * May need to releive flow control
-	 */
-	if (( tp->t_state & TBLOCK) && ( tp->t_iflag & IXOFF)) {
-		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
-		tp->t_state &= ~TBLOCK;
-	}
 
 	pmpopen = 0;
 	nversflag = 0;
@@ -447,42 +448,31 @@ register cred_t	*credp;
 			|| tp->t_state & ( BUSY | WIOC) 
 			|| tp->t_out.bu_bp != NULL)) {
 
-			if ( npp_getoblk( tp) == 0) {
+			if ( getoblk( tp) == 0) {
+				sx = splstr();
 				tp->t_state |= TTIOW;
-				tp->t_dstat |= CLDRAIN;
-				/*
-				 * Need timeout here to break a deadlock
- 				 * condition since the last transaction
-				 * to the ppc could have been a suspend output
-				 * or there could be a hardware problem on the
-				 * board.  In either case the transmitter could
-				 * be disabled and further transmission to the
-				 * port is suspended.
-				 */
-				tid = timeout( npp_nodrain, (caddr_t)tp, CL_TIME);
-				sleep( (caddr_t)&tp->t_oflag, PZERO|PCATCH);
-				if ( tp->t_dstat & CLDRAIN) {
-					untimeout( tid);
-					tp->t_dstat &= ~CLDRAIN;
-				} else {
-					tp->t_state &= ~(TTIOW | BUSY | WIOC);
+				if ( sleep( (caddr_t)&tp->t_oflag, PZERO + 1|PCATCH)) {
+					tp->t_state &= ~TTIOW;
+					splx( sx);
 					break;
 				}
+				splx( sx);
 			}
 		}
 
+	sx = splstr();
 	if ( tp->t_state & CARR_ON) {
 		if ( tp->t_dstat & OPDRAIN) {
-			tp->t_dstat &= ~OPDRAIN;
+			tp->t_dstat &= ~(OPDRAIN);
 			wakeup( (caddr_t)&tp->t_cc[1]);
 		}
 	} else {
 		if ( tp->t_state & BUSY)
-			tp->t_state &= ~BUSY;
+			tp->t_state &= ~(BUSY);
 		nlla_ldeuld( nppcbid[tp->t_dev], nppcpid[tp->t_dev]);
 	}
 
-	tp->t_state &= ~ISOPEN;	/* TTY marked closed. */
+	tp->t_state &= ~(ISOPEN);	/* TTY marked closed. */
 	/*
 	 * deallocate buffers
 	 */
@@ -499,6 +489,12 @@ register cred_t	*credp;
 
 		tp->t_in.bu_ptr = NULL;
 
+		ppcp->dcb -= CB_PER_PPC;
+		if ( ppcp->dcb <= INITCB)
+			ppcp->dcb -= INITCB;
+
+		if ( ppcp->dcb <= 0) 	/* this is the last close on the board */
+			ppcp->dcb = 0;
 	}
 
 	if ( tp->t_ioctlp != NULL) {	/* dump the ioctl buffer */ 
@@ -512,6 +508,11 @@ register cred_t	*credp;
 	}
 	tp->t_out.bu_ptr = NULL;
 
+	tp->t_dstat &= ~(SUPBUF);	/* No bufs requested for this TTY. */
+
+	/*
+	 * Send the final disconnect request to the PORTS board.
+	 */
 	while ( !( nlla_xfree( nppcbid[tp->t_dev], nppcpid[tp->t_dev]))) {
 		tp->t_dstat |= WENTRY;
 		if ( sleep( (caddr_t)&tp->t_cc[1], TTOPRI | PCATCH)) {
@@ -521,7 +522,15 @@ register cred_t	*credp;
 		}
 	}
 
-	tp->t_state &= ~CARR_ON;
+	/*
+	 * Calculate the number of message buffers to free out of the PPC. 
+	 * For each buffer that is released by the PCC board a
+	 * PPC_RECV will be received( see nppint()) by the host after the
+	 * PPC board has received the Disconnect(PPC_DISC) from the host.
+	 */
+	if (( eflush = ppcp->qcb - ppcp->dcb) < 0)
+		eflush = 0;
+	tp->t_state &= ~(CARR_ON);
 	if ( tp->t_cflag & HUPCL)	/* Hang up on disconnect. */
 		dcode = (GR_DTR | GR_CREAD);
 	else
@@ -531,26 +540,15 @@ register cred_t	*credp;
 	 * process could have opened the ports line with
 	 * O_NDELAY off and another with the flag on.
 	 */
-	tp->t_state &= ~WOPEN;
-	tp->t_rdqp = NULL;
+	 tp->t_state &= ~WOPEN;
 
 	/*
 	 * Flush and disconnect the PPC.
 	 */
-	nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)0, dcode);
+	nlla_regular( nppcbid[tp->t_dev], TRUE, 0, nppcpid[tp->t_dev], PPC_DISC, 0, (char)eflush, dcode);
 
 	splx( sx);
 	return( 0);
-}
-/*
- * Wakeup sleep in close routine.
- */
-STATIC void
-npp_nodrain( tp)
-register struct strtty *tp;
-{
-	tp->t_dstat &= ~CLDRAIN;
-	wakeup( (caddr_t)&tp->t_oflag);
 }
 
 /****************************************
@@ -580,8 +578,13 @@ register mblk_t *bp;
 
 	case M_DATA:
 		/*
-		 * Translate complex messages to simple messages
+		 * Delay sending data to terminal if carrier not
+		 * present
 		 */
+		if ( !( tp->t_state & CARR_ON)) {
+			putq( qp, bp);
+			return( 0);
+		}
 		while ( bp != NULL) {
 			msgbp = unlinkb( bp);
 			bp->b_cont = NULL;
@@ -592,31 +595,24 @@ register mblk_t *bp;
 
 			bp = msgbp;
 		}
-		/*
-		 * Delay sending data to terminal if carrier not
-		 * present
-		 */
-		if ( !( tp->t_state & CARR_ON)) 
-			return( 0);
-
 		if ( qp->q_first != NULL)
-			npp_getoblk( tp);
+			getoblk( tp);
 		break;
 
 	case M_IOCTL:
-		npp_putioc( qp, bp);
+		putioc( qp, bp);
 		if ( qp->q_first != NULL)
-			npp_getoblk( tp);
+			getoblk( tp);
 		break;
 
 	case M_FLUSH:
 		sx = splstr();
 		if ( *bp->b_rptr & FLUSHW) {
-			npp_flush( tp, FWRITE);
+			nttflush( tp, FWRITE);
 			*bp->b_rptr &= ~FLUSHW;
 		}
 		if ( *bp->b_rptr & FLUSHR) {
-			npp_flush( tp, FREAD);
+			nttflush( tp, FREAD);
 			putnext( RD( qp), bp);
 		} else
 			freemsg( bp);
@@ -627,10 +623,10 @@ register mblk_t *bp;
 	case M_START:
 		sx = splstr();
 		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_RES);
-		tp->t_state &= ~BUSY;
+		tp->t_state &= ~(BUSY | TBLOCK | WIOC);
 		splx( sx);
 		freemsg( bp);
-		npp_getoblk( tp);
+		getoblk( tp);
 		break;
 
 	case M_STOP:
@@ -644,7 +640,7 @@ register mblk_t *bp;
 	case M_STARTI:
 		sx = splstr();
 		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
-		tp->t_state &= ~TBLOCK;
+		tp->t_state &= ~(TBLOCK);
 		splx( sx);
 		freemsg( bp);
 		break;
@@ -688,7 +684,7 @@ register struct strtty *tp;
 	sx = splstr();
 
 	if ( tp->t_out.bu_bp == NULL) {	/* nothing to send */
-		tp->t_state &= ~BUSY;
+		tp->t_state &= ~(BUSY);
 		tp->t_out.bu_ptr = NULL;
 		tp->t_out.bu_cnt = 0;
 		splx( sx);
@@ -720,7 +716,7 @@ register struct strtty *tp;
  * Called by Xmit Complete interrupt handler and bufcall() routines.
  */
 STATIC int
-npp_getoblk( tp)
+getoblk( tp)
 register struct strtty *tp;
 {
 	register mblk_t	*msgbp;
@@ -728,16 +724,10 @@ register struct strtty *tp;
 
 	int	sx;
 
-
 	sx = splstr();
 
-	if ( !tp->t_rdqp) { /* If the stream has gone away just return */
-		splx( sx);
-		return( 0);
-	}
-
 	if ( tp->t_state & (BUSY | WIOC)) {
-		splx( sx);
+		splx(sx);
 		return( 0);
 	}
 
@@ -747,7 +737,7 @@ register struct strtty *tp;
 		 * wakeup close write queue drain
 		 */
 		if ( tp->t_state & TTIOW) {
-			tp->t_state &= ~TTIOW;
+			tp->t_state &= ~(TTIOW);
 			wakeup((caddr_t) &tp->t_oflag);
 		}
 		splx( sx);
@@ -768,12 +758,12 @@ register struct strtty *tp;
 			tp->t_out.bu_bp = NULL;
 			tp->t_out.bu_ptr = NULL;
 			tp->t_out.bu_cnt = 0;
-			tp->t_state &= ~BUSY;
+			tp->t_state &= ~(BUSY);
 		}
 		break;
 
 	case M_IOCTL:
-		npp_srvioc( qp, msgbp);
+		srvioc( qp, msgbp);
 		break;
 
 	default:
@@ -789,7 +779,7 @@ register struct strtty *tp;
  * ioctl handler for output PUT procedure
  */
 STATIC int
-npp_putioc( qp, bp)
+putioc( qp, bp)
 register queue_t *qp;
 register mblk_t *bp;
 {
@@ -838,7 +828,7 @@ register mblk_t *bp;
 			putq( qp, bp);
 			break;
 		}
-		npp_srvioc( qp, bp);
+		srvioc( qp, bp);
 		break;
 
 	case TCSETA: {	/* immediate parm set   */
@@ -864,7 +854,7 @@ register mblk_t *bp;
 		bcopy( (caddr_t)cb->c_cc, (caddr_t)tp->t_cc, NCC);
 
 		tp->t_ioctlp = NULL;
-		if ( err_ret = npp_setparm( tp, DONTSLEEP)) {
+		if ( err_ret = nppsetparm( tp, DONTSLEEP)) {
 			bp->b_datap->db_type = M_IOCNAK;
 			msgb1p = unlinkb( bp);
 			freeb( msgb1p);
@@ -908,7 +898,7 @@ register mblk_t *bp;
 		bcopy( (caddr_t)cb->c_cc, (caddr_t)tp->t_cc, NCCS);
 
 		tp->t_ioctlp = NULL;
-		if ( err_ret = npp_setparm( tp, DONTSLEEP)) {
+		if ( err_ret = nppsetparm( tp, DONTSLEEP)) {
 			bp->b_datap->db_type = M_IOCNAK;
 			msgb1p = unlinkb( bp);
 			freeb( msgb1p);
@@ -931,7 +921,7 @@ register mblk_t *bp;
 
 		if (( msgbp = allocb( sizeof(struct termio), BPRI_MED)) == NULL) {
 			putbq( qp, bp);
-			bufcall( sizeof( struct termio), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( struct termio), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		}
 		if ( bp->b_cont)
@@ -946,7 +936,7 @@ register mblk_t *bp;
 		cb->c_line = tp->t_line;
 		bcopy( (caddr_t)tp->t_cc, (caddr_t)cb->c_cc, NCC);
 
-		bp->b_cont->b_wptr += sizeof( struct termio);
+		bp->b_cont->b_wptr += sizeof(struct termio);
 		bp->b_datap->db_type = M_IOCACK;
 		iocbp->ioc_count = sizeof(struct termio);
 		putnext( RD(qp), bp);
@@ -959,9 +949,9 @@ register mblk_t *bp;
 		if ( bp->b_cont)
 			freemsg( bp->b_cont);	/* Bad user formatted I_STR */
 
-		if (( msgbp = allocb( sizeof( struct termios), BPRI_MED)) == NULL) {
+		if (( msgbp = allocb( sizeof(struct termios), BPRI_MED)) == NULL) {
 			putbq( qp, bp);
-			bufcall( sizeof( struct termios), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( struct termios), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		}
 		bp->b_cont = msgbp;
@@ -1000,11 +990,11 @@ register mblk_t *bp;
 
 		if (( msgbp = allocb( 4, BPRI_HI)) == NULL) {
 			putbq( qp, bp);
-			bufcall( 4, BPRI_HI, npp_getoblk, (long)tp);
+			bufcall( 4, BPRI_HI, getoblk, (long)tp);
 			return( 0);
 		}
 		bp->b_cont = msgbp;
-		if ( err_ret = npp_versreq( nppcbid[tp->t_dev])) {
+		if ( err_ret = nversreq( nppcbid[tp->t_dev])) {
 			bp->b_datap->db_type = M_IOCNAK;
 			iocbp->ioc_error = err_ret;
 			putnext( RD( qp), bp);
@@ -1218,7 +1208,7 @@ register mblk_t *bp;
  *
  */
 STATIC int
-npp_srvioc( qp, bp)
+srvioc( qp, bp)
 register queue_t *qp;
 register mblk_t *bp;
 {
@@ -1253,7 +1243,7 @@ register mblk_t *bp;
 		register struct termio *cb;
 
 
-		npp_flush( tp, FREAD);
+		nttflush( tp, FREAD);
 		putctl1( RD(qp)->q_next, M_FLUSH, FLUSHR);
 
 		if ( !bp->b_cont) {
@@ -1277,10 +1267,10 @@ register mblk_t *bp;
 		else
 			tp->t_ioctlp = NULL;
 
-		if (( err_ret = npp_setparm( tp, DONTSLEEP)) == EAGAIN) {
+		if (( err_ret = nppsetparm( tp, DONTSLEEP)) == EAGAIN) {
 			tp->t_ioctlp = NULL;
 			putbq( qp, bp);
-			bufcall( sizeof( Options), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( Options), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		} else if ( err_ret != 0) {
 			tp->t_ioctlp = NULL;
@@ -1332,10 +1322,10 @@ register mblk_t *bp;
 		else
 			tp->t_ioctlp = NULL;
 
-		if (( err_ret = npp_setparm( tp, DONTSLEEP)) == EAGAIN) {
+		if (( err_ret = nppsetparm( tp, DONTSLEEP)) == EAGAIN) {
 			tp->t_ioctlp = NULL;
 			putbq( qp, bp);
-			bufcall( sizeof( Options), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( Options), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		} else if ( err_ret != 0) {
 			tp->t_ioctlp = NULL;
@@ -1367,7 +1357,7 @@ register mblk_t *bp;
 		register struct termios *cb;
 
 
-		npp_flush( tp, FREAD);
+		nttflush( tp, FREAD);
 		putctl1( RD(qp)->q_next, M_FLUSH, FLUSHR);
 
 		if ( !bp->b_cont) {
@@ -1391,10 +1381,10 @@ register mblk_t *bp;
 		else
 			tp->t_ioctlp = NULL;
 
-		if (( err_ret = npp_setparm( tp, DONTSLEEP)) == EAGAIN) {
+		if (( err_ret = nppsetparm( tp, DONTSLEEP)) == EAGAIN) {
 			tp->t_ioctlp = NULL;
 			putbq( qp, bp);
-			bufcall( sizeof( Options), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( Options), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		} else if ( err_ret != 0) {
 			tp->t_ioctlp = NULL;
@@ -1447,10 +1437,10 @@ register mblk_t *bp;
 		else
 			tp->t_ioctlp = NULL;
 
-		if (( err_ret = npp_setparm( tp, DONTSLEEP)) == EAGAIN) {
+		if (( err_ret = nppsetparm( tp, DONTSLEEP)) == EAGAIN) {
 			tp->t_ioctlp = NULL;
 			putbq( qp, bp);
-			bufcall( sizeof( Options), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof( Options), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		} else if ( err_ret != 0) {
 			tp->t_ioctlp = NULL;
@@ -1483,7 +1473,7 @@ register mblk_t *bp;
 
 		if (( msgbp = allocb( sizeof( struct termio), BPRI_MED)) == NULL) {
 			putbq( qp, bp);
-			bufcall( sizeof(struct termio), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof(struct termio), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		}
 		if ( bp->b_cont)
@@ -1510,7 +1500,7 @@ register mblk_t *bp;
 
 		if (( msgbp = allocb( sizeof(struct termios), BPRI_MED)) == NULL) {
 			putbq( qp, bp);
-			bufcall( sizeof(struct termios), BPRI_MED, npp_getoblk, (long)tp);
+			bufcall( sizeof(struct termios), BPRI_MED, getoblk, (long)tp);
 			return( 0);
 		}
 		if ( bp->b_cont)
@@ -1565,12 +1555,12 @@ register mblk_t *bp;
 
 /*
  * Sets parameters on the PPC board.
- * Called from npp_putioc() and npp_srvioc().
+ * Called from putioc() and srvioc().
  * NOTE: this routine can be called form routines that may or may not
  *	have a user context
  */
 STATIC int
-npp_setparm( tp, slpind)
+nppsetparm( tp, slpind)
 register struct strtty *tp;
 register int	slpind;	/* = CANSLEEP if sleep possible, = DONTSLEEP otherwise */
 {
@@ -1601,7 +1591,7 @@ register int	slpind;	/* = CANSLEEP if sleep possible, = DONTSLEEP otherwise */
 			if ( sleep( (caddr_t)&tp->t_cc[1], TTOPRI + 1 | PCATCH)) {
 				/*
 				 * Sleep called with PCATCH so that on user
-				 * interrupt of the open call the processor
+				 * interupt of the open call the processor
 				 * priority is reset before control is returned
 				 * to the user
 				 */
@@ -1637,7 +1627,7 @@ register int	slpind;	/* = CANSLEEP if sleep possible, = DONTSLEEP otherwise */
 		freeb( bp);
 		tp->t_state &= ~WIOC;
 		splx( sx);
-		return( EINVAL);
+		return( EIO);
 	}
 
 	if ( nppcpid[tp->t_dev] == CENTRONICS)
@@ -1704,46 +1694,9 @@ register struct strtty *tp;
 	tp->t_in.bu_ptr = NULL;
 
 	/*
-	 * If input flow control is on and we hit the hi-water mark
-	 * then transmit a STOP character.
-	 */ 
-	if (( tp->t_iflag & IXOFF) && !( tp->t_state & TBLOCK) 
-	   && ( (int)tp->t_in.bu_cnt + (int)tp->t_rdqp->q_count >= (int)tp->t_rdqp->q_hiwat)) {
-		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_BLK);
-		tp->t_state |= TBLOCK;
-	}
-	/*
-	 * Check if there is room in the queue to hold the message.
-	 */
-	if ( (int)tp->t_in.bu_cnt + (int)tp->t_rdqp->q_count > npp_max_input) {
-		/*
-		 * Dump all data in the input stream
-		 * by first flushing the read queue and then
-		 * sending upstream an M_FLUSH and
-		 * reuse the large buffer.
-		 */
-		flushq( tp->t_rdqp, FLUSHDATA);
-		putctl1( tp->t_rdqp->q_next, M_FLUSH, FLUSHR);
-		if ( tp->t_lbuf)
-			tp->t_lbuf->b_rptr = tp->t_lbuf->b_wptr = tp->t_lbuf->b_datap->db_base;
-		/*
-		 * May need to relieve flow control
-		 */
-		if (( tp->t_state & TBLOCK) && ( tp->t_iflag & IXOFF)) {
-			nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
-			tp->t_state &= ~TBLOCK;
-		}
-		splx( sx);
-		/*
-		 * Return the current buffer address to the ppc
-		 */
-		return( npp_abuf_to_ppc( tp, bp));
-	}
-
-	/*
 	 * Copy buffer just received to a large buffer
 	 */
-	if (( fn_ret = npp_copy_to_lbuf( tp, bp)) != SUCCESS) {
+	if (( fn_ret = copy_to_lbuf( tp, bp)) != SUCCESS) {
 		ppcp->rbp[i].bp = bp;
 		splx( sx);
 		return( fn_ret);
@@ -1753,7 +1706,7 @@ register struct strtty *tp;
 	 */
 	if (( mp = dupb( tp->t_lbuf)) == NULL) {
 		/*
-		 *  Have to undo the npp_copy_to_lbuf
+		 *  Have to undo the copy_to_lbuf
 		 */
 		tp->t_lbuf->b_wptr -= tp->t_in.bu_cnt;
 		ppcp->rbp[i].bp = bp;
@@ -1764,7 +1717,7 @@ register struct strtty *tp;
 	/*
 	 * Return the current buffer address to the ppc
 	 */
-	if (( fn_ret = npp_abuf_to_ppc( tp, bp)) != SUCCESS) {
+	if (( fn_ret = abuf_to_ppc( tp, bp)) != SUCCESS) {
 		tp->t_lbuf->b_wptr -= tp->t_in.bu_cnt;
 		freeb( mp);
 		splx( sx);
@@ -1847,12 +1800,9 @@ register short	bid;
 				sx = splstr();
 				for ( i = 0; i < MAX_RBUF; i++) {
 					if (( ppcp->rbp[i].bp != NULL) && ( ppcp->rbp[i].sp == (long)tp->t_in.bu_ptr)) {
-						bp = ppcp->rbp[i].bp;
+						freeb( ppcp->rbp[i].bp);
 						ppcp->rbp[i].bp = NULL;
-						if ( npp_abuf_to_ppc( tp, bp) == E_LLA_QUEUE) {
-							putctl1( tp->t_rdqp->q_next, M_ERROR, EIO);
-							cmn_err( CE_WARN, "PORTS: Hardware error board %d, port %d. Can't get buffer\n", nppcbid[tp->t_dev], nppcpid[tp->t_dev]);
-						}
+						ppcp->qcb--;
 						break;
 					}
 				}
@@ -1875,7 +1825,7 @@ register short	bid;
 					if (( ppcp->rbp[i].bp != NULL) && ( ppcp->rbp[i].sp == (long)tp->t_in.bu_ptr)) {
 						bp = ppcp->rbp[i].bp;
 						ppcp->rbp[i].bp = NULL;
-						if ( npp_abuf_to_ppc( tp, bp) == E_LLA_QUEUE) {
+						if ( abuf_to_ppc( tp, bp) == E_LLA_QUEUE) {
 							putctl1( tp->t_rdqp->q_next, M_ERROR, EIO);
 							cmn_err( CE_WARN, "PORTS: Hardware error board %d, port %d. Can't get buffer\n", nppcbid[tp->t_dev], nppcpid[tp->t_dev]);
 						}
@@ -1889,7 +1839,7 @@ register short	bid;
 			if (( npp_ret = npp_in( tp)) != SUCCESS) {
 				if ( npp_ret == E_LLA_QUEUE) {
 					putctl1( tp->t_rdqp->q_next, M_ERROR, EIO);
-					npp_flush( tp, FREAD|FWRITE);
+					nttflush( tp, FREAD|FWRITE);
 					cmn_err( CE_WARN, "PORTS: Hardware error board %d, port %d. Can't get buffer\n", nppcbid[tp->t_dev], nppcpid[tp->t_dev]);
 				} else if ( npp_ret == E_NO_LBUFS) /* Ran out of "large" STREAMS buffers */
 					bufcall( LARGEBUFSZ, BPRI_MED, npp_in, (long)tp);
@@ -1919,14 +1869,14 @@ register short	bid;
 				if ( tp->t_out.bu_cnt > PPBUFSIZ)
 					tp->t_out.bu_cnt = PPBUFSIZ;
 				else
-					tp->t_dstat &= ~SPLITMSG;
+					tp->t_dstat &= ~(SPLITMSG);
 
 				if (( tp->t_state & WIOC) || ( npp_out( tp) == 0)) {
 					tp->t_out.bu_bp->b_rptr -= ocnt;
 					putbq( WR(tp->t_rdqp), tp->t_out.bu_bp);
 					tp->t_out.bu_bp = NULL;
-					tp->t_state &= ~BUSY;
-					npp_getoblk( tp);	/* try again */
+					tp->t_state &= ~(BUSY);
+					getoblk( tp);	/* try again */
 				}
 			} else {
 				if ( tp->t_out.bu_bp != NULL) {
@@ -1935,17 +1885,15 @@ register short	bid;
 				}
 				tp->t_out.bu_ptr = NULL;
 				tp->t_out.bu_cnt = 0;
-				tp->t_state &= ~BUSY;
-				npp_getoblk( tp);	/* get another block to send */
+				tp->t_state &= ~(BUSY);
+				getoblk( tp);	/* get another block to send */
 			}
 			break;
 
 		case PPC_ASYNC:
-
 			switch ( cqe.appl.pc[0]) {
 
 			case AC_BRK:
-
 				drv_setparm( SYSRINT, 1);
 
 				putctl( tp->t_rdqp->q_next, M_BREAK);
@@ -1953,49 +1901,45 @@ register short	bid;
 					tp->t_state |= BUSY;
 
 				nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_ABX);
+
 				break;
 
 			case AC_DIS:
-
 				drv_setparm( SYSMINT, 1);
 
-				tp->t_state &= ~CARR_ON;
-				if ( tp->t_state & ISOPEN) {
+				tp->t_state &= ~(CARR_ON);
+				if ( tp->t_state & ISOPEN)
 					putctl( tp->t_rdqp->q_next, M_HANGUP);
-					npp_flush( tp, (FREAD | FWRITE));
-				}
+				nttflush( tp, (FREAD | FWRITE));
 				break;
 
 			case AC_CON:
-
 				drv_setparm( SYSMINT, 1);
 
 				tp->t_state |= CARR_ON;
 				if ( tp->t_state & WOPEN) {
 					tp->t_state &= ~WOPEN;
-					wakeup( (caddr_t)&tp->t_line);
+					wakeup( (caddr_t) & tp->t_line);
 				}
 				if (( WR( tp->t_rdqp)->q_first) != NULL) {
 					drv_usecwait( drv_hztousec( npp_tm_delay));	/* delay npp_tm_delay ticks */
-					npp_getoblk( tp);
+					getoblk( tp);
 				}
 				break;
 
 			case AC_FLU:
-
 				if ( tp->t_dstat & WENTRY) {
 					tp->t_dstat &= ~(SETOPT | WENTRY);
 					wakeup( (caddr_t) & tp->t_cc[1]);
 				}
 				tp->t_state &= ~BUSY;
 				if (( WR( tp->t_rdqp)->q_first) != NULL)
-					npp_getoblk( tp);
+					getoblk( tp);
 				break;
 			}
 			break;
 
 		case PPC_OPTIONS:
-
 			/*
 			 * Ack original TCSET??? ioctl here, since the
 			 * queues on the board are certainly drained
@@ -2020,22 +1964,22 @@ register short	bid;
 
 			if ( tp->t_dstat & WENTRY) {
 				tp->t_dstat &= ~(SETOPT | WENTRY);
-				wakeup( (caddr_t)&tp->t_cc[1]);
+				wakeup( (caddr_t) & tp->t_cc[1]);
 			}
 
-			tp->t_state &= ~WIOC;
+			tp->t_state &= ~(WIOC);
 			if (( WR( tp->t_rdqp)->q_first) != NULL)
-				npp_getoblk( tp);
+				getoblk( tp);
 			break;
 
 		case PPC_DISC:
 		case PPC_CONN:
 			if ( tp->t_dstat & WENTRY) {
 				tp->t_dstat &= ~(SETOPT | WENTRY);
-				wakeup( (caddr_t)&tp->t_cc[1]);
+				wakeup( (caddr_t) & tp->t_cc[1]);
 			}
 			if (( WR( tp->t_rdqp)->q_first) != NULL)
-				npp_getoblk( tp);
+				getoblk( tp);
 			break;
 
 		case PPC_DEVICE:
@@ -2055,7 +1999,7 @@ register short	bid;
 			break;
 
 		case PPC_BRK:
-			tp->t_state &= ~WIOC;
+			tp->t_state &= ~(WIOC);
 			/*
 			 * Ack original TCSBRK ioctl here, since the
 			 * queues on the board are certainly drained
@@ -2073,7 +2017,7 @@ register short	bid;
 			}
 
 			if (( WR( tp->t_rdqp)->q_first) != NULL)
-				npp_getoblk( tp);
+				getoblk( tp);
 			break;
 
 		case SYSGEN:
@@ -2151,7 +2095,7 @@ register short	bid;
 				}
 			}
 			wakeup( (caddr_t)&ppcp->qcb);
-			npp_getoblk( tp);
+			getoblk( tp);
 			break;
 
 		default:
@@ -2172,7 +2116,7 @@ register short	bid;
  * flush TTY queues
  */
 STATIC void
-npp_flush( tp, cmd)
+nttflush( tp, cmd)
 register struct strtty *tp;
 register int cmd;
 {
@@ -2191,20 +2135,20 @@ register int cmd;
 		 * Dump the current xmit buffer
 		 */
 		if (( tp->t_out.bu_bp != NULL) && ( tp->t_dstat & SPLITMSG))
-			tp->t_dstat &= ~SPLITMSG;
+			tp->t_dstat &= ~(SPLITMSG);
 
 		if ( tp->t_out.bu_bp != NULL) {
 			freemsg( tp->t_out.bu_bp);
 			tp->t_out.bu_bp = NULL;
 		}
 
-		tp->t_state &= ~BUSY;
+		tp->t_state &= ~(BUSY);
 		/*
 		 * Awaken the close waiting for output to drain
 		 */
 		if ( tp->t_state & TTIOW) {
-			tp->t_state &= ~TTIOW;
-			wakeup( (caddr_t)&tp->t_oflag);
+			tp->t_state &= ~(TTIOW);
+			wakeup((caddr_t) &tp->t_oflag);
 		}
 
 		/*
@@ -2219,18 +2163,14 @@ register int cmd;
 		flushq( tp->t_rdqp, FLUSHDATA);
 
 		/*
-		 * Reuse the large input buffer
-		 */
-		if ( tp->t_lbuf)
-			tp->t_lbuf->b_rptr = tp->t_lbuf->b_wptr = tp->t_lbuf->b_datap->db_base;
-
-		/*
 		 * Abort reception on the PPC
 		 */
 		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_ABR);
 
 		if ( tp->t_state & TBLOCK) {
-			tp->t_state &= ~TBLOCK;
+			tp->t_state &= ~(TBLOCK);
+			tp->t_state &= ~(WIOC);
+			tp->t_state &= ~(BUSY);
 			nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
 		}
 	}
@@ -2302,7 +2242,7 @@ nppclr()
 }
 
 STATIC int
-npp_versreq( bid)
+nversreq( bid)
 short	bid;
 {
 	register struct ppcboard *tb;
@@ -2336,31 +2276,43 @@ register queue_t *qp;
 {
 	register mblk_t *mp;
 	register struct strtty *tp;
-	register	int	sx;
+
+	int	sx;
 
 
-	sx = splstr();
 	tp = (struct strtty *)qp->q_ptr;
+	if (( tp->t_iflag & IXOFF) && ( tp->t_state & TBLOCK)) {
+		sx = splstr();
+		nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
+		tp->t_state &= ~(TBLOCK);
+		splx(sx);
+	}
 	
 	while (( mp = getq( qp)) != NULL) {
-
-		if ( canput( qp->q_next) == 0) {
-			putbq( qp, mp);
-			splx( sx);
-			return( 0);
-		}
-
-		putnext( qp, mp);
 		/*
-		 * May need to relieve flow control
+		 * Note: only put back non-prioity messages
+		 *	send up all priority messages immediately these
+		 *	cannot be queued
 		 */
-		if (( tp->t_state & TBLOCK) && ( tp->t_iflag & IXOFF)
-		    && ( tp->t_rdqp->q_count <= tp->t_rdqp->q_lowat)) {
-			nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_UNB);
-			tp->t_state &= ~TBLOCK;
-		}
+		if ((( mp->b_datap->db_type & QPCTL) == QNORM) && ( canput( qp->q_next) == 0)) {
+			/*
+			 * Should block the terminal from sending any more
+			 * characters at this time. 
+			 * Set state to T_BLOCK and block out transmission.
+			 * this procedure will be back enabled when
+			 * the module upstream executes a getq().
+			 */
+			putbq( qp, mp);
+			if ( tp->t_iflag & IXOFF) {
+				sx = splstr();
+				nlla_express( nppcbid[tp->t_dev], 0, 0, nppcpid[tp->t_dev], PPC_DEVICE, 0L, DR_BLK);
+				tp->t_state |= TBLOCK;
+				splx( sx);
+			}
+			return( 0);
+		} else 
+			putnext( qp, mp);
 	}
-	splx( sx);
 	return( 0);
 }
 /*
@@ -2429,11 +2381,11 @@ register queue_t *qp;
 }
 
 /*
- * Pass the address of the stream buffer bp->b_datap->db_base to the PPC
+ * Tell ppc the address of the stream buffer bp->b_datap->db_base
  */
 
 STATIC int
-npp_abuf_to_ppc( tp, bp)
+abuf_to_ppc( tp, bp)
 register struct strtty	*tp;
 register mblk_t	*bp;
 {
@@ -2468,7 +2420,7 @@ register mblk_t	*bp;
  */
 
 STATIC int
-npp_copy_to_lbuf( tp, bp)
+copy_to_lbuf( tp, bp)
 register struct strtty	*tp;
 register mblk_t	*bp;
 {

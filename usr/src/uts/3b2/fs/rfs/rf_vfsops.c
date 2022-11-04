@@ -1,11 +1,4 @@
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)fs:fs/rfs/rf_vfsops.c	1.35"
+#ident	"@(#)fs:fs/rfs/rf_vfsops.c	1.28.1.1 UNOFFICIAL"
 #include "sys/list.h"
 #include "sys/types.h"
 #include "sys/sysinfo.h"
@@ -24,12 +17,12 @@
 #include "sys/pathname.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/systm.h"
 #include "sys/sysmacros.h"
 #include "sys/immu.h"
 #include "sys/proc.h"
+#include "sys/rf_messg.h"
 #include "sys/debug.h"
 #include "sys/cmn_err.h"
 #include "sys/rf_debug.h"
@@ -51,7 +44,6 @@
 #include "rf_canon.h"
 #include "sys/buf.h"
 #include "sys/uio.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 #include "sys/kmem.h"
 
@@ -88,6 +80,9 @@ STATIC int	rf_unmount();
 STATIC int	rf_root();
 STATIC int	rf_statvfs();
 STATIC int	rf_sync();
+STATIC int	rf_vget();
+STATIC int	rf_mountroot();
+STATIC int	rf_swapvp();
 
 struct vfsops rf_vfsops = {
 	rf_mount,
@@ -95,13 +90,9 @@ struct vfsops rf_vfsops = {
 	rf_root,
 	rf_statvfs,
 	rf_sync,
-	rf_nosys,	/* vget */
-	rf_nosys,	/* mountroot */
-	rf_nosys,	/* swapvp */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
-	rf_nosys,	/* filler */
+	rf_vget,
+	rf_mountroot,
+	rf_swapvp,
 	rf_nosys,	/* filler */
 	rf_nosys,	/* filler */
 	rf_nosys,	/* filler */
@@ -118,7 +109,7 @@ rf_head_t rf_head = {(rf_vfs_t*)&rf_head, (rf_vfs_t*)&rf_head};
 /*
  * operations on objects of type rf_vfs_t
  */
-STATIC int	getrfvfs();
+STATIC rf_vfs_t	*getrfvfs();
 STATIC void	putrfvfs();
 rf_vfs_t	*findrfvfs();
 
@@ -128,20 +119,25 @@ int		rfsr_nservers;
 int		rfsr_nidle;
 int		rfsr_nmsg;
 
-/* ARGSUSED */
 void
 rf_clock(pc, psw)
 	caddr_t		pc;
 	psw_t		psw;
 {
-	rf_srv_info.rfsi_nservers += rfsr_nservers;
+	extern caddr_t	waitloc;
+
+	if (!USERMODE(psw) && pc != waitloc && RF_SERVER()) {
+		/* ticks servicing remote */
+		rf_srv_info.rfsi_serve++;
+	}
+	rf_srv_info.rfsi_nservers += rfsr_nservers;	/* cumul. tally */
 	if (rfsr_nidle) {
 		rf_srv_info.rfsi_srv_que += rfsr_nidle;
-		rf_srv_info.rfsi_srv_occ++;
+		rf_srv_info.rfsi_srv_occ++;	/* sec's occ'd */
 	}
 	if (rfsr_nmsg) {
 		rf_srv_info.rfsi_rcv_que += rfsr_nmsg;
-		rf_srv_info.rfsi_rcv_occ++;
+		rf_srv_info.rfsi_rcv_occ++;	/* sec's occ'd */
 	}
 }
 
@@ -181,7 +177,7 @@ rf_stime(crp)
 			 * Minimal sndd should be adequate for
 			 * communication and recovery.
 			 */
-			sndd_set(sdp, qp, &rf_daemon_gift);
+			sndd_set(sdp, qp, RECOVER_RD);
 			if ((tmperror = rfcl_op(sdp, crp, RFSYNCTIME,
 			  &rqarg, &bp, FALSE)) == 0) {
 				if ((tmperror = RF_RESP(bp)->rp_errno) == 0) {
@@ -207,8 +203,6 @@ rcvd_t		*rcvd;
 gdp_t		*gdp;
 rd_user_t	*rd_user;
 
-STATIC rf_gift_t	rf_mount_gift = {MOUNT_RD, 0};	/* template */
-
 int
 rf_init(vfswp, fstyp)
 	register vfssw_t	*vfswp;
@@ -218,21 +212,12 @@ rf_init(vfswp, fstyp)
 	size_t			rcvdsz = nrcvd * sizeof(rcvd_t);
 	size_t			gdpsz = maxgdp * sizeof(gdp_t);
 	size_t			rd_usersz = nrduser * sizeof(rd_user_t);
-	int			error = 0;
 
 	rfcl_fsinfo.fsivop_other++;
-
-	/*
-	 * Kludge for SVID-compliance is preferable to allocating the
-	 * structure in generic code.
-	 */
-	rfsi_servep = &rf_srv_info.rfsi_serve;
-
+	ASSERT(!rf_state);
 	if (nsndd < MINSNDD || nrcvd < MINRCVD ||
 	  maxgdp < MINGDP || nrduser < 0) {
-		sndd = NULL;
-		error = EINVAL;
-		goto out;
+		return EINVAL;
 	}
 	if ((sndd = (sndd_t *)kmem_zalloc(snddsz, KM_SLEEP)) != NULL) {
 		if ((rcvd = (rcvd_t *)kmem_zalloc(rcvdsz, KM_SLEEP)) != NULL) {
@@ -240,23 +225,20 @@ rf_init(vfswp, fstyp)
 			  != NULL) {
 				if ((rd_user = (rd_user_t *)
 				  kmem_zalloc(rd_usersz, KM_SLEEP)) != NULL) {
-					goto out;
+					goto success;
 				}
 				kmem_free((caddr_t)gdp, gdpsz);
-				gdp = NULL;
 			}
 			kmem_free((caddr_t)rcvd, rcvdsz);
-			rcvd = NULL;
 		}
 		kmem_free((caddr_t)sndd, snddsz);
-		sndd = NULL;
 	}
-	error = ENOMEM;
-out:
+	return ENOMEM;
+success:
 	vfswp->vsw_vfsops = &rf_vfsops;
 	strcpy(vfswp->vsw_name, "rfs");
 	rf_type = fstyp;
-	return error;
+	return 0;
 }
 
 /*
@@ -293,10 +275,6 @@ rf_mount(vfsp, mntpt, uap, crp)
 		error = EPERM;
 		goto out;
 	}
-	if (mntpt->v_type != VDIR) {
-		error = ENOTDIR;
-		goto out;
-	}
 	if (mntpt->v_count != 1 || mntpt->v_flag & VROOT) {
 		error = EBUSY;
 		goto out;
@@ -316,6 +294,10 @@ rf_mount(vfsp, mntpt, uap, crp)
 	}
 	DUPRINT3(DB_MNT_ADV, "rf_mount: token.t_id=%x, t_uname=%s\n",
 	  rfmdata.rfm_token.t_id, rfmdata.rfm_token.t_uname);
+	if (RF_SERVER()) {
+		error = EMULTIHOP;
+		goto out;
+	}
 	if (rf_state != RF_UP) {
 		error = ENONET;
 		goto out;
@@ -337,7 +319,7 @@ rf_mount(vfsp, mntpt, uap, crp)
 	if (error = sndd_create(TRUE, &chansdp)) {
 		goto out;
 	}
-	sndd_set(chansdp, mountqp, &rf_mount_gift);
+	sndd_set(chansdp, mountqp, MOUNT_RD);
 	/*
 	 * Allocate send descriptor to hold reference to rf_rsrc.
 	 */
@@ -360,7 +342,8 @@ rf_mount(vfsp, mntpt, uap, crp)
 		error = EINVAL;
 		goto out;
 	}
-	if ((error = getrfvfs(name, &rfvfsp)) != 0) {
+	if ((rfvfsp = getrfvfs(name)) == NULL) {
+		error = ENOMEM;
 		goto out;
 	}
 	/*
@@ -479,10 +462,9 @@ rf_unmount(vfsp, crp)
 	 * server (sd_stat & SDLINKDOWN), if it completed successfully on the
 	 * server, or if the link to the server goes down (ECOMM or ENOLINK).
 	 */
-	if (((error = rfcl_op(sdp, crp, RFUMOUNT, &rqarg, &bp, FALSE)) == 0 &&
-	   (error = RF_RESP(bp)->rp_errno) == 0) ||
-	  error == ENOLINK ||
-	  error == ECOMM) {
+	if (sdp->sd_stat & SDLINKDOWN || (((error = rfcl_op(sdp, crp, RFUMOUNT,
+	  &rqarg, &bp, FALSE)) == 0 && (error = RF_RESP(bp)->rp_errno) == 0) ||
+	  error == ENOLINK || error == ECOMM)) {
 		ASSERT(rootvp->v_count == 1);
 		rfc_mountinval(rfvfsp);
 		QPTOGP(sdp->sd_queue)->mntcnt--;
@@ -549,27 +531,22 @@ rf_statvfs(vfsp, stvfsp)
 		return du_fstatfs(vfsp, stvfsp);
 	}
 	datasz = gp->hetero == NO_CONV ? sizeof(statvfs_t) :
-	  sizeof(statvfs_t) + STATVFS_XP;
+	  sizeof(statvfs_t) + STATVFS_XP - MINXPAND;
 	rpsz = RF_MIN_RESP(gp->version);
 	if ((error = rfcl_op(chansdp, u.u_cred, RFSTATVFS, &init_rq_arg, &bp,
-	  TRUE)) == 0 && (error = RF_RESP(bp)->rp_errno) == 0) {
+	  TRUE)) == 0 && (error = RF_RESP(bp)->rp_errno) == 0 &&
+	  (error = RF_PULLUP(bp, rpsz, datasz)) == 0) {
+		caddr_t	rpdata = rf_msgdata(bp, rpsz);
 
-		if (RF_PULLUP(bp, rpsz, datasz)) {
-			gdp_j_accuse("rf_statvfs bad data from server", gp);
-			error = EPROTO;
-		} else {
-			caddr_t	rpdata = rf_msgdata(bp, rpsz);
-
-			if (gp->hetero != NO_CONV &&
-			  !rf_fcanon(STATVFS_FMT, rpdata, rpdata + datasz,
+		if (gp->hetero != NO_CONV) {
+			if (!rf_fcanon(STATVFS_FMT, rpdata, rpdata + datasz,
 			   (caddr_t)stvfsp)) {
-				gdp_j_accuse("rf_statvfs bad data from server",
+				gdp_discon("rf_statvfs bad data from server",
 				  gp);
 				error = EPROTO;
 			}
-			if (!error) {
-				*stvfsp = *(statvfs_t *)rpdata;
-			}
+		} else {
+			*stvfsp = *(statvfs_t *)rpdata;
 		}
 	}
 	rf_freemsg(bp);
@@ -616,6 +593,50 @@ rf_sync(vfsp, flag, crp)
 	return 0;
 }
 
+/* ARGSUSED */
+STATIC int
+rf_vget(vfsp, vpp, fidp)
+	vfs_t	*vfsp;
+	vnode_t	**vpp;
+	fid_t	*fidp;
+{
+	rfcl_fsinfo.fsivop_other++;
+	cmn_err(CE_WARN,"rf_vget called\n");
+	return ENOSYS;
+}
+
+/* ARGSUSED */
+STATIC int
+rf_mountroot(vfsp, why)
+	vfs_t		*vfsp;
+	whymountroot_t	why;
+{
+	rfcl_fsinfo.fsivop_other++;
+	cmn_err(CE_WARN,"rf_mountroot called\n");
+	return ENOSYS;
+}
+
+/* ARGSUSED */
+STATIC int
+rf_swapvp(vfsp, vpp, nm)
+	vfs_t	*vfsp;
+	vnode_t	**vpp;
+	char	*nm;
+{
+	rfcl_fsinfo.fsivop_other++;
+	cmn_err(CE_WARN,"rf_swapvp called\n");
+	return ENOSYS;
+}
+
+#ifndef UNNECESSARYRESTRICTION
+/*
+ * Only allow a mount of a directory resource on a directory file, of
+ * a non-directory resource on a non-directory file.
+ */
+#define rf_vtypematch(covered, root) \
+ (((covered)->v_type == VDIR) == ((root)->v_type == VDIR) ? 0 : ENOTDIR)
+#endif
+
 /*
  * Process response to succesfully completed rf_mount.
  * Return 0 for success, nonzero errno for failure.
@@ -654,9 +675,34 @@ rf_mount_resp(mntpt, bp, giftsdpp, vfsp, gp, crp)
 		return error ? error : ENOLINK;
 	}
 	rfvfsp->rfvfs_refcnt = 0;	/* incremented by rfcl_findsndd */
-	sndd_set(*giftsdpp, (queue_t *)msg->m_queue, &msg->m_gift);
-     	if (!(error = rfcl_findsndd(giftsdpp, crp, bp, vfsp))) {
+	sndd_set(*giftsdpp, (queue_t *)msg->m_queue, msg->m_giftid);
+#ifndef UNNECESSARYRESTRICTION
+	if (!(error = rfcl_findsndd(giftsdpp, crp, bp, vfsp))) {
+		if ((error = rf_vtypematch(mntpt,
+		  vp = SDTOV(*giftsdpp))) != 0) {
+                        /*
+                         * In local error case, unmount to let the server
+                         * toss it's data structures.  rf_mount will clean
+                         * up data structures it passed in.
+                         */
+                        sndd_t	*giftsdp = *giftsdpp;
+                        mblk_t	*umbp = NULL;
+                        int	tmperr = 0;
 
+                        if (!(giftsdp->sd_stat & SDLINKDOWN) && ((tmperr =
+                          rfcl_op(giftsdp, crp, RFUMOUNT, &init_rq_arg, &umbp,
+                          FALSE)) != 0 || (tmperr = RF_RESP(umbp)->rp_errno) !=
+                          0) && tmperr != ENOLINK && tmperr != ECOMM) {
+                                cmn_err(CE_WARN,
+                                  "rf_mount left dangling mount on server");
+                        }
+                        if (umbp != NULL) {
+                                rf_freemsg(umbp);
+                        }
+		} else {
+#else
+     	if (!(error = rfcl_findsndd(giftsdpp, crp, bp, vfsp))) {
+#endif
 		/*
 		 * With current implementation, rfcl_findsndd will actually
 		 * just return the vnode attached to current giftsd,
@@ -667,7 +713,6 @@ rf_mount_resp(mntpt, bp, giftsdpp, vfsp, gp, crp)
 		 * We make the call primarily to get the vnode filled in;
 		 * the following assignment is redundant, then, but harmless.
 		 */
-
 		vp = SDTOV(*giftsdpp);
 		vp->v_flag |= VROOT;
 
@@ -700,7 +745,52 @@ rf_mount_resp(mntpt, bp, giftsdpp, vfsp, gp, crp)
 		rfvfsp->rfvfs_mntproc = NULL;
 		gp->mntcnt++;
 	}
+#ifndef UNNECESSARYRESTRICTION
+	}
+#endif
 	return error;
+}
+
+/*
+ * Copy the member fields from the referenced statfs structure into the
+ * referenced statvfs structure, zeroing other fields of the statvfs.
+ */
+void
+fs_to_vfs(sfp, svp, vfsp)
+	register struct statfs	*sfp;
+	register struct statvfs	*svp;
+	register vfs_t		*vfsp;
+{
+	bzero((caddr_t)svp, sizeof(struct statvfs));
+	svp->f_bsize = sfp->f_bsize;
+	svp->f_frsize = !sfp->f_frsize ? sfp->f_bsize : sfp->f_frsize;
+	/*
+	 * statfs bsize is in terms of 512 byte blocks.
+	 */
+	svp->f_blocks = sfp->f_blocks / (sfp->f_bsize / 512);
+	svp->f_bfree = sfp->f_bfree / (sfp->f_bsize / 512);
+	svp->f_bavail = sfp->f_bfree;
+	svp->f_files = sfp->f_files;
+	svp->f_ffree = sfp->f_ffree;
+	svp->f_favail = sfp->f_ffree;
+	svp->f_fsid = vfsp->vfs_dev;	/* TO DO:  check this in terms of
+					 * ustat
+					 */
+	/*
+	 * We can't provide the base type because the old statfs structure
+	 * supplies only an fstype number, which is meaningless on the
+	 * client.
+	 */
+	strcpy((caddr_t)svp->f_basetype, "unknown");
+	svp->f_flag = vf_to_stf(vfsp->vfs_flag);
+	bcopy(sfp->f_fname, &svp->f_fstr[0], sizeof(sfp->f_fname));
+	bcopy(sfp->f_fpack, &svp->f_fstr[sizeof(sfp->f_fname)],
+	  sizeof(sfp->f_fpack));
+	/*
+	 * Set namemax to 14, which is DIRSIZ in SVR3.x.  This isn't generally
+	 * correct, but the protocol doesn't provide the information.
+	 */
+	svp->f_namemax = 14;
 }
 
 /*
@@ -717,10 +807,10 @@ rf_mount_resp(mntpt, bp, giftsdpp, vfsp, gp, crp)
 STATIC ulong	rfvfs_map[BT_BITOUL(MAPSZ)];
 
 /*
- * If name is a remote resource already mounted, or
- * space to mount another remote resource, returns and errno.
- * Otherwise returns 0 and updates *rfvfspp with a pointer to a free
- * rf_vfs_t with the index and name defined, and linked into the rf_vfs
+ * If name is a remote resource already mounted, or there is no
+ * space to mount another remote resource, returns NULL.
+ * Otherwise returns a pointer to a free rf_vfs_t with
+ * the index and name defined, and linked into the rf_vfs
  * chain, but with other members zeroed.
  *
  * We link the partially-defined rf_head into the chain because
@@ -733,10 +823,9 @@ STATIC ulong	rfvfs_map[BT_BITOUL(MAPSZ)];
  * It's safe to put the rf_head on the list because the only thing
  * client fumount does is match on index, then look at root vp.
  */
-STATIC int
-getrfvfs(name, rfvfspp)
+STATIC rf_vfs_t *
+getrfvfs(name)
 	register char		*name;
-	rf_vfs_t			**rfvfspp;
 {
 	register rf_vfs_t	*newrfvfs;
 	register rf_vfs_t	*rfp = rf_head.rfh_next;
@@ -749,13 +838,12 @@ getrfvfs(name, rfvfspp)
 	 * having ascertained absence of duplicates, and putting
 	 * the rf_head in the list.
 	 */
-
 	if (inx < 0) {
-		return ENOMEM;
+		return NULL;
 	}
 	if ((newrfvfs =
 	    (rf_vfs_t *)kmem_zalloc(sizeof(rf_vfs_t), KM_SLEEP)) == NULL) {
-		return ENOMEM;
+		return NULL;
 	}
 	while (rfp != headp) {
 		/*
@@ -765,7 +853,7 @@ getrfvfs(name, rfvfspp)
 		if (!strcmp(rfp->rfvfs_name, name)) {
 			/* duplicate name */
 			kmem_free((caddr_t)newrfvfs, sizeof(rf_vfs_t));
-			return EBUSY;
+			return NULL;
 		}
 		rfp = rfp->rfvfs_next;
 	}
@@ -775,8 +863,7 @@ getrfvfs(name, rfvfspp)
 	LS_INIT(newrfvfs);
 	LS_INIT(&newrfvfs->rfvfs_sdhash);
 	LS_INS_AFTER(headp, newrfvfs);
-	*rfvfspp = newrfvfs;
-	return 0;
+	return newrfvfs;
 }
 
 /*
@@ -844,6 +931,9 @@ rf_ustat(dev, ustbuf)
 	size_t			rpsz;
 	union rq_arg		rqarg = init_rq_arg;
 
+	if (RF_SERVER()) {
+		return EMULTIHOP;
+	}
 	if (rf_state != RF_UP) {
 		return EINVAL;
 	}
@@ -864,26 +954,21 @@ rf_ustat(dev, ustbuf)
 	rqarg.rqustat.dev = (long)lobyte(sdev);
 
 	datasz = gp->hetero == NO_CONV ? sizeof(struct ustat) :
-	  sizeof(struct ustat) + USTAT_XP;
+	  sizeof(struct ustat) + USTAT_XP - MINXPAND;
 	rpsz = RF_MIN_RESP(gp->version);
 	if ((error = rfcl_op(chansdp, u.u_cred, RFUSTAT, &rqarg, &bp, TRUE)) ==
-	  0 && (error = RF_RESP(bp)->rp_errno) == 0) {
-		if (RF_PULLUP(bp, rpsz, datasz)) {
-			gdp_j_accuse("rf_ustat bad data", gp);
-			error = EPROTO;
-		} else {
-			caddr_t	rpdata = rf_msgdata(bp, rpsz);
+	  0 && (error = RF_RESP(bp)->rp_errno) == 0 &&
+	  (error = RF_PULLUP(bp, rpsz, datasz)) == 0) {
+		register caddr_t	rpdata = rf_msgdata(bp, rpsz);
 
-			if (gp->hetero != NO_CONV &&
-			  !rf_fcanon(USTAT_FMT, rpdata, rpdata + datasz,
-			   rpdata)) {
-				gdp_j_accuse("rf_ustat bad data", gp);
-				error = EPROTO;
-			}
-			if (!error && copyout(rpdata, (caddr_t)ustbuf,
-			  sizeof(struct ustat))) {
-				error = EFAULT;
-			}
+		if (gp->hetero != NO_CONV &&
+		  !rf_fcanon(USTAT_FMT, rpdata, rpdata + datasz, rpdata)) {
+			gdp_discon("rf_ustat bad data from server", gp);
+			error = EPROTO;
+		}
+		if (!error && copyout(rpdata, (caddr_t)ustbuf,
+		  sizeof(struct ustat))) {
+			error = EFAULT;
 		}
 	}
 	rf_freemsg(bp);
@@ -938,7 +1023,7 @@ rf_ustat_sdget(sdev, sdpp, gpp)
 		sndd_free(&sdp);
 		return ENOENT;
 	} else {
-		sndd_set(sdp, (*gpp)->queue, &rf_mount_gift);
+		sndd_set(sdp, (*gpp)->queue, MOUNT_RD);
 		sdp->sd_mntid = searchsdp->sd_mntid;
 		*sdpp = sdp;
 		return 0;

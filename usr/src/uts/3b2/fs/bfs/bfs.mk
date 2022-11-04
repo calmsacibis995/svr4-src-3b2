@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/bfs/bfs.mk	1.16"
+#ident	"@(#)fs:fs/bfs/bfs.mk	1.15"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -133,7 +133,6 @@ bfs_vnops.o: bfs_vnops.c \
 	$(INC)/sys/cmn_err.h \
 	$(INC)/sys/conf.h \
 	$(INC)/sys/cred.h \
-	$(INC)/sys/dirent.h \
 	$(INC)/sys/errno.h \
 	$(INC)/sys/time.h \
 	$(INC)/sys/fcntl.h \

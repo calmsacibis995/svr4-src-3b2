@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libcrypt:cryptio.c	1.19"
+#ident	"@(#)libcrypt:cryptio.c	1.16.1.1"
 
 #ifdef __STDC__
 	#pragma weak run_setkey = _run_setkey
@@ -13,13 +13,15 @@
 	#pragma weak crypt_close = _crypt_close
 	#pragma weak makekey = _makekey
 #endif
-
 #include "synonyms.h"
+
 #include <stdio.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
+#undef uname
 
 #define	READER		0
 #define	WRITER		1
@@ -44,8 +46,8 @@ extern int kill();
 extern char *strncpy();
 extern int	close(),
 		execl(),
+		fork(),
 		pipe();
-extern pid_t	fork();
 void	_exit();
 
 int crypt_close(); 
@@ -66,7 +68,7 @@ const char *keyparam;
 	return(1);
 }
 
-static char cmd[] = "exec /usr/bin/crypt -p 2>/dev/null";
+static char cmd[] = "exec /bin/crypt -p 2>/dev/null";
 static int
 cryptopen(p)
 int	p[2];
@@ -204,7 +206,7 @@ int	p[2]; /* file descriptor array to cmd stdin and stdout */
 		(void) close( 1 );
 		(void) fcntl( fromcmd[1], F_DUPFD, 1 );
 		(void) close( fromcmd[1] );
-		(void) execl("/sbin/sh", "sh", "-c", cmd, 0);
+		(void) execl("/bin/sh", "sh", "-c", cmd, 0);
 		_exit(1);
 	}
 	if(pid == -1)
@@ -224,13 +226,21 @@ int	p[2];
 {
 	register pid_t	r;
 	int		status;
-	pid_t		waitpid();
+	pid_t		wait(), waitpid();
 	void		(*hstat)(),
 			(*istat)(),
 			(*qstat)();
 	
+	static int vers;
+	struct utsname uname_buf;
 	pid_t pid;
 
+	if (vers == 0) {
+		if (uname(&uname_buf) > 0)
+			vers = 2; /* SVR4 system */
+		else
+			vers = 1;
+	}
 	if(p[0] < 0 || p[0] >= 256 || p[1] < 0 || p[1] >= 256)
 		return -1;
 	pid = popen_pid[p[0]];
@@ -241,8 +251,12 @@ int	p[2];
 	istat = signal(SIGINT, SIG_IGN);
 	qstat = signal(SIGQUIT, SIG_IGN);
 	hstat = signal(SIGHUP, SIG_IGN);
-	while ((r = waitpid(pid, &status, 0)) == (pid_t)-1 && errno == EINTR)
-		;
+	if(vers == 2)
+		while ((r = wait(&status)) != pid  &&  r != (pid_t)-1  || errno == EINTR)
+			;
+	else
+		while ((r = waitpid(pid, &status, 0)) == (pid_t)-1 && errno == EINTR)
+			;
 	if (r == (pid_t)-1)
 		status = -1;
 	(void) signal(SIGINT, istat);

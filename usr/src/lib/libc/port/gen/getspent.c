@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/getspent.c	1.4"
+#ident	"@(#)libc-port:gen/getspent.c	1.3"
 
 #ifdef __STDC__
 	#pragma weak setspent = _setspent
@@ -222,7 +222,7 @@ register FILE *f ;
 	else
 	   (void) fprintf ( f, ":" ) ;
 	if ( p->sp_expire > 0 )
-	   (void) fprintf ( f, "%d:", p->sp_expire ) ;
+	   (void) fprintf ( f, "%d\n", p->sp_expire ) ;
 	else
 	   (void) fprintf ( f, ":" ) ;
 	if ( p->sp_flag != 0 )

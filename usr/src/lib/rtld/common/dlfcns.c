@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/dlfcns.c	1.8"
+#ident	"@(#)rtld:common/dlfcns.c	1.5"
 
 #include "rtinc.h"
 
@@ -16,6 +16,7 @@
  */
 
 #ifdef __STDC__
+	#pragma weak dlerror = _dlerror
 
 char *_dlerror()
 #else
@@ -45,6 +46,7 @@ static DLLIST *dl_makelist	ARGS((struct rt_private_map *lm));
 static int dl_delete		ARGS((DLLIB *dptr));
 
 #ifdef __STDC__
+	#pragma weak dlopen = _dlopen
 VOID *_dlopen(pathname, mode)
 #else
 VOID *dlopen(pathname, mode)
@@ -103,7 +105,7 @@ int mode;
 	if (!dlptr || (dlptr->dl_status != DL_OPEN && dlptr->dl_name)) {
 
 		if (mode != RTLD_LAZY && mode != RTLD_NOW) {
-			_rt_lasterr("%s: %s: illegal mode to dlopen: %d",(char*) _rt_name,_proc_name,mode);
+			_rt_lasterr("ld.so: %s: illegal mode to dlopen: %d",_proc_name,mode);
 			return 0;
 		}
 		/* set up rtld interface */
@@ -140,7 +142,7 @@ int mode;
 			retval++;
 		}
 		if (retval->d_tag == DT_NULL) {
-			_rt_lasterr("%s: %s: interface error: bad return value to dlopen",(char*) _rt_name,_proc_name);
+			_rt_lasterr("ld.so: %s: interface error: bad return value to dlopen",_proc_name);
 			return 0;
 		}
 			
@@ -250,6 +252,7 @@ struct rt_private_map *lm;
  */
 
 #ifdef __STDC__
+	#pragma weak dlsym = _dlsym
 
 VOID *_dlsym(handle, name)
 #else
@@ -267,11 +270,11 @@ VOID *handle;
 	DPRINTF(LIST,(2,"rtld: dlsym(0x%x, %s)\n",handle,name?name:(CONST char *)"0"));
 
 	if (!name) {
-		_rt_lasterr("%s: %s: null symbol name to dlsym",(char*) _rt_name,_proc_name);
+		_rt_lasterr("ld.so: %s: null symbol name to dlsym",_proc_name);
 		return(0);
 	}
 	if (((DLLIB *)handle)->dl_status != DL_OPEN) {
-		_rt_lasterr("%s: %s: dlsym: attempt to find symbol %s in closed object",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: dlsym: attempt to find symbol %s in closed object",_proc_name,name);
 		return(0);
 	}
 
@@ -290,7 +293,7 @@ VOID *handle;
 		}
 	}
 	if (!sym) {
-		_rt_lasterr("%s: %s: dlsym: can't find symbol: %s",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: dlsym: can't find symbol: %s",_proc_name,name);
 		return(0);
 	}
 symfound:
@@ -309,6 +312,7 @@ symfound:
  */
 
 #ifdef __STDC__
+	#pragma weak dlclose = _dlclose
 
 int _dlclose(handle)
 #else 
@@ -323,7 +327,7 @@ VOID *handle;
 	DPRINTF(LIST,(2,"rtld: dlclose(0x%x)\n",handle));
 
 	if (((DLLIB *)handle)->dl_status != DL_OPEN) {
-		_rt_lasterr("%s: %s: dlclose: attempt to close already closed object",(char*) _rt_name,_proc_name);
+		_rt_lasterr("ld.so: %s: dlclose: attempt to close already closed object",_proc_name);
 		return(1);
 	}
 	/* decrement reference counts of all objects associated
@@ -423,7 +427,7 @@ DLLIB *dptr;
 								PTRUNC(addr), 
 								msize) == -1) {
 								/*  ??? or should we continue ??? */
-								_rt_lasterr("%s: %s: dlclose: failure unmapping %s",(char*) _rt_name,_proc_name,NAME(lm));
+								_rt_lasterr("ld.so: %s: dlclose: failure unmapping %s",_proc_name,NAME(lm));
 								return(0);
 							}
 						}

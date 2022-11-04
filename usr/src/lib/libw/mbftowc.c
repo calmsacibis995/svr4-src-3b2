@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libw:mbftowc.c	1.2"
+#ident	"@(#)libw:mbftowc.c	1.1"
 #include <ctype.h>
 #include <stdlib.h>
 #include "_wchar.h"
@@ -19,8 +19,6 @@ int *peekc;
 	register int length;
 	register wchar_t intcode;
 	register c;
-	register shift;
-	int lflag;
 	char *olds = s;
 	wchar_t mask;
 	
@@ -31,23 +29,16 @@ int *peekc;
 		*wchar = c;
 		return(1);
 	}
-	lflag = _ctype[520] > 3 || eucw1 > 2;
 	intcode = 0;
 	if (c == SS2) {
 		if(!(length = eucw2)) 
 			goto lab1;
-		if (lflag)
-			mask = P01;
-		else
-			mask = H_P01;
+		mask = P01;
 		goto lab2;
 	} else if(c == SS3) {
 		if(!(length = eucw3)) 
 			goto lab1;
-		if (lflag)
-			mask = P01;
-		else
-			mask = H_P01;
+		mask = P10;
 		goto lab2;
 	} 
 
@@ -56,17 +47,13 @@ lab1:
 		*wchar = c;
 		return(1);
 	}
-	if (lflag)
-		mask = P11;
-	else
-		mask = H_P11;
 	length = eucw1 - 1;
+	mask = P11;
 	intcode = c & 0177;
 lab2:
 	if(length < 0)
 		return -1;
 	
-	shift = 8 - lflag;
 	while(length--) {
 		*s++ = c = (*f)();
 		if(c < 0200 || iscntrl(c)) {
@@ -75,7 +62,7 @@ lab2:
 			--s;
 			return(-(s - olds));
 		}
-		intcode = (intcode << shift) | (c & 0177);
+		intcode = (intcode << 8) | (c & 0177);
 	}
 	*wchar = intcode | mask;
 	return(s - olds);

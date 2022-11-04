@@ -5,23 +5,26 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libw:getwidth.c	1.4"
+#ident	"@(#)libw:getwidth.c	1.3"
 #include "libw.h"
-#include "_wchar.h"
 #include <ctype.h>
+#define CSWIDTH	514
 
 void getwidth(eucstruct)
 eucwidth_t *eucstruct;
 {
-	eucstruct->_eucw1 = eucw1;
-	eucstruct->_eucw2 = eucw2;
-	eucstruct->_eucw3 = eucw3;
-	eucstruct->_multibyte = multibyte;
-	if (_ctype[520] > 3 || eucw1 > 2)
+	unsigned char *cswidth = &__ctype[CSWIDTH];
+	eucstruct->_eucw1 = cswidth[0];
+	eucstruct->_eucw2 = cswidth[1];
+	eucstruct->_eucw3 = cswidth[2];
+	eucstruct->_multibyte = (cswidth[6] > 1);
+	if (cswidth[0] > sizeof(unsigned short) 
+	|| cswidth[1] > sizeof(unsigned short) 
+	|| cswidth[2] > sizeof(unsigned short))
 		eucstruct->_pcw = sizeof(unsigned long);
 	else
 		eucstruct->_pcw = sizeof(unsigned short);
-	eucstruct->_scrw1 = scrw1;
-	eucstruct->_scrw2 = scrw2;
-	eucstruct->_scrw3 = scrw3;
+	eucstruct->_scrw1 = cswidth[3];
+	eucstruct->_scrw2 = cswidth[4];
+	eucstruct->_scrw3 = cswidth[5];
 }

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:ftw.h	1.3.1.9"
+#ident	"@(#)head:ftw.h	1.3.1.7"
 /*
  *	Codes for the third argument to the user-supplied function
  *	which is passed as the second argument to ftwalk
@@ -46,11 +46,9 @@ struct FTW
 
 #if defined(__STDC__)
 
-#include <sys/types.h>
-#include <sys/stat.h>
 extern int ftw(const char *, int (*)(const char *, const struct stat *, int), int);
 extern int _xftw(const int, const char *, int (*)(const char *, const struct stat *, int), int);
-extern int nftw(const char *, int (*)(const char *, const struct stat *, int, struct FTW *), int, int);
+extern int nftw(const char *, int (*)(const char *, const struct stat *, int), int, int);
 
 #else
 
@@ -74,8 +72,6 @@ int depth;
 /* nftw not available to non-EFT applications */
 
 #if defined(_STYPES)
-#include <errno.h>
-
 static int nftw(path, fn, depth, flags)
 const char *path;
 int (*fn) ();

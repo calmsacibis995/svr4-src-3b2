@@ -1,8 +1,8 @@
-#ident	"@(#)pkg.nlp:lp/ifiles/pkginfo	1.9"
+#ident	"@(#)pkg.nlp:lp/ifiles/pkginfo	1.8"
 ARCH="3B2"
 # BASEDIR="/"
 CATEGORY="system"
-CLASSES="none bsd post cron OAMadmin OAMmif"
+CLASSES="none bsd post build OAMadmin OAMmif"
 # DESC=
 # EMAIL=
 # HOTLINE=

@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)nametoaddr:tcpip/tcpip.mk	1.2"
+#ident	"@(#)nametoaddr:tcpip/tcpip.mk	1.1"
 
 #	Makefile for tcpip.so
 
@@ -15,9 +15,9 @@ DIR = $(ROOT)/usr/lib
 
 INC = $(ROOT)/usr/include
 
-LDFLAGS = -s 
+LDFLAGS = -s
 
-CFLAGS = -O -I$(INC) -D_NSL_RPC_ABI 
+CFLAGS = -O -I$(INC)
 
 STRIP = strip
 

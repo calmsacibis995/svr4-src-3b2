@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_common.c	1.7"
+#ident	"@(#)fs:fs/nfs/nfs_common.c	1.6"
 
 /*      @(#)nfs_common.c 1.4 88/09/19 SMI      */
 
@@ -56,10 +56,6 @@ int nfsdebug = 2;
 nfstsize()
 {
 #ifdef	SYSV
-	/*
-	 *	Unfortunately, the networking architecture in System V doesn't
-	 *	allow us to ask this question of the network interfaces.
-	 */
 	return (NFS_MAXDATA);
 #else
 	register struct ifnet *ifp;
@@ -126,7 +122,7 @@ vattr_to_nattr(vap, na)
 	 * VFIFO type to the special over-the-wire type. (see note in nfs.h)
 	 *
 	 * BUYER BEWARE:
-	 *  If you are porting the NFS to a non-Sun server, you probably
+	 *  If you are porting the NFS to a non-SUN server, you probably
 	 *  don't want to include the following block of code.  The
 	 *  over-the-wire special file types will be changing with the
 	 *  NFS Protocol Revision.

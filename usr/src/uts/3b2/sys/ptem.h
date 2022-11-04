@@ -8,7 +8,7 @@
 #ifndef _SYS_PTEM_H
 #define _SYS_PTEM_H
 
-#ident	"@(#)head.sys:sys/ptem.h	11.6"
+#ident	"@(#)head.sys:sys/ptem.h	11.5"
 
 /*
  * The ptem data structure used to define the global data
@@ -26,8 +26,7 @@ struct ptem
  * state flags
  * if state is zero then ptem entry is free to be allocated
  */
-#define INUSE 		0x1	/* Internal ptem entry in use */
-#define OFLOW_CTL 	0x2	/* Outflow control on */
+#define INUSE 	0x1
 /*
  * Constants used to distinguish between a common function invoked
  * from the read or write side put procedures

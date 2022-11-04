@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/fw_pump.c	1.4"
+#ident	"@(#)boot:boot/filledt/dcp/fw_pump.c	1.3"
 
 # include	"sys/types.h"
 # include	"sys/inode.h"
@@ -181,7 +181,7 @@ if (answ[0] == 'y') P_CMDQ->b_dev = FLOPDISK;
 	    PRINTF("fhp = 0x%x, shp = 0x%x, fa = 0x%x, nsec = 0x%x\n",fhp,shp,fa,nsect);
 	    PRINTF("Section %s, paddr 0x%x, size 0x%x, flags 0x%x\n",shp->s_name,shp->s_paddr,shp->s_size,shp->s_flags);
 #endif
-	    if (STRCMP(shp->s_name,".start") == 0)
+	    if (strcmp(shp->s_name,".start") == 0)
 		strtaddr = shp->s_paddr; /* Set start address to .start */
 	    if((shp->s_flags & STYP_NOLOAD) != 0 || (shp->s_scnptr == 0)) {
                 continue;

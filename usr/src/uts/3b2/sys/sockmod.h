@@ -8,7 +8,7 @@
 #ifndef _SYS_SOCKMOD_H
 #define	_SYS_SOCKMOD_H
 
-#ident	"@(#)head.sys:sys/sockmod.h	1.10"
+#ident	"@(#)head.sys:sys/sockmod.h	1.7"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -27,14 +27,14 @@
  * Notice of copyright on this source code product does not indicate 
  * publication.
  * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
  * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * 	          All rights reserved.
  *  
  */
 
-
 #include <sys/un.h>	/* for sockaddr_un */
+
 
 /* internal flags - in addition to the ones in timod.h */
 #define		S_WINFO		0x01000	/* waiting for T_info to complete */
@@ -65,7 +65,6 @@ struct si_udata {
 	int	tidusize;	/* TIDU size          */
 	int	addrsize;	/* address size	      */
 	int	optsize;	/* options size	      */
-	int	etsdusize;	/* expedited size     */
 	int	servtype;	/* service type       */
 	int	so_state;	/* socket states      */
 	int	so_options;	/* socket options     */
@@ -104,7 +103,6 @@ struct bind_ux {
 	struct	ux_extaddr	ux_extaddr;
 };
 
-#ifndef _KERNEL
 extern struct _si_user 	*_s_checkfd();
 extern struct _si_user 	*_s_open();
 extern void 		 _s_aligned_copy();
@@ -120,15 +118,5 @@ extern void		 _s_close();
 extern int		 _s_getfamily();
 extern int		 _s_uxpathlen();
 extern void		 (*sigset())();
-
-/* Socket library debugging
- */
-extern int		_s_sockdebug;
-#define	SOCKDEBUG(S, A, B)	\
-			if ((((S) && (S)->udata.so_options & SO_DEBUG)) || \
-						_s_sockdebug) { \
-				(void)syslog(LOG_ERR, (A), (B)); \
-			}
-#endif /* !_KERNEL */
 
 #endif /* _SYS_SOCKMOD_H */

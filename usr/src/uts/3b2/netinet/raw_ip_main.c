@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/rip_main.c	1.7"
+#ident	"@(#)netinet:netinet/rip_main.c	1.5"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -293,9 +293,9 @@ ripuwsrv(q)
         while (bp = getq(q)) {
 		t_prim = (union T_primitives *)bp->b_rptr;
 		if (t_prim->type == T_UNITDATA_REQ) {
-			struct sockaddr_in *sin;
+			struct taddr_in *sin;
 
-			sin = (struct sockaddr_in *)(bp->b_rptr + 
+			sin = (struct taddr_in *)(bp->b_rptr + 
 					      t_prim->unitdata_req.DEST_offset);
 			error = rip_connaddr(inp, sin);
                 	if (!error) {
@@ -496,7 +496,7 @@ ripioctl(q, bp)
  * this is the subfunction of the upper put routine which handles data and
  * protocol packets for us. 
  */
-static	struct	sockaddr_in ripsin = { AF_INET, INADDR_ANY };
+static	struct	taddr_in ripsin = { AF_INET, INADDR_ANY };
 
 rip_state(q, bp)
 	queue_t        *q;
@@ -505,7 +505,7 @@ rip_state(q, bp)
 	register union T_primitives *t_prim;
 	register struct inpcb *inp = qtoinp(q);
 	int             error = 0;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 
 	/*
 	 * check for pending error, or a broken state machine 
@@ -544,7 +544,7 @@ rip_state(q, bp)
 		t_prim->info_ack.ETSDU_size = 1;
 		t_prim->info_ack.CDATA_size = -2;	/* ==> not supported */
 		t_prim->info_ack.DDATA_size = -2;
-		t_prim->info_ack.ADDR_size = sizeof(struct sockaddr_in);
+		t_prim->info_ack.ADDR_size = sizeof(struct taddr_in);
 		t_prim->info_ack.OPT_size = -1;
 		t_prim->info_ack.TIDU_size = 16 * 1024;
 		t_prim->info_ack.SERV_type = T_CLTS;
@@ -564,11 +564,12 @@ rip_state(q, bp)
 		if (t_prim->bind_req.ADDR_length == 0) {
 			error = rip_bind(inp, &ripsin);
 		} else {
-			if (!in_chkaddrlen(t_prim->bind_req.ADDR_length)) {
+			if (t_prim->bind_req.ADDR_length != 
+						sizeof(struct taddr_in)) {
 				T_errorack(q, bp, TBADADDR, 0);
 				break;
 			}
-			sin = (struct sockaddr_in *) 
+			sin = (struct taddr_in *) 
 				(bp->b_rptr + t_prim->bind_req.ADDR_offset);
 			error = rip_bind(inp, sin);
 		}
@@ -576,19 +577,19 @@ rip_state(q, bp)
 			break;
 		inp->inp_tstate = TS_IDLE;
 		if ((bp = reallocb(bp, sizeof(struct T_bind_ack)
-				       + sizeof(struct sockaddr_in), 1))
+				       + sizeof(struct taddr_in), 1))
 		    == NULL) {
 			return;
 		}
 		t_prim = (union T_primitives *) bp->b_rptr;
 		t_prim->bind_ack.PRIM_type = T_BIND_ACK;
-		t_prim->bind_ack.ADDR_length = sizeof(struct sockaddr_in);
+		t_prim->bind_ack.ADDR_length = sizeof(struct taddr_in);
 		t_prim->bind_ack.ADDR_offset = sizeof(struct T_bind_ack);
-		sin = (struct sockaddr_in *)
+		sin = (struct taddr_in *)
 			(bp->b_rptr + sizeof(struct T_bind_ack));
 		bp->b_wptr = (unsigned char *)
-			(((caddr_t) sin) + sizeof(struct sockaddr_in));
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+			(((caddr_t) sin) + sizeof(struct taddr_in));
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_addr = inp->inp_laddr;
 		qreply(q, bp);
@@ -609,7 +610,7 @@ rip_state(q, bp)
 			T_errorack(q, bp, TOUTSTATE, 0);
 			break;
 		}
-		sin = (struct sockaddr_in *) 
+		sin = (struct taddr_in *) 
 				(bp->b_rptr + t_prim->conn_req.DEST_offset);
 		error = rip_connaddr(inp, sin);
 		if (error) {
@@ -776,7 +777,7 @@ struct inpcb *inp;
 {
 	mblk_t *mp;
 	struct T_uderror_ind *uderr;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 
 	if (!inp->inp_q)
 		return;
@@ -791,7 +792,7 @@ struct inpcb *inp;
 	uderr->OPT_length = 0;
 	uderr->OPT_offset = 0;
 	uderr->ERROR_type = inp->inp_error;
-	sin = (struct sockaddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
+	sin = (struct taddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
 	bzero(sin, sizeof(*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_addr = inp->inp_faddr;
@@ -808,7 +809,7 @@ rip_uderr(bp)
 mblk_t *bp;
 {
 	struct N_uderror_ind *uderr;
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 
 	uderr = (struct N_uderror_ind *) bp->b_rptr;
 	if (uderr->ERROR_type == ENOSR) {
@@ -826,7 +827,7 @@ rip_ctlinput(bp)
 	struct ip_ctlmsg *ctl;
 	extern u_char   inetctlerrmap[];
 	int             in_rtchange();
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 
 	ctl = (struct ip_ctlmsg *) bp->b_rptr;
 	if ((unsigned) ctl->command > PRC_NCMDS)
@@ -863,7 +864,7 @@ rip_ctlinput(bp)
 
 rip_notify(head, dst, proto, errno)
 	struct inpcb   *head;
-	register struct sockaddr_in *dst;
+	register struct taddr_in *dst;
 	int		proto, errno;
 {
 	register struct inpcb *inp;

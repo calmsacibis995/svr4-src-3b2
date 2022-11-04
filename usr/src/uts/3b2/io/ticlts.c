@@ -5,15 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)kernel:io/ticlts.c	1.8"
-
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
+#ident	"@(#)kernel:io/ticlts.c	1.4.3.1"
 /*
  *	TPI loopback transport provider.
  *	Datagram mode.
@@ -41,65 +33,6 @@
 #include <sys/mkdev.h>
 #include <sys/ticlts.h>
 
-int ticlts_tracealloc=0;
-int ticlts_tracefree=0;
-
-#if defined(__STDC__)
-
-#define KMEM_alloc(a,b) Kmem_alloc(a,b,__LINE__,#a,#b)
-#define KMEM_free(a,b)  Kmem_free(a,b,__LINE__,#a,#b)
-
-char *Kmem_alloc(a,b,c,d,e)
-unsigned int a;
-int b;
-char *c,*d,*e;
-{
-char *r;
-r=kmem_alloc(a,b);
-if (ticlts_tracealloc)
-printf("kmem_alloc(%d,%d)=%x from %d (%s,%s)\n",a,b,r,c,d,e);
-return(r);
-}
-
-void Kmem_free(a,b,c,d,e)
-char * a;
-int b;
-char *c,*d,*e;
-{
-if (ticlts_tracefree)
-printf("kmem_free(%x,%d) from %d (%s,%s)\n",a,b,c,d,e);
-kmem_free(a,b);
-}
-
-#else
-
-#define KMEM_alloc(a,b) Kmem_alloc(a,b,__LINE__)
-#define KMEM_free(a,b)  Kmem_free(a,b,__LINE__)
-
-char *Kmem_alloc(a,b,c)
-unsigned int a;
-int b;
-char *c;
-{
-char *r;
-r=kmem_alloc(a,b);
-if (ticlts_tracealloc)
-printf("kmem_alloc(%d,%d)=%x from %d\n",a,b,r,c);
-return(r);
-}
-
-void Kmem_free(a,b,c)
-char * a;
-int b;
-char *c;
-{
-if (ticlts_tracefree)
-printf("kmem_free(%x,%d) from %d\n",a,b,c);
-kmem_free(a,b);
-}
-
-#endif
-
 
 extern char			ti_statetbl[TE_NOEVENTS][TS_NOSTATES];
 extern int			nulldev();
@@ -111,6 +44,7 @@ STATIC int			tcl_bequal(),tcl_bind(),tcl_blink(),tcl_ckopt(),
 				tcl_rsrv(),tcl_sumbytes(),tcl_uderr(),tcl_unbind(),
 				tcl_unblink(),tcl_unconnect(),tcl_unolink(),tcl_wput(),
 				tcl_wropt(),tcl_wsrv();
+STATIC void			tcl_link();
 STATIC tcl_endpt_t		*tcl_endptinit(),*tcl_getendpt();
 STATIC tcl_addr_t		*tcl_addrinit(),*tcl_getaddr();
 
@@ -205,7 +139,7 @@ tcl_unolink(te)
 	/*
 	 *	free te
 	 */
-	(void)KMEM_free(te,sizeof(tcl_endpt_t));
+	(void)kmem_free(te,sizeof(tcl_endpt_t));
 	return(TCL_PASS);
 }
 
@@ -281,8 +215,8 @@ tcl_unblink(te)
 		/*
 		 *	free ta
 		 */
-		(void)KMEM_free(tcl_abuf(ta),tcl_alen(ta));
-		(void)KMEM_free(ta,sizeof(tcl_addr_t));
+		(void)kmem_free(tcl_abuf(ta),tcl_alen(ta));
+		(void)kmem_free(ta,sizeof(tcl_addr_t));
 	}
 	return(TCL_PASS);
 }
@@ -331,7 +265,7 @@ tcl_cpabuf(to,from)
 	ASSERT(tcl_abuf(from) != NULL);
 	if (tcl_abuf(to) == NULL) {
 		ASSERT(tcl_alen(to) == 0);
-		abuf = (char *)KMEM_alloc(tcl_alen(from),KM_NOSLEEP);
+		abuf = (char *)kmem_alloc(tcl_alen(from),KM_NOSLEEP);
 		if (abuf == NULL) {
 			return(TCL_FAIL);
 		}
@@ -363,7 +297,7 @@ tcl_endptinit(min)
 	/*
 	 *	get an endpt
 	 */
-	te1 = (tcl_endpt_t *)KMEM_alloc(sizeof(tcl_endpt_t),KM_NOSLEEP);
+	te1 = (tcl_endpt_t *)kmem_alloc(sizeof(tcl_endpt_t),KM_NOSLEEP);
 	if (te1 == NULL) {
 		u.u_error = ENOMEM;
 		return(NULL);
@@ -397,7 +331,7 @@ tcl_endptinit(min)
 					/*
 					 *	wrapped around
 					 */
-					(void)KMEM_free(te1,sizeof(tcl_endpt_t));
+					(void)kmem_free(te1,sizeof(tcl_endpt_t));
 					u.u_error = ENOSPC;
 					return(NULL);
 				}
@@ -447,7 +381,7 @@ tcl_addrinit(ta)
 	/*
 	 *	get an address
 	 */
-	ta1 = (tcl_addr_t *)KMEM_alloc(sizeof(tcl_addr_t),KM_NOSLEEP);
+	ta1 = (tcl_addr_t *)kmem_alloc(sizeof(tcl_addr_t),KM_NOSLEEP);
 	if (ta1 == NULL) {
 		return(NULL);
 	}
@@ -484,7 +418,7 @@ tcl_addrinit(ta)
 			}
 		}
 		if (tcl_cpabuf(ta1,ta) == TCL_FAIL) {
-			(void)KMEM_free(ta1,sizeof(tcl_addr_t));
+			(void)kmem_free(ta1,sizeof(tcl_addr_t));
 			return(NULL);
 		}
 		/*
@@ -501,7 +435,7 @@ tcl_addrinit(ta)
 		 *	an abuf was requested; copy it in
 		 */
 		if (tcl_cpabuf(ta1,ta) == TCL_FAIL) {
-			(void)KMEM_free(ta1,sizeof(tcl_addr_t));
+			(void)kmem_free(ta1,sizeof(tcl_addr_t));
 			return(NULL);
 		}
 	}
@@ -918,6 +852,14 @@ tcl_close(q)
 	ASSERT(q != NULL);
 	te = (tcl_endpt_t *)q->q_ptr;
 	ASSERT(te != NULL);
+
+	/* If the queue was looped then
+	 * unloop it.
+	 */
+	if ((WR(q))->q_next != NULL) {
+		(WR(q))->q_next = NULL;
+	}
+
 	(void)tcl_unconnect(te);
 	(void)tcl_unblink(te);
 	STRLOG(TCL_ID,tcl_min(te),4,SL_TRACE,
@@ -956,6 +898,27 @@ tcl_wput(q,mp)
 		    "tcl_wput _%d_: got illegal msg, M_type=%d",__LINE__,mp->b_datap->db_type);
 		(void)freemsg(mp);
 		return(UNIX_FAIL);
+
+	   case M_CTL:
+		switch(*(long *)mp->b_rptr) {
+		default:
+			break;
+
+		case TCL_LINK:
+			tcl_link(q, mp);
+			break;
+
+		case TCL_UNLINK:
+			/* Unlink the endpoint.
+			 */
+			if (q->q_next)
+				q->q_next = NULL;
+			break;
+
+		}
+		freemsg(mp);
+		return(UNIX_PASS);
+
 	    case M_IOCTL:
 		/* no ioctl's supported */
 		STRLOG(TCL_ID,tcl_min(te),4,SL_TRACE,
@@ -1307,7 +1270,7 @@ tcl_fatal(q,mp)
 {
 	register tcl_endpt_t		*te;
 
-printf("FATAL tcl_fatal called %x %x\n",q,mp);
+
 	ASSERT(q != NULL);
 	ASSERT(mp != NULL);
 	te = (tcl_endpt_t *)q->q_ptr;
@@ -1604,8 +1567,8 @@ tcl_bind(q,mp)
 	if ((mp2 = allocb(msz2,BPRI_HI)) == NULL) {
 		STRLOG(TCL_ID,tcl_min(te),2,SL_TRACE,
 		    "tcl_bind _%d_ errack: tli_err=TSYSERR, unix_err=ENOMEM",__LINE__);
-		(void)KMEM_free(tcl_abuf(ta),tcl_alen(ta));
-		(void)KMEM_free(ta,sizeof(tcl_addr_t));
+		(void)kmem_free(tcl_abuf(ta),tcl_alen(ta));
+		(void)kmem_free(ta,sizeof(tcl_addr_t));
 		te->te_state = NEXTSTATE(TE_ERROR_ACK,te->te_state);
 		ASSERT(te->te_state != NR);
 		(void)tcl_errack(q,mp,TSYSERR,ENOMEM);
@@ -1978,7 +1941,7 @@ tcl_uderr(q,mp,err)
 	tcl_addr_t			addr,addr1;
 	int				alen,olen;
 
-#ifndef	NO_UDERR
+
 	ASSERT(q != NULL);
 	ASSERT(mp != NULL);
 	te = (tcl_endpt_t *)q->q_ptr;
@@ -2053,10 +2016,6 @@ tcl_uderr(q,mp,err)
 		(void)qreply(q,mp1);
 	}
 	return(TCL_PASS);
-#else
-	(void)freemsg(mp);
-	return(TCL_PASS);
-#endif
 }
 
 
@@ -2102,8 +2061,7 @@ tcl_data(q,mp)
 	||  ((olen > 0) && ((ooff + olen) > msz))) {
 		STRLOG(TCL_ID,tcl_min(te),1,SL_TRACE,
 		    "tcl_data _%d_ fatal: bad control info",__LINE__);
-		/*(void)tcl_fatal(q,mp);		/* or tcl_uderr() ?? */
-		(void)tcl_uderr(q,mp,TCL_BADADDR);
+		(void)tcl_fatal(q,mp);		/* or tcl_uderr() ?? */
 		return(TCL_FAIL);
 	}
 	if ((alen <= 0) || (alen > TCL_ADDRSZ)) {
@@ -2163,12 +2121,8 @@ tcl_data(q,mp)
 	if (!canput(te1->te_rq->q_next)) {
 		STRLOG(TCL_ID,tcl_min(te),3,SL_TRACE,
 		    "tcl_data _%d_: canput() failure",__LINE__);
-#ifndef NO_FLOW_CONTROL
 		te1->te_backwq = q;
 		putbq(q,mp);
-#else
-		(void)freemsg(mp); /*Very reasonable thing to do for datagram*/
-#endif
 		return(TCL_FAIL);
 	}
 	/*
@@ -2250,3 +2204,30 @@ tcl_data(q,mp)
 	(void)putnext(te1->te_rq,mp1);
 	return(TCL_PASS);
 }
+
+static void
+tcl_link(q, mp)
+	register queue_t		*q;
+	register mblk_t			*mp;
+{
+	tcl_addr_t			addr;
+	register tcl_addr_t		*ta;
+	register struct tcl_sictl	*tcl_sictl;
+	register tcl_endpt_t		*te1;
+
+	tcl_sictl = (struct tcl_sictl *)mp->b_rptr;
+
+	addr.ta_alen = tcl_sictl->ADDR_len;
+	addr.ta_abuf = (caddr_t)(mp->b_rptr + tcl_sictl->ADDR_offset);
+	addr.ta_ahash = tcl_mkahash(&addr);
+
+	if ((ta = tcl_getaddr(TCL_DEST, &addr)) != NULL) {
+		/* Link my write queue to the
+		 * destinations read queue.
+		 */
+		te1 = ta->ta_blist;
+ 
+		if (q->q_next == NULL)
+			q->q_next = te1->te_rq;
+	}
+}	

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/popen.c	1.29"
+#ident	"@(#)libc-port:stdio/popen.c	1.26"
 /*LINTLIBRARY*/
 #ifdef __STDC__
 	#pragma weak pclose = _pclose
@@ -20,13 +20,13 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <unistd.h>
+#include <osfcn.h>
 
 #define	tst(a,b) (*mode == 'r'? (b) : (a))
 #define	RDR	0
 #define	WTR	1
 
-#define BIN_SH "/sbin/sh"
+#define BIN_SH "/bin/sh"
 #define SH "sh"
 #define SHFLG "-c"
 #if DSHLIB
@@ -44,7 +44,7 @@ const char	*cmd, *mode;
 	register int myside, yourside, pid;
 
 #if DSHLIB
-	if (popen_pid == NULL && (popen_pid = (int *)calloc(256, sizeof(int))) == NULL)
+	if (popen_pid == NULL && (popen_pid = malloc(sizeof(int) * 256)) == NULL)
 		return (NULL);
 #endif
 	

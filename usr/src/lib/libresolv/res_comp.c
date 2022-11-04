@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:res_comp.c	1.2"
+#ident	"@(#)libresolv:res_comp.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <arpa/nameser.h>
-#include "res.h"
 
 
 /*

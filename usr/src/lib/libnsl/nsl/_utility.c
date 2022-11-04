@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:nsl/_utility.c	1.11"
+#ident	"@(#)libnsl:nsl/_utility.c	1.8"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/errno.h"
@@ -64,7 +64,6 @@ int fd;
  * This is to ensure that if the user wants to align a network
  * addr on a non-word boundry then it will happen.
  */
-void
 _t_aligned_copy(buf, len, init_offset, datap, rtn_offset)
 char *buf;
 char *datap;
@@ -94,7 +93,6 @@ int y;
  * The only thing that can be in look buffer is a T_discon_ind,
  * T_ordrel_ind or a T_uderr_ind.
  */
-void
 _t_putback(tiptr, dptr, dsize, cptr, csize)
 struct _ti_user *tiptr;
 caddr_t dptr;
@@ -150,7 +148,7 @@ long type;
 	int size;
 
 	cntlflag = fcntl(fd,F_GETFL,0);
-	fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0) & ~(O_NDELAY | O_NONBLOCK));
+	fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0) & ~O_NDELAY);
 
 	ctlbuf.len = 0;
 	ctlbuf.buf = tiptr->ti_ctlbuf;
@@ -267,7 +265,6 @@ int *retlen;
  * alloc scratch buffers and look buffers
  */
 
-/* ARGSUSED */
 _t_alloc_bufs(fd, tiptr, info)
 register struct _ti_user *tiptr;
 struct T_info_ack info;
@@ -326,7 +323,7 @@ struct T_info_ack info;
 	tiptr->ti_lookcsize = 0;
 	tiptr->ti_lookdsize = 0;
 	tiptr->ti_lookflg = 0;
-	tiptr->ti_flags = USED | info.PROVIDER_flag;
+	tiptr->ti_flags = USED;
 	tiptr->ti_maxpsz = info.TIDU_size;
 	tiptr->ti_servtype = info.SERV_type;
 	tiptr->ti_state = T_UNINIT;
@@ -349,7 +346,6 @@ long infosize;
 	}
 }
 
-void
 _null_tiptr(tiptr)
 struct _ti_user *tiptr;
 {

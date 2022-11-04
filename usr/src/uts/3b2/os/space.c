@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/space.c	1.17"
+#ident	"@(#)kernel:os/space.c	1.16"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/immu.h"
@@ -74,3 +74,10 @@ int	kpbase;
  */
 
 pte_t	*kptbl;
+
+/* new structure for proc table restructure */
+
+proc_t *pactivelist;	/* the active processes header */
+pincr_t *pfreelisthead;	/* the first free pincr table entry pointer */
+pincr_t *pfreelisttail;	/* the last free pincr table entry pointer */
+

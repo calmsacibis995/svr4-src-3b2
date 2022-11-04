@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/authdesubr.c	1.11"
+#ident	"@(#)krpc:krpc/authdesubr.c	1.8"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)authdesubr.c 1.3 89/03/19 SMI"
 #endif
@@ -60,178 +60,102 @@ static char sccsid[] = "@(#)authdesubr.c 1.3 89/03/19 SMI"
 #include <sys/strsubr.h>
 #include <sys/cred.h>
 #include <sys/utsname.h>
+#include <sys/cmn_err.h>
 #include <sys/vnode.h>
-#include <sys/file.h>
 #include <sys/uio.h>
 #include <sys/systeminfo.h>
-#include <rpc/rpcb_prot.h>
+
+#ifndef DEBUG
+#define cmn_err(CE_NOTE, msg)		/* turn off debugging */
+#endif
 
 #define USEC_PER_SEC 1000000
-#define TOFFSET ((u_long)86400*(365*70 + (70/4)))
-#define WRITTEN ((u_long)86400*(365*86 + (86/4)))
+#define TOFFSET (86400U*(365*70 + (70/4)))
+#define WRITTEN (86400U*(365*86 + (86/4)))
 
-#define NC_INET		"inet"		/* XXX */
-
-rtime(synctp, addrp, calltype, timep, wait)
-	dev_t			synctp;
-	struct netbuf		*addrp;
-	int			calltype;
-	struct timeval		*timep;
-	struct timeval		*wait;
+/*
+rtime_wakeup(so)
+	struct socket *so;	
 {
-	extern timestruc_t	time;
-	int			error;
-	int			timo;
-	time_t			thetime;
-	int			dummy;
-	struct t_kunitdata	*unitdata;
-	TIUSER			*tiptr;
-	struct vnode		*vp;
-	int			type;
-	int			uderr;
-	int			retries;
+	so->so_error = ETIMEDOUT;
+	sbwakeup(so, &so->so_rcv);
+}
+*/
 
-	retries = 5;
-	if (calltype == 0) {
-		/* Use old method.
-		 */
-again:
-		RPCLOG(8, "rtime: using old method\n", 0);
-		if ((error = t_kopen(NULL, synctp,
-					FREAD|FWRITE|FNDELAY, &tiptr)) != 0) {
-			RPCLOG(1, "rtime: t_kopen %d\n", error);
-			return -1;
-		}
-	
-		if ((error = t_kbind(tiptr, NULL, NULL)) != 0) {
-			(void)t_kclose(tiptr, 1);
-			RPCLOG(1, "rtime: t_kbind %d\n", error);
-			return -1;
-		}
-	
-		if ((error = t_kalloc(tiptr, T_UNITDATA, T_UDATA|T_ADDR,
-					 	(char **)&unitdata)) != 0) {
-			RPCLOG(1, "rtime: t_kalloc %d\n", error);
-			(void)t_kclose(tiptr, 1);
-			return -1;
-		}
-	
-		unitdata->addr.len = addrp->len;
-		bcopy(addrp->buf, unitdata->addr.buf, unitdata->addr.len);
-	
-		unitdata->udata.buf = (caddr_t)&dummy;
-		unitdata->udata.len = sizeof(dummy);
-	
-		if ((error = t_ksndudata(tiptr, unitdata, NULL)) != 0) {
-			RPCLOG(1, "rtime: t_ksndudata %d\n", error);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			return -1;
-		}
-	
-		timo = (int)(wait->tv_sec * HZ +
-				(wait->tv_usec * HZ) / USEC_PER_SEC);
-		RPCLOG(8, "rtime: timo %x\n", timo);
-		if ((error = t_kspoll(tiptr, timo, READWAIT, &type)) != 0) {
-			RPCLOG(1, "rtime: t_kspoll %d\n", error);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			return -1;
-		}
-	
-		if (type == 0) {
-			RPCLOG(1, "rtime: t_kspoll timed out\n", 0);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			return -1;
-		}
-	
-		if ((error =t_krcvudata(tiptr, unitdata, &type, &uderr)) != 0) {
-			RPCLOG(1, "rtime: t_krcvudata %d\n", error);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			return -1;
-		}
-	
-		if (type != T_DATA) {
-			RPCLOG(1, "rtime: t_krcvudata rtnd type %d\n", type);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			if (retries-- == 0)
-				return -1;
-			else	goto again;
-		}
-	
-		if (unitdata->udata.len < sizeof(u_long)) {
-			RPCLOG(1, "rtime: bad rcvd length %d\n",
-						unitdata->udata.len);
-			(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			(void)t_kclose(tiptr, 1);
-			if (retries-- == 0)
-				return -1;
-			else	goto again;
-		}
-	
-		/* LINTED pointer alignment */
-		thetime = (time_t) ntohl(*(u_long *)unitdata->udata.buf);
 
-		(void)t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-		(void)t_kclose(tiptr, 1);
-	}
-	else	{
-		CLIENT			*client;
-		struct knetconfig	config;
-		struct timeval		timeout;
+rtime(addrp, timep, wait)
+	struct netbuf *addrp;
+	struct timeval *timep;
+	struct timeval *wait;
+{
+	int error, timo;
+	u_long thetime;
+	/* int s; */
+	int dummy;
+	register struct t_kunitdata *unitdata;
+	register TIUSER *tiptr;
+	/* extern int clone_no, udp_no; */
+	struct vnode *vp;
 
-		RPCLOG(1, "rtime: using new method\n", 0);
-
-		/* We talk to rpcbind.
-		 */
-		config.knc_rdev = synctp;
-		config.knc_protofmly = NC_INET;		/* XXX */
-		error = clnt_tli_kcreate(&config, addrp, (u_long)RPCBPROG,
-	       			(u_long)RPCBVERS, 0, retries,
-				 u.u_procp->p_cred, &client);
-	 
-		if (error != 0) {
-			RPCLOG(1, 
-			  "key_call: clnt_tli_kcreate rtned error %d", error);
-			return -1;
-		}
-		timeout.tv_sec = 60;
-		timeout.tv_usec = 0;
-		error = clnt_call(client, RPCBPROC_GETTIME, xdr_void, NULL, 
-				xdr_u_long, (caddr_t)&thetime, timeout);
-		auth_destroy(client->cl_auth);
-		clnt_destroy(client);
-		if (error != RPC_SUCCESS) {
-			RPCLOG(1, 
-			"rtime: time sync clnt_call failed: error %x", error);
-			RPCLOG(1, clnt_sperrno(error), 0);
-			error = EIO;
-			return -1;
-		}
-	}
-
-	if (calltype != 0)
-		thetime += TOFFSET;
-
-	RPCLOG(8, "rtime: thetime = %x\n", thetime);
-
-	if (thetime < WRITTEN) {
-		RPCLOG(1, "rtime: time returned is too far in past %x",
-						thetime);
-		RPCLOG(1, "rtime: WRITTEN %x", WRITTEN);
+	if ((error = lookupname ("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &vp)) != 0)
+		return -1;
+	if ((tiptr = t_kopen(NULL, vp->v_rdev, O_RDWR|O_NDELAY,
+					(struct t_info *)NULL)) == NULL) {
+		VN_RELE(vp);
 		return -1;
 	}
-	thetime -= TOFFSET;
+	VN_RELE(vp);
+	if (t_kbind(tiptr, NULL, NULL) < 0) {
+		t_kclose(tiptr, 1);
+		return -1;
+	}
+	if ((unitdata = (struct t_kunitdata *)t_kalloc(tiptr, T_UNITDATA,
+						/* LINTED pointer alignment */
+                                                T_UDATA|T_ADDR)) == (struct t_kunitdata *)NULL) {
+                printf("rtime: t_kalloc %d\n", u.u_error);
+		t_kclose(tiptr, 1);
+                return -1;
+        }
 
-	timep->tv_sec = thetime;
-	RPCLOG(8, "rtime: timep->tv_sec = %x\n", timep->tv_sec);
-	RPCLOG(8, "rtime: machine time  = %x\n", hrestime.tv_sec);
+	unitdata->addr.len = addrp->len;
+	bcopy(addrp->buf, unitdata->addr.buf, unitdata->addr.len);
+	unitdata->udata.buf = (caddr_t)&dummy;
+	unitdata->udata.len = sizeof(dummy);
+
+	if (t_ksndudata(tiptr, unitdata, NULL) < 0) {
+		t_kclose(tiptr, 1);
+		return -1;
+	}
+
+	timo = (int)(wait->tv_sec * HZ + (wait->tv_usec * HZ) / USEC_PER_SEC);
+	if (t_kspoll(tiptr, timo, READWAIT) < 0) {
+		t_kclose(tiptr, 1);
+		return -1;
+	}
+
+	if (t_krcvudata(tiptr, unitdata, &error) < 0) {
+		t_kclose(tiptr, 1);
+		return -1;
+	}
+
+	if (unitdata->udata.len < sizeof(u_long)) {
+		printf("rtime: bad rcvd length %d\n", unitdata->udata.len);
+		t_kclose(tiptr, 1);
+		return -1;
+	}
+
+	t_kclose(tiptr, 1);
+
+	/* LINTED pointer alignment */
+	thetime = *(u_long *)unitdata->udata.buf;
+
+	if (thetime < WRITTEN) {
+		cmn_err(CE_NOTE, "time returned is too far in past");
+		return(-1);
+	}
+	timep->tv_sec = thetime - TOFFSET;
 	timep->tv_usec = 0;
-	RPCLOG(8, "rtime: returning success\n", 0);
-	return 0;
+	return(0);
 }
 
 

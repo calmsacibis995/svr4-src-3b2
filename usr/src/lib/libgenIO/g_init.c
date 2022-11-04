@@ -5,13 +5,13 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libgenIO:g_init.c	1.4"
+#ident	"@(#)libgenIO:g_init.c	1.3"
 
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mkdev.h>
-#include <sys/statvfs.h>
+#include <sys/statfs.h>
 #include <fcntl.h>
 #include <sys/sys3b.h>
 #include <stdio.h>
@@ -54,23 +54,19 @@ int *devtype, *fdes;
 	struct s3bconf *buffer;
 	struct s3bc *table;
 	struct stat st_buf;
-	struct statvfs stfs_buf;
+	struct statfs stfs_buf;
 
 	*devtype = G_NO_DEV;
 	bufsize = -1;
 	if (fstat(*fdes, &st_buf) == -1)
 		return(-1);
 	if (!(st_buf.st_mode & S_IFCHR) && !(st_buf.st_mode & S_IFBLK)) {
-		if (st_buf.st_mode & S_IFIFO) {
-			bufsize = 512;
-		} else {
-			*devtype = G_FILE; /* find block size for this file system */
-			if (fstatvfs(*fdes, &stfs_buf) < 0) {
-					bufsize = -1;
-					errno = ENODEV;
-			} else 
-				bufsize = stfs_buf.f_bsize;
-		}
+		*devtype = G_FILE; /* find block size for this file system */
+		if (fstatfs(*fdes, &stfs_buf, sizeof(struct statfs), 0) < 0) {
+			bufsize = -1;
+			errno = ENODEV;
+		} else
+			bufsize = stfs_buf.f_bsize;
 		return(bufsize);
 
 	/* We'll have to add a remote attribute to stat but this 

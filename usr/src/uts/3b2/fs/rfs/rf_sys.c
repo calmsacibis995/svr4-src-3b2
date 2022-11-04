@@ -5,7 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_sys.c	1.4.2.12"
+#ident	"@(#)fs:fs/rfs/rf_sys.c	1.4.3.1"
+
 /*
  *  System calls for remote file sharing.
  */
@@ -26,8 +27,8 @@
 #include "sys/vfs.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
+#include "sys/rf_messg.h"
 #include "sys/rf_debug.h"
 #include "sys/debug.h"
 #include "sys/rf_adv.h"
@@ -47,8 +48,6 @@
 #include "rf_auth.h"
 #include "sys/dirent.h"
 #include "sys/cred.h"
-#include "sys/buf.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 #include "sys/file.h"
 #include "rfcl_subr.h"
@@ -56,13 +55,26 @@
 #include "sys/kmem.h"
 #include "rf_serve.h"
 
+#ifdef RFSUNMOUNTHACK
+/*
+ * capability to get at otherwise unreachable file systems
+ *
+ * 0 ucap reserved for kernel use.  ucaps are not inheritable
+ * across forks.  They are expired on using them for an unmount.
+ */
+typedef struct rfsys_cap {
+	struct rfsys_cap	*c_next;
+	struct rfsys_cap	*c_prev;
+	int			c_ucap;		/* user manifestation */
+	pid_t			c_pid;		/* of allocating proc */
+	vnode_t			*c_vp;		/* vp in rf_vfs */
+} rfsys_cap_t;
+#endif
+
 char rfs_domain[MAXDNAME+1] = "";	/* domain name for this machine	*/
 STATIC int rf_vflg = 0;			/* require (1) host verification
 					 * or not (0) */
-STATIC int	rfud_lastumsg;
-
-STATIC int	rfs_vhigh = RFS2DOT0;
-STATIC int	rfs_vlow = RFS1DOT0;
+STATIC int rfud_lastumsg;
 
 extern int	rfs_vhigh;
 extern int	rfs_vlow;
@@ -70,12 +82,21 @@ extern int	rf_state;
 extern int	nsrmount;
 extern ls_elt_t	rf_umsgq;		/* queue for user-level daemon */
 extern int	rf_umsgcnt;		/* length of rf_umsgq */
+extern int	rf_recovery_flag;	/* set KILL bit to kill rf_recovery */
+extern proc_t	*rf_recovery_procp;	/* sleep address for rf_recovery */
 extern int	nsndd;
+extern int	rf_daemon_flag;
+extern rcvd_t	*rf_daemon_rd;
 
 /* imports */
 extern int	dofusers();
 extern int	dounmount();
 extern int	strprefix();
+
+#ifdef RFSUNMOUNTHACK
+/* exports */
+extern int	rf_putcap();
+#endif
 
 STATIC int	rfsys_fumount();
 STATIC int	rfsys_sendumsg();
@@ -97,7 +118,20 @@ STATIC int	rfsys_start();
 STATIC int	rfsys_stop();
 STATIC int	rfsys_debug();
 
-STATIC void	rf_fuserve();
+#ifdef RFSUNMOUNTHACK
+STATIC int	rfsys_getcap();
+STATIC int	rfsys_putcap();
+STATIC int	rfsys_submnts();
+STATIC int	rfsys_fusers();
+STATIC int	rfsys_unmount();
+STATIC int	rf_vfsincaplist();
+
+STATIC rfsys_cap_t	*rf_findcap();
+STATIC int		rf_alloccap();
+#endif
+
+STATIC void		rf_fuserve();
+STATIC void		rf_memfree();
 
 /*
  * nadvertise is the number of resources currently advertised.
@@ -154,6 +188,18 @@ rfsys(uap, rvp)
 		return rfsys_stop(uap, rvp);
 	case RF_DEBUG:
 		return rfsys_debug(uap, rvp);
+#ifdef RFSUNMOUNTHACK
+	case RF_GETCAP:
+		return rfsys_getcap(uap, rvp);
+	case RF_PUTCAP:
+		return rfsys_putcap(uap, rvp);
+	case RF_SUBMNTS:
+		return rfsys_submnts(uap, rvp);
+	case RF_FUSERS:
+		return rfsys_fusers(uap, rvp);
+	case RF_UNMOUNT:
+		return rfsys_unmount(uap, rvp);
+#endif
 	default:
 		return EINVAL;
 	}
@@ -214,16 +260,10 @@ rfsys_fumount(uap, rvp)
 		error = EADV;
 		goto out;
 	}
-	if (rscp->r_flags & R_FUMOUNT) {
-		DUPRINT1(DB_MNT_ADV, "rfsys_fumount:  already fumounted\n");
-		error = EINVAL;
-		goto out;
-	}
 	rscp->r_flags |= R_FUMOUNT;
 	DUPRINT2(DB_MNT_ADV, "rfsys_fumount: vnode %x\n", rscp->r_rootvp);
 	(void)sndd_create(FALSE, &sdp);
 	(void)rcvd_create(FALSE, RDSPECIFIC, &rd);
-	rd->rd_sdp = sdp;
 	srp = rscp->r_mountp;
 	while (srp) {
 		sr_mount_t		*nextsrp = srp->srm_nextp;
@@ -236,10 +276,10 @@ rfsys_fumount(uap, rvp)
 					  RF_MIN_REQ(QPTOGP(client)->version);
 
 		ASSERT(client);
-		sndd_set(sdp, client, &rf_daemon_gift);
+		sndd_set(sdp, client, RECOVER_RD);
 		rf_signal_serve(rscp->r_mntid, srp);
-		(void)rf_allocmsg(bufsize, (size_t)0, BPRI_MED, FALSE,
-		  NULLCADDR, NULLFRP, &bp);
+		(void)rf_allocmsg(bufsize, (size_t)0, BPRI_MED, FALSE, NULLCADDR,
+		  NULLFRP, &bp);
 		ASSERT(bp);
 		cop = RF_COM(bp);
 		RF_REQ(bp)->rq_rec_fumount.srmntid = rscp->r_mntid;
@@ -250,7 +290,9 @@ rfsys_fumount(uap, rvp)
 		  && (tmperr = rf_rcvmsg(rd, &in_bp)) == 0) {
 			rf_fuserve(rscp->r_mntid);
 			srp->srm_flags |= SRM_FUMOUNT;
-			wakeprocs((caddr_t)client->q_ptr, PRMPT);
+			wakeup((caddr_t)client->q_ptr);
+			rf_recovery_flag |= RFRECFUMOUNT;
+			wakeup((caddr_t)&rf_recovery_procp);
 			rf_freemsg(in_bp);
 			in_bp = NULL;
 		} else {
@@ -258,8 +300,6 @@ rfsys_fumount(uap, rvp)
 		}
 		srp = nextsrp;
 	}
-	rf_recovery_flag |= RFRECFUMOUNT;
-	wakeprocs((caddr_t)&rf_recovery_procp, PRMPT);
 out:
 	sndd_free(&sdp);
 	rcvd_free(&rd);
@@ -281,10 +321,10 @@ rf_fuserve(srm_mntid)
 		if (ACTIVE_SRD(rd) && rd->rd_vp
 		    && (((sndd_t *)(rd->rd_vp))->sd_stat & SDSERVE)
 		    && ((sndd_t *)(rd->rd_vp))->sd_mntid == srm_mntid) {
-			DUPRINT1(DB_MNT_ADV, "rfsys_fumount: waking server\n");
+			DUPRINT1(DB_MNT_ADV, "rfsys_fumount: waking server \n");
 			rd->rd_stat |= RDLINKDOWN;
 			rf_checkq(rd, srm_mntid);
-			wakeprocs((caddr_t)&rd->rd_qslp, PRMPT);
+			wakeup((caddr_t)&rd->rd_qslp);
 		}
 	}
 }
@@ -324,14 +364,11 @@ rfsys_sendumsg(uap, rvp)
 	if (datasz > ULINESIZ) {
 		return EINVAL;
 	}
-	if (rf_state != RF_UP)  {
-		return ENONET;
-	}
 	if ((cl_queue = gdp_sysidtoq((sysid_t)smp->cl_sysid)) == NULL) {
 		return ECOMM;
 	}
 	(void)sndd_create(FALSE, &chansdp);
-	sndd_set(chansdp, cl_queue, &rf_daemon_gift);
+	sndd_set(chansdp, cl_queue, RECOVER_RD);
 	vcver = QPTOGP(chansdp->sd_queue)->version;
 	rqsz = RF_MIN_REQ(vcver);
 	totalsz = rqsz + datasz;
@@ -381,10 +418,6 @@ rfsys_getumsg(uap, rvp)
 	if (!suser(u.u_cred)) {
 		return EPERM;
 	}
-	if (rf_state != RF_UP)  {
-		rvp->r_val1 = RFUD_LASTUMSG;
-		return 0;
-	}
 	s = splstr();
 	while ((bp = (mblk_t *)LS_REMQUE(&rf_umsgq)) == NULL) {
 		if (sleep((caddr_t)&rf_daemon_lock, PZERO + 1 | PCATCH)) {
@@ -402,6 +435,9 @@ rfsys_getumsg(uap, rvp)
 			splx(s);
 			rvp->r_val1 = RFUD_LASTUMSG;
 			return 0;
+		} else if (LS_ISEMPTY(&rf_umsgq)) {
+			cmn_err(CE_NOTE,
+			"rfsys_getumsg awakened with empty queue");
 		}
 	}
 	splx(s);
@@ -437,11 +473,8 @@ rfsys_lastumsg(uap, rvp)
 	if (!suser(u.u_cred)) {
 		return EPERM;
 	}
-	if (rf_state != RF_UP)  {
-		return ENONET;
-	}
 	rfud_lastumsg = 1;
-	wakeprocs((caddr_t)&rf_daemon_lock, PRMPT);
+	wakeup((caddr_t)&rf_daemon_lock);
 	return 0;
 }
 
@@ -578,11 +611,14 @@ rfsys_setidmap(uap, rvp)
 	rval_t			*rvp;
 {
 	rfsys_setidmapa_t	*sap = (rfsys_setidmapa_t *)uap;
+	int			error;
 
 	if (!suser(u.u_cred)) {
 		return EPERM;
 	}
-	return rf_setidmap(sap->name, sap->flag, sap->map, u.u_cred);
+	error = rf_setidmap(sap->name, sap->flag,
+	    sap->map, u.u_cred);
+	return error;
 }
 
 /*
@@ -673,7 +709,7 @@ rfsys_version(uap, rvp)
 }
 
 /*
- * Return the current runstate of RFS.
+ * Return the curren runstate of RFS.
  */
 /* ARGSUSED */
 STATIC int
@@ -747,9 +783,6 @@ rfsys_clients(uap, rvp)
 	struct client		client;
 	char			rsrc_name[RFS_NMSZ];
 
-	if (rf_state != RF_UP)  {
-		return ENONET;
-	}
 	if (error = copyinstr(clap->rscnmp, rsrc_name, RFS_NMSZ, &cpin_count)) {
 		return error;
 	}
@@ -809,9 +842,6 @@ rfsys_resources(uap, rvp)
 	register rf_resource_t		*endrsc =
 					  (rf_resource_t *)&rf_resource_head;
 
-	if (rf_state != RF_UP)  {
-		return ENONET;
-	}
 	rsbp = rap->rsbufp;
 	while (rsrcp != endrsc) {
 		if (!(rsrcp->r_flags & R_FUMOUNT)) {
@@ -841,7 +871,8 @@ rfsys_start(uap, rvp)
 	rval_t		*rvp;
 {
 	int		s;
-	register proc_t	*p;
+	register proc_t	**p;
+	register proc_t	**endproc = v.ve_proc;
 	pid_t		childpid;	/* newproc out arg */
 	int		error = 0;
 	size_t		datasz = MIN(PAGESIZE, DU_DATASIZE);
@@ -852,13 +883,12 @@ rfsys_start(uap, rvp)
 	if (!suser(u.u_cred)) {
 		return EPERM;
 	}
-
 	/*
 	 * Implicit assumption made explicit.
 	 * TO DO:
 	 * These should be based on canonical representations.  Others???
 	 */
-
+	rfud_lastumsg = 0;
 	if (datasz < sizeof(flock_t)
 	    || datasz < sizeof(o_flock_t)
 	    || datasz < sizeof(rf_attr_t)
@@ -866,100 +896,140 @@ rfsys_start(uap, rvp)
 	    || datasz < sizeof(struct statfs)
 	    || datasz < sizeof(struct statvfs)
 	    || datasz < RF_MAXDIRENT) {
-		cmn_err(CE_NOTE, "rfsys_start: RF_DATASIZE too small");
+		cmn_err(CE_NOTE,
+		    "rftart: faulty implementation, RF_DATASIZE too small");
 		return ENOSYS;
 	}
-
-	if (!sndd) {
-
-		/* NULLed by rf_init */
-
-		cmn_err(CE_NOTE, "rfsys_start: no memory configured");
-		return ENOSYS;
-	}
-
 	while (rf_state == RF_INTER) {
 		sleep((caddr_t)&rf_state, PREMOTE);
 	}
-
-	/* This is a critical section that ends in rf_daemon. */
-
+	/* This is a critical section. Only one process at a time
+	 * can execute this code.
+	 */
 	if (rf_state == RF_UP)  {
-		DUPRINT1 (DB_RFSTART, "rfsys_start: system already booted\n");
-		wakeprocs((caddr_t)&rf_state, PRMPT);
+		DUPRINT1 (DB_RFSTART, "rftart: system already booted\n");
+		wakeup((caddr_t)&rf_state);
 		return EEXIST;
 	}
-
 	rf_state = RF_INTER;   /* RFS in an intermediate state */
-	rfud_lastumsg = 0;
-
 	if (rf_comminit()) {
 		rf_state = RF_DOWN;
-		wakeprocs((caddr_t)&rf_state, PRMPT);
+		wakeup((caddr_t)&rf_state);
 		return EAGAIN;  /* compatability */
 	}
-	DUPRINT1(DB_RFSTART, "rfsys_start comm initialized\n");
-
+	DUPRINT1(DB_RFSTART, "comm initialized\n");
 	auth_init();
 	if (error = gdp_init()) {
-		DUPRINT2 (DB_RFSTART, "rfsys_start gdp_init error %d\n", error);
+		DUPRINT2 (DB_RFSTART, "rfstart gdp_init error %d\n", error);
 		rf_commdinit();
 		rf_state = RF_DOWN;
-		wakeprocs((caddr_t)&rf_state, PRMPT);
+		wakeup((caddr_t)&rf_state);
 		return error;
 	}
-	DUPRINT1(DB_RFSTART, "rfsys_start gdp initialized\n");
-
-	/* enable caching */
-
+	DUPRINT1(DB_RFSTART, "gdp initialized\n");
+	/*
+	 * enable caching
+	 */
 	if (rc_time != -1) {
 		rfc_time = rc_time * HZ;
 	} else {
 		rfc_time = -1;
 	}
-
 	/*
 	 * Newproc sets child's pid in out arg; caller
 	 * normally passes in &rvp->r_val1, but we don't want
 	 * to return it
 	 */
-
 	u.u_procp->p_flag |= SNOWAIT;
-
 	switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC,
 	  &childpid, &error))  {
 	case 0:
 		break;
 	case 1:
-
-		/*
-                 * rf_daemon forks new processes when more daemons are
-                 * required, then returns the function to execute.
-		 * The call is from here so that the stack is smaller.
-                 */
-
-                (*rf_daemon())();
-
+		u.u_procp->p_cstime = u.u_procp->p_stime =
+			u.u_procp->p_cutime = u.u_procp->p_utime = 0;
+		rf_recovery_procp = u.u_procp;
+		rf_memfree();
+		bcopy("rf_recovery", u.u_comm, sizeof("rf_recovery"));
+		bcopy("rf_recovery", u.u_psargs, sizeof("rf_recovery"));
+		rf_recovery();
 		/* NOTREACHED */
 		break;
 	default:
-		cmn_err(CE_WARN, "rfsys_start: cannot fork rf_daemon\n");
+		DUPRINT1 (DB_RFSTART, "rftart: cannot fork rf_recovery\n");
 		rf_commdinit();
+		rf_state = RF_DOWN;
+		wakeup((caddr_t)&rf_state);
 		return EAGAIN;
 	}
-
+	switch (newproc(NP_FAILOK | NP_NOLAST | NP_SYSPROC,
+	  &childpid, &error))  {
+	case 0:
+		break;
+	case 1:
+		u.u_procp->p_cstime = u.u_procp->p_stime =
+			u.u_procp->p_cutime = u.u_procp->p_utime = 0;
+		rf_daemon_procp = u.u_procp;
+		rf_memfree();
+		bcopy("rf_daemon", u.u_comm, sizeof("rf_daemon"));
+		bcopy("rf_daemon", u.u_psargs, sizeof("rf_daemon"));
+		/*
+                 * The following is not pretty.	 rf_daemon forks new
+                 * processes when more servers are required.  Each
+                 * new child returns here and becomes a server.	 The
+                 * call is from here so that the stack is smaller.
+                 */
+                rf_daemon();
+		rf_serve();	/* only reached if rf_daemon has forked */
+		/* NOTREACHED */
+		break;
+	default:
+		DUPRINT1 (DB_RFSTART, "rftart: cannot fork rf_daemon\n");
+		rf_commdinit();
+		rf_recovery_flag |= RFRECKILL;
+		wakeup((caddr_t)&rf_recovery_procp);
+		return EAGAIN;
+	}
 	/*  now allow advertise calls, set all sysid's in proc table  */
-
 	s = spl6();
-	for (p = practive; p; p = p->p_next) {
-		p->p_sysid = 0;
+	for (p = &nproc[0]; p < endproc; p++) {
+		if (*p) {
+			(*p)->p_sysid = 0;
+		}
 	}
 	splx(s);
 
-	/* initialize server "device" table */
+	/* initialize server device table */
 	rfsr_dev_init();
 
 	return error;
+}
+
+/*
+ * Release user memory for proc forked from user proc, but which
+ * stays in kernel.  Also give up unneeded directory references,
+ * close files.
+ */
+STATIC void
+rf_memfree()
+{
+	register int	i;
+	file_t		*fp;
+
+	relvm(u.u_procp);
+	VN_RELE(u.u_cdir);
+	u.u_cdir = rootdir;
+	VN_HOLD(u.u_cdir);
+	if (u.u_rdir) {
+		VN_RELE(u.u_rdir);
+	}
+	u.u_rdir = NULL;
+	for (i = 0; i < u.u_nofiles; i++) {
+		if (getf(i, &fp) == 0) {
+			closef(fp);
+			setf(i, NULLFP);
+		}
+	}
 }
 
 /*
@@ -978,62 +1048,59 @@ rfsys_stop(uap, rvp)
 	if (!suser(u.u_cred)) {
 		return EPERM;
 	}
-
-	/* Critical section as in rfsys_start. */
-
+	/*
+	 *  Begin critical section.  As in rftart, only one process at a time
+	 * through this section of code.
+	 */
 	while (rf_state == RF_INTER) {
 		sleep((caddr_t)&rf_state, PREMOTE);
 	}
 	if (rf_state == RF_DOWN) {
 		DUPRINT1(DB_RFSTART, "rfsys_stop: system already stopped\n");
-		wakeprocs((caddr_t)&rf_state, PRMPT);
+		wakeup((caddr_t)&rf_state);
 		return ENONET;
 	}
 	rf_state = RF_INTER;
 
-	/* can't stop if anything is remotely mounted */
-
+	/*
+	 * can't stop if anything is remotely mounted
+	 */
 	while (vfsp) {
 		if (ISRFSVFSP(vfsp)) {
 			DUPRINT1 (DB_RFSTART,
 			    "rfsys_stop: can't stop with remote mounts.\n");
 			rf_state = RF_UP;
-			wakeprocs((caddr_t)&rf_state, PRMPT);
+			wakeup((caddr_t)&rf_state);
 			return EBUSY;
 		}
 		vfsp = vfsp->vfs_next;
 	}
-
 	while (rsrcp != (struct rf_resource*)&rf_resource_head) {
 		if (rsrcp->r_mountp) {
 			DUPRINT1 (DB_RFSTART,
 			    "rfsys_stop: can't stop with clients.");
 			rf_state = RF_UP;
-			wakeprocs((caddr_t)&rf_state, PRMPT);
+			wakeup((caddr_t)&rf_state);
 			return ESRMNT;
 		}
 		if (!(rsrcp->r_flags & R_UNADV)) {
 			DUPRINT1 (DB_RFSTART,
 			 "rfsys_stop: can't stop with advertised resources.\n");
 			rf_state = RF_UP;
-			wakeprocs((caddr_t)&rf_state, PRMPT);
+			wakeup((caddr_t)&rf_state);
 			return EADV;
 		}
 		rsrcp = rsrcp->r_nextp;
 	}
-
-	rfud_lastumsg = 1;
-	wakeprocs((caddr_t)&rf_daemon_lock, PRMPT);
-
-	DUPRINT1(DB_RFSTART, "rfsys_stop: taking down links\n");
+	DUPRINT1(DB_RFSTART, "rfsys_stop: taking down links \n");
 	gdp_kill();             /* cut all connections */
 
 	/* kill daemons - rf_state goes to DOWN after both die */
-
-	DUPRINT1(DB_RFSTART, "rfsys_stop: killing daemon\n");
+	DUPRINT1(DB_RFSTART, "rfsys_stop: killing daemons \n");
 	rf_daemon_flag |= RFDKILL;
-	wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
-
+	wakeup((caddr_t)&rf_daemon_rd->rd_qslp);
+	rf_recovery_flag |= RFRECKILL;
+	wakeup((caddr_t)&rf_recovery_procp);
 	DUPRINT1(DB_RFSTART, "rfsys_stop: done\n");
 	return 0;
 }
@@ -1163,13 +1230,13 @@ rfsys_advfs(uap, rvp)
 		error = EREMOTE;
 		goto bad;
 	}
-
+#ifndef UNNECESSARYRESTRICTION
 	if (vp->v_type != VDIR)	 {
 		/* the specified path name was not a directory */
 		error = ENOTDIR;
 		goto bad;
 	}
-
+#endif
 	/*
 	 * if the file system containing the specified directory was mounted
 	 * read only, the advertisement must be read only.
@@ -1179,7 +1246,7 @@ rfsys_advfs(uap, rvp)
 		goto bad;
 	}
 	if ((rp = vp_to_rsc(vp)) != NULL) {
-		if (rp->r_flags & R_FUMOUNT || !(rp->r_flags & R_UNADV)) {
+		if (!(rp->r_flags & R_UNADV)) {
 			/* already advertised */
 			error = EADV;
 			goto bad;
@@ -1249,15 +1316,8 @@ rfsys_advfs(uap, rvp)
 	/*
 	 * allocate a general receive descriptor for the resource
 	 */
-	if ((giftrd = vtord(vp)) == NULL) {
-		if ((error = rcvd_create(TRUE, RDGENERAL, &giftrd)) != 0) {
-			goto bad;
-		}
-		giftrd->rd_vp = vp;
-		VN_HOLD(vp);		/* this will be released by rcvd_free */
-	} else {
-		ASSERT(giftrd->rd_vp == vp);
-		giftrd->rd_refcnt++;
+	if (error = rcvd_create(TRUE, RDGENERAL, &giftrd)) {
+		goto bad;
 	}
 	/*
 	 * insertrsc finds the next free resource index value, assigning
@@ -1271,6 +1331,7 @@ rfsys_advfs(uap, rvp)
 	newrp->r_flags = advp->flag & A_RDONLY;	/* 0 or A_RDONLY */
 	newrp->r_rootvp = vp;
 	strcpy(newrp->r_name, adv_name);
+	giftrd->rd_vp = vp;
 	newrp->r_queuep = giftrd;
 	DUPRINT2(DB_MNT_ADV, "exit adv: error is %d\n", error);
 	nadvertise++;
@@ -1283,9 +1344,7 @@ bad:
 	if (newrp) {
 		freersc(&newrp);
 	}
-	if (giftrd) {
-		rcvd_delete(&giftrd, 0, -1, 1);
-	}
+	rcvd_free(&giftrd);
 	return error;
 }
 
@@ -1329,16 +1388,12 @@ rfsys_unadvfs(uap, rvp)
 	if ((rp = name_to_rsc(adv_name)) == NULL) {     /* not advertised */
 		return ENODEV;
 	}
-	if (rp->r_flags & R_FUMOUNT || rp->r_flags & R_UNADV) { 
-		/*
-		 * has already been unadvertised
-		 */
+	if (rp->r_flags & R_UNADV) {    /* has already been unadvertised */
 		return ENODEV;
 	}
 	rp->r_flags |= R_UNADV;         /* mark this as unadvertised */
-	rcvd_delete(&rp->r_queuep, (sysid_t)0, (long)-1, 1);
+	rcvd_delete(&rp->r_queuep, (sysid_t)0, (long)-1);
 	clistp = rp->r_clistp;
-	rp->r_clistp = NULL;
 	if (!rp->r_mountp) {	/* not currently mounted, remove */
 		rf_resource_t *arp = rp;	/* addressable */
 
@@ -1362,3 +1417,442 @@ rfsys_unadvfs(uap, rvp)
 	--nadvertise;
 	return 0;
 }
+
+#ifdef RFSUNMOUNTHACK
+
+STATIC ls_elt_t	rfsys_caphead = {&rfsys_caphead, &rfsys_caphead};
+STATIC int	rfsys_cap_cnt = 1;	/* 0 is distinguished value */
+
+/*
+ * Update rvp->r_val1 with a value that can be used to operate on
+ * the rf_vfs containing the file that is named by the longest
+ * traversible prefix of the path.  Update cappath with that prefix.
+ */
+
+typedef struct rfsys_getcapa {
+	int 	opcode;
+	char	*path;
+	char	*cappath;
+} rfsys_getcapa_t;
+
+STATIC int
+rfsys_getcap(uap, rvp)
+	caddr_t		uap;
+	rval_t		*rvp;
+{
+	rfsys_getcapa_t	*gcp = (rfsys_getcapa_t *)uap;
+	pathname_t	pn;
+	pathname_t	cpn;
+	rfsys_cap_t	*cap;
+	int		error;
+	vnode_t		*cdir;
+	vnode_t		*rootvp;
+	int		pathlen = 0;
+	int		oldpnlen;
+
+	if (!suser(u.u_cred)) {
+		return EPERM;
+	}
+	if (error = pn_get(gcp->path, UIO_USERSPACE, &pn)) {
+		return error;
+	}
+	if (pn_peekchar(&pn) != '/') {
+		pn_free(&pn);
+		return EINVAL;
+	}
+	pn_alloc(&cpn);
+
+	/*
+	 * Parse the pathname component-at-a-time to find the
+	 * last reachable component.
+	 */
+	cdir = u.u_cdir;
+	VN_HOLD(u.u_cdir = rootdir);
+	oldpnlen = pn.pn_pathlen;
+	pn_skipslash(&pn);
+	while (pn_pathleft(&pn)) {
+		char	comp[MAXNAMELEN];
+		vnode_t	*vp;
+
+		if (error = pn_stripcomponent(&pn, comp)) {
+			break;
+		}
+		(void)pn_set(&cpn, comp);
+		if (lookuppn(&cpn, FOLLOW, NULLVPP, &vp)) {
+			break;
+		}
+		VN_RELE(u.u_cdir);
+		u.u_cdir = vp;
+		if (vp->v_flag & VROOT) {
+			pathlen += oldpnlen - pn.pn_pathlen;
+			oldpnlen = pn.pn_pathlen;
+		}
+		pn_skipslash(&pn);
+	}
+	/*
+	 * To avoid acting rashly on user typos, we confine
+	 * this facility to RFS file systems.  A general
+	 * facility would mitigate the problem.
+	 */
+	if (!(error = ISRFSVP(u.u_cdir) ? 0 : EINVAL) &&
+	  !(error = VFS_ROOT(u.u_cdir->v_vfsp, &rootvp))) {
+		if (!(error =
+		   copyout(pn.pn_buf, gcp->cappath, pathlen) ? EFAULT : 0) &&
+		  !(error =
+		   subyte(gcp->cappath + pathlen, '\0') ? EFAULT : 0) &&
+		  !(error = rf_alloccap(rootvp, u.u_procp->p_epid, &cap))) {
+			LS_INSQUE(&rfsys_caphead, cap);
+			rvp->r_val1 = cap->c_ucap;
+		} else {
+			VN_RELE(rootvp);
+		}
+	}
+
+	VN_RELE(u.u_cdir);
+	u.u_cdir = cdir;
+	pn_free(&pn);
+	pn_free(&cpn);
+	return error;
+}
+
+/*
+ * Give up the cap denoted by ucap.
+ */
+
+typedef struct rfsys_putcapa {
+	int 	opcode;
+	int	ucap;
+} rfsys_putcapa_t;
+
+/* ARGSUSED */
+STATIC int
+rfsys_putcap(uap, rvp)
+	caddr_t	uap;
+	rval_t	*rvp;
+{
+	int	error = 0;
+	int	ucap = ((rfsys_putcapa_t *)uap)->ucap;
+
+	if (!suser(u.u_cred)) {
+		error = EPERM;
+	} else if (ucap < 1) {
+		error = EINVAL;
+	} else {
+		error = rf_putcap(ucap, u.u_procp->p_epid);
+	}
+	return error;
+}
+
+/*
+ * Remove from global list and destroy cap(s) denoted by ucap.
+ */
+int
+rf_putcap(ucap, pid)
+	int		ucap;
+	pid_t		pid;
+{
+	rfsys_cap_t	*cap;
+
+	if ((cap = rf_findcap(ucap, pid)) != NULL) {
+		ls_elt_t	head;
+		ls_elt_t	*lp;
+
+		LS_INIT(&head);
+		LS_INSQUE(&head, cap);
+		for (lp = head.ls_next; !LS_ISEMPTY(&head); lp = head.ls_next) {
+			LS_REMOVE(lp);
+			cap = (rfsys_cap_t *)lp;
+			VN_RELE(cap->c_vp);
+			kmem_free(cap, sizeof(rfsys_cap_t));
+		}
+		return 0;
+	} else {
+		return EINVAL;
+	}
+}
+
+/*
+ * Update buf with values that can be used to operate on the submounts
+ * of ucap, and rvp->r_val1 with the number of values returned.  If
+ * the number of entries is greater than nebuf (number of elements
+ * in buf), fail.
+ */
+
+typedef struct rfsys_submntsa {
+	int 	opcode;
+	int	ucap;
+	uint	nebuf;
+	caddr_t	buf;
+} rfsys_submntsa_t;
+
+STATIC int
+rfsys_submnts(uap, rvp)
+	caddr_t			uap;
+	rval_t			*rvp;
+{
+	rfsys_submntsa_t	*fsup = (rfsys_submntsa_t *)uap;
+	vfs_t			*vfsp;
+	vfs_t			*subvfsp;
+	rfsys_cap_t		*fscp;
+	rfsys_cap_t		*subcap;
+	uint			nsub = 0;
+	int			error = 0;
+	ls_elt_t		*lp;
+	ls_elt_t		uhead;		/* handle to clean up errors */
+	ls_elt_t		pfxhead;	/* for VFSs found by looking
+						 * at name of mounpoint */
+
+	if (!suser(u.u_cred)) {
+		return EPERM;
+	}
+	if (fsup->ucap < 1 ||
+	  (fscp = rf_findcap(fsup->ucap, u.u_procp->p_epid)) == NULL) {
+		return EINVAL;
+	}
+	/* rf_findcap does a destructive read of the list */
+	LS_INSQUE(&rfsys_caphead, fscp);
+	LS_INIT(&uhead);
+	LS_INIT(&pfxhead);
+
+	/* Search vfs list for submounts and save them on list head. */
+	vfsp = fscp->c_vp->v_vfsp;
+	for (subvfsp = rootvfs; subvfsp; subvfsp = subvfsp->vfs_next) {
+		int		pfx = 0;
+		vnode_t		*subroot;
+
+		if (subvfsp->vfs_vnodecovered->v_vfsp != vfsp &&
+		  !(pfx = strprefix(vfsp->vfs_namecovered,
+		   subvfsp->vfs_namecovered))) {
+			continue;
+		}
+		if (!pfx && ++nsub > fsup->nebuf) {
+			error = EOVERFLOW;
+			break;
+		}
+		if (error = VFS_ROOT(subvfsp, &subroot)) {
+			break;
+		}
+		if (error = rf_alloccap(subroot, u.u_procp->p_epid, &subcap)) {
+			VN_RELE(subroot);
+			break;
+		}
+		if (pfx) {
+			LS_INSQUE(&pfxhead, subcap);
+		} else {
+			LS_INSQUE(&uhead, subcap);
+		}
+	}
+
+	/*
+	 * For submounts found through matching pathnames, retain only
+	 * those that are logically immediate submounts.
+	 */
+
+	while (!LS_ISEMPTY(&pfxhead)) {
+		lp = pfxhead.ls_next;
+		LS_REMOVE(lp);
+		if (!error ) {
+			vfs_t	*coveredvfsp;
+
+			subcap = (rfsys_cap_t *)lp;
+			coveredvfsp =
+			  subcap->c_vp->v_vfsp->vfs_vnodecovered->v_vfsp;
+			if (rf_vfsincaplist(coveredvfsp, &uhead) ||
+			  rf_vfsincaplist(coveredvfsp, &pfxhead)) {
+				VN_RELE(subcap->c_vp);
+				kmem_free(subcap, sizeof(rfsys_cap_t));
+				continue;
+			}
+			if (++nsub > fsup->nebuf) {
+				error = EOVERFLOW;
+			}
+		}
+		if (error) {
+			VN_RELE(subcap->c_vp);
+			kmem_free(subcap, sizeof(rfsys_cap_t));
+		} else {
+			LS_INSQUE(&uhead, subcap);
+		}
+	}
+
+	/* Move ucaps into user space. */
+	for (lp = uhead.ls_next; !error && lp != &uhead; lp = lp->ls_next) {
+		subcap = (rfsys_cap_t *)lp;
+		if (suword(fsup->buf, subcap->c_ucap)) {
+			error = EFAULT;
+		}
+		fsup->buf += sizeof(subcap->c_ucap);
+	}
+
+	/* If error, toss list; otherwise save it. */
+	for (lp = uhead.ls_next; !LS_ISEMPTY(&uhead); lp = uhead.ls_next) {
+		LS_REMOVE(lp);
+		subcap = (rfsys_cap_t *)lp;
+		if (error) {
+			VN_RELE(subcap->c_vp);
+			kmem_free(subcap, sizeof(rfsys_cap_t));
+		} else {
+			LS_INSQUE(&rfsys_caphead, subcap);
+		}
+	}
+
+	rvp->r_val1 = nsub;
+	return error;
+}
+
+/*
+ * Return 1 if vfsp is denoted by some cap in the list headed by hp,
+ * 0 otherwise.
+ */
+STATIC int
+rf_vfsincaplist(vfsp, hp)
+	vfs_t		*vfsp;
+	ls_elt_t	*hp;
+{
+	ls_elt_t	*lp;
+
+	for (lp = hp->ls_next; lp != hp; lp = lp->ls_next) {
+		if(((rfsys_cap_t *)lp)->c_vp->v_vfsp == vfsp) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Invoke dofusers() with the vnode denoted by ucap, and with the
+ * args flags, outbp, and rvp.
+ */
+
+typedef struct rfsys_fusersa {
+	int 	opcode;
+	int	ucap;
+	int	flags;
+	char	*outbp;
+} rfsys_fusersa_t;
+
+STATIC int
+rfsys_fusers(uap, rvp)
+	caddr_t		uap;
+	rval_t		*rvp;
+{
+	rfsys_fusersa_t	*fup = (rfsys_fusersa_t *)uap;
+	rfsys_cap_t	*fscp;
+	int		error;
+
+	if (!suser(u.u_cred)) {
+		return EPERM;
+	}
+	if (fup->ucap < 1 ||
+	  (fscp = rf_findcap(fup->ucap, u.u_procp->p_epid)) == NULL) {
+		error = EINVAL;
+	} else {
+		/* rf_findcap does a destructive read of the list */
+		LS_INSQUE(&rfsys_caphead, fscp);
+		error = dofusers(fscp->c_vp, fup->flags, fup->outbp, rvp);
+	}
+	return error;
+}
+
+/*
+ * unmount the vfs with root vp denoted by ucap.
+ * NOTE:  ucap is expired after the call here.
+ */
+
+typedef struct rfsys_unmounta {
+	int 	opcode;
+	int	ucap;
+} rfsys_unmounta_t;
+
+/* ARGSUSED */
+STATIC int
+rfsys_unmount(uap, rvp)
+	caddr_t			uap;
+	rval_t			*rvp;
+{
+	rfsys_unmounta_t	*ump = (rfsys_unmounta_t *)uap;
+	rfsys_cap_t		*fscp;
+	int			error;
+
+	if (!suser(u.u_cred)) {
+		return EPERM;
+	}
+	if (ump->ucap < 1 ||
+	  (fscp = rf_findcap(ump->ucap, u.u_procp->p_epid)) == NULL) {
+		error = EINVAL;
+	} else {
+		vfs_t	*vfsp = fscp->c_vp->v_vfsp;
+
+		VN_RELE(fscp->c_vp);
+		kmem_free(fscp, sizeof(rfsys_cap_t));
+		error = dounmount(vfsp, u.u_cred);
+	}
+	return error;
+}
+
+/*
+ * Return a pointer to a list of rfsys_caps matching ucap and epid,
+ * or NULL if no match.  0 matches all ucaps for pid.
+ * NOTE:  removes the rfsys_caps from the global list.  Caller
+ * must destroy or replace.
+ */
+STATIC rfsys_cap_t *
+rf_findcap(ucap, pid)
+	int		ucap;
+	pid_t		pid;
+{
+	ls_elt_t	head;
+	rfsys_cap_t	*cap;
+	ls_elt_t	*lp;
+
+	LS_INIT(&head);
+	for (lp = rfsys_caphead.ls_next;
+	  lp != &rfsys_caphead;
+	  lp = lp->ls_next) {
+		cap = (rfsys_cap_t *)lp;
+		if (cap->c_pid == pid && (cap->c_ucap == ucap || !ucap)) {
+			LS_REMOVE(lp);
+			LS_INSQUE(&head, lp);
+			if (cap->c_ucap == ucap) {
+				break;
+			}
+		}
+	}
+	if (LS_ISEMPTY(&head)) {
+		cap = NULL;
+	} else {
+		cap = (rfsys_cap_t *)head.ls_next;
+		LS_REMOVE(&head);
+	}
+	return cap;
+}
+
+/*
+ * Allocate a fully initialized rfsys_cap, else fail.
+ * (list elements intialized to empty)
+ */
+STATIC int
+rf_alloccap (vp, pid, cpp)
+	vnode_t		*vp;
+	pid_t		pid;
+	rfsys_cap_t	**cpp;
+{
+	rfsys_cap_t	*cp = kmem_alloc(sizeof(rfsys_cap_t), KM_SLEEP);
+	int		error = 0;
+
+	if (!cp) {
+		error = ENOMEM;
+	} else {
+		LS_INIT(cp);
+		cp->c_ucap = rfsys_cap_cnt++;
+		cp->c_pid = pid;
+		cp->c_vp = vp;
+		if (rfsys_cap_cnt == INT_MAX) {
+			rfsys_cap_cnt = 1;
+		}
+		*cpp = cp;
+	}
+	return error;
+}
+
+#endif /* RFSUNMOUNTHACK */

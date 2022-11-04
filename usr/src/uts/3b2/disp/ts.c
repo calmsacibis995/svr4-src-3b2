@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:disp/ts.c	1.23"
+#ident	"@(#)kernel:disp/ts.c	1.22"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -66,10 +66,9 @@ else if ((tspp)->ts_umdpri < 0) \
 
 void		ts_donice(), ts_init();
 STATIC int	ts_admin(), ts_enterclass(), ts_fork(), ts_getclinfo();
-STATIC int	ts_nosys(), ts_parmsin(), ts_parmsout(), ts_parmsset();
-STATIC int	ts_proccmp();
+STATIC int	ts_parmsin(), ts_parmsout(), ts_parmsset(), ts_proccmp();
 STATIC void	ts_exitclass(), ts_forkret(), ts_getglobpri();
-STATIC void	ts_nullsys(), ts_parmsget(), ts_preempt();
+STATIC void	ts_nullclass(), ts_parmsget(), ts_preempt();
 STATIC void	ts_setrun(), ts_sleep(), ts_swapin(), ts_swapout();
 STATIC void	ts_tick(), ts_trapret(), ts_update(), ts_wakeup();
 
@@ -96,23 +95,23 @@ STATIC struct classfuncs ts_classfuncs = {
 	ts_proccmp,
 	ts_setrun,
 	ts_sleep,
-	ts_nullsys,
+	ts_nullclass,
 	ts_swapin,
 	ts_swapout,
 	ts_tick,
 	ts_trapret,
 	ts_wakeup,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys,
-	ts_nosys
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass,
+	ts_nullclass
 };
 
 
@@ -541,15 +540,8 @@ int		*globprip;
 }
 
 
-STATIC int
-ts_nosys()
-{
-	return(ENOSYS);
-}
-
-
 STATIC void
-ts_nullsys()
+ts_nullclass()
 {
 }
 

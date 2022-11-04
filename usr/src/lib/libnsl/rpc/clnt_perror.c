@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:clnt_perror.c	1.3"
+#ident	"@(#)librpc:clnt_perror.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -37,7 +37,6 @@ static char sccsid[] = "@(#)clnt_perror.c 1.31 89/03/31 Copyr 1984 Sun Micro";
  */
 #ifndef KERNEL
 #include <stdio.h>
-#include <string.h>
 #endif
 
 #include <rpc/types.h>
@@ -45,6 +44,7 @@ static char sccsid[] = "@(#)clnt_perror.c 1.31 89/03/31 Copyr 1984 Sun Micro";
 #include <rpc/clnt.h>
 
 #ifndef KERNEL
+extern char *sys_errlist[];
 extern char *t_errlist[];
 extern char *malloc();
 extern int t_nerr;
@@ -142,7 +142,7 @@ clnt_sperror(cl, s)
 		(void) sprintf(str, "; %s", t_errlist[e.re_terrno]); 
 		str += strlen(str);
 		if (e.re_errno) {
-			(void) sprintf(str, "; %s", strerror(e.re_errno)); 
+			(void) sprintf(str, "; %s", sys_errlist[e.re_errno]); 
 			str += strlen(str);
 		}
 		break;
@@ -150,7 +150,7 @@ clnt_sperror(cl, s)
 	case RPC_CANTSEND:
 	case RPC_CANTRECV:
 		if (e.re_errno) {
-			(void) sprintf(str, "; errno = %s", strerror(e.re_errno)); 
+			(void) sprintf(str, "; errno = %s", sys_errlist[e.re_errno]); 
 			str += strlen(str);
 		}
 		if (e.re_terrno) {
@@ -216,7 +216,8 @@ char *
 clnt_spcreateerror(s)
 	char *s;
 {
-	extern int _sys_num_err;
+	extern int sys_nerr;
+	extern char *sys_errlist[];
 	char *str = _buf();
 
 	if (str == NULL)
@@ -239,9 +240,9 @@ clnt_spcreateerror(s)
 	case RPC_SYSTEMERROR:
 		(void) strcat(str, " - ");
 		if (rpc_createerr.cf_error.re_errno > 0
-		    && rpc_createerr.cf_error.re_errno < _sys_num_err)
+		    && rpc_createerr.cf_error.re_errno < sys_nerr)
 			(void) strcat(str,
-			    strerror(rpc_createerr.cf_error.re_errno));
+			    sys_errlist[rpc_createerr.cf_error.re_errno]);
 		else
 			(void) sprintf(&str[strlen(str)], "Error %d",
 			    rpc_createerr.cf_error.re_errno);
@@ -256,9 +257,9 @@ clnt_spcreateerror(s)
 			(void) sprintf(&str[strlen(str)], "TLI Error %d",
 					    rpc_createerr.cf_error.re_terrno);
 		if (rpc_createerr.cf_error.re_errno > 0) {
-			if (rpc_createerr.cf_error.re_errno < _sys_num_err)
+			if (rpc_createerr.cf_error.re_errno < sys_nerr)
 				(void) strcat(str,
-			    strerror(rpc_createerr.cf_error.re_errno));
+			    sys_errlist[rpc_createerr.cf_error.re_errno]);
 			else
 				(void) sprintf(&str[strlen(str)], "Error %d",
 					    rpc_createerr.cf_error.re_terrno);

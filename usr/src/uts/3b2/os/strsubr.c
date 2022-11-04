@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/strsubr.c	1.32"
+#ident	"@(#)kernel:os/strsubr.c	1.23.1.7"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -81,7 +81,7 @@ struct queue *scanqtail;	/*  last queue */
 char strbcwait;			/* bufcall functions waiting */
 char strbcflag;			/* bufcall functions ready to go */
 struct bclist strbcalls;	/* list of waiting bufcalls */
-unsigned char qbf[NBAND];	/* band flushing backenable flags */
+unsigned char qbf[256];		/* band flushing backenable flags */
 int strscanflag;		/* true when strscan timeout is pending */
 
 struct	strstat strst;		/* Streams statistics structure */
@@ -91,17 +91,8 @@ struct	strstat strst;		/* Streams statistics structure */
  */
 struct	msgb		*msgfreelist;
 struct	mdbblock	*mdbfreelist;
-STATIC struct seinfo *sefreelist;
 STATIC struct mux_node *mux_nodes;	/* mux info for cycle checking */
-#define SECACHE 10
-STATIC struct seinfo Secache[SECACHE];	/* emergency cache of seinfo's	*/
-					/* in case memory runs out	*/
-STATIC struct seinfo *secachep;		/* cache list head		*/
-struct strinfo Strinfo[NDYNAMIC];	/* dynamic resource info	*/
-long Strcount;				/* count of streams resources	*/
-					/* in bytes			*/
-extern long strthresh;			/* threshold for stopping some	*/
-					/* streams operations		*/
+struct strinfo Strinfo[NDYNAMIC];	/* dynamic resource info */
 
 extern struct qinit strdata;
 extern struct qinit stwdata;
@@ -127,17 +118,6 @@ strinit()
 	 */
 	mdbfreelist = NULL;
 	msgfreelist = NULL;
-
-	/*
-	 * set up seinfo cache (if memory runs out, we need a few of
-	 * these so things have a chance to recover)
-	 */
-	sefreelist = NULL;
-	for (i = 0; i < SECACHE; ++i) {
-		Secache[i].s_next = secachep;
-		secachep = &Secache[i];
-	}
-
 	/*
 	 * Set up mux_node structures.
 	 */
@@ -183,11 +163,9 @@ strgiveback()
 		n = mdbfree >> 3;
 		for (j = 0; j < n; ++j) {
 			mdbp = mdbfreelist;
-			mdbfreelist = 
-		  	   (struct mdbblock *)( mdbp->msgblk.m_mblock.b_next);
+			mdbfreelist = (struct mdbblock *)( mdbp->msgblk.b_next);
 			kmem_free(mdbp, sizeof(struct mdbblock));
 			Strinfo[DYN_MDBBLOCK].sd_cnt--;
-			Strcount -= sizeof(struct mdbblock);
 		}
 	}
 	if (msgfree > msgavguse) {
@@ -196,9 +174,8 @@ strgiveback()
 		for (j = 0; j < n; ++j) {
 			msgp = msgfreelist;
 			msgfreelist = msgp->b_next;
-			kmem_free(msgp, sizeof(struct mbinfo));
+			kmem_free(msgp, sizeof(struct msgb));
 			Strinfo[DYN_MSGBLOCK].sd_cnt--;
-			Strcount -= sizeof(struct mbinfo);
 		}
 	}
 	timeout(strgiveback, 0, 60 * HZ);
@@ -488,7 +465,7 @@ strtime(stp)
 	struct stdata *stp;
 {
 	if (stp->sd_flag & STRTIME) {
-		wakeprocs((caddr_t)stp->sd_wrq, PRMPT);
+		wakeup((caddr_t)stp->sd_wrq);
 		stp->sd_flag &= ~STRTIME;
 	}
 }
@@ -507,7 +484,7 @@ str2time(stp)
 	struct stdata *stp;
 {
 	if (stp->sd_flag & STR2TIME) {
-		wakeprocs((caddr_t)&stp->sd_iocwait, PRMPT);
+		wakeup((caddr_t)&stp->sd_iocwait);
 		stp->sd_flag &= ~STR2TIME;
 	}
 }
@@ -526,7 +503,7 @@ str3time(stp)
 	struct stdata *stp;
 {
 	if (stp->sd_flag & STR3TIME) {
-		wakeprocs((caddr_t)stp, PRMPT);
+		wakeup((caddr_t)stp);
 		stp->sd_flag &= ~STR3TIME;
 	}
 }
@@ -670,7 +647,6 @@ alloclink(qup, qdown, fpdown)
 	linkp->li_fpdown = fpdown;
 	BUMPUP(strst.linkblk);
 	Strinfo[DYN_LINKBLK].sd_cnt++;
-	Strcount += sizeof(struct linkinfo);
 	linkp->li_next = (struct linkinfo *) Strinfo[DYN_LINKBLK].sd_head;
 	if (linkp->li_next)
 		linkp->li_next->li_prev = linkp;
@@ -702,7 +678,6 @@ lbfree(linkp)
 	}
 	kmem_free(linkp, sizeof(struct linkinfo));
 	Strinfo[DYN_LINKBLK].sd_cnt--;
-	Strcount -= sizeof(struct linkinfo);
 	strst.linkblk.use--;
 	splx(s);
 	return;
@@ -1034,7 +1009,6 @@ strmakemsg(mctl, count, uiop, stp, flag, mpp)
 	 */
 	if ((mctl != NULL) && (mctl->len >= 0)) {
 		register int ctlcount;
-		int allocsz;
 
 		if (flag & RS_HIPRI) 
 			msgtype = M_PCPROTO;
@@ -1045,21 +1019,12 @@ strmakemsg(mctl, count, uiop, stp, flag, mpp)
 		base = mctl->buf;
 
 		/*
-		 * Give modules a better chance to reuse M_PROTO/M_PCPROTO
-		 * blocks by increasing the size to something more usable.
-		 */
-		allocsz = MAX(ctlcount, 64);
-
-		/*
 		 * Range checking has already been done; simply try
 		 * to allocate a message block for the ctl part.
 		 */
-		while (!(bp = allocb(allocsz, pri))) {
-			if (uiop->uio_fmode  & (FNDELAY|FNONBLOCK))
-				return (EAGAIN);
-			if (error = strwaitbuf(allocsz, pri))
+		while (!(bp = allocb(ctlcount, pri)))
+			if (error = strwaitbuf(ctlcount, pri))
 				return (error);
-		}
 
 		bp->b_datap->db_type = msgtype;
 		if (copyin(base, (caddr_t) bp->b_wptr, ctlcount)) {
@@ -1089,14 +1054,11 @@ strmakemsg(mctl, count, uiop, stp, flag, mpp)
 		register int size;
 
 		size = count + (offlg ? 0 : wroff);
-		while ((bp = allocb(size, pri)) == NULL) {
-			if (uiop->uio_fmode  & (FNDELAY|FNONBLOCK))
-				return (EAGAIN);
+		while ((bp = allocb(size, pri)) == NULL)
 			if (error = strwaitbuf(size, pri)) {
 				freemsg(mp);
 				return (error);
 			}
-		}
 		if (wroff && !offlg++ &&
 		    (wroff < bp->b_datap->db_lim - bp->b_wptr)) {
 			bp->b_rptr += wroff;
@@ -1211,7 +1173,6 @@ strwaitq(stp, flag, count, fmode, done)
 	caddr_t slpadr;
 	mblk_t *mp;
 	long *rd_count;
-	int bid;
 
 	if (fmode & (FNDELAY|FNONBLOCK)) {
 		if (!(flag & NOINTR))
@@ -1234,9 +1195,8 @@ strwaitq(stp, flag, count, fmode, done)
 		if ((flag & READWAIT) && (stp->sd_flag & SNDMREAD)) {
 			while ((mp = allocb(sizeof(long), BPRI_MED)) == NULL) {
 				s = splstr();
-				bid = bufcall(sizeof(long), BPRI_MED, strqbuf,
-				    stp);
-				if (bid == 0) {
+				if (bufcall(sizeof(long), BPRI_MED, strqbuf,
+				    stp) == 0) {
 					splx(s);
 					*done = 1;
 					return (EAGAIN);
@@ -1246,7 +1206,6 @@ strwaitq(stp, flag, count, fmode, done)
 						if (stp->sd_flag & RDBUFWAIT) {
 							/* interrupted sleep */
 							stp->sd_flag &= ~RDBUFWAIT;
-							unbufcall(bid);
 							splx(s);
 							*done = 1;
 							return (EINTR);
@@ -1287,7 +1246,7 @@ strwaitq(stp, flag, count, fmode, done)
 	if (sleep(slpadr, slppri|PCATCH)) {
 		stp->sd_flag &= ~slpflg;
 		splx(s);
-		wakeprocs(slpadr, PRMPT);
+		wakeup(slpadr);
 		if (!(flag & NOINTR))
 			error = EINTR;
 		*done = 1;
@@ -1372,74 +1331,55 @@ strqbuf(stp)
 		s = splstr();
 		stp->sd_flag &= ~RDBUFWAIT;
 		splx(s);
-		wakeprocs((caddr_t)RD(stp->sd_wrq), PRMPT);
+		wakeup((caddr_t)RD(stp->sd_wrq));
 	}
 }
 
 /*
+ * Allocate a controlling terminal.
+ */
+int
+strctty(stp, oldttyp, flag)
+	register struct stdata *stp;
+	pid_t *oldttyp;
+	int flag;
+{
+	register proc_t *pp = u.u_procp;
+
+	if (stp->sd_flag & (STRHUP|STRDERR|STWRERR|STPLEX)) {
+		if ((oldttyp == NULL) && (u.u_ttyp != NULL)) {
+			*u.u_ttyp = 0;
+			u.u_ttyp = NULL;
+		}
+		return;
+	}
+	if (oldttyp == NULL && u.u_ttyp != NULL) {
+		stp->sd_flag |= STRISTTY;
+		realloctty(stp->sd_vnode);
+	} else if (((stp->sd_flag & (STRISTTY|STRCTTY)) == STRISTTY) &&
+	    (stp->sd_sid == 0) && (stp->sd_rerror == 0) &&
+	    (stp->sd_werror == 0) && !(flag & FNOCTTY) &&
+	    (pp->p_sessp->s_sid == pp->p_pid) && 
+	    (cttydev(pp) == NODEV)) {
+		alloctty(pp, stp->sd_vnode, &stp->sd_sid, &stp->sd_pgrp);
+		stp->sd_flag |= STRCTTY;
+	}
+}
+ 
+/*
  * Perform job control discipline access checks.
  * Return 0 for success and the errno for failure.
  */
-
-#define cantsend(pp,sig) \
-	(sigismember(&pp->p_ignore,sig) || sigismember(&pp->p_hold,sig))
-
 int
 straccess(stp, mode)
 	struct stdata *stp;
 	enum jcaccess mode;
 {
-	register proc_t *pp;
-	register sess_t *sp;
+	register struct proc *p = u.u_procp;
 
-	if (stp->sd_sidp == NULL)
-		return 0;
-
-	pp = u.u_procp;
-	sp = pp->p_sessp;
-
-	for (;;) {
-
-		/* 
-		 * if this is not the calling process's controlling terminal
-		 * or the calling process is already in the foreground
-		 * then allow access
-		 */
-
-		if (sp->s_dev != stp->sd_vnode->v_rdev 
-		  || pp->p_pgidp == stp->sd_pgidp)
-			return 0;
-
-		/*
-		 * check to see if controlling terminal has been deallocated
-		 */
-
-		if (sp->s_vp == NULL) {
-			if (cantsend(pp,SIGHUP))
-				return EIO;
-			pgsignal(pp->p_pgidp, SIGHUP);
-		} 
-
-		else if (mode == JCGETP)
-			return 0;
-
-		else if (mode == JCREAD) {
-			if (cantsend(pp,SIGTTIN) || pp->p_detached)
-				return EIO;
-			pgsignal(pp->p_pgidp,SIGTTIN);
-		} 
-
-		else {  /* mode == JCWRITE or JCSETP */
-			if (mode == JCWRITE && !(stp->sd_flag & STRTOSTOP)
-			  || cantsend(pp,SIGTTOU))
-				return 0;
-			if (pp->p_detached)
-				return EIO;
-			pgsignal(pp->p_pgidp, SIGTTOU);
-		}
-
-		(void) sleep((caddr_t)&lbolt, STIPRI);
-	}
+	if (!(stp->sd_flag & STRCTTY))
+		return (0);
+	return (accsctty(stp->sd_vnode, mode, stp->sd_flag&STRTOSTOP));
 }
 
 /*
@@ -1487,7 +1427,6 @@ shalloc(qp)
 	stp->sd_wrq = WR(qp);
 	BUMPUP(strst.stream);
 	Strinfo[DYN_STREAM].sd_cnt++;
-	Strcount += sizeof(struct shinfo);
 	shp->sh_next = (struct shinfo *) Strinfo[DYN_STREAM].sd_head;
 	if (shp->sh_next)
 		shp->sh_next->sh_prev = shp;
@@ -1521,7 +1460,6 @@ shfree(stp)
 	}
 	kmem_free(shp, sizeof(struct shinfo));
 	Strinfo[DYN_STREAM].sd_cnt--;
-	Strcount -= sizeof(struct shinfo);
 	strst.stream.use--;
 	splx(s);
 	return;
@@ -1540,15 +1478,13 @@ xmsgalloc()
 {
 	register struct msgb *mp;
 
-	if ((mp	= (struct msgb *) kmem_zalloc(sizeof(struct mbinfo), SE_NOSLP))
+	if ((mp	= (struct msgb *) kmem_zalloc(sizeof(struct msgb), SE_NOSLP))
 	 	== NULL) {
 		strst.msgblock.fail++;
 		return NULL;
 	}
 	BUMPUP(strst.msgblock);
 	Strinfo[DYN_MSGBLOCK].sd_cnt++;
-	Strcount += sizeof(struct mbinfo);
-	_INSERT_MSG_INUSE((struct mbinfo *)mp);
 	return((mblk_t *)mp);
 }
 
@@ -1574,8 +1510,6 @@ xmdballoc()
 
 	BUMPUP(strst.mdbblock);
 	Strinfo[DYN_MDBBLOCK].sd_cnt++;
-	Strcount += sizeof(struct mdbblock);
-	_INSERT_MDB_INUSE(mp);
 	return(mp);
 }
 
@@ -1636,7 +1570,6 @@ allocq()
 	BUMPUP(strst.queue);
 	BUMPUP(strst.queue);
 	Strinfo[DYN_QUEUE].sd_cnt += 2;
-	Strcount += sizeof(struct queinfo);
 	qip->qu_next = (struct queinfo *) Strinfo[DYN_QUEUE].sd_head;
 	if (qip->qu_next)
 		qip->qu_next->qu_prev = qip;
@@ -1683,7 +1616,6 @@ freeq(qp)
 		qip->qu_prev->qu_next = qip->qu_next;
 	}
 	kmem_free(qip, sizeof(struct queinfo));
-	Strcount -= sizeof(struct queinfo);
 	/* for accounting purposes, count individually */
 	strst.queue.use -= 2;
 	Strinfo[DYN_QUEUE].sd_cnt -= 2;
@@ -1706,7 +1638,6 @@ allocband()
 		return(NULL);
 	}
 	Strinfo[DYN_QBAND].sd_cnt++;
-	Strcount += sizeof(struct qbinfo);
 	qbip->qbi_next = (struct qbinfo *) Strinfo[DYN_QBAND].sd_head;
 	if (qbip->qbi_next)
 		qbip->qbi_next->qbi_prev = qbip;
@@ -1739,7 +1670,6 @@ freeband(qbp)
 		qbip->qbi_prev->qbi_next = qbip->qbi_next;
 	}
 	kmem_free(qbip, sizeof(struct qbinfo));
-	Strcount -= sizeof(struct qbinfo);
 	Strinfo[DYN_QBAND].sd_cnt--;
 	splx(s);
 	return;
@@ -1756,36 +1686,13 @@ sealloc(slpflag)
 	register struct seinfo *sep;
 
 	s = splstr();
-	if (sefreelist) {
-		sep = sefreelist;
-		sefreelist = sep->s_next;
-		sep->s_strevent.se_procp = NULL;
-		sep->s_strevent.se_events = 0;
-		sep->s_strevent.se_next = NULL;
-	}
-	else if (sep = (struct seinfo *) kmem_zalloc(sizeof(struct seinfo), slpflag)) {
-		Strinfo[DYN_STREVENT].sd_cnt++;
-		Strcount += sizeof(struct seinfo);
-	}
-	else {
-		if (slpflag == SE_NOSLP) {
-			/* use the cache for these */
-			if (secachep) {
-				sep = secachep;
-				secachep = secachep->s_next;
-				sep->s_strevent.se_procp = NULL;
-				sep->s_strevent.se_events = 0;
-				sep->s_strevent.se_next = NULL;
-			}
-		}
-		if (sep == NULL) {
-			/* failed anyhow */
-			strst.strevent.fail++;
-			splx(s);
-			return(NULL);
-		}
+	if ((sep = (struct seinfo *) kmem_zalloc(sizeof(struct seinfo), slpflag)) == NULL) {
+		strst.strevent.fail++;
+		splx(s);
+		return(NULL);
 	}
 	BUMPUP(strst.strevent);
+	Strinfo[DYN_STREVENT].sd_cnt++;
 	sep->s_next = (struct seinfo *) Strinfo[DYN_STREVENT].sd_head;
 	if (sep->s_next)
 		sep->s_next->s_prev = sep;
@@ -1817,15 +1724,8 @@ sefree(sep)
 			seip->s_next->s_prev = seip->s_prev;
 		seip->s_prev->s_next = seip->s_next;
 	}
-	if (seip >= &Secache[0] && seip <= &Secache[SECACHE]) {
-		/* it's from the cache */
-		seip->s_next = secachep;
-		secachep = seip;
-	}
-	else {
-		seip->s_next = sefreelist;
-		sefreelist = seip;
-	}
+	kmem_free(seip, sizeof(struct seinfo));
+	Strinfo[DYN_STREVENT].sd_cnt--;
 	strst.strevent.use--;
 	splx(s);
 	return;
@@ -1850,7 +1750,6 @@ queuerun()
 	register int count;
 	register struct strevent *sep;
 	register qband_t *qbp;
-	register int nevent;
 	mblk_t *mp;
 
 	s = splstr();
@@ -1878,48 +1777,19 @@ queuerun()
 			strbcwait = strbcflag = 0;
 
 			/*
-			 * count how many events are on the list
-			 * now so we can check to avoid looping
-			 * in low memory situations
-			 */
-			nevent = 0;
-			for (sep = strbcalls.bc_head; sep; sep = sep->se_next)
-				nevent++;
-			/*
 			 * get estimate of available memory from kmem_avail().
 			 * awake all bufcall functions waiting for
 			 * memory whose request could be satisfied 
 			 * by 'count' memory and let 'em fight for it.
 			 */
 			count = kmem_avail();
-			while ( (sep = strbcalls.bc_head) && nevent ) {
-				--nevent;
+			while ( (sep = strbcalls.bc_head) ) {
 				if ( sep->se_size <= count ) {
 					strbcalls.bc_head = sep->se_next;
 					(*sep->se_func)(sep->se_arg);
 					sefree(sep);
 				}
-				else {
-					/*
-					 * too big, try again later - note
-					 * that nevent was decremented above
-					 * so we won't retry this one on this
-					 * iteration of the loop
-					 */
-					strbcalls.bc_head = sep->se_next;
-					sep->se_next = NULL;
-					strbcalls.bc_tail->se_next = sep;
-					strbcalls.bc_tail = sep;
-				}
 			}
-			if (strbcalls.bc_head)
-				/*
-				 * still some bufcalls we couldn't do
-				 * let kmem_free know
-				 */
-				strbcwait = 1;
-			else
-				strbcalls.bc_tail = NULL;
 		}
 
 		while (q = qhead) {
@@ -1969,7 +1839,7 @@ runqueues()
 	register s;
 
 	s = splhi();
-	if (qrunflag && !queueflag) {
+	if (qrunflag & !queueflag) {
 		queueflag = 1;
 		splx(s);
 		queuerun();
@@ -2001,6 +1871,51 @@ findmod(name)
 	return(-1);
 }
 
+
+/*
+ * Make sure no streams reference process group pgid.
+ */
+void
+strclearpg(pgid)
+	pid_t pgid;
+{
+	register stdata_t *stp;
+	register struct shinfo *shp;
+
+	for (shp = (struct shinfo *) Strinfo[DYN_STREAM].sd_head; shp; shp = shp->sh_next) {
+		stp = (stdata_t *) shp;
+		if (stp->sd_pgrp == pgid)
+			stp->sd_pgrp = 0;
+	}
+}
+
+/*
+ * Make sure no streams reference session id sid.
+ */
+void
+strclearsid(sid)
+	pid_t sid;
+{
+	register stdata_t *stp;
+	register struct shinfo *shp;
+
+	for (shp = (struct shinfo *) Strinfo[DYN_STREAM].sd_head; shp; shp = shp->sh_next) {
+		stp = (stdata_t *) shp;
+		if (stp->sd_sid == sid)
+			stp->sd_sid = 0;
+	}
+}
+
+/*
+ * Shut off the STRCTTY flag (occurs when either the session leader
+ * exits or when the last reference to the file is closed).
+ */
+void
+strclearctty(stp)
+	register stdata_t *stp;
+{
+	stp->sd_flag &= ~STRCTTY;
+}
 
 /*
  * Set the QBACK or QB_BACK flag in the given queue for
@@ -2100,95 +2015,16 @@ strsignal(stp, sig, band)
 		splx(s);
 		break;
 
+	case SIGTSTP:
+		if ((stp->sd_pgrp > 0) && !detachedpg(stp->sd_pgrp))
+			signal(stp->sd_pgrp, SIGTSTP);
+		break;
+
 	default:
-		if (stp->sd_pgidp) {
-			if (stp->sd_flag & STRPID)
-				prsignal(stp->sd_pgidp, sig);
-			else
-				pgsignal(stp->sd_pgidp, sig);
-		}
+		if (stp->sd_pgrp > 0)
+			signal(stp->sd_pgrp, sig);
+		else if (stp->sd_pgrp < 0)
+			psignal(stp->sd_procp, sig);
 		break;
 	}
-}
-
-strhup(stp)
-	struct stdata *stp;
-{
-	int s;
-
-	s = splstr();
-	if (stp->sd_sigflags & S_HANGUP) 
-		strsendsig(stp->sd_siglist, S_HANGUP, 0L);
-	pollwakeup(&stp->sd_pollist, POLLHUP);
-	if (stp->sd_eventflags & S_HANGUP)
-		strevpost(stp, S_HANGUP, 0L);
-	splx(s);
-}
-
-stralloctty(sp, stp)
-	register sess_t *sp;
-	register struct stdata *stp;
-{
-	stp->sd_sidp = sp->s_sidp;
-	stp->sd_pgidp = sp->s_sidp;
-	stp->sd_flag &= ~STRPID;
-	PID_HOLD(stp->sd_pgidp);
-	PID_HOLD(stp->sd_sidp);
-}
-
-strfreectty(stp)
-	register struct stdata *stp;
-{
-	pgsignal(stp->sd_pgidp, SIGHUP);
-	PID_RELE(stp->sd_pgidp);
-	PID_RELE(stp->sd_sidp);
-	stp->sd_pgidp = NULL;
-	stp->sd_sidp = NULL;
-	if (! (stp->sd_flag & STRHUP) )
-		strhup(stp);
-}
-
-/*
- * Unlink "all" persistant links.
- */
-void
-strpunlink(crp)
-	struct cred *crp;
-{
-	struct stdata *stp;
-	struct shinfo  *shp;
-	int rval;
-	/*
-	 * for each allocated stream head, call munlinkall()
-	 * with flag of LINKPERSIST to unlink any/all persistant
-	 * links for the device.
-	 */
-
-	shp = (struct shinfo *) Strinfo[DYN_STREAM].sd_head;
-	while(shp)
-	{
-		stp = (struct stdata *) shp;
-		(void) munlinkall(stp, LINKIOCTL|LINKPERSIST, crp, &rval);
-		shp = shp->sh_next;
-	}
-}
-
-int
-strctty(pp, stp)
-	register proc_t *pp;
-	register struct stdata *stp;
-{
-	extern vnode_t *makectty();
-	register sess_t *sp = pp->p_sessp;
-
-	if ((stp->sd_flag & (STRHUP|STRDERR|STWRERR|STPLEX)) == 0
-	  && stp->sd_sidp == NULL		/* not allocated as ctty */
-	  && stp->sd_pgidp == NULL		/* not allocated as socket */
-	  && sp->s_sidp == pp->p_pidp		/* session leader */
-	  && sp->s_vp == NULL) {		/* without ctty */
-		alloctty(pp, makectty(stp->sd_vnode));
-		stralloctty(sp, stp);
-		return 1;
-	}
-	return 0;
 }

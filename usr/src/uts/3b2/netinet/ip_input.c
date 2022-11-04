@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/ip_input.c	1.8"
+#ident	"@(#)netinet:netinet/ip_input.c	1.6"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -926,10 +926,15 @@ u_char          inetctlerrmap[PRC_NCMDS] = {
 					    ENOPROTOOPT
 };
 
+#ifndef	IPFORWARDING
+#define	IPFORWARDING	1
+#endif
+#ifndef	IPSENDREDIRECTS
+#define	IPSENDREDIRECTS	1
+#endif
 int             ipprintfs = 0;
-
-extern int		ipforwarding;		/* from /etc/master.d/ip */
-extern int		ipsendredirects;	/* from /etc/master.d/ip */
+int             ipforwarding = IPFORWARDING;
+int             ipsendredirects = IPSENDREDIRECTS;
 
 /*
  * Forward a packet.  If some error occurs return the sender an icmp packet.
@@ -967,8 +972,21 @@ ip_forward(q, bp)
 			printf ("ip_forward: cant forward\n");
 		}
 		ipstat.ips_cantforward++;
-		freemsg(bp);
-		return;
+
+		/*
+		** This was #ifdef gateway in 4.3BSD.  Rather than have
+		** that, only send these packets if ipsendredirects is on.
+		** This way, if both forwarding and sendredirects are off,
+		** we won't flood the network with this excess traffic.
+		*/
+
+		if (ipsendredirects) {
+			type = ICMP_UNREACH, code = ICMP_UNREACH_NET;
+			goto sendicmp;
+		} else {
+			freemsg(bp);
+			return;
+		}
 	}
 	if (in_canforward(ip->ip_dst) == 0) {
 		if (ipdprintf) {

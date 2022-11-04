@@ -8,7 +8,7 @@
 #ifndef _SYS_CLASS_H
 #define _SYS_CLASS_H
 
-#ident	"@(#)head.sys:sys/class.h	1.14"
+#ident	"@(#)head.sys:sys/class.h	1.12"
 
 
 /*
@@ -56,7 +56,7 @@ typedef struct classfuncs {
 	void		(*cl_trapret)();	/* Don't move without changing */
 						/*  .set in ml/ttrap.s */
 	void		(*cl_wakeup)();
-	int		(*cl_filler[11])();
+	void		(*cl_filler[11])();
 } classfuncs_t;
 
 
@@ -65,7 +65,8 @@ typedef struct classfuncs {
 
 #define	CL_ENTERCLASS(clp, clparmsp, pp, pstatp, pprip, pflagp, pcredpp, clprocpp, reqpcid, reqpcredp) \
 (*(clp)->cl_funcs->cl_enterclass)\
-  (clparmsp, pp, pstatp, pprip, pflagp, pcredpp, clprocpp, reqpcid, reqpcredp)
+  (clparmsp, pp, pstatp, pprip, pflagp, pcredpp, clprocpp, reqpcid,\
+	reqpcredp)
 
 #define	CL_EXITCLASS(pp, clprocp) (*(pp)->p_clfuncs->cl_exitclass)(clprocp)
 
@@ -85,9 +86,10 @@ typedef struct classfuncs {
 #define	CL_PARMSGET(pp, clprocp, clparmsp) \
     (*(pp)->p_clfuncs->cl_parmsget)(clprocp, clparmsp)
 
-#define CL_PARMSIN(clp, clparmsp, rqpcid, rqpcredp, tgpcid, tgpcredp, tgpclpp) \
-(*(clp)->cl_funcs->cl_parmsin)\
-(clparmsp, rqpcid, rqpcredp, tgpcid, tgpcredp, tgpclpp)
+#define CL_PARMSIN(clp, clparmsp, reqpcid, reqpcredp, \
+targpcid, targpcredp, targpclpp) \
+(*(clp)->cl_funcs->cl_parmsin)(clparmsp, reqpcid, reqpcredp, \
+targpcid, targpcredp, targpclpp)
 
 #define CL_PARMSOUT(clp, clparmsp, reqpcid, reqpcredp, targpcredp) \
 (*(clp)->cl_funcs->cl_parmsout)(clparmsp, reqpcid, reqpcredp, targpcredp)

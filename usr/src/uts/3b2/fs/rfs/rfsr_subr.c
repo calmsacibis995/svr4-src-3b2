@@ -1,11 +1,4 @@
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)fs:fs/rfs/rfsr_subr.c	1.18"
+#ident	"@(#)fs:fs/rfs/rfsr_subr.c	1.10.1.1 UNOFFICIAL"
 
 /*
  * Support operations for the RFS server daemon.
@@ -23,7 +16,6 @@
 #include "sys/stream.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/psw.h"
 #include "sys/pcb.h"
@@ -48,19 +40,18 @@
 #include "sys/rf_adv.h"
 #include "sys/uio.h"
 #include "sys/fs/rf_vfs.h"
+#include "sys/rf_messg.h"
 #include "sys/dirent.h"
 #include "rf_serve.h"
 #include "sys/statfs.h"
 #include "sys/statvfs.h"
 #include "rf_auth.h"
 #include "rfcl_subr.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 #include "sys/hetero.h"
 #include "rf_canon.h"
 #include "sys/sysinfo.h"
 #include "sys/kmem.h"
-#include "sys/mman.h"
 #include "sys/fs/rf_acct.h"
 
 /* imports */
@@ -82,14 +73,6 @@ STATIC int	rfsr_dev_find();
 STATIC int	rfsr_dev_insert();
 STATIC void	rfsr_dev_clean();
 STATIC int	rfsr_writev();
-STATIC int	rfsr_discon();
-STATIC void	rfm_remove();
-
-#ifdef DEBUG
-int	rfsr_idle_lock;
-int	rfsr_active_lock;
-int	rfsr_msg_lock;
-#endif
 
 /*
  * Translate pathname to vnode, or path crosses back to client,
@@ -108,9 +91,9 @@ rfsr_lookupname(followlink, stp, dirvpp, compvpp, sr_ctrlp)
 	register int	error;
 	size_t		hdrsz = RF_MIN_REQ(stp->sr_vcver);
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz,
-	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) {
-		return rfsr_j_accuse("rfsr_lookupname bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz,
+	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) != 0) {
+		return error;
 	}
 	if ((error =
 	  pn_get(rf_msgdata(stp->sr_in_bp, hdrsz), UIO_SYSSPACE, &lookpn))
@@ -137,63 +120,40 @@ rfsr_lookupname(followlink, stp, dirvpp, compvpp, sr_ctrlp)
  */
 int
 rfsr_lookuppn(pnp, followlink, stp, dirvpp, compvpp, sr_ctrlp)
-	register pathname_t	*pnp;		/* pathname to lookup */
-	symfollow_t		followlink;	/* (don't) follow sym links */
-	rfsr_state_t		*stp;
-	vnode_t			**dirvpp;	/* parent vnode */
-	vnode_t			**compvpp;	/* entry vnode */
-	rfsr_ctrl_t		*sr_ctrlp;
+	register pathname_t *pnp;	/* pathname to lookup */
+	symfollow_t followlink;		/* (don't) follow sym links */
+	rfsr_state_t *stp;		/* state struct assoc with request */
+	vnode_t **dirvpp;		/* ptr for parent vnode */
+	vnode_t **compvpp;		/* ptr for entry vnode */
+	rfsr_ctrl_t *sr_ctrlp;
 {
-	register vnode_t	*vp;		/* current directory vp */
-	register vnode_t	*cvp;		/* current component vp */
-	vnode_t			*tvp;		/* addressable temp ptr */
-	register vfs_t		*vfsp;		/* ptr to vfs for mount indir */
-	char			component[MAXNAMELEN];
-	register int		error = 0;
-	register int		nlink;
-	int			lookup_flags;
-	vnode_t			*rsc_rootvp;
-	vnode_t			*rdir;		/* root directory */
-	rf_request_t		*req;
+	register vnode_t *vp;		/* current directory vp */
+	register vnode_t *cvp;		/* current component vp */
+	vnode_t *tvp;			/* addressable temp ptr */
+	register vfs_t *vfsp;		/* ptr to vfs for mount indir */
+	char component[MAXNAMELEN];	/* buffer for component */
+	register int error = 0;
+	register int nlink;
+	int lookup_flags;
+	vnode_t *rsc_rootvp;
+	vnode_t *rdir;			/* root directory */
 
 	nlink = 0;
 	cvp = NULLVP;
 	lookup_flags = dirvpp ? LOOKUP_DIR : 0;
 	rsc_rootvp = stp->sr_rsrcp->r_rootvp;
 
-	/* start at current directory. */
-
+	/*
+	 * start at current directory.
+	 */
 	vp = stp->sr_rdp->rd_vp;
 	VN_HOLD(vp);
 
-	/* To avoid special checks */
-
-	req = RF_REQ(stp->sr_in_bp);
-	rdir = rootdir;
-	if (req->rq_rrdir_id) {
-		if (stp->sr_vcver >= RFS2DOT0) {
-			rf_gift_t	gift;
-
-			gift.gift_id = req->rq_rrdir_id;
-			gift.gift_gen = req->rq_rrdir_gen;
-			if ((rdir = rf_gifttovp(&gift, stp->sr_vcver)) ==
-			  NULL) {
-
-				/* Client has sent an invalid reference. */
-
-				return EPROTO;
-			}
-		} else if (req->rq_rrdir_id <= 0 || req->rq_rrdir_id >= nrcvd ||
-		  (rdir = rcvd[req->rq_rrdir_id].rd_vp) == NULL) {
-
-			/* Client has sent an invalid reference. */
-
-			return EPROTO;
-		}
-	}
-
+	/* To avoid special checks
+	 */
+	rdir = RF_REQ(stp->sr_in_bp)->rq_rrdir ?
+		rcvd[RF_REQ(stp->sr_in_bp)->rq_rrdir].rd_vp : rootdir;
 begin:
-
 	/*
 	 * Each time we begin a new name interpretation (e.g.
 	 * when first called and after each symbolic link is
@@ -201,7 +161,6 @@ begin:
 	 * root directory if the name starts with a '/', otherwise
 	 * continuing from the current directory.
 	 */
-
 	component[0] = 0;
 	if (pn_peekchar(pnp) == '/') {
 		VN_RELE(vp);
@@ -209,11 +168,6 @@ begin:
 		vp = rdir;
 		VN_HOLD(vp);
 	}
-
-        /*
-         * Eliminate any trailing slashes in the pathname.
-	 */
-	pn_fixslash(pnp);
 
 next:
 	/*
@@ -242,7 +196,7 @@ next:
 		 */
 		if (dirvpp) {
 			VN_RELE(vp);
-			return EEXIST;
+			return EINVAL;
 		}
 		(void) pn_set(pnp, ".");
 		if (compvpp)
@@ -413,10 +367,7 @@ checkforroot:
 		}
 		if (vfsp->vfs_flag & VFS_MLOCK) {
 			vfsp->vfs_flag |= VFS_MWAIT;
-			if ((sleep((caddr_t)vfsp, PVFS | PCATCH)) != 0) {
-				error = EINTR;
-				goto bad;
-			}
+			(void) sleep((caddr_t)vfsp, PVFS);
 			continue;
 		}
 		if (error = VFS_ROOT(cvp->v_vfsmountedhere, &tvp))
@@ -441,7 +392,7 @@ skip:
 			if (VN_CMP(vp, cvp)) {
 				VN_RELE(vp);
 				VN_RELE(cvp);
-				return EEXIST;
+				return EINVAL;
 			}
 			*dirvpp = vp;
 		} else {
@@ -519,7 +470,7 @@ reset_len(pnp, opcode, stp)
 
 	bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
 	cop = RF_COM(bp);
-	RF_RESP(bp)->rp_v2giftinfo.pathlen = pnp->pn_pathlen;
+	RF_RESP(bp)->rp_v2gift.pathlen = pnp->pn_pathlen;
 	cop->co_mntid = stp->sr_srmp->srm_mntid;
 	cop->co_opcode = opcode;
 	return bp;
@@ -552,12 +503,10 @@ rfsr_gift_setup(stp, vp, out_port)
 	register rf_response_t	*resp = RF_RESP(stp->sr_out_bp);
 	register rf_common_t	*cop = RF_COM(stp->sr_out_bp);
 	rcvd_t			*giftrd = vtord(vp);
-	int			mandlock;
 	vattr_t			vattr;
 
 	/* if sd went bad, forget it */
 	if (out_port->sd_stat & SDLINKDOWN) {
-		VN_RELE(vp);
 		return ENOLINK;
 	}
 	ASSERT(!stp->sr_gift);
@@ -570,14 +519,11 @@ rfsr_gift_setup(stp, vp, out_port)
 		 * the reference is redundant (for that client).
 		 */
 		giftrd->rd_refcnt++;
-		VN_RELE(vp);
 	} else {
 		/*
-		 * First remote reference to this file.  In this case, the
-		 * vp remains held.  rcvd_free will later release it.
+		 * First remote reference to this file.
 		 */
 		if (error = rcvd_create(TRUE, RDGENERAL, &giftrd)) {
-			VN_RELE(vp);
 			return error;
 		}
 		giftrd->rd_vp = vp;
@@ -586,62 +532,48 @@ rfsr_gift_setup(stp, vp, out_port)
 	 */
 	if ((rdup = rdu_get(giftrd, sysid, out_port->sd_mntid,
 	  out_port->sd_queue)) == NULL) {
-		rcvd_delete(&giftrd, (sysid_t)0, (long)-1, 1);
+		rcvd_delete(&giftrd, (sysid_t)0, (long)-1);
 		return ENOSPC;
 	}
 	vattr.va_mask =
 		AT_UID | AT_GID | AT_NLINK | AT_SIZE | AT_MODE | AT_VCODE;
 	if ((error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred)) != 0) {
-		rdu_del(giftrd, sysid, out_port->sd_mntid, 1);
-		rcvd_delete(&giftrd, sysid, out_port->sd_mntid, 1);
+		rdu_del(giftrd, sysid, out_port->sd_mntid);
+		rcvd_delete(&giftrd, sysid, out_port->sd_mntid);
 		return error;
 	}
 	stp->sr_srmp->srm_refcnt++;
 
+	cop->co_nlink = vattr.va_nlink;
 	cop->co_uid = vattr.va_uid;
 	cop->co_gid = vattr.va_gid;
 	cop->co_ftype = VTTOIF(vp->v_type);
 	cop->co_size = vattr.va_size;
 	resp->rp_fhandle = (long)vp;
 	if (stp->sr_vcver >= RFS2DOT0) {
-		resp->rp_v2giftinfo.flags = 0;
-		if (vp->v_flag & VNOSWAP) {
-			resp->rp_v2giftinfo.flags |= RPG_NOSWAP;
+		resp->rp_v2gift.flags = 0;
+		if (vp->v_flag & VNOMAP) {
+			resp->rp_v2gift.flags |= RPG_NOMAP;
 		}
-		if (vp->v_flag & VNOMAP || vp->v_type == VCHR) {
-			resp->rp_v2giftinfo.flags |= RPG_NOMAP;
-		}
-	} else {
-		cop->co_nlink = vattr.va_nlink;
 	}
-
-	mandlock = MANDLOCK(vp, vattr.va_mode);
-	if (mandlock && stp->sr_vcver < RFS2DOT0) {
-		resp->rp_cache |= RP_MNDLCK;
-	}
-
 	if (stp->sr_srmp->srm_flags & SRM_CACHE && vp->v_type == VREG) {
-
-		if (!mandlock &&
+		if (!MANDLOCK(vp, vattr.va_mode) &&
 	  	  (lbolt - giftrd->rd_mtime > rfc_time ||
 		   lbolt < giftrd->rd_mtime)) {
 			rdup->ru_cflag |= RU_CACHE_ON;
 			rdup->ru_cflag &= ~RU_CACHE_DISABLE;
 		}
-
 		if (rdup->ru_cflag & RU_CACHE_ON) {
 			if (stp->sr_vcver >= RFS2DOT0) {
 				resp->rp_v2vcode = vattr.va_vcode;
 			} else if (stp->sr_opcode == RFCREATE ||
 			  stp->sr_opcode == RFOPEN) {
-
 				/*
 				 * 3.2 clients only expect cacheing
 				 * info with gifts obtained via open
 				 * and create.  rp_rval has
 				 * different uses otherwise.
 				 */
-
 				resp->rp_cache = DU_CACHE_ENABLE;
 				stp->sr_ret_val = vattr.va_vcode;
 			}
@@ -677,9 +609,6 @@ rfsr_chkrdq(rdp, pid, sysid)
 		return NULL;
 	}
 	s = splstr();
-
-	ASSERT(!rdp->rd_qslp++);
-
 	qcnt = rdp->rd_qcnt;
 	current = (mblk_t *)rdp->rd_rcvdq.ls_next;
 	for (mi = 0; mi < qcnt; current = current->b_next, mi++) {
@@ -691,16 +620,10 @@ rfsr_chkrdq(rdp, pid, sysid)
 			if (RCVDEMP(rdp)) {
 				rfsr_rmmsg(rdp);
 			}
-
-			ASSERT(!--rdp->rd_qslp);
-
 			splx(s);
 			return current;
 		}
 	}
-
-	ASSERT(!--rdp->rd_qslp);
-
 	splx(s);
 	return NULL;
 }
@@ -810,8 +733,7 @@ rfsr_adj_timeskew(gp, sec, nsec)
 	}
 }
 
-/*
- * Process request for big reads from raw devices.
+/* Process request for big reads from raw devices.
  * Stp denotes the server state structure with sr_ret_val set to the
  * residual read count, and sr_cred holding the client credentials.
  * Vp denotes the file to be read, uiop a uio_t with associated
@@ -934,8 +856,6 @@ rfsr_cookedread(stp, vp, uiop, ioflag, base)
 				  (rd_user_t **)NULL);
 
 	ASSERT(rdup);
-	ASSERT(!stp->sr_out_bp);
-
 	VOP_RWLOCK(vp);
 	disabled = stp->sr_srmp->srm_flags & SRM_CACHE &&
 	  rdup->ru_cflag & RU_CACHE_DISABLE;
@@ -1041,28 +961,26 @@ rfsr_rawwrite(stp, vp, uiop, ioflag, base)
 	register caddr_t	buf;
 	register caddr_t	nextcp;		/* in buf */
 	register caddr_t	end;		/* beyond end of buf */
-	register size_t		nleft = stp->sr_ret_val;
+	size_t			cpinsize;	/* bytes to rcopyin call */
+	size_t			nleft;		/* bytes still on client */
 	size_t			writerq = 0;	/* bytes sent to VOP_WRITE */
 	size_t			prewrite = 0;
 	mblk_t			*iobp;
 	int			totwrite = 0;
 	int			error = 0;
-	iovec_t			*save_iovp = uiop->uio_iov;
-	int			save_iovcnt = uiop->uio_iovcnt;
 
 	if ((buf = kseg((int)btoc(bufsize))) == NULL) {
 		return ENOMEM;
 	}
 
 	end = buf + bufsize;
-	nextcp = buf;
+	nleft = stp->sr_ret_val;
 
 	if (stp->sr_in_bp) {
 
 		ASSERT(RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite);
 
 		prewrite = RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite;
-		nleft -= prewrite;
 
 		/*
 		 * Drop the RFS headers, so that all blocks contain only
@@ -1073,24 +991,25 @@ rfsr_rawwrite(stp, vp, uiop, ioflag, base)
 		  rf_dropbytes(stp->sr_in_bp, RF_MIN_REQ(stp->sr_vcver));
 
 		if (prewrite > stp->sr_ret_val || !iobp) {
-			error =
-			  rfsr_discon("rfsr_rawwrite bad request header", stp);
+			error = rfsr_discon("rfsr_rawwrite bad request header",
+			  stp);
 			goto out;
 		}
 	}
 
+	nleft -= prewrite;
 	while (prewrite) {
 		size_t	cpsz;
 
 		/* Move data from message into buf. */
 
+		nextcp = buf;
 		while (iobp &&
 		  (cpsz = MIN(end - nextcp, iobp->b_wptr - iobp->b_rptr))
 		   != 0) {
 			bcopy((caddr_t)iobp->b_rptr, nextcp, cpsz);
 			nextcp += cpsz;
 			totwrite += cpsz;
-			prewrite -= cpsz;
 			if ((iobp->b_rptr += cpsz) == iobp->b_wptr) {
 				stp->sr_in_bp = stp->sr_in_bp->b_cont;
 				iobp->b_cont = NULL;
@@ -1099,14 +1018,16 @@ rfsr_rawwrite(stp, vp, uiop, ioflag, base)
 			}
 		}
 
+		writerq = nextcp - buf;
+		base += writerq;
+		prewrite -= writerq;
+
 		if (!prewrite != !iobp) {
 			error = rfsr_discon("rfsr_rawrite bad prewrite", stp);
 			goto out;
 		}
 
-		writerq = nextcp - buf;
-
-		if (nextcp == end || nextcp - buf == stp->sr_ret_val) {
+		if (nextcp == end || !nleft) {
 
 			/*
 			 * Write now only if buffer is full or nothing left
@@ -1117,15 +1038,13 @@ rfsr_rawwrite(stp, vp, uiop, ioflag, base)
 			uiop->uio_resid = uiop->uio_iov->iov_len = writerq;
 
 			if ((error =
-			  VOP_WRITE(vp, uiop, ioflag, stp->sr_cred)) != 0 ||
+			   VOP_WRITE(vp, uiop, ioflag, stp->sr_cred)) != 0 ||
 			  uiop->uio_resid == writerq) {
 
 				/* Error or can't write any more */
 
 				goto out;
 			}
-			uiop->uio_iov = save_iovp;
-			uiop->uio_iovcnt = save_iovcnt;
 
 			if (uiop->uio_resid) {
 
@@ -1137,58 +1056,48 @@ rfsr_rawwrite(stp, vp, uiop, ioflag, base)
 
 				ovbcopy(nextcp - uiop->uio_resid, buf,
 				  (size_t)uiop->uio_resid);
-				writerq -= uiop->uio_resid;
-				nextcp = buf + uiop->uio_resid;
-			} else {
-				nextcp = buf;
 			}
-			stp->sr_ret_val -= writerq;
-			base += writerq;
+
+			stp->sr_ret_val -= writerq - uiop->uio_resid;
 		}
 #ifdef	DEBUG
 		else {
-			/* Fall through to rcopyin and write */
+			/* Fall throught to rcopyin and write */
 			ASSERT(!prewrite);
 		}
 #endif
 	}
 
-	while (stp->sr_ret_val && !error) {
-		size_t	rcprq;		/* bytes to rcopyin */
+	while(stp->sr_ret_val && !error) {
 
-		rcprq = (size_t)MIN(nleft - (nextcp - buf), end - nextcp);
-		if (rcprq) {
-			if ((rcopyin(base, nextcp, rcprq, 1)) != 0) {
-				error = EFAULT;
-				goto out;
-			}
-			nleft -= rcprq;
-			base += rcprq;
-			nextcp += rcprq;
+		ASSERT(nleft);
+
+		cpinsize = MIN(nleft, end - nextcp);
+		if (rcopyin(base, nextcp, cpinsize, 1)) {
+			error = EFAULT;
+			goto out;
 		}
 
-		writerq = nextcp - buf;
-		uiop->uio_iov->iov_base = buf;
-		uiop->uio_resid = uiop->uio_iov->iov_len = writerq;
+		nleft -= cpinsize;
+		base += cpinsize;
+		totwrite += cpinsize;
+		writerq = nextcp + cpinsize - buf;
 
-		if ((error = VOP_WRITE(vp, uiop, ioflag, stp->sr_cred)) != 0 ||
+		uiop->uio_iov->iov_base = nextcp = buf;
+		uiop->uio_resid = uiop->uio_iov->iov_len = writerq = cpinsize;
+
+		if ((error =
+		   VOP_WRITE(vp, uiop, ioflag, stp->sr_cred)) != 0 ||
 		  uiop->uio_resid == writerq) {
 			goto out;
 		}
-		uiop->uio_iov = save_iovp;
-		uiop->uio_iovcnt = save_iovcnt;
 
 		if (uiop->uio_resid) {
 			ovbcopy(nextcp - uiop->uio_resid, buf,
 			  (size_t)uiop->uio_resid);
-			writerq -= uiop->uio_resid;
-			nextcp = buf + uiop->uio_resid;
-		} else {
-			nextcp = buf;
 		}
 
-		stp->sr_ret_val -= writerq;
-		totwrite += writerq;
+		stp->sr_ret_val -= writerq - uiop->uio_resid;
 	}
 out:
 	SR_FREEMSG(stp);
@@ -1224,8 +1133,7 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 	register size_t		nleft;		/* bytes on client */
 	register size_t		writerq;	/* bytes in message */
 	register sndd_t		*srchan;	/* channel to client */
-	size_t			totwrite = 0;
-	off_t			o_offset;	/* original file offset */
+	int			totwrite = 0;
 	register int		error = 0;
 	int			tmperror = 0;	/* remember errors that don't
 						 * immediately break the loop
@@ -1233,7 +1141,6 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 
 	VOP_RWLOCK(vp);
 
-	o_offset = uiop->uio_offset;
 	nleft = stp->sr_ret_val;
 	srchan = u.u_srchan;
 
@@ -1241,7 +1148,7 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 
 		ASSERT(RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite);
 
-		nleft -= writerq = RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite;
+		writerq = RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite;
 
 		if (writerq > stp->sr_ret_val) {
 			error = rfsr_discon("rfsr_cookedwrite bad prewrite",
@@ -1250,16 +1157,15 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 		}
 	
 		if ((error = rfsr_writev(vp, uiop, ioflag, stp,
-		  RF_MIN_REQ(stp->sr_vcver),
-		  (size_t)RF_REQ(stp->sr_in_bp)->rq_xfer.prewrite)) != 0) {
+		  RF_MIN_REQ(stp->sr_vcver))) != 0) {
 			goto out;
 		}
-		writerq -= uiop->uio_resid;
-		stp->sr_ret_val -= writerq; 
-		base += writerq;
-		totwrite += writerq;
+		stp->sr_ret_val -= writerq - uiop->uio_resid;
 	}
 
+	nleft -= writerq;
+	base += writerq;
+	totwrite += writerq;
 	if (!stp->sr_ret_val || uiop->uio_resid || error) {
 		goto out;
 	}
@@ -1279,7 +1185,6 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 		}
 
 		writerq = RF_RESP(stp->sr_in_bp)->rp_count;
-		nleft -= writerq;
 
 		if (writerq > stp->sr_ret_val) {
 			error = rfsr_discon("rfsr_cookedwrite bad copyin", stp);
@@ -1288,11 +1193,11 @@ rfsr_cookedwrite(stp, vp, uiop, ioflag, base)
 
 		if (!tmperror && !uiop->uio_resid) {
 			tmperror = rfsr_writev(vp, uiop, ioflag, stp,
-			  RF_MIN_RESP(stp->sr_vcver), writerq);
-			writerq -= uiop->uio_resid;
-			stp->sr_ret_val -= writerq; 
+			  RF_MIN_RESP(stp->sr_vcver));
+			stp->sr_ret_val -= writerq - uiop->uio_resid;
 			totwrite += writerq;
 		}
+		nleft -= writerq;
 		rf_freemsg(stp->sr_in_bp);
 		stp->sr_in_bp = NULL;
 	}
@@ -1300,20 +1205,15 @@ out:
 	rcvd_free(&rd);
 	SR_FREEMSG(stp);
 	VOP_RWUNLOCK(vp);
-	if (!error && vp->v_type == VREG) {
-		(void)VOP_PUTPAGE(vp, o_offset, totwrite,
-		  B_ASYNC, stp->sr_cred);
-	}
 	stp->sr_srmp->srm_kbcnt += totwrite / 1024;
 	return error ? error : tmperror;
 }
 
 /*
  * Code common to initialization sequences of rfsr_read, rfsr_write.
- * Always returns an error status.  If no other errors, and client is
- * pre-SVR4, and a change in mandatory lock status has occurred,
- * allocates a response, sets its RP_MNDLCK flag, sets *sr_ctrlp to
- * SR_NACK_RESP, and returns ENOMEM.
+ * Always returns an error status.  If no errors and a change in mandatory
+ * lock status has occurred, allocates a response, sets its RP_MNDLCK flag
+ * and set *sr_ctrlp to SR_NACK_RESP.
  */
 int
 rfsr_rdwrinit(stp, uiop, vp, flagp, sr_ctrlp)
@@ -1328,36 +1228,12 @@ rfsr_rdwrinit(stp, uiop, vp, flagp, sr_ctrlp)
 	register unsigned	ioflag = 0;
 	register int		error = 0;
 	int			chklock;
-	int			op = stp->sr_opcode;
-	rd_user_t		*rdup;
-
-	/* TO DO:  checks for GETPAGE/PUTPAGE (here?) */
-
-	switch (op) {
-	case RFREAD:
-	case RFWRITE:
-	case DUREADI:
-	case DUWRITEI:
-		rdup = rdu_find(stp->sr_rdp,
-			  u.u_procp->p_sysid, u.u_srchan->sd_mntid,
-			  (rd_user_t **)NULL);
-		if (!rdup ||
-		  (op == RFREAD || op == DUREADI) &&
-		   !rdup->ru_frwcnt && !rdup->ru_frcnt ||
-		  (op == RFWRITE || op == DUWRITEI) &&
-		   !rdup->ru_frwcnt && !rdup->ru_fwcnt) {
-			return EPROTO;
-		}
-		break;
-	default:
-		break;
-	}
 
 	chklock = RF_MSG(stp->sr_in_bp)->m_stat & RF_VER1 &&
-	  stp->sr_vcver < RFS2DOT0 && !(req->rq_flags & RQ_MNDLCK);
-
-	/* return value of read, write requests in residual char count */
-
+	  !(req->rq_flags & RQ_MNDLCK);
+	/*
+	 * return value of read, write requests in residual char count
+	 */
 	stp->sr_ret_val = req->rq_xfer.count;
 	stp->sr_oldoffset = req->rq_xfer.offset;
 	uiop->uio_iovcnt = 1;
@@ -1373,41 +1249,18 @@ rfsr_rdwrinit(stp, uiop, vp, flagp, sr_ctrlp)
 	}
 	*flagp = ioflag;
 
-	if (chklock || op == RFPUTPAGE) {
+	if (chklock || stp->sr_opcode == RFPUTPAGE) {
 		vattr.va_mask = AT_MODE | AT_SIZE;
 	  	if ((error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred)) == 0) {
-			if (op == RFPUTPAGE) {
-				size_t	rsz;
-
-				/*
-				 * TO DO:  The btoprsz hack tries to mimic
-				 * what a disk file system does in truncating
-				 * putpages.  It's not clear this is good
-				 * enough, nor is it clear we can do better
-				 * while continuing to map putpages into
-				 * writes.
-				 */
-
-				rsz = ptob(btopr(vattr.va_size));
-				if (stp->sr_ret_val + uiop->uio_offset > rsz) {
-					error = EFAULT;
-				} else if (stp->sr_ret_val + uiop->uio_offset
-				  > vattr.va_size) {
-					stp->sr_ret_val -=
-					  (rsz - vattr.va_size);
-					if (req->rq_xfer.prewrite >
-					  stp->sr_ret_val) {
-						req->rq_xfer.prewrite =
-						  stp->sr_ret_val;
-					}
-				}
+			if (stp->sr_opcode == RFPUTPAGE &&
+			  stp->sr_ret_val + uiop->uio_offset >= vattr.va_size) {
+				error = EFAULT;
 			} else if (chklock && MANDLOCK(vp, vattr.va_mode)) {
 				ASSERT(!stp->sr_out_bp);
 				stp->sr_out_bp =
 				  rfsr_rpalloc((size_t)0, stp->sr_vcver);
 				RF_RESP(stp->sr_out_bp)->rp_cache = RP_MNDLCK;
 				*sr_ctrlp = SR_NACK_RESP;
-				error = ENOMEM;
 			}
 		}
 	}
@@ -1422,13 +1275,12 @@ rfsr_rdwrinit(stp, uiop, vp, flagp, sr_ctrlp)
  * impunity.
  */
 STATIC int
-rfsr_writev(vp, uiop, ioflag, stp, hdrsz, nbytes)
+rfsr_writev(vp, uiop, ioflag, stp, hdrsz)
 	vnode_t		*vp;
 	uio_t		*uiop;
 	unsigned	ioflag;
 	rfsr_state_t	*stp;
 	size_t		hdrsz;
-	size_t		nbytes;
 {
 	iovec_t		*iovp;
 	int		niov = 0;
@@ -1442,7 +1294,6 @@ rfsr_writev(vp, uiop, ioflag, stp, hdrsz, nbytes)
 	}
 
 	rf_iov_alloc(uiop, stp->sr_in_bp);
-	uiop->uio_resid = nbytes;
 	iovp = uiop->uio_iov;
 	niov = uiop->uio_iovcnt;
 
@@ -1499,27 +1350,15 @@ rfsr_rcvmsg(bufpp, sdp, stp)
 			rfsr_exit(stp);		/* no return */
 			/* NOTREACHED */
 		} else {
-
-			/* rf_deliver will take the server off the idle list. */
-
-			ASSERT(!rfsr_idle_lock++);
-
+			/* Arrmsg will take the server off the idle list
+			 */
 			++rfsr_nidle;
 			u.u_procp->p_rlink = rfsr_idle_procp;
 			rfsr_idle_procp = u.u_procp;
-
-			ASSERT(!--rfsr_idle_lock);
-
 			if (sleep((caddr_t)&u.u_procp->p_srwchan,
 			  PREMOTE | PCATCH | PNOSTOP)) {
-
-				ASSERT(!rfsr_idle_lock++);
-
 				rfsr_rmlist(&rfsr_idle_procp, &rfsr_nidle,
 				  u.u_procp);
-
-				ASSERT(!--rfsr_idle_lock);
-
 				splx(s);
 				rfsr_exit(stp);
 				/* NOTREACHED */
@@ -1537,17 +1376,12 @@ rfsr_rcvmsg(bufpp, sdp, stp)
 		/*
 		 * Signal messages don't contain gifts of specific rds.
 		 */
-		sndd_set(sdp, msg->m_queue, &msg->m_gift);
+		sndd_set(sdp, (queue_t *)msg->m_queue, msg->m_giftid);
 	}
 	sdp->sd_mntid = RF_COM(bufp)->co_mntid;
-
-	ASSERT(!rfsr_active_lock++);
-
 	++rfsr_nactive;
 	u.u_procp->p_rlink = rfsr_active_procp;
 	rfsr_active_procp = u.u_procp;
-
-	ASSERT(!--rfsr_active_lock);
 
 	splx(s);
 }
@@ -1601,14 +1435,12 @@ rfsr_rmactive(procp)
 	register struct proc *procp;
 {
 	rf_delsig(procp, SIGUSR1);
-	ASSERT(!rfsr_active_lock++);
 	rfsr_rmlist(&rfsr_active_procp, &rfsr_nactive, procp);
-	ASSERT(!--rfsr_active_lock);
 }
 
-/*
- * Add rcvd to the end of the rfsr_msgs list.  Duplicates are ignored
- * dbecause interrupts on different receive descriptors can try to put
+/* add rcvd to the END of the rfsr_msgs list.
+ * duplicates are ignored because interrupts on
+ * different receive descriptors can try to put
  * the same receive descriptor on the rfsr_msgs list.
  *
  * We use splstr because rf_deliver manipulates message and server lists
@@ -1622,8 +1454,6 @@ rfsr_addmsg(rcvdp)
 {
 	register rcvd_t *current;
 	register int s = splstr();
-
-	ASSERT(!rfsr_msg_lock++);
 
 	if (!rfsr_msgs)  {
 		rfsr_msgs = rcvdp;
@@ -1640,14 +1470,11 @@ rfsr_addmsg(rcvdp)
 			rfsr_nmsg++;
 		}
 	}
-
-	ASSERT(!--rfsr_msg_lock);
-
 	splx(s);
 }
 
-/*
- * If the rd is empty, remove it from the rfsr_msgs list.
+
+/* If the rd is empty, remove it from the rfsr_msgs list.
  * Update rfsr_nmsg, NULL rcvdp->rd_next.
  *
  * We use splstr because rf_deliver manipulates message and server lists
@@ -1660,14 +1487,11 @@ rfsr_rmmsg(rcvdp)
 	register rcvd_t *prev;
 	register int s = splstr();
 
-	ASSERT(!rfsr_msg_lock++);
-
 	if (RCVDEMP(rcvdp) && rfsr_msgs) {
 		prev = rfsr_msgs;
 		if (rfsr_msgs == rcvdp) {
 			rfsr_msgs = rfsr_msgs->rd_next;
 			--rfsr_nmsg;
-			rcvdp->rd_next = NULL;
 		} else {
 			register rcvd_t *current;
 
@@ -1682,9 +1506,6 @@ rfsr_rmmsg(rcvdp)
 			}
 		}
 	}
-
-	ASSERT(!--rfsr_msg_lock);
-
 	splx(s);
 }
 
@@ -2147,24 +1968,24 @@ rsuword(to, w)
  * receive copyin messages from the client.  Otherwise, *rdpp
  * is undefined.  Base is denotes the client io buffer, and is
  * used only for protocol consistency; clients have this information
- * and should ignore server copy.  chan is assumed to point to the
+ * and should ignore server copy.  Gift is assumed to point to the
  * channel to the client; nbytes is the number of bytes of data to request.
  *
  * Returns 0 for success, nonzero errno for failure.  NULLs *rdpp in
  * failure cases.
  */
 STATIC int
-sendcopyinmsg(rdpp, base, chan, nbytes)
+sendcopyinmsg(rdpp, base, gift, nbytes)
 	rcvd_t			**rdpp;
 	register caddr_t	base;
-	register sndd_t		*chan;
+	register sndd_t		*gift;
 	size_t			nbytes;
 {
 	register rcvd_t		*rdp;
 	register int		error;
 	register mblk_t		*outbp;
 	register rf_response_t	*resp;
-	register int		vcver = QPTOGP(chan->sd_queue)->version;
+	register int		vcver = QPTOGP(gift->sd_queue)->version;
 
 	/* NOTE: because of protocol history, there is NO SUCH
 	 * THING AS A RFCOPYIN REQUEST.  Messages in both directions
@@ -2174,13 +1995,13 @@ sendcopyinmsg(rdpp, base, chan, nbytes)
 		return error;
 	}
 	rdp = *rdpp;
-	rdp->rd_sdp = chan;
+	rdp->rd_sdp = gift;
 	outbp = rfsr_rpalloc((size_t)0, vcver);
 	resp = RF_RESP(outbp);
 	RF_COM(outbp)->co_opcode = RFCOPYIN;
 	resp->rp_count = nbytes;
 	resp->rp_xfer.buf = (long)base;
-	if ((error = rf_sndmsg(chan, outbp, RF_MIN_RESP(vcver), rdp, FALSE))
+	if ((error = rf_sndmsg(gift, outbp, RF_MIN_RESP(vcver), rdp, FALSE))
 	  != 0) {
 		rcvd_free(rdpp);
 	}
@@ -2224,6 +2045,7 @@ rfsr_copyflock(flp, stp)
 	register caddr_t	flp;
 	register rfsr_state_t	*stp;
 {
+	int			error;
 	size_t			datasz;
 	size_t			hdrsz;
 	register caddr_t	rqdata;
@@ -2232,10 +2054,12 @@ rfsr_copyflock(flp, stp)
 	  stp->sr_vcver >= RFS2DOT0 ? sizeof(flock_t) : sizeof(o_flock_t);
 	hdrsz = RF_MIN_REQ(stp->sr_vcver);
 	if (stp->sr_gdpp->hetero != NO_CONV) {
-		datasz += (stp->sr_vcver >= RFS2DOT0 ? FLOCK_XP : OFLOCK_XP);
+		datasz += (stp->sr_vcver >= RFS2DOT0 ? FLOCK_XP :
+		  OFLOCK_XP) - MINXPAND;
 	}
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		return rfsr_discon("rfsr_copyflock bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
+		SR_FREEMSG(stp);
+		return error;
 	}
 	rqdata = rf_msgdata(stp->sr_in_bp, hdrsz);
 	if (stp->sr_gdpp->hetero != NO_CONV &&
@@ -2325,23 +2149,17 @@ rfsr_lastdirents(dp, uiop, ooff, resid, eofp)
  * this point error-free, and after they have allocated a response message,
  * referred to by stp->sr_out_bp.
  *
- * This routine should be used only for connections of version 2 or later,
+ * This routine should be used only for connections of version 2 or greater,
  * where the response does not contain a gift.
  *
- * When the response to a version 2 or later client contains a gift,
- * rp_v2vcode must refer to the newly referenced file, not the original
- * operand vp.  Code in rfsr_gift_setup(), rather than this routine,
- * handles that case.
+ * When the response contains a gift, rp_v2vcode refers to
+ * the newly referenced file.  Code in rfsr_gift_setup(), rather than this
+ * routine, handles that case.
  *
- * For version 2 or later clients, sets rp_v2vcode in the response to
- * indicate whether cacheing may be enabled(reenabled) for the file
- * referred to by stp->sr_vp. Whenever it sets this to a non-zero value,
- * it ensures that the rduptr->ru_cflag is set for this file/client pair.
- *
- * For old clients, sets the DU_CACHE_ENABLE flag if the current op is
- * RFREAD, and if caching should be reenabled.  Also sets rp_rdwr.isize
- * for RFREAD and DUREADI ops, and sets RP_MNDLCK if mandatory locking
- * is enabled for the file.
+ * rfsr_cacheck() sets rp_v2vcode in the response to indicate whether
+ * cacheing may be enabled(reenabled) for the file referred to by stp->sr_vp.
+ * Whenever it sets this to a non-zero value, it ensures that the
+ * rduptr->ru_cflag is set for this file/client pair.
  */
 int
 rfsr_cacheck(stp, mntid)
@@ -2352,7 +2170,6 @@ rfsr_cacheck(stp, mntid)
 	register rcvd_t		*rcvdp = stp->sr_rdp;
 	register vnode_t	*vp = RDTOV(rcvdp);
 	register int		error;
-	register int		mandlock;
 
 	/*
 	 * vp or rdup can be NULL if we've just given up our last
@@ -2361,7 +2178,6 @@ rfsr_cacheck(stp, mntid)
 	 */
 
 	ASSERT(!stp->sr_gift);
-	ASSERT(stp->sr_out_bp);
 
 	if (vp && (rdup = rdu_find(rcvdp, u.u_procp->p_sysid,
 	   mntid, (rd_user_t **)NULL)) != NULL) {
@@ -2372,25 +2188,9 @@ rfsr_cacheck(stp, mntid)
 		if ((error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred)) != 0) {
 			return error;
 		}
-
 		RF_COM(stp->sr_out_bp)->co_size = vattr.va_size;
 		rp->rp_fhandle = (long)vp;
-		mandlock = MANDLOCK(vp, vattr.va_mode);
-
-		if (stp->sr_vcver == RFS1DOT0) {
-			if (stp->sr_opcode == RFREAD ||
-			  stp->sr_opcode == DUREADI) {
-				rp->rp_rdwr.isize = vattr.va_size;
-			}
-			if (mandlock) {
-				rp->rp_cache |= RP_MNDLCK;
-			}
-			if (stp->sr_opcode != RFREAD) {
-				return 0;
-			}
-		}
-
-		if (!mandlock && vp->v_type == VREG &&
+		if (!MANDLOCK(vp, vattr.va_mode) && vp->v_type == VREG &&
                   stp->sr_srmp->srm_flags & SRM_CACHE &&
 		  (lbolt - rcvdp->rd_mtime > rfc_time ||
 		   lbolt < rcvdp->rd_mtime)) {
@@ -2402,7 +2202,6 @@ rfsr_cacheck(stp, mntid)
 				}
 			}
 		}
-
 		if (rdup->ru_cflag & RU_CACHE_ON && stp->sr_vcver >= RFS2DOT0) {
 			rp->rp_v2vcode = vattr.va_vcode;
 		}
@@ -2410,7 +2209,7 @@ rfsr_cacheck(stp, mntid)
 	return 0;
 }
 
-STATIC int
+int
 rfsr_discon(msg, stp)
 	char		*msg;
 	rfsr_state_t	*stp;
@@ -2418,289 +2217,4 @@ rfsr_discon(msg, stp)
 	gdp_discon(msg, stp->sr_gdpp);
 	SR_FREEMSG(stp);
 	return EPROTO;
-}
-
-int
-rfsr_j_accuse(msg, stp)
-	char		*msg;
-	rfsr_state_t	*stp;
-{
-	gdp_j_accuse(msg, stp->sr_gdpp);
-	SR_FREEMSG(stp);
-	return EPROTO;
-}
-
-/*
- * Record a mapping in rdup's mapping descriptor list, keeping the list in
- * order by offsets (but unordered by length).
- */
-int
-rfm_addmap(rdup, off, len, prot)
-	rd_user_t	*rdup;
-	uint		off;
-	uint		len;
-	uint		prot;
-{
-	rf_mapd_t	*nmp = (rf_mapd_t *)kmem_alloc(sizeof(rf_mapd_t), 
-	  KM_SLEEP);
-	rf_mapd_t	*mp = (rf_mapd_t *)rdup->ru_mapdlist.ls_next;
-	int		reads = prot & PROT_READ ? 1 : 0;
-	int		writes = prot & PROT_WRITE ? 1 : 0;
-	int		execs = prot & PROT_EXEC ? 1 : 0;
-
-	if (!nmp) {
-		return ENOMEM;
-	}
-	while (mp != (rf_mapd_t *)&rdup->ru_mapdlist && mp->rfm_off <= off) {
-		if (mp->rfm_off == off && mp->rfm_len == len) {
-			mp->rfm_reads += reads;
-			mp->rfm_writes += writes;
-			mp->rfm_execs += execs;
-			kmem_free((caddr_t)nmp, sizeof(rf_mapd_t));
-			nmp = NULL;
-			break;
-		}
-		mp = (rf_mapd_t *)mp->rfm_list.ls_next;
-	}
-	if (nmp) {
-		nmp->rfm_off = off;
-		nmp->rfm_len = len;
-		nmp->rfm_reads = reads;
-		nmp->rfm_writes = writes;
-		nmp->rfm_execs = execs;
-		LS_INS_BEFORE(mp, nmp);
-	}
-
-	/* TO DO:  list should compact at EVERY update. */
-
-	return 0;
-}
-
-/*
- * delmap off to off + len for vp, updating rdup mapping descriptor list.
- */
-void
-rfm_delmap(rdup, off, len, prot, vp, crp)
-	rd_user_t	*rdup;
-	uint		off;
-	uint		len;
-	uint		prot;
-	vnode_t		*vp;
-	cred_t		*crp;
-{
-	rf_mapd_t	*rmdp = (rf_mapd_t *)rdup->ru_mapdlist.ls_next;
-	int		reads = prot & PROT_READ ? 1 : 0;
-	int		writes = prot & PROT_WRITE ? 1 : 0;
-	int		execs = prot & PROT_EXEC ? 1 : 0;
-
-	while (len && rmdp != (rf_mapd_t *)&rdup->ru_mapdlist) {
-		register uint	moff = rmdp->rfm_off;
-		register uint	mlen = rmdp->rfm_len;
-		register uint	deloff = MAX(moff, off);
-		register uint	dellen = MIN(off + len, moff + mlen) - deloff;
-		rf_mapd_t	*nextp = (rf_mapd_t *)rmdp->rfm_list.ls_next;
-
-		if (moff <= off + len && moff + mlen >= off) {
-			if (rmdp->rfm_reads >= reads &&
-			  rmdp->rfm_writes >= writes &&
-			  rmdp->rfm_execs >= execs) {
-				(void)VOP_DELMAP(vp, deloff, NULL, NULL,
-				  dellen, prot, prot, 0, crp);
-				rfm_remove(rdup, vp, rmdp, deloff, dellen,
-				  prot, crp);
-				off = deloff + dellen;
-				len -= dellen;
-			}
-		} else if (moff > off + len) {
-			/*
-			 * Now we're out of range since mapdlist is sorted into
-			 * chunks by offset.
-			 */
-			break;
-		}
-		rmdp = nextp;
-	}
-}
-
-/*
- * Remove an instance of a mapping with prot protections ranging from deloff
- * to deloff + dellen.  This is a complex undertaking since it can actually
- * involve adding two new descriptors in the case that one is split and is
- * still referenced in the original form.  
- *
- * NOTE:  When it is necessary to add new descriptors and an allocation fails,
- * more of a mapping is disposed of (to replace the need for the descriptors).
- * Although this might prevent further use of the mapping, it is most important
- * to protect the server state.
- */
-STATIC void
-rfm_remove(rdup, vp, rmdp, deloff, dellen, prot, crp)
-	rd_user_t	*rdup;
-	vnode_t		*vp;
-	rf_mapd_t	*rmdp;
-	uint		deloff;
-	uint		dellen;
-	uint		prot;
-	cred_t		*crp;
-{
-	register uint	moff = rmdp->rfm_off;
-	register uint	mlen = rmdp->rfm_len;
-
-	if (deloff > moff) {
-		if (rfm_addmap(rdup, moff, deloff - moff, prot)) {
-			cmn_err(CE_NOTE, "rfm_remove:  kmem_alloc failed\n");
-			(void)VOP_DELMAP(vp, moff, NULL, NULL, deloff - moff,
-			  prot, prot, 0, crp);
-			rfm_remove(rdup, vp, rmdp, moff,
-			  dellen + (deloff - moff), prot, crp);
-			return;
-		}
-	}
-	if (deloff + dellen < moff + mlen) {
-		if (rfm_addmap(rdup, deloff + dellen, 
-		  (moff + mlen) - (deloff + dellen), prot)) {
-			cmn_err(CE_NOTE, "rfm_remove:  kmem_alloc failed\n");
-			(void)VOP_DELMAP(vp, deloff + dellen, NULL, NULL,
-			 (moff + mlen) - (deloff + dellen), prot, prot, 0, crp);
-			rfm_remove(rdup, vp, rmdp, moff, mlen, prot, crp);
-			return;
-		}
-	}
-	if (rmdp->rfm_reads && (prot & PROT_READ)) {
-		rmdp->rfm_reads--;
-	}
-	if (rmdp->rfm_writes && (prot & PROT_WRITE)) {
-		rmdp->rfm_writes--;
-	}
-	if (rmdp->rfm_execs && (prot & PROT_EXEC)) {
-		rmdp->rfm_execs--;
-	}
-	if (!(rmdp->rfm_reads + rmdp->rfm_writes + rmdp->rfm_execs)) {
-		ls_remove((ls_elt_t *)rmdp);
-		kmem_free(rmdp, sizeof(rf_mapd_t));
-	}
-	return;
-}
-
-/*
- * remove all mapping descriptors, doing appropriate VOP_DELMAPs
- */
-void
-rfm_empty(rdup, vp)
-	rd_user_t	*rdup;
-	vnode_t		*vp;
-{
-	rf_mapd_t	*rmdp;
-
-	while ((rmdp = (rf_mapd_t *)LS_REMQUE(&rdup->ru_mapdlist)) != NULL) {
-		register int	i;
-
-		for (i = MAX(MAX(rmdp->rfm_reads, rmdp->rfm_writes), 
-		  rmdp->rfm_execs); i; i -= 1) {
-			uint	prot = 0;
-			
-			if (rmdp->rfm_reads) {
-				prot |= PROT_READ;
-				rmdp->rfm_reads--;
-			}
-			if (rmdp->rfm_writes) {
-				prot |= PROT_WRITE;
-				rmdp->rfm_writes--;
-			}
-			if (rmdp->rfm_execs) {
-				prot |= PROT_EXEC;
-				rmdp->rfm_execs--; 
-			}
-			(void)VOP_DELMAP(vp, rmdp->rfm_off, NULL, NULL,
-			  rmdp->rfm_len, prot, prot, 0, 0);
-		}
-		kmem_free(rmdp, sizeof(rf_mapd_t));
-	}
-}
-
-/*
- * Check whether the client machine making a request to do with a mapping
- * has generous enough permissions.  Returns 1 if the access is allowed, 0
- * otherwise.
- *
- * The loosely defined vm/vfs interface allows VOP_GETPAGE/VOP_PUTPAGE
- * operations not preceded by VOP_MAPs, in fact, it is cheaper to check
- * whether the file is mappable by the client than to verify that a 
- * mapping exists.  We only check for an existing mapping if the cheaper
- * check fails.
- */
-int
-rfm_check(vp, crp, rdup, off, len, prot)
-	vnode_t		*vp;
-	cred_t		*crp;
-	rd_user_t	*rdup;
-	uint		off;
-	uint		len;
-	uint		prot;
-{
-	rf_mapd_t	*rmdp = (rf_mapd_t *)rdup->ru_mapdlist.ls_next;
-	vattr_t		vattr;
-	int		reads = prot & PROT_READ ? 1 : 0;
-	int		writes = prot & PROT_WRITE ? 1 : 0;
-	int		execs = prot & PROT_EXEC ? 1 : 0;
-
-	vattr.va_mask = AT_SIZE;
-	if (VOP_GETATTR(vp, &vattr, ATTR_COMM, crp) || off > 
-	  vattr.va_size) {
-		return 0;
-	}
-
-	if (writes <= (int)(rdup->ru_frwcnt + rdup->ru_fwcnt) &&
-	  (rdup->ru_frwcnt + rdup->ru_fwcnt + rdup->ru_frcnt) &&
-	  !(vp->v_flag & VNOMAP) && !vp->v_filocks &&
-	  (vp->v_type == VREG || vp->v_type == VBLK)) {
-		return 1;
-	}
-
-	if (off + len > (vattr.va_size + PAGEOFFSET & PAGEMASK)) {
-		len = vattr.va_size - off;
-	}
-	while (rmdp != (rf_mapd_t *)&rdup->ru_mapdlist) {
-		register uint	moff = rmdp->rfm_off;
-		register uint	mlen = rmdp->rfm_len;
-
-		if (moff > off) {
-			/*
-			 * We're beyond descriptors with off offset in the
-			 * sorted list and didn't find sufficient mappings.
-			 */
-			break;
-		} else if (moff + mlen >= off && rmdp->rfm_reads >= reads &&
-		  rmdp->rfm_writes >= writes && rmdp->rfm_execs >= execs) {
-			if (moff + mlen >= off + len) {
-				return 1;
-			} else {
-				len = (off + len) - (moff + mlen);
-				off = moff + mlen;
-			}
-		}
-		rmdp = (rf_mapd_t *)rmdp->rfm_list.ls_next;
-	}
-	return 0;
-}
-
-void
-rfm_lock(rdup)
-	rd_user_t	*rdup;
-{
-	while (rdup->ru_mapdstat & MAPDLOCK) {
-		rdup->ru_mapdstat |= MAPDWANT;
-		sleep((caddr_t)&rdup->ru_mapdstat, PREMOTE | PCATCH);
-	}
-	rdup->ru_mapdstat = MAPDLOCK;
-}
-
-void
-rfm_unlock(rdup)
-	rd_user_t	*rdup;
-{
-	if (rdup->ru_mapdstat & MAPDWANT) {
-		wakeprocs((caddr_t)&rdup->ru_mapdstat, PRMPT);
-	}
-	rdup->ru_mapdstat = 0;
 }

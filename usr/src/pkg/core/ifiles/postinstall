@@ -1,4 +1,4 @@
-#ident	"@(#)pkgcore:ifiles/postinstall	1.14"
+#ident	"@(#)pkgcore:ifiles/postinstall	1.9"
 
 error=no
 while read from to comment
@@ -12,7 +12,6 @@ done <<!ENDOFLIST! | installf $PKGINST -
 	/etc/fs/bfs/mkfs /usr/lib/fs/bfs/mkfs
 	/etc/fs/bfs/mount /usr/lib/fs/bfs/mount
 	/etc/fs/proc/mount /usr/lib/fs/proc/mount
-	/etc/fs/fd/mount /usr/lib/fs/fd/mount
 	/etc/fs/rfs/mount /usr/lib/fs/rfs/mount
 	/etc/fs/s5/clri /usr/lib/fs/s5/clri
 	/usr/lib/fs/s5/df /etc/fs/s5/df
@@ -44,15 +43,14 @@ done <<!ENDOFLIST! | installf $PKGINST -
 	/sbin/npump /usr/sbin/npump
 	/sbin/pump /usr/sbin/pump
 	/sbin/rc0 /usr/sbin/rc0
-	/sbin/rc1 /usr/sbin/rc1
 	/sbin/rc2 /usr/sbin/rc2
 	/sbin/rc3 /usr/sbin/rc3
 	/sbin/rc6 /usr/sbin/rc6
-	/sbin/init /usr/sbin/init
 	/sbin/setclk /usr/sbin/setclk
 	/sbin/sh /usr/bin/sh
 	/sbin/shutdown /usr/sbin/shutdown
 	/sbin/su /usr/bin/su
+	/sbin/sync /usr/sbin/sync
 	/sbin/uadmin /usr/sbin/uadmin
 	/sbin/umount /usr/sbin/umount
 	/sbin/umountall /usr/sbin/umountall
@@ -61,7 +59,6 @@ done <<!ENDOFLIST! | installf $PKGINST -
 	/usr/sbin/buildsys /sbin/buildsys
 	/usr/sbin/ports /sbin/ports
 	/usr/sbin/setmnt /sbin/setmnt
-	/usr/bin/uname /sbin/uname
 !ENDOFLIST!
 
 #make necessary links for files copied above
@@ -84,10 +81,6 @@ then
 	installf $PKGINST /proc d 555 root root || error=yes
 fi
 
-if [ ! -d /dev/fd ]
-then
-	installf $PKGINST /dev/fd d 555 root root || error=yes
-fi
 
 installf -f $PKGINST || error=yes
 

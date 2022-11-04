@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fseek.c	1.15"
+#ident	"@(#)libc-port:stdio/fseek.c	1.14"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -31,8 +31,7 @@ int	ptrname;
 			offset -= iop->_cnt;
 		}
 	} else if(iop->_flag & (_IOWRT | _IORW)) {
-		if (fflush(iop) == EOF)
-			return(-1);
+		(void) fflush(iop);
 	}
 	iop->_flag &= (unsigned short)~_IOEOF;
 	iop->_cnt = 0;

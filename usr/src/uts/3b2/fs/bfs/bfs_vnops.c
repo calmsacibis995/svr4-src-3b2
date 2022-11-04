@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/bfs/bfs_vnops.c	1.58"
+#ident	"@(#)fs:fs/bfs/bfs_vnops.c	1.47"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
 #include "sys/conf.h"
 #include "sys/cred.h"
-#include "sys/dirent.h"
 #include "sys/errno.h"
 #include "sys/time.h"
 #include "sys/fcntl.h"
@@ -52,7 +51,7 @@ STATIC int bfs_open(), bfs_close(), bfs_read(), bfs_write();
 STATIC int bfs_ioctl(), bfs_getattr(), bfs_setattr();
 STATIC int bfs_access(), bfs_lookup(), bfs_create();
 STATIC int bfs_remove(), bfs_rename(), bfs_readdir(), bfs_fsync();
-STATIC int bfs_fid(), bfs_seek(), bfs_cmp(), bfs_freespace();
+STATIC int bfs_fid(), bfs_seek(), bfs_cmp(), bfs_frlock(), bfs_freespace();
 
 STATIC void bfs_inactive();
 STATIC int bfs_link();
@@ -70,7 +69,7 @@ struct vnodeops bfsvnodeops = {
 	bfs_lookup,
 	bfs_create,
 	bfs_remove,
-	bfs_link,
+	bfs_link,	/* link */
 	bfs_rename,
 	fs_nosys,	/* mkdir */
 	fs_nosys,	/* rmdir */
@@ -84,7 +83,7 @@ struct vnodeops bfsvnodeops = {
 	fs_rwunlock,
 	bfs_seek,
 	bfs_cmp,
-	fs_frlock,
+	bfs_frlock,
 	bfs_freespace,
 	fs_nosys,	/* realvp */
 	fs_nosys,	/* getpage */
@@ -94,32 +93,7 @@ struct vnodeops bfsvnodeops = {
 	fs_nosys,	/* delmap */
 	fs_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -279,6 +253,7 @@ bfs_getattr(vp, vap, flags, cr)
 	/*
 	 * We get most of the attrs from the dirent.
 	 */
+	vap->va_mask = dir->d_fattr.va_mask;
 	vap->va_type = dir->d_fattr.va_type;
 	vap->va_mode = (mode_t)dir->d_fattr.va_mode;
 	vap->va_uid = dir->d_fattr.va_uid;
@@ -290,7 +265,8 @@ bfs_getattr(vp, vap, flags, cr)
 	vap->va_mtime.tv_nsec = 0;
 	vap->va_ctime.tv_sec = dir->d_fattr.va_ctime;
 	vap->va_ctime.tv_nsec = 0;
-	vap->va_blksize = 512;
+	vap->va_blksize = dir->d_fattr.va_blksize;
+	vap->va_nblocks = dir->d_fattr.va_nblocks;
 	vap->va_vcode = 0;
 
 	/*
@@ -301,10 +277,9 @@ bfs_getattr(vp, vap, flags, cr)
 		vap->va_size = (dir->d_eoffset - (dir->d_sblock*BFS_BSIZE)) +1;
 	else
 		vap->va_size = 0;
-	vap->va_nblocks = btod(vap->va_size);
+
 	vap->va_nodeid =  dir->d_ino;
-	vap->va_fsid = vp->v_vfsp->vfs_dev;
-	vap->va_rdev = 0;
+	vap->va_fsid = vap->va_rdev = vp->v_vfsp->vfs_dev;
 	kmem_free((caddr_t)dir, sizeof(struct bfs_dirent));
 	return 0;
 }
@@ -366,6 +341,8 @@ bfs_setattr(vp, vap, flags, cr)
 			if (!groupmember(battrs->va_gid, cr))
 				battrs->va_mode &= ~VSGID;
 		}
+		if ((vp->v_flag & VTEXT) && (battrs->va_mode & VSVTX) == 0)
+			xrele(vp); 
 	}
 	/*
 	 * Change file ownership; must be the owner of the file
@@ -496,8 +473,18 @@ bfs_access(vp, mode, flags, cr)
 
 	kmem_free((caddr_t)dir, sizeof(struct bfs_dirent));
 
-	if ((mode & VWRITE) && (vp->v_vfsp->vfs_flag & VFS_RDONLY))
-		return EROFS;
+	/*
+	 * If the text is busy, do not allow writing.
+	 */
+	if (mode & VWRITE) {
+		if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+			return EROFS;
+		if (vp->v_flag & VTEXT) {
+			xrele(vp);
+			if (vp->v_flag & VTEXT)
+				return EBUSY;
+		}
+	}
 
 
 	/*
@@ -536,8 +523,6 @@ bfs_cmp(vp1, vp2)
 }
 
 
-#define RECBUFSIZE	1048
-
 STATIC int
 bfs_readdir(vp, uiop, cr, eofp)
 	struct vnode *vp;
@@ -549,37 +534,43 @@ bfs_readdir(vp, uiop, cr, eofp)
 	register struct bfs_ldirs *ld;
 	off_t  diroff = uiop->uio_offset;
 	register struct bsuper *bs = (struct bsuper *)vp->v_vfsp->vfs_data;
-	register struct dirent *drp;
-	char *drent;
+	struct bfs_drent_overlay *drent;
 	char *buf;
 	off_t offset;
 	off_t i;
 	int error = 0;
 	int buflen = 0;
 	int len, chunksize;
-	int reclen, namesz;
-	int indrent = 0;
-	int fixsz;
+
+	drent = (struct bfs_drent_overlay *)
+	  kmem_zalloc(sizeof(struct bfs_drent_overlay), KM_SLEEP);
 
 	/*
 	 * Check for a valid offset into the "directory".
 	 */
-	if (diroff % sizeof(struct bfs_ldirs) != 0)
+	if (diroff % sizeof(struct bfs_ldirs) != 0) {
+		kmem_free(drent, sizeof( struct bfs_drent_overlay));
 		return ENOENT;
+	}
 
-	if (diroff < 0)
+	if (diroff < 0) {
+		kmem_free(drent, sizeof( struct bfs_drent_overlay));
 		return EINVAL;
+	}
+	drent->d_reclen = sizeof(struct bfs_drent_overlay);
 
 	BFS_IOBEGIN(bs);
 	CHECK_LOCK(bs);
 
 	dir = (struct bfs_dirent *)
 	  kmem_alloc(sizeof(struct bfs_dirent), KM_SLEEP);
+	BFS_IOBEGIN(bs);
 	/*
 	 * Get the ROOT inode.
 	 */
 	error = BFS_GETINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO), dir,cr);
 	if (error) {
+		kmem_free(drent, sizeof( struct bfs_drent_overlay));
 		kmem_free(dir, sizeof(struct bfs_dirent));
 		BFS_IOEND(bs);
 		return(error);
@@ -589,12 +580,8 @@ bfs_readdir(vp, uiop, cr, eofp)
 	chunksize = MIN(len, DIRBUFSIZE);
 	buf = kmem_alloc(chunksize, KM_SLEEP);
 
-	drent = kmem_alloc(RECBUFSIZE, KM_SLEEP);
-	drp = (struct dirent *)drent;
-	fixsz = (char *)drp->d_name - (char *)drp;
-
-	for (offset = diroff + (dir->d_sblock * BFS_BSIZE);
-	     uiop->uio_resid > 0 && len > 0; len -= buflen, offset += buflen) {	
+	for (offset = diroff + (dir->d_sblock * BFS_BSIZE); len > 0;
+	     len -= buflen, offset +=buflen) {	
 
 		buflen = MIN(chunksize, len);
 		/*
@@ -602,50 +589,31 @@ bfs_readdir(vp, uiop, cr, eofp)
 		 */
 		error = BFS_GETDIRLIST(bs->bsup_devnode, offset, buf,buflen,cr);
 		if (error) {
+			kmem_free(drent, sizeof( struct bfs_drent_overlay));
 			kmem_free(dir, sizeof(struct bfs_dirent));
 			kmem_free(buf, chunksize);
-			kmem_free(drent, RECBUFSIZE);
 			BFS_IOEND(bs);
 			return(error);
 		}
 
-		for (i = 0; i < buflen && uiop->uio_resid >= indrent;
-		     i += sizeof(struct bfs_ldirs)) {
+		for (i = 0; i < buflen; i += sizeof(struct bfs_ldirs)) {
+			if (uiop->uio_resid < sizeof(struct bfs_drent_overlay))
+				break;
 			ld = (struct bfs_ldirs *) (buf + i);
-			if (ld->l_ino == 0 )
-				continue;
-			namesz = (ld->l_name[BFS_MAXFNLEN -1] == '\0') ?
-				 strlen(ld->l_name) : BFS_MAXFNLEN;
-			reclen = (fixsz + namesz + 1 + (NBPW -1)) & ~(NBPW -1);
+			if (ld->l_ino != 0 ) {
+				drent->d_ino = ld->l_ino;
+				drent->d_off = offset +i;
+				strncpy(drent->d_name, ld->l_name,BFS_MAXFNLEN);
+				uiomove(drent, sizeof(struct bfs_drent_overlay),
+			  		UIO_READ, uiop);
 
-			if (RECBUFSIZE - indrent < reclen || 
-			    uiop->uio_resid < indrent + reclen ) {
-				uiomove(drent, indrent, UIO_READ, uiop);
-				if (uiop->uio_resid < reclen) {
-					offset += i;
-					indrent = -1;
-					break;
-				}
-				drp = (struct dirent *) drent;
-				indrent = 0;
-			}
-			if (uiop->uio_resid >= indrent + reclen) {
-				drp->d_ino = ld->l_ino;
-				drp->d_off = offset +i;
-				drp->d_reclen = (short)reclen;
-				strncpy(drp->d_name, ld->l_name,BFS_MAXFNLEN);
-				drp->d_name[namesz] = '\0';
-				drp = (struct dirent *) (((char *)drp) +reclen);
-				indrent += reclen;
 			}
 		}
-		if (indrent == -1)
+		if (uiop->uio_resid < sizeof(struct bfs_drent_overlay)) {
+			offset += i;
 			break;
+		}
 	}
-
-	if (indrent > 0 && uiop->uio_resid >= indrent)
-		uiomove(drent, indrent, UIO_READ, uiop);
-
 	/*
 	 * The offset must be changed manually to reflect the filesystem
 	 * DEPENDENT directory size.
@@ -656,9 +624,9 @@ bfs_readdir(vp, uiop, cr, eofp)
 			*eofp = (offset >= dir->d_eoffset);
 	}
 
+	kmem_free(drent, sizeof( struct bfs_drent_overlay));
 	kmem_free(dir, sizeof(struct bfs_dirent));
 	kmem_free(buf, chunksize);
-	kmem_free(drent, RECBUFSIZE);
 	BFS_IOEND(bs);
 	return(error);
 }
@@ -762,13 +730,9 @@ bfs_lookup(dvp, nm, vpp, pnp, flags, rdir, cr)
 	register struct bsuper *bs = (struct bsuper *)dvp->v_vfsp->vfs_data;
 	off_t offset;
 	struct vnode *vp;
-	int error;
 
 	if (dvp->v_type != VDIR)	/* We can only read root */
 		return ENOTDIR;
-
-	if (error = bfs_access(dvp, VEXEC, 0, cr))
-		return error;
 
 	/*
 	 * The null name means the current directory.
@@ -819,13 +783,6 @@ bfs_remove(vp, nm, cr)
 	daddr_t lastblock = 0;
 
 	/*
-	 * Since BFS is a flat file system, only need to check permissions
-	 * of the ROOT directory.
-	 */
-	if (error = bfs_access(vp, VEXEC|VWRITE, 0, cr))
-		return error;
-
-	/*
 	 * Get a new vnode for the file in question.
 	 */
 	error = bfs_lookup(vp, nm, &rvp, (struct pathname *)0, 0, NULLVP, cr);
@@ -833,7 +790,7 @@ bfs_remove(vp, nm, cr)
 		return error;
 
 	if (rvp->v_type == VDIR) {
-		VN_RELE(rvp);
+		VN_RELE(rvp);		/* Should probably never get here */
 		return EISDIR;
 	}
 
@@ -842,6 +799,19 @@ bfs_remove(vp, nm, cr)
 
 	BFS_IOBEGIN(bs);
 	CHECK_LOCK(bs);
+
+	/*
+	 * Check if the file is busy in core.
+	 */
+	if (rvp->v_flag & VTEXT) {
+		xrele(rvp);
+		if (rvp->v_flag & VTEXT) {
+			BFS_IOEND(bs);
+			kmem_free(dir, sizeof(struct bfs_dirent));
+			VN_RELE(rvp);
+			return EBUSY;
+		}
+	}
 
 	/*
 	 * If this is the file farthest into the disk, we must flag a
@@ -871,13 +841,7 @@ bfs_remove(vp, nm, cr)
 	dir->d_fattr.va_nlink -= 1;
 	dir->d_fattr.va_ctime = hrestime.tv_sec;
 
-	error = BFS_PUTINODE(bs->bsup_devnode, rvp->v_data, dir, cr);
-	if (error) { 
-		BFS_IOEND(bs);
-		kmem_free(dir, sizeof(struct bfs_dirent));
-		VN_RELE(rvp);
-		return error;
-	}
+	BFS_PUTINODE(bs->bsup_devnode, rvp->v_data, dir, cr);
 
 	/*
 	 * If link count is >= 1, we are done!
@@ -915,9 +879,7 @@ bfs_remove(vp, nm, cr)
 		kmem_free(dir, sizeof(struct bfs_dirent));
 		VN_RELE(rvp);
 		return error;
-	} else
-		bs->bsup_compacted = BFS_NO;
-
+	}
 	BFS_IOEND(bs);
 
 	/*
@@ -932,11 +894,14 @@ bfs_remove(vp, nm, cr)
 		BFS_GETINODE(bs->bsup_devnode, bs->bsup_lastfile, ldir, cr);
 
 		if (ldir->d_sblock == dir->d_eblock + 1 &&
-		    ldir->d_eblock - ldir->d_sblock < SMALLFILE)
+		    ldir->d_eblock - ldir->d_sblock < SMALLFILE) {
 			bfs_compact(bs, cr);
+		} else
+			bs->bsup_compacted = BFS_NO;
 
 		kmem_free(ldir, sizeof(struct bfs_dirent));
-	}
+	} else
+		bs->bsup_compacted = BFS_NO;
 
 	kmem_free(dir, sizeof(struct bfs_dirent));
 	VN_RELE(rvp);
@@ -996,7 +961,7 @@ bfs_link(tdvp, svp, tnm, cr)
 {
 	register struct bsuper *bs = (struct bsuper *)svp->v_vfsp->vfs_data;
 	register struct bfs_dirent *dir;
-	ushort sino;
+	o_ino_t sino;
 	int error = 0;
 
 	if (tdvp->v_type != VDIR) 
@@ -1133,8 +1098,15 @@ bfs_create(dvp, fname, vap, excl, mode, vpp, cr)
 	/*
 	 * Get most attributes from argument list.
 	 */
+	dir->d_fattr.va_mask = vap->va_mask;
 	dir->d_fattr.va_type = vap->va_type;
 	dir->d_fattr.va_mode = (o_mode_t)vap->va_mode;
+	dir->d_fattr.va_nodeid = vap->va_nodeid;
+	dir->d_fattr.va_size = vap->va_size;
+	dir->d_fattr.va_blksize = vap->va_blksize;
+	dir->d_fattr.va_nblocks = vap->va_nblocks;
+	dir->d_fattr.va_rdev = 0;
+	dir->d_fattr.va_fsid = cmpdev(dvp->v_vfsp->vfs_dev);
 	dir->d_fattr.va_uid = cr->cr_uid;
 	dir->d_fattr.va_gid = cr->cr_gid;
 	dir->d_fattr.va_mtime = hrestime.tv_sec;
@@ -1149,12 +1121,7 @@ bfs_create(dvp, fname, vap, excl, mode, vpp, cr)
 	/*
 	 * Put the new dirent in the inode slot.
 	 */
-	error = BFS_PUTINODE(bs->bsup_devnode, dir_off, dir, cr);
-	if (error) {
-		BFS_IOEND(bs);
-		kmem_free(dir, sizeof(struct bfs_dirent));
-		return error;
-	}
+	BFS_PUTINODE(bs->bsup_devnode, dir_off, dir, cr);
 
 	BFS_IOEND(bs);
 
@@ -1179,6 +1146,30 @@ bfs_create(dvp, fname, vap, excl, mode, vpp, cr)
 	return 0;
 }
 
+/* ARGSUSED */
+STATIC
+int	
+bfs_frlock(vp, cmd, bfp, flag, offset, cr)
+	struct vnode *vp;
+	int cmd;
+	struct flock *bfp;
+	int flag;
+	off_t offset;
+	struct cred *cr;
+{
+	int frcmd;
+
+	if (cmd == F_GETLK || cmd == F_O_GETLK)
+		frcmd = 0;
+	else if (cmd == F_SETLK)
+		frcmd = SETFLCK;
+	else if (cmd == F_SETLKW)
+		frcmd = SETFLCK|SLPFLCK;
+	else
+		return EINVAL;
+
+	return reclock(vp, bfp, frcmd, flag, offset);
+}
 
 /* ARGSUSED */
 STATIC int
@@ -1226,6 +1217,17 @@ bfs_write(vp, uiop, ioflag, cr)
 	
 	BFS_IOBEGIN(bs);
 	CHECK_LOCK(bs);
+
+	/*
+	 * Check for busy text.
+	 */
+	if (vp->v_flag & VTEXT) {
+		xrele(vp);
+		if (vp->v_flag & VTEXT) {
+			BFS_IOEND(bs);
+			return ETXTBSY;
+		}
+	}
 
 	if (uiop->uio_offset < 0) {
 		BFS_IOEND(bs);
@@ -1388,7 +1390,7 @@ bfs_write(vp, uiop, ioflag, cr)
 		/*
 		 * Write the new dirent.
 		 */
-		if (dir->d_eoffset >= (dir->d_eblock * BFS_BSIZE)) {
+		if (dir->d_eoffset > (dir->d_eblock * BFS_BSIZE)) {
 			dir->d_eblock = dir->d_eoffset / BFS_BSIZE;
 
 			if (!oeblock)
@@ -1408,5 +1410,5 @@ bfs_write(vp, uiop, ioflag, cr)
 	kmem_free(dir, sizeof(struct bfs_dirent));
 	kmem_free(buf, chunksize);
 	BFS_IOEND(bs);
-	return 0;
+	return 0 ;
 }

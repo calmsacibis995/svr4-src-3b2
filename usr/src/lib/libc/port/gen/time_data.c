@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/time_data.c	1.2"
+#ident	"@(#)libc-port:gen/time_data.c	1.1"
 #include	"synonyms.h"
 #include 	<time.h>
 #include 	<tzfile.h>
@@ -41,5 +41,5 @@ const struct {
 	76,	119,	303,
 	75,	58,	303,	/* 1975: Last Sun in Feb - last Sun in Oct */
 	74,	5,	333,	/* 1974: Jan 6 - last Sun. in Nov */
-	69,	119,	303,	/* start GMT	*/
+	70,	119,	303,	/* start GMT	*/
 };

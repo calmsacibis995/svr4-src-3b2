@@ -1,4 +1,4 @@
-!#ident	"@(#)curses:screen/curses.ed	1.58"
+!#ident	"@(#)curses:screen/curses.ed	1.55"
 e keycaps
 H
 g/.*KEY_/s//KEY_/
@@ -52,7 +52,7 @@ $a
 # define SYSV
 #endif
    /* Some V7 systems define L_ctermid - we list those here */
-#ifdef BSD
+#ifdef sun
 # undef SYSV
 #endif
 
@@ -202,61 +202,6 @@ extern char	curs_parm_err[],
 		*curs_err_strings[];
 
 /* Function declarations */
-
-#ifdef	_VR3_COMPAT_CODE
-
-extern	_ochtype	*acs_map;
-extern	chtype		*acs32map;
-
-/* definitions for Vr3 source compatibility */
-
-#define initscr		initscr32
-#define newterm		newterm32
-#define waddch		w32addch
-#define wechochar	w32echochar
-#define pechochar	p32echochar
-#define winsch		w32insch
-#define vidputs		vid32puts
-#define vidattr		vid32attr
-#define wattroff	w32attroff
-#define wattron		w32attron
-#define wattrset	w32attrset
-#define acs_map		acs32map
-#define box		box32
-
-#ifdef	__STDC__
-extern	WINDOW	*initscr();
-extern	SCREEN	*newterm(char *, FILE *, FILE *);
-#else
-extern	WINDOW	*initscr();
-extern	SCREEN	*newterm();
-#endif
-
-/* declarations for mini-curses */
-
-#ifdef	__STDC__
-extern	WINDOW	*m_initscr(void);
-
-extern	SCREEN	*m_newterm(char *, FILE *, FILE *);
-
-extern	int	m_addch(int), m_addstr(char *), m_clear(void), m_erase(void),
-		m_move(int, int), m_refresh(void);
-
-#else  /* __STDC__ */
-extern	WINDOW	*m_initscr();
-
-extern	SCREEN	*m_newterm();
-
-extern	int	m_addch(), m_addstr(), m_clear(), m_erase(),
-		m_move(), m_refresh();
-
-#endif /* __STDC__ */
-
-#else	/* _VR3_COMPAT_CODE */
-
-extern	chtype	*acs_map;
-
-#endif	/* _VR3_COMPAT_CODE */
 
 #ifdef __STDC__
 
@@ -513,6 +458,61 @@ extern chtype	getbkgd(), getattrs();
 
 #endif  /* __STDC__ */
 #endif	/* defined(CURS_PERFORMANCE) && !defined(lint) */
+
+#ifdef	_VR3_COMPAT_CODE
+
+extern	_ochtype	*acs_map;
+extern	chtype		*acs32map;
+
+/* definitions for Vr3 source compatibility */
+
+#define initscr		initscr32
+#define newterm		newterm32
+#define waddch		w32addch
+#define wechochar	w32echochar
+#define pechochar	p32echochar
+#define winsch		w32insch
+#define vidputs		vid32puts
+#define vidattr		vid32attr
+#define wattroff	w32attroff
+#define wattron		w32attron
+#define wattrset	w32attrset
+#define acs_map		acs32map
+#define box		box32
+
+#ifdef	__STDC__
+extern	WINDOW	*initscr();
+extern	SCREEN	*newterm(char *, FILE *, FILE *);
+#else
+extern	WINDOW	*initscr();
+extern	SCREEN	*newterm();
+#endif
+
+/* declarations for mini-curses */
+
+#ifdef	__STDC__
+extern	WINDOW	*m_initscr(void);
+
+extern	SCREEN	*m_newterm(char *, FILE *, FILE *);
+
+extern	int	m_addch(int), m_addstr(char *), m_clear(void), m_erase(void),
+		m_move(int, int), m_refresh(void);
+
+#else  /* __STDC__ */
+extern	WINDOW	*m_initscr();
+
+extern	SCREEN	*m_newterm();
+
+extern	int	m_addch(), m_addstr(), m_clear(), m_erase(),
+		m_move(), m_refresh();
+
+#endif /* __STDC__ */
+
+#else	/* _VR3_COMPAT_CODE */
+
+extern	chtype	*acs_map;
+
+#endif	/* _VR3_COMPAT_CODE */
 
 #if	defined(NOMACROS) || defined(lint)
 
@@ -1047,6 +1047,6 @@ $a
 0r copyright.h
 /screen\/copyright\.h/d
 1i
-#ident	"@(#)curses:screen/curses.ed	1.58"
+#ident	"@(#)curses:screen/curses.ed	1.55"
 .
 w curses.h

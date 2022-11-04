@@ -8,7 +8,7 @@
 #ifndef _SYS_SYSTM_H
 #define _SYS_SYSTM_H
 
-#ident	"@(#)head.sys:sys/systm.h	11.49"
+#ident	"@(#)head.sys:sys/systm.h	11.41"
 /*
  * Random set of variables used by more than one routine.
  */
@@ -39,7 +39,6 @@ extern	int	rstchown;	/* 1 ==> restrictive chown(2) semantics */
 extern void iomove(caddr_t, int, int);
 extern int is32b(void);
 extern void wakeprocs(caddr_t, int);
-extern void wakeup(caddr_t);
 extern int sleep(caddr_t, int);
 extern int min(int, int);
 extern int max(int, int);
@@ -51,12 +50,14 @@ extern int nodev(void);
 extern int nulldev(void);
 extern int getudev(void);
 extern int bcmp(char *, char *, size_t);
+extern int intrerr(int);
 extern int memlow(void);
 extern int stoi(char **);
-extern void numtos(u_long, char *);
+extern char *strcpy(char *, char *);
 extern char *strncpy(char *, char *, size_t);
 extern int strcmp(char *, char *);
 extern int strncmp(char *, char *, size_t);
+extern int strlen(char *);
 extern int copyin(caddr_t, caddr_t, size_t);
 extern int lcopyin(caddr_t, caddr_t, size_t);
 extern int copyout(caddr_t, caddr_t, size_t);
@@ -87,7 +88,6 @@ extern int userstrlen(caddr_t);
 extern void iomove();
 extern int is32b();
 extern void wakeprocs();
-extern void wakeup();
 extern int sleep();
 extern int min();
 extern int max();
@@ -99,12 +99,14 @@ extern int nodev();
 extern int nulldev();
 extern int getudev();
 extern int bcmp();
+extern int intrerr();
 extern int memlow();
 extern int stoi();
-extern void numtos();
+extern char *strcpy();
 extern char *strncpy();
 extern int strcmp();
 extern int strncmp();
+extern int strlen();
 extern int copyin();
 extern int lcopyin();
 extern int copyout();
@@ -135,11 +137,13 @@ extern int userstrlen();
 #endif
 
 /*
- * Arguments to wakeprocs() to specify preemptive vs.
- * non-preemptive wakeup
+ * Preemptive and non-preemptive wakeup calls
  */
-#define	NOPRMPT	0
-#define	PRMPT	1
+#define	NOPREEMPT	0
+#define	PREEMPTOK	1
+
+#define	wakeup(chan)	wakeprocs((chan), PREEMPTOK)
+#define	wakeupnp(chan)	wakeprocs((chan), NOPREEMPT)
 
 #endif /* _KERNEL */
 
@@ -182,6 +186,8 @@ typedef union rval rval_t;
 extern int Dstflag;
 extern int Timezone;
 
+#endif	/* _SYS_SYSTM_H */
+
 #ifdef	KPERF
 
 /*	This is the structure for the  kernel performance		*/ 
@@ -205,8 +211,8 @@ extern int Timezone;
 typedef struct kernperf {
 	unsigned char	kp_type;	/* the record type as defined below */
 	unsigned char	kp_level;	/* A priority level.		*/
-	pid_t 		kp_pid;		/* A process id.	*/
-	clock_t 	kp_time;	/* A relative time in 10 	*/
+	unsigned short	kp_pid;		/* A process id.	*/
+	unsigned long	kp_time;	/* A relative time in 10 	*/
 					/* microseconds units		*/
 	unsigned long	kp_pc;		/* A pc (kernel address).	*/
 } kernperf_t;
@@ -282,5 +288,3 @@ extern int exitflg;
 extern void swtch();
 
 #endif	/* KPERF */
-
-#endif	/* _SYS_SYSTM_H */

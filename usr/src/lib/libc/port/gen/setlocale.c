@@ -5,19 +5,16 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/setlocale.c	1.9"
+#ident	"@(#)libc-port:gen/setlocale.c	1.5"
 /*
 * setlocale - set and query function for all or parts of a program's locale.
 */
 #include "synonyms.h"
-#include "shlib.h"
 #include <locale.h>
 #include "_locale.h"	/* internal to libc locale data structures */
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
-
-static char *set_cat();
 
 char *
 setlocale(cat, loc)
@@ -69,14 +66,10 @@ const char *loc;
 	*/
 	if (cat == LC_ALL)
 	{
-		static int reset = 0;
 		register const char *p;
 		register int i;
-		register char *sv_loc;
 
-		if (!reset)
-			sv_loc = setlocale(LC_ALL, NULL);
-		cat = LC_CTYPE;
+		cat = LC_CTYPE - 1;
 		if ((p = loc)[0] != '/')	/* simple locale */
 		{
 			loc = strncpy(part, p, LC_NAMELEN - 1);
@@ -91,25 +84,10 @@ const char *loc;
 				part[i] = '\0';
 				p += i;
 			}
-			if (set_cat(cat++, part) == 0) {
-				reset = 1;
-				setlocale(LC_ALL, sv_loc);
-				reset = 0;
-				return 0;
-			}
-		} while (cat < LC_ALL);
-		return setlocale(LC_ALL, NULL);
+			(void)setlocale(++cat, part);
+		} while (cat < LC_ALL - 1);
+		return setlocale(LC_ALL, (char *)0);
 	}
-	return(set_cat(cat, loc));
-}
-
-static char *
-set_cat(cat, loc)
-int cat;
-const char *loc;
-{
-	char part[LC_NAMELEN];
-
 	/*
 	* Set single category's locale.  By default,
 	* just note the new name and handle it later.
@@ -130,7 +108,7 @@ const char *loc;
 	}
 	else {
 		int fd;
-		static const char *name[LC_ALL] = 
+		static char name[LC_ALL][12] = 
 			{ "LC_CTYPE", 
 			  "LC_NUMERIC",
 			  "LC_TIME",
@@ -138,11 +116,9 @@ const char *loc;
 			  "LC_MONETARY",
 			  "LC_MESSAGES"
  			};
-		if (strcmp(loc, _cur_locale[cat]) != 0) {
-			if ((fd = open(_fullocale(loc, name[cat]), O_RDONLY)) == -1)
-				return 0;
-			(void)close(fd);
-		}
+		if ((fd = open(_fullocale(loc, name[cat]), O_RDONLY)) == -1)
+			return 0;
+		(void)close(fd);
 	}
 	return strcpy(_cur_locale[cat], loc);
 }

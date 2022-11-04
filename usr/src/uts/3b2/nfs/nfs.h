@@ -8,7 +8,7 @@
 #ifndef _NFS_NFS_H
 #define _NFS_NFS_H
 
-#ident	"@(#)head.sys:sys/nfs/nfs.h	1.5"
+#ident	"@(#)head.sys:sys/nfs/nfs.h	1.4"
 
 /*	@(#)nfs.h 2.38 88/08/19 SMI 	*/
 
@@ -99,7 +99,7 @@ enum nfsftype {
 #define NFS_FIFO_TYPE	NFCHR
 #define NFS_FIFO_MODE	S_IFCHR
 /* #define NFS_FIFO_DEV	(~0) */
-#define NFS_FIFO_DEV	((u_long)-1)
+#define NFS_FIFO_DEV	(-1UL)
 
 /* identify fifo in nfs attributes */
 #define NA_ISFIFO(NA)	(((NA)->na_type == NFS_FIFO_TYPE) && \

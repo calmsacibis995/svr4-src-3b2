@@ -5,14 +5,13 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/_wrtchk.c	1.5"
+#ident	"@(#)libc-port:stdio/_wrtchk.c	1.4"
 /*LINTLIBRARY*/
 
 #include "synonyms.h"
 #include "shlib.h"
 #include <stdio.h>
 #include "stdiom.h"
-#include <errno.h>
 
 #undef _wrtchk
 
@@ -26,7 +25,6 @@ _wrtchk(iop)	/* check permissions, correct for read & write changes */
 	{
 		if (!(flags & (_IOWRT | _IORW))) {
 			iop->_flag |= _IOERR;
-			errno = EBADF;
 			return EOF; /* stream is not writeable */
 		}
 		iop->_flag = (flags & ~_IOEOF) | _IOWRT;

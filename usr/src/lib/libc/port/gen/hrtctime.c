@@ -5,8 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/hrtctime.c	1.3"
+#ident	"@(#)libc-port:gen/hrtctime.c	1.2"
 
+#ifdef __STDC__
+	#pragma weak hrtctime = _hrtctime
+	#pragma weak hrtasctime = _hrtasctime
+#endif
 #include "synonyms.h"
 #include <time.h>
 #include <stdio.h>
@@ -20,7 +24,7 @@ static char cbuf[100];
 
 
 char *
-_hrtctime(tdp)
+hrtctime(tdp)
 hrtime_t *tdp;
 {
 	register struct tm	*tmp;
@@ -40,7 +44,7 @@ hrtime_t *tdp;
 
 
 char *
-_hrtasctime(tmp, rem, res)
+hrtasctime(tmp, rem, res)
 struct tm *tmp;
 ulong rem;
 ulong res;

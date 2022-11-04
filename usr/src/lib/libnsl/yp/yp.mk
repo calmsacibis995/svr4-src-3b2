@@ -7,7 +7,7 @@
 
 
 
-#ident	"@(#)libyp:libyp.mk	1.10"
+#ident	"@(#)libyp:libyp.mk	1.8"
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #	PROPRIETARY NOTICE (Combined)
@@ -32,7 +32,7 @@
 #
 USRLIB = $(ROOT)/usr/lib
 INC = $(ROOT)/usr/include 
-CFLAGS= -O -Kpic -I$(INC) -D_NSL_RPC_ABI
+CFLAGS= -O -Kpic -I$(INC)
 STRIP = strip
 SIZE = size
 LINT = lint
@@ -48,7 +48,7 @@ LIBOBJS= ../dbm.o ../yp_all.o ../yp_bind.o ../yp_enum.o\
 	../yp_b_clnt.o ../yp_b_xdr.o
 
 YPSRC= $(OBJS:.o=.c)
-HDRS = dbm.h yp_prot.h ypclnt.h  
+HDRS = dbm.h yp_prot.h ypclnt.h ypupd.h 
 
 all: $(OBJS)
 	cp $(OBJS) ../
@@ -111,7 +111,6 @@ yp_order.o: yp_order.c\
 yp_update.o: yp_update.c\
 	$(INC)/stdio.h\
 	$(INC)/rpc/rpc.h\
-	$(INC)/rpcsvc/ypupd.h\
 	yp_b.h
 
 yperr_string.o: yperr_string.c\
@@ -130,7 +129,7 @@ ypprot_err.o: ypprot_err.c\
  
 ypupd.o: ypupd.c\
 	$(INC)/rpc/rpc.h\
-	$(INC)/rpcsvc/ypupd.h
+	ypupd.h
  
 ypxdr.o: ypxdr.c\
 	$(INC)/rpc/rpc.h\

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)sgs-inc:common/link.h	1.8"
+#ident	"@(#)sgs-inc:common/link.h	1.7"
 
 #ifndef _LINK_H
 #define _LINK_H
@@ -62,9 +62,6 @@ typedef struct {
 
 #define DT_MAXPOSTAGS	24	/* number of positive tags */
 #define DT_MAXNEGTAGS	3	/* number of negative tags */
-
-#define DT_LOPROC	0x70000000	/* processor specific range */
-#define DT_HIPROC	0x7fffffff
 
 
 

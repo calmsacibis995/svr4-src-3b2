@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/exit.c	1.74"
+#ident	"@(#)kernel:os/exit.c	1.67"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -127,14 +127,18 @@ exit(why, what)
 	sigemptyset(&p->p_sigmask);
 	sigdelq(p, 0);
 
-	closeall(1);
+	closeall(0);
 
 	ev_signal(p, 0);
 
 	(void)hrt_cancel_proc();
 
-	if (sp->s_sidp == p->p_pidp && sp->s_vp != NULL)
+	if (sp->s_vp && *sp->s_sidp == p->p_pid) {
+		signal(*sp->s_fgidp,SIGHUP);
+		if (sp->s_vp->v_stream)
+			strclearctty(sp->s_vp->v_stream);
 		freectty(sp);
+	}
 
 	ufp = u.u_flist.uf_next;
 	while (ufp) {
@@ -175,30 +179,16 @@ exit(why, what)
 	p->p_utime += p->p_cutime;
 	p->p_stime += p->p_cstime;
 
-	if ((q = p->p_orphan) != NULL) {
-
-		register proc_t *nokp = p->p_nextofkin;
-
-		for (; ; q = q->p_nextorph) {
-			q->p_nextofkin = nokp;
-			if (q->p_nextorph == NULL)
-				break;
-		}
-
-		q->p_nextorph = nokp->p_orphan;
-		nokp->p_orphan = p->p_orphan;
-		p->p_orphan = NULL;
-
-	}
+	detachcld(p);
 
 	if ((q = p->p_child) != NULL) {
 
-		pgdetach(p);
+		register proc_t *proc1 = nproc[1];
 
 		for (; ; q = q->p_sibling) {
 			q->p_ppid = 1;
 			q->p_oppid = 1;
-			q->p_parent = proc_init;
+			q->p_parent = proc1;
 			if (q->p_flag & STRC)
 				psignal(q, SIGKILL);
 			sigcld(q);
@@ -206,11 +196,11 @@ exit(why, what)
 				break;
 		}
 
-		q->p_sibling = proc_init->p_child;
-		proc_init->p_child = p->p_child;
+		q->p_sibling = proc1->p_child;
+		proc1->p_child = p->p_child;
 		p->p_child = NULL;
 
-	}
+	}	/* end if children */
 
 
 	/*
@@ -227,9 +217,6 @@ exit(why, what)
 		preempt();
 	}
 
-	if (p->p_exec)
-		VN_RELE(p->p_exec);
-
 	/*
 	 * These MUST be set here because parents waiting for children
 	 * will only check p_wcode since more conditions than zombie
@@ -241,7 +228,7 @@ exit(why, what)
 	p->p_wdata = what;
 
 	if (p->p_trace)
-		wakeprocs((caddr_t)p->p_trace, PRMPT);
+		wakeup((caddr_t)p->p_trace);
 
 	sigcld(p);
 
@@ -378,9 +365,6 @@ waitid(idtype, id, ip, options)
 				return 0;
 			}
 
-			if (idtype == P_PID)
-				break;
-
 		} while ((cp = cp->p_sibling) != NULL);
 
 		if (!found || ready == found)
@@ -391,11 +375,8 @@ waitid(idtype, id, ip, options)
 			return 0;
 		}
 
-		if (idtype == P_PID)
-			sleep((caddr_t)cp, PWAIT);
-		else
-			sleep((caddr_t)pp, PWAIT);
-
+		if (sleep((caddr_t)pp, PWAIT | PCATCH))
+			return intrerr(1);
 	}
 	return ECHILD;
 }
@@ -461,37 +442,28 @@ void
 freeproc(p)
 	proc_t *p;
 {
- 	register proc_t *q;
+	register proc_t	*q;
 
-        ASSERT(p->p_stat == SZOMB);
+	ASSERT(p->p_stat == SZOMB);
 
-        p->p_nextofkin->p_cutime += p->p_utime;
-	p->p_nextofkin->p_cstime += p->p_stime;
+	leavepg(p);
+	exitsession(p);
 
-        if (p->p_trace)
+	q = p->p_parent;
+	q->p_cutime += p->p_utime;
+	q->p_cstime += p->p_stime;
+	if (p->p_trace)
 		prexit(p);
-
-	if ((q = p->p_nextofkin)->p_orphan == p)
-		q->p_orphan = p->p_nextorph;
-	else {
-		for (q = q->p_orphan; q; q = q->p_nextorph)
-			if (q->p_nextorph == p)
-                                break;
-		ASSERT(q && q->p_nextorph == p);
-		q->p_nextorph = p->p_nextorph;
-	}
-
-	if ((q = p->p_parent)->p_child == p)
+	if (q->p_child == p)
 		q->p_child = p->p_sibling;
 	else {
 		for (q = q->p_child; q; q = q->p_sibling)
 			if (q->p_sibling == p)
-                                break;
+				break;
 		ASSERT(q && q->p_sibling == p);
 		q->p_sibling = p->p_sibling;
 	}
-
-	pid_exit(p);	/* frees pid and proc structure */
+	pid_release(p->p_pid);	/* frees pid and proc structure */
 }
 
 /*

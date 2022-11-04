@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/log.c	1.14"
+#ident	"@(#)kernel:io/log.c	1.12"
 
 /*
  * Streams log driver.
@@ -18,10 +18,10 @@
 #include "sys/stream.h"
 #include "sys/strstat.h"
 #include "sys/log.h"
-#include "sys/inline.h"
 #include "sys/strlog.h"
 #include "sys/systm.h"
 #include "sys/debug.h"
+#include "sys/inline.h"
 #include "sys/cred.h"
 #include "sys/file.h"
 #include "sys/ddi.h"
@@ -190,7 +190,6 @@ logwput(q, bp)
 	register struct log *lp;
 	struct log_ctl *lcp;
 	mblk_t *cbp, *pbp;
-	int size;
 
 	lp = (struct log *)q->q_ptr;
 	switch (bp->b_datap->db_type) {
@@ -233,11 +232,8 @@ logwput(q, bp)
 				goto lognak;
 			}
 			s = splhi();
-			if (putbufwpos > putbufrpos)
-				size = putbufwpos - putbufrpos;
-			else
-				size = putbufsz - putbufrpos + putbufwpos;
-			if (!(pbp = allocb(size, BPRI_HI))) {
+			if (!(pbp = allocb((putbufwpos - putbufrpos),
+			    BPRI_HI))) {
 				splx(s);
 				freeb(cbp);
 				iocp->ioc_error = EAGAIN;
@@ -679,9 +675,8 @@ logcons(mp)
 	register mblk_t *mp;
 {
 	register int s, i;
-	register unsigned char *cp;
 	register struct log *lp;
-	mblk_t *bp;
+	register unsigned char *cp;
 	struct log_ctl *lcp;
 	int nlog = 0;
 	int didsee = 0;
@@ -690,24 +685,21 @@ logcons(mp)
 	 * Assumption that only short messages get logged to the
 	 * console.  That's why we don't use bcopy().
 	 */
-	bp = mp;
 	s = splhi();
-	for (mp = mp->b_cont; mp; mp = mp->b_cont) {
-		cp = mp->b_rptr;
-		while (cp < mp->b_wptr) {
-			if (++putbufwpos >= putbufsz)
-				putbufwpos = 0;
-			putbuf[putbufwpos] = *cp++;
-		}
+	cp = mp->b_cont->b_rptr;
+	while (cp < mp->b_cont->b_wptr) {
+		if (++putbufwpos >= putbufsz)
+			putbufwpos = 0;
+		putbuf[putbufwpos] = *cp++;
 	}
 
-	lcp = (struct log_ctl *)bp->b_rptr;
+	lcp = (struct log_ctl *)mp->b_rptr;
 	lcp->seq_no = log_conseq;
 	i = CLONEMIN + 1;
 	for (lp = &log_log[i]; i < log_cnt; i++, lp++)
 		if (lp->log_state & LOGCONS) {
 			nlog++;
-			didsee += sendmsg(lp, bp);
+			didsee += sendmsg(lp, mp);
 		}
 
 	if (didsee)

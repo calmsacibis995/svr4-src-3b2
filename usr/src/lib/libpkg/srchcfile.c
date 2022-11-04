@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:srchcfile.c	1.7.1.1"
+#ident	"@(#)libpkg:srchcfile.c	1.7"
 
 #include <stdio.h>
 #include <limits.h>
@@ -22,8 +22,6 @@
 		return(-1); \
 	}
 
-extern void	free();
-extern void	*calloc();
 
 static int	getstr(), 
 		getnum(), 
@@ -274,9 +272,10 @@ Path_Done:
 		   getstr(fpin, NULL, ATRSIZ, ept->ainfo.group))
 			ERROR("unable to read mode/owner/group")
 
-		/* don't have to check (mode < 0) since '-' is not a legal */
-		if((ept->ainfo.mode != BADMODE) && ((ept->ainfo.mode > 07777) ||
-		(strchr("cbdxp", ept->ftype) && (ept->ainfo.mode > 02000))))
+		/* don't have to check for (mode < 0) since '-'
+		   is not a legal digit */
+		if((ept->ainfo.mode > 07777) || (strchr("cbdxp", ept->ftype) && 
+		(ept->ainfo.mode > 02000)))
 			ERROR("illegal value for mode")
 	}
 

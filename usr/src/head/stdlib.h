@@ -8,7 +8,7 @@
 #ifndef _STDLIB_H
 #define _STDLIB_H
 
-#ident	"@(#)head:stdlib.h	1.19"
+#ident	"@(#)head:stdlib.h	1.15"
 
 typedef	struct {
 	 int	quot;
@@ -90,7 +90,7 @@ extern char *ecvt(double, int, int *, int *);
 extern char *fcvt(double, int, int *, int *);
 extern char *getcwd(char *, int);
 extern char *getlogin(void);
-extern int getopt(int, char *const *, const char *);
+extern int getopt(int, const char **, const char *);
 extern char *getpass(const char *);
 extern int getpw(int, char *);
 extern char *gcvt(double, int, char *);
@@ -100,7 +100,7 @@ extern char *l64a(long);
 extern void ltol3(char *, const long *, int);
 extern void * memalign(size_t, size_t);
 extern char *mktemp(char *);
-extern int putenv(char *);
+extern int putenv(const char *);
 extern char *realpath(char *, char *);
 extern void swab(const char *, char *, int);
 extern char *ttyname(int);

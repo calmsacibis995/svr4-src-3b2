@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libnsl:dial/dial.mk	1.6"
+#ident	"@(#)libnsl:dial/dial.mk	1.5"
 #
 # ***************************************************************
 # *	Copyright (c) 1984 AT&T Technologies, Inc.		*
@@ -37,7 +37,6 @@ all: $(OBJS)
 
 dial.o:	dial.c \
 	callers.c conn.c \
-	dk.h dkbreak.c dkdial.c dkerr.c dkminor.c dtnamer.c sysexits.h \
 	getargs.c interface.c line.c \
 	stoa.c strecpy.c strsave.c sysfiles.c ulockf.c uucpdefs.c \
 	uucp.h

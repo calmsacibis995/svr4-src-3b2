@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/rip_cb.c	1.5"
+#ident	"@(#)netinet:netinet/rip_cb.c	1.4"
 
 /*
  *	System V STREAMS TCP - Release 2.0
@@ -126,7 +126,7 @@ rip_disconnect(inp)
 
 rip_bind(inp, addr)
 	register struct inpcb *inp;
-	struct sockaddr_in *addr;
+	struct taddr_in *addr;
 {
 
 /* BEGIN DUBIOUS */
@@ -156,7 +156,7 @@ rip_bind(inp, addr)
  */
 rip_connaddr(inp, addr)
 	struct inpcb *inp;
-	struct sockaddr_in *addr;
+	struct taddr_in *addr;
 {
 	if (addr->sin_family != AF_INET)
 		return(EAFNOSUPPORT);

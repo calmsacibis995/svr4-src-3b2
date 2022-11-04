@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:nl_types.h	1.3"
+#ident	"@(#)head:nl_types.h	1.2"
 
 /*
  * allow for limits.h
@@ -133,9 +133,5 @@ typedef nl_catd_t *nl_catd;
 int catclose(nl_catd);
 char *catgets(nl_catd, int, int, char *);
 nl_catd catopen(char *, int);
-
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
-char *gettxt(const char *, const char *);
-#endif
 
 #endif

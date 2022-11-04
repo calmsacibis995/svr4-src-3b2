@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/doscan.c	2.35"
+#ident	"@(#)libc-port:stdio/doscan.c	2.32"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include <stdio.h>
@@ -71,12 +71,6 @@ va_list va_alist;
 					  * arglst[0] is the first argument
 					  * arglst[1] is the second argument, etc.
 					  */
-
-	/* Check if readable stream */
-	if (!(iop->_flag & (_IOREAD | _IORW))) {
-		errno = EBADF;
-		return(EOF);
-	}
 
 	/* Initialize args and sargs to the start of the argument list.
 	 * Note that ANSI guarantees that the address of the first member of
@@ -162,8 +156,7 @@ va_list va_alist;
 			return(EOF); /* unexpected end of format */
 		if (isupper(ch))  /* no longer documented */
 		{
-			if (_lib_version == c_issue_4)
-				size = 'l';
+			size = 'l';
 			ch = _tolower(ch);
 		}
 		if (ch!= 'n' && !flag_eof)
@@ -321,12 +314,11 @@ va_list *listp;
 			else if (inchar == '+' || inchar == '-' ||
 				(isspace(inchar) && (_lib_version == c_issue_4)))
 			{
-				if ((len-2) < 0)
+				if ((len-=2) < 0)
 				{
 					locungetc(inchar);
 					break;
 				}
-				--len;
 				lookahead = readchar(iop);
 				if (isdigit(lookahead))
 				{

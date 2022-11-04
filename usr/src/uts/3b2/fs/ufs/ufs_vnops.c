@@ -5,37 +5,13 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_vnops.c	1.66"
+#ident	"@(#)fs:fs/ufs/ufs_vnops.c	1.50"
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
-#include <sys/resource.h>
 #include <sys/signal.h>
 #include <sys/cred.h>
 #include <sys/user.h>
@@ -153,32 +129,7 @@ struct vnodeops ufs_vnodeops = {
 	ufs_delmap,
 	fs_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -269,12 +220,9 @@ ufs_write(vp, uiop, ioflag, cr)
 		 */
 		uiop->uio_offset = ip->i_size;
 	}
-	if (vp->v_type == VREG && uiop->uio_offset >= ip->i_size) {
-		if (ip->i_map) {
-			ILOCK(ip);
+	if (vp->v_type == VREG && uiop->uio_offset > ip->i_size) {
+		if (ip->i_map)
 			ufs_freemap(ip);
-			IUNLOCK(ip);
-		}
 	}
 	error = rwip(ip, uiop, UIO_WRITE, ioflag);
 	ITIMES(ip);
@@ -341,8 +289,8 @@ rwip(ip, uio, rw, ioflag)
 	register int n, on, mapon;
 	register struct fs *fs;
 	struct vnode *vp;
+	unsigned long int limit = uio->uio_limit << SCTRSHFT;
 	int type, error, pagecreate;
-	rlim_t limit = uio->uio_limit;
 	u_int flags;
 	int iupdat_flag;
 	long old_blocks;
@@ -359,11 +307,6 @@ rwip(ip, uio, rw, ioflag)
 	ASSERT(rw == UIO_READ || rw == UIO_WRITE);
 	type = ip->i_mode & IFMT;
 	ASSERT(type == IFREG || type == IFDIR || type == IFLNK);
-	vp = ITOV(ip);
-	if (MANDLOCK(vp, ip->i_mode)
-	  && (error = chklock(vp, rw == UIO_READ ? FREAD : FWRITE,
-	    uio->uio_offset, uio->uio_resid, uio->uio_fmode)))
-		return (error);
 	if (uio->uio_offset < 0 || (uio->uio_offset + uio->uio_resid) < 0)
 		return (EINVAL);
 	if (uio->uio_resid == 0)
@@ -371,6 +314,10 @@ rwip(ip, uio, rw, ioflag)
 
 
 	if (rw == UIO_WRITE) {
+		if (type == IFREG && uio->uio_offset >= limit) {
+			error = EFBIG;
+			goto out;
+		}
 		ip->i_flag |= INOACC;	/* don't update ref time in getpage */
 	} else {
 		ip->i_flag |= IACC;
@@ -382,6 +329,7 @@ rwip(ip, uio, rw, ioflag)
 		iupdat_flag = 0;
 	}
 	fs = ip->i_fs;
+	vp = ITOV(ip);
 	do {
 		off = uio->uio_offset & MAXBMASK;
 		mapon = uio->uio_offset & MAXBOFFSET;
@@ -401,13 +349,6 @@ rwip(ip, uio, rw, ioflag)
 
 		base = segmap_getmap(segkmap, vp, off);
 		if (rw == UIO_WRITE) {
-			if (type == IFREG && uio->uio_offset + n >= limit) {
-				if (uio->uio_offset >= limit) {
-					error = EFBIG;
-					goto out;
-				}
-				n = limit - uio->uio_offset;
-			}
 			if (uio->uio_offset + n > ip->i_size) {
 				/*
 				 * We are extending the length of the file.
@@ -434,7 +375,7 @@ rwip(ip, uio, rw, ioflag)
 				 */
 				if (mapon == 0) {
 					segmap_pagecreate(segkmap, base,
-					    (u_int)n, 0);
+					    (u_int)n, 0, 0, 0);
 					pagecreate = 1;
 				} else
 					pagecreate = 0;
@@ -454,7 +395,7 @@ rwip(ip, uio, rw, ioflag)
 					(void) segmap_release(segkmap, base, 0);
 					break;
 				}
-				segmap_pagecreate(segkmap, base, (u_int)n, 0);
+				segmap_pagecreate(segkmap, base, (u_int)n, 0, 0, 0);
 				pagecreate = 1;
 			} else
 				pagecreate = 0;
@@ -529,11 +470,8 @@ rwip(ip, uio, rw, ioflag)
 					flags = SM_WRITE | SM_ASYNC |
 					    SM_DONTNEED;
 				}
-				if (ip->i_map) {
-					ILOCK(ip);
+				if (ip->i_map)
 					ufs_freemap(ip);
-					IUNLOCK(ip);
-				}
 				ip->i_flag |= IUPD | ICHG;
 				if (u.u_cred->cr_uid != 0)
 					ip->i_mode &= ~(ISUID | ISGID);
@@ -640,7 +578,7 @@ ufs_getattr(vp, vap, flags, cr)
 		vap->va_blksize = fsp->fs_fsize;
 		break;
 	}
-	vap->va_nblocks = ip->i_blocks;
+	vap->va_nblocks = dbtofsb(fsp, ip->i_blocks);
 	return (0);
 }
 
@@ -690,6 +628,8 @@ ufs_setattr(vp, vap, flags, cr)
 				ip->i_mode &= ~ISGID;
 		}
 		ip->i_flag |= ICHG;
+		if ((vp->v_flag & VTEXT) && ((ip->i_mode & ISVTX) == 0))
+			xrele(vp);
 	}
 	if (mask & (AT_UID|AT_GID)) {
 		int checksu = 0;
@@ -963,7 +903,7 @@ ufs_create(dvp, name, vap, excl, mode, vpp, cr)
 	 * nothing more we can do here because the resultant vnode may
 	 * be of a different file system type.
 	 */
-	if (ip != NULL && ITOV(ip)->v_vfsmountedhere) {
+	if (error == 0 && ITOV(ip)->v_vfsmountedhere) {
 		vnode_t *vp = ITOV(ip);
 
 		ufs_iunlock(ip);
@@ -1134,13 +1074,6 @@ ufs_rename(sdvp, snm, tdvp, tnm, cr)
 	}
 
 	/*
-	 * POSIX 1003.3 requires write permission on a directory in order
-	 * to rename it.
-	 */
-	if ((sip->i_mode & IFMT) == IFDIR
-	  && (error = ufs_iaccess(sip, IWRITE, cr)) != 0)
-		goto out;
-	/*
 	 * Link source to the target.
 	 */
 	if (error = ufs_direnter(tdp, tnm, DE_RENAME, sdp, sip,
@@ -1287,13 +1220,12 @@ nextblk:
 	/* Read in the next chunk */
 	if (error = fbread(vp, (long)offset, bytes_wanted, S_OTHER, &fbp))
 		goto out;
-	ip->i_flag |= IACC;
+
 	incount = 0;
 	idp = (struct direct *)fbp->fb_addr;
 	if (idp->d_ino == 0 && idp->d_reclen == 0 &&
 		idp->d_namlen == 0) {
 		cmn_err(CE_WARN, "ufs_readir: bad dir, inumber = %d\n", ip->i_number);
-		fbrelse(fbp, S_OTHER);
 		error = ENXIO;
 		goto out;
 	}	
@@ -1698,6 +1630,12 @@ reread:
 			bp->b_dev = cmpdev(dev);
 			bp->b_blkno = fsbtodb(fs, bn) +
 			    btodb(blkoff(fs, io_off));
+#if 0
+			bp->b_un.b_addr = 0;
+#else
+			pgaddr = pfntokv(page_pptonum(pp));
+			bp->b_un.b_addr = (caddr_t)pgaddr;
+#endif
 
 			/*
 			 * Zero part of page which we are not
@@ -1792,8 +1730,12 @@ reread:
 			bp2->b_dev = cmpdev(dev);
 			bp2->b_blkno = fsbtodb(fs, bn2) +
 			    btodb(blkoff(fs, io_off));
+#if 0
 			bp2->b_un.b_addr = (caddr_t)pgoff;
-
+#else
+			pgaddr = pfntokv(page_pptonum(pp2));
+			bp2->b_un.b_addr = (caddr_t)(pgaddr + pgoff);
+#endif
 			/*
 			 * Zero part of page which we are not
 			 * going to be reading from disk now.
@@ -1951,8 +1893,11 @@ ufs_writelbn(ip, bn, pp, len, pgoff, flags)
 	bp->b_dev = cmpdev(ip->i_dev);
 	bp->b_blkno = bn;
 	bp->b_blkno = bn;
+#if 0
 	bp->b_un.b_addr = (addr_t)pgoff;
-
+#else
+	bp->b_un.b_addr = (caddr_t)pfntokv(page_pptonum(pp)) + pgoff;
+#endif
 	(*bdevsw[getmajor(ip->i_dev)].d_strategy)(bp);
 
 	/*
@@ -2073,19 +2018,26 @@ again:
 		ip->i_nextr = 0;
 
 		/*
+		 * If the modified time on the inode has not already been
+		 * set elsewhere (e.g. for write/setattr) and this is not
+		 * a call from msync (B_FORCE) we set the time now.
+		 * This gives us approximate modified times for mmap'ed files
+		 * which are modified via stores in the user address space.
+		 */
+		if ((ip->i_flag & IMODTIME) == 0 || (flags & B_FORCE)) {
+			ip->i_flag |= IUPD;
+			ITIMES(ip);
+		}
+		/*
 		 * This is an attempt to clean up loose ends left by
 		 * applications that store into mapped files.  It's
 		 * insufficient, strictly speaking, for ill-behaved
 		 * applications, but about the best we can do.
 		 */
-		if ((ip->i_flag & IMODTIME) == 0 || (flags & B_FORCE)) {
-			ip->i_flag |= IUPD;
-			ITIMES(ip);
-			if (vp->v_type == VREG) {
-				ILOCK(ip);
-				err = fs_vcode(vp, &ip->i_vcode);
-				IUNLOCK(ip);
-			}
+		if (vp->v_type == VREG) {
+			ILOCK(ip);
+			err = fs_vcode(vp, &ip->i_vcode);
+			IUNLOCK(ip);
 		}
 	}
 
@@ -2105,8 +2057,8 @@ again:
 		 * any dirty pages, we only need to use S_OTHER
 		 * here and we should not get back a bn == UFS_HOLE.
 		 */
-		if (err = ufs_bmap(ip, lbn, &bn, (daddr_t *)0, bsize, S_WRITE,
-		    1))
+		if (err = ufs_bmap(ip, lbn, &bn, (daddr_t *)0, bsize, S_OTHER,
+		    0))
 			break;
 		ASSERT(bn != UFS_HOLE);
 
@@ -2243,9 +2195,7 @@ ufs_map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 		(void) as_unmap(as, *addrp, len);
 	}       
 
-	ILOCK(VTOI(vp));
 	error = ufs_allocmap(VTOI(vp));
-	IUNLOCK(VTOI(vp));
 	if (error == 0)
 		return (error);	
 	vn_a.vp = vp;
@@ -2261,11 +2211,11 @@ ufs_map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 
 /* ARGSUSED */
 STATIC int
-ufs_addmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
+ufs_addmap(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	struct vnode *vp;
 	uint off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	uint len;
 	u_char prot, maxprot;
 	uint flags;
@@ -2280,11 +2230,11 @@ ufs_addmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
 
 /*ARGSUSED*/
 STATIC int
-ufs_delmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
+ufs_delmap(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;

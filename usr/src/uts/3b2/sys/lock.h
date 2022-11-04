@@ -8,7 +8,7 @@
 #ifndef _SYS_LOCK_H
 #define _SYS_LOCK_H
 
-#ident	"@(#)head.sys:sys/lock.h	11.7"
+#ident	"@(#)head.sys:sys/lock.h	11.6"
 /*
  * flags for locking procs and texts
  */
@@ -18,8 +18,6 @@
 #define	DATLOCK	 4
 
 #ifdef _KERNEL
-
-#define	MEMLOCK	 8
 
 #if defined(__STDC__)
 int punlock(void);

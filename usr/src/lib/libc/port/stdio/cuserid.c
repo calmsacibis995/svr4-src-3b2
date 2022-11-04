@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/cuserid.c	1.14"
+#ident	"@(#)libc-port:stdio/cuserid.c	1.13"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 #ifdef __STDC__
@@ -19,6 +19,7 @@
 extern char *getlogin();
 extern int getuid();
 extern struct passwd *getpwuid();
+extern void endpwent();
 static char res[L_cuserid];
 
 char *
@@ -34,6 +35,7 @@ cuserid(s)
 	if (p != 0)
 		return strcpy(s, p);
 	pw = getpwuid(getuid());
+	endpwent();
 	if (pw != 0)
 		return strcpy(s, pw->pw_name);
 	*s = '\0';

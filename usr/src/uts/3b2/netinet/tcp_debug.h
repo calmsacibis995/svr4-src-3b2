@@ -8,7 +8,7 @@
 #ifndef _NETINET_TCP_DEBUG_H
 #define _NETINET_TCP_DEBUG_H
 
-#ident	"@(#)head.sys:sys/netinet/tcp_debug.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/tcp_debug.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -53,9 +53,5 @@ char	*tanames[] =
     { "input", "output", "user", "respond", "drop", "timer" };
 #endif
 
-#ifdef _KERNEL
-extern int		tcp_ndebug, tcp_debx;
-extern struct tcp_debug	tcp_debug[];
-#endif /* _KERNEL */
-
+#define	TCP_NDEBUG 100
 #endif	/* _NETINET_TCP_DEBUG_H */

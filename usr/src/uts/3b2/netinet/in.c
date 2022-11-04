@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/in.c	1.4"
+#ident	"@(#)netinet:netinet/in.c	1.3"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -88,7 +88,7 @@ extern struct ip_provider provider[];
 extern struct ip_pcb ip_pcb[];
 extern struct ip_provider *lastprov;
 
-extern struct ifstats *ifstats;		/* from /etc/master.d/kernel */
+struct ifstats *ifstats;
 
 inet_hash(in, hp)
 	struct in_addr  in;

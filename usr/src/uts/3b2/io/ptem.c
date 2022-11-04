@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/ptem.c	1.13"
+#ident	"@(#)kernel:io/ptem.c	1.11.1.2"
 /*
  * Description: The PTEM streams module is used as a pseudo
  *		driver emulator. Its purpose is to emulate
@@ -726,35 +726,12 @@ register mblk_t *mp;	/* Pointer to current message block */
 		freemsg( mp);
 		break;
 
-	case M_STOP:
-		/*
-		 * Set the output flow control state
-		 */
-		ntp->state |= OFLOW_CTL;
-		putnext( q, mp);
-		break;
-
-	case M_START:
-		/*
-		 * Relieve the output flow control state
-		 */
-		ntp->state &= ~OFLOW_CTL;
-		putnext( q, mp);
-		while (( mp = getq( q)) != NULL)
-			putnext( q, mp);
-		break;
-
 	case M_DATA:
+		/*
+		 * Free all zero length messages
+		 */
 		if (( mp->b_wptr - mp->b_rptr) <= 0)
-			/*
-			 * Free all zero length messages
-			 */
 			freemsg( mp);
-		else if ( ntp->state & OFLOW_CTL)
-			/*
-			 * Queue data messages in the flow control case
-			 */
-			putq( q, mp);
 		else
 			putnext( q, mp);
 		break;

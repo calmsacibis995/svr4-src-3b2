@@ -8,7 +8,7 @@
 #ifndef _NETINET_TCP_FSM_H
 #define _NETINET_TCP_FSM_H
 
-#ident	"@(#)head.sys:sys/netinet/tcp_fsm.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/tcp_fsm.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -29,25 +29,6 @@
  *  	(c) 1986,1987,1988,1989  Sun Microsystems, Inc.
  *  	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *  	          All rights reserved.
- */
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
  */
 
 /*
@@ -98,6 +79,10 @@ u_char	tcp_outflags[TCP_NSTATES] = {
     TH_ACK, TH_ACK,
     TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
 };
+#endif
+
+#ifdef KPROF
+int	tcp_acounts[TCP_NSTATES][PRU_NREQ];
 #endif
 
 #ifdef	TCPSTATES

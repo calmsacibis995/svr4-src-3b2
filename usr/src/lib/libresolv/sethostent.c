@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:sethostent.c	1.2"
+#ident	"@(#)libresolv:sethostent.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -34,7 +34,6 @@
 #include <arpa/nameser.h>
 #include <netinet/in.h>
 #include <resolv.h>
-#include "res.h"
 
 sethostent(stayopen)
 {

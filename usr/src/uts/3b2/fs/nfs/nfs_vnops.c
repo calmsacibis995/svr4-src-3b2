@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_vnops.c	1.38"
+#ident	"@(#)fs:fs/nfs/nfs_vnops.c	1.22"
 
 /*	@(#)nfs_vnodeops.c 2.167 88/10/19 SMI 	*/
 
@@ -152,9 +152,9 @@ STATIC	void nfs_rwunlock();
 STATIC	int nfs_seek();
 STATIC  int nfs_cmp();
 STATIC  int nfs_frlock();
-STATIC  int nfs_space();
 
 extern	int fs_nosys();
+/* STATIC	int nfs_badop(); */
 
 STATIC  int nfs_realvp();
 STATIC	int nfs_getpage();
@@ -163,6 +163,13 @@ STATIC	int nfs_map();
 STATIC	int nfs_addmap();
 STATIC	int nfs_delmap();
 extern	int fs_poll();
+
+#ifdef	notyet
+STATIC	int nfs_lockctl();
+STATIC	int nfs_select();
+STATIC	int nfs_noop();
+STATIC	int nfs_dump();
+#endif	/* notyet */
 
 struct vnodeops nfs_vnodeops = {
 	nfs_open,
@@ -192,7 +199,7 @@ struct vnodeops nfs_vnodeops = {
 	nfs_seek,
 	nfs_cmp,
 	nfs_frlock,
-	nfs_space,
+	fs_nosys,	/* space */
 	nfs_realvp,
 	nfs_getpage,
 	nfs_putpage,
@@ -201,32 +208,7 @@ struct vnodeops nfs_vnodeops = {
 	nfs_delmap,
 	fs_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -473,7 +455,7 @@ rwvp(vp, uio, rw, ioflag, cred)
 		 */
 		if (rw == UIO_WRITE && (n == MAXBSIZE ||
 		    (on == 0 && (off + n) >= rp->r_size))) {
-			segmap_pagecreate(segkmap, base + on, (u_int)n, 0);
+			segmap_pagecreate(segkmap, base + on, (u_int)n, 0, 0, 0);
 			pagecreate = 1;
 		}
 
@@ -788,6 +770,18 @@ nfs_ioctl(vp, com, arg, flag, cred, rvalp)
 	return (ENOTTY);
 }
 
+#ifdef	notyet
+/*ARGSUSED*/
+STATIC int
+nfs_select(vp, which, cred)
+	struct vnode *vp;
+	int which;
+	struct cred *cred;
+{
+	return (EOPNOTSUPP);
+}
+#endif	/* notyet */
+
 /*ARGSUSED*/
 STATIC int
 nfs_getattr(vp, vap, flags, cred)
@@ -881,10 +875,10 @@ nfs_setattr(vp, vap, flags, cred)
 			vap->va_mtime.tv_nsec = 0;
 
 		/* make sure we only set the right fields */
-		if (!(mask&AT_MODE))	vap->va_mode = (mode_t)-1;
+		if (!(mask&AT_MODE))	vap->va_mode = -1U;
 		if (!(mask&AT_UID))	vap->va_uid = -1;
 		if (!(mask&AT_GID))	vap->va_gid = -1;
-		if (!(mask&AT_SIZE))	vap->va_size = (u_long)-1;
+		if (!(mask&AT_SIZE))	vap->va_size = -1U;
 		/* set if: AT_ATIME not set and
 			   AT_MTIME set and ATTR_UTIME not set */
 		if (!(mask&AT_ATIME) && (!(mask&AT_MTIME) || (flags&ATTR_UTIME)))
@@ -904,7 +898,6 @@ nfs_setattr(vp, vap, flags, cred)
 				nfs_cache_check(vp, mtime);
 				nfs_attrcache(vp, &ns->ns_attr);
 			} else {
-				PURGE_ATTRCACHE(vp);
 				PURGE_STALE_FH(error, vp);
 			}
 		}
@@ -1154,19 +1147,6 @@ nfs_oldlookup(dvp, nm, vpp, cred, pnp, flags)
 	*vpp = (struct vnode *)dnlc_lookup(dvp, nm, cred);
 	if (*vpp) {
 		VN_HOLD(*vpp);
-
-		/*
-		 *	Make sure we can search this directory (after the
-		 *	fact).  It's done here because over the wire lookups
-		 *	verify permissions on the server.  VOP_ACCESS will
-		 *	one day go over the wire, so let's use it sparingly.
-		 */
-		error = VOP_ACCESS(dvp, VEXEC, 0, cred);
-		if (error) {
-			VN_RELE(*vpp);
-			runlock(vtor(dvp));
-			return (error);
-		}
 	} else {
 		dr = (struct  nfsdiropres *)kmem_alloc(sizeof (*dr), KM_SLEEP);
 		setdiropargs(&da, nm, dvp);
@@ -1485,17 +1465,12 @@ nfs_rename(odvp, onm, ndvp, nnm, cred)
 	int error;
 	enum nfsstat status;
 	struct nfsrnmargs args;
-	struct vnode *realvp;
 
 #ifdef NFSDEBUG
 	printf("nfs_rename from %s %x '%s' to %s %x '%s'\n",
 	    vtomi(odvp)->mi_hostname, odvp, onm,
 	    vtomi(ndvp)->mi_hostname, ndvp, nnm);
 #endif
-
-	if (VOP_REALVP(ndvp, &realvp) == 0)
-		ndvp = realvp;
-
 	if (!strcmp(onm, ".") || !strcmp(onm, "..") || !strcmp(nnm, ".") ||
 	    !strcmp (nnm, "..")) {
 		error = EINVAL;
@@ -1732,15 +1707,6 @@ nfs_readdir(vp, uiop, cred, eofp)
 	}
 	iovp = uiop->uio_iov;
 	alloc_count = count = iovp->iov_len;
-
-	/*
-	 *	UGLINESS: SunOS 3.2 servers apparently cannot always handle an
-	 *	RFS_READDIR request with rda_count set to more than 0x400. So
-	 *	we reduce the request size here purely for compatibility.
-	 */
-	if (count > 0x400)
-		count = 0x400;
-
 #ifdef NFSDEBUG
 	printf("nfs_readdir %s %x count %d offset %ld\n",
 	    vtomi(vp)->mi_hostname, vp, count, uiop->uio_offset);
@@ -1822,10 +1788,10 @@ nfs_strategy(bp)
 		if (nfs_wakeup_one_biod == 1)	{
 			wakeup_one((caddr_t)&async_bufhead);
 		} else {
-			wakeprocs((caddr_t)&async_bufhead, PRMPT);
+			wakeup((caddr_t)&async_bufhead);
 		}
 #else
-		wakeprocs((caddr_t)&async_bufhead, PRMPT);
+		wakeup((caddr_t)&async_bufhead);
 #endif
 		return (0);
 	} else {
@@ -1837,6 +1803,9 @@ async_daemon()
 {
 	register struct buf *bp;
 	struct rnode *rp;
+
+	/* detach from the terminal */
+	newsession();
 
 	relvm(u.u_procp);	/* First, release resources */
 
@@ -1884,12 +1853,12 @@ async_daemon()
 				}
 			}
 		}
+		/* sigclearall(u.u_procp); */	/* gone, so duplicate it's effects */
 		{
 			struct proc *p = u.u_procp;
 			p->p_cursig = 0;
 			if (p->p_curinfo) {
-				kmem_free((caddr_t)p->p_curinfo,
-					sizeof(*p->p_curinfo));
+				kmem_free((caddr_t)p->p_curinfo, sizeof(*p->p_curinfo));
 				p->p_curinfo = NULL;
 			}
 		}
@@ -1927,6 +1896,12 @@ do_bio(bp)
 	long count;
 	int error;
 	int read, async;
+	/* caddr_t pgaddr; */
+	/* int mapped = 0; */
+	/* caddr_t rdaddr; */
+	/* struct page *pp; */
+	/* int cnt, numreqs, bytescnt, i; */
+	/* u_int offset; */
 
 	read = bp->b_flags & B_READ;
 	async = bp->b_flags & B_ASYNC;
@@ -1937,6 +1912,15 @@ do_bio(bp)
 #endif
 
 	if (read) {
+		/*
+		 * kludge to read more than a page: if the logical page size is
+		 * greater than the physical page size, we will be trying to read
+		 * more than a page. But we don't have a valid mapping to several
+		 * contiguous pages. So allocate a buffer, read into the buffer,
+		 * and copy from there into the pages one page at a time.
+		 */
+		/* rdaddr = kmem_zalloc (btopr(bp->b_bcount) * PAGESIZE, KM_SLEEP); */
+		/* error = bp->b_error = nfsread(bp->b_vp, rdaddr, */
 		error = bp->b_error = nfsread(bp->b_vp, bp->b_un.b_addr,
 		    (u_int)dbtob(bp->b_blkno), (long)bp->b_bcount,
 		    (long *)&bp->b_resid, rp->r_cred, &va);
@@ -1960,8 +1944,28 @@ do_bio(bp)
 				 */
 				error = NFS_EOF;
 			}
+			/* copy from our buffer to the pages */
+/*
+ *			ASSERT (bp->b_pages != NULL);
+ *			pp = bp->b_pages;
+ *		
+ *			for (cnt = 0; cnt < btopr(bp->b_bcount); cnt++) {
+ *				pgaddr = (caddr_t) pfntokv (page_pptonum(pp));
+ *				bcopy (rdaddr + (cnt * PAGESIZE), pgaddr, PAGESIZE);
+ *				pp = pp->p_next;
+ *			}
+ */
 		}
+		/* Free the buffer we just allocated */
+		/* kmem_free (rdaddr, btopr(bp->b_bcount) * PAGESIZE); */
 	} else {
+		/* make sure we have a valid mapping to the pages we're writing from */
+		/* if ((pgaddr = segmap_findaddr (segkmap, bp->b_vp, bp->b_pages->p_offset)) == -1) { */
+			/* pgaddr = segmap_getmap (segkmap, bp->b_vp, bp->b_pages->p_offset); */
+			/* mapped = 1; */
+		/* } */
+		/* bp->b_un.b_addr = (caddr_t) pgaddr; */
+
 		/*
 		 * If the write fails and it was asynchronous
 		 * all future writes will get an error.
@@ -1972,6 +1976,32 @@ do_bio(bp)
 			if (count < 0) {
 				cmn_err(CE_PANIC, "do_bio: write count < 0");
 			}
+/*
+ *			if (count > PAGESIZE) {
+ *				numreqs = count / PAGESIZE;
+ *				if (count % PAGESIZE)
+ *					numreqs++;
+ *				bp->b_reqcnt = numreqs;
+ *			} else
+ *				numreqs = 1;
+ *			i = 0;
+ *			pp = bp->b_pages;
+ *			do {
+ *				if (i == (numreqs - 1)) {
+ *					if (count % PAGESIZE)
+ *						bytescnt = count % PAGESIZE;
+ *					else
+ *						bytescnt = PAGESIZE;
+ *				} else
+ *					bytescnt = PAGESIZE;
+ *				offset = (u_int) pp->p_offset;
+ *				pgaddr = (caddr_t) pfntokv (page_pptonum (pp));
+ *				error = bp->b_error = nfswrite (bp->b_vp, pgaddr,
+ *					(u_int)pp->p_offset, bytescnt, rp->r_cred);
+ *				i++;
+ *				pp = pp->p_next;
+ *			} while (pp != bp->b_pages);
+ */
 			error = bp->b_error = nfswrite(bp->b_vp,
 			    bp->b_un.b_addr, (u_int)dbtob(bp->b_blkno),
 			    count, rp->r_cred);
@@ -2002,6 +2032,8 @@ do_bio(bp)
 	 * Call pvn_done() to free the bp and pages.  If not ASYNC
 	 * then we have to call pageio_done() to free the bp.
 	 */
+	/* if (mapped) */
+		/* segmap_release (segkmap, bp->b_un.b_addr, SM_DONTNEED); */
 	pvn_done(bp);
 	if (!async) {
 		pageio_done(bp);
@@ -2015,6 +2047,55 @@ do_bio(bp)
 #endif
 	return (error);
 }
+
+#ifdef	notyet
+STATIC int
+nfs_noop()
+{
+
+	return (EREMOTE);
+}
+#endif	/* notyet */
+
+#ifdef	notyet
+/*
+ * Record-locking requests are passed to the local Lock-Manager daemon.
+ */
+STATIC int
+nfs_lockctl(vp, ld, cmd, cred, clid)
+	struct vnode *vp;
+	struct flock *ld;
+	int cmd;
+	struct cred *cred;
+	int clid;
+{
+	lockhandle_t lh;
+
+#ifndef lint
+	if (sizeof (lh.lh_id) != sizeof (fhandle_t))
+		cmn_err(CE_PANIC, "fhandle and lockhandle-id are not the same size!");
+#endif
+#ifdef	VNOCACHE
+	/*
+	 * If we are setting a lock mark the vnode VNOCACHE so the page
+	 * cache does not give inconsistent results on locked files shared
+	 * between clients.  The VNOCACHE flag is never turned off as long
+	 * as the vnode is active because it is hard to figure out when the
+	 * last lock is gone.
+	 * XXX - what if some already has the vnode mapped in?
+	 */
+	if (((vp->v_flag & VNOCACHE) == 0) &&
+	    (ld->l_type != F_UNLCK) && (cmd != F_GETLK)) {
+		vp->v_flag |= VNOCACHE;
+		vtor(vp)->r_error = nfs_putpage(vp, 0, 0, B_INVAL, cred);
+	}
+#endif
+	lh.lh_vp = vp;
+	lh.lh_servername = vtomi(vp)->mi_hostname;
+	bcopy((caddr_t)vtofh(vp), (caddr_t)&lh.lh_id, sizeof (fhandle_t));
+	return (klm_lockctl(&lh, ld, cmd, cred, clid));
+}
+#endif	/* notyet */
 
 /* ARGSUSED */
 STATIC int
@@ -2094,19 +2175,11 @@ reread:
 	lbn = off / bsize;
 	blkoff = lbn * bsize;
 
-#ifdef	VNOCACHE
-	if (rp->r_nextr == off && !(vp->v_flag & VNOCACHE)) {
-		readahead = nfs_nra;
-	} else {
-		readahead = 0;
-	}
-#else
 	if (rp->r_nextr == off) {
 		readahead = nfs_nra;
 	} else {
 		readahead = 0;
 	}
-#endif
 
 #ifdef NFSDEBUG
 	printf("nfs_getapage: nextr %d off %d size %d ra %d ",
@@ -2182,7 +2255,7 @@ reread:
 		 */
 		io_len = ptob(btopr(io_len));
 
-		bp = pageio_setup(pp, io_len, vp, pl == NULL ?
+		bp = pageio_setup(pp, io_len, vp, ppp == NULL ?
 		    (B_ASYNC | B_READ) : B_READ);
 
 		bp->b_blkno = btodb(io_off);
@@ -2201,9 +2274,28 @@ reread:
 		 * read access to the buffer before copying data.
 		 */
 		if (io_off >= rp->r_size && seg == segkmap) {
+			/* No contiguous virtual mapping; must zero pages individually */
+			/* Yes there is now */
 			bzero(bp->b_un.b_addr, io_len);
+/*
+ *			{
+ *				struct page *pagep = pp;
+ *				int zerolen = io_len;
+ *				do {
+ *					pgaddr = pfntokv (page_pptonum(pagep));
+ *					if (zerolen >= PAGESIZE) {
+ *						bzero ((caddr_t) pgaddr, PAGESIZE);
+ *						zerolen -= PAGESIZE;
+ *					} else {
+ *						bzero ((caddr_t) pgaddr, zerolen);
+ *						zerolen = 0;
+ *					}
+ *					pagep = pagep->p_next;
+ *				} while (pagep != pp && zerolen);
+ *			}
+ */
 			pvn_done(bp);
-			if (pl != NULL)
+			if (ppp != NULL)
 				pageio_done(bp);
 		} else {
 			err = nfs_strategy(bp);
@@ -2409,10 +2501,8 @@ nfs_getpage(vp, off, len, protp, pl, plsz, seg, addr, rw, cred)
 	 * write operation the local file size might not be extended yet.
 	 * In this case we want to be able to return pages of zeroes.
 	 */
-	if (off + len > rp->r_size + PAGEOFFSET && seg != segkmap) {
-		RUNLOCK(rp);
+	if (off + len > rp->r_size + PAGEOFFSET && seg != segkmap)
 		return (EFAULT);		/* beyond EOF */
-	}
 
 	if (len <= PAGESIZE)
 		err = nfs_getapage(vp, off, protp, pl, plsz, seg, addr,
@@ -2664,11 +2754,11 @@ nfs_map(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 
 /*ARGSUSED*/
 STATIC int
-nfs_addmap(vp, off, as, addr, len, prot, maxprot, flags, cred)
+nfs_addmap(vp, off, as, addrp, len, prot, maxprot, flags, cred)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;
@@ -2699,11 +2789,9 @@ nfs_frlock(vp, cmd, bfp, flag, offset, cr)
 {
 	int frcmd, error;
 	lockhandle_t lh;
-	short whence;
 
 #ifdef NFSDEBUG
-	cmn_err(CE_CONT, "entering nfs_frlock(): cmd %d, flag %d, offset %d, start %d, len %d, whence %d\n",
-		cmd, flag, offset, bfp->l_start, bfp->l_len, bfp->l_whence);
+	printf("entering nfs_frlock()....\n");
 #endif
 
 	if (cmd == F_GETLK)
@@ -2712,34 +2800,8 @@ nfs_frlock(vp, cmd, bfp, flag, offset, cr)
 		frcmd = SETFLCK;
 	else if (cmd == F_SETLKW)
 		frcmd = SETFLCK|SLPFLCK;
-	else {
-#ifdef NFSDEBUG
-		cmn_err(CE_CONT, "nfs_frlock: Invalid command %d\n", cmd);
-#endif
+	else
 		return EINVAL;
-	}
-
-	switch (bfp->l_type) {
-                case F_RDLCK:
-                        if (!((cmd == F_GETLK) || (cmd == F_RGETLK)) &&
-                                !(flag & FREAD)) {
-                                return EBADF;
-                        }
-                        break;
- 
-                case F_WRLCK:
-                        if (!((cmd == F_GETLK) || (cmd == F_RGETLK)) &&
-                                !(flag & FWRITE)) {
-                                return EBADF;
-                        }
-                        break;
- 
-                case F_UNLCK:
-                        break;
-
-		default:
-			return EINVAL;
-        } 
 
 #ifdef VNOCACHE
 	/*
@@ -2756,85 +2818,15 @@ nfs_frlock(vp, cmd, bfp, flag, offset, cr)
 		vtor(vp)->r_error = nfs_putpage(vp, 0, 0, B_INVAL, cred);
 	}
 #endif
-
-	/* Convert start to be relative to beginning of file */
-	whence = bfp->l_whence;
-	if (error = convoff(vp, bfp, 0, offset)) {
-#ifdef NFSDEBUG
-		cmn_err(CE_CONT, "nfs_frlock: convoff: error %d\n", error);
-#endif
-		return (error);
-	}
-
-	/* Convert l_len to be the end of the rec lock l_end */
-	if (bfp->l_len < 0) {
-#ifdef NFSDEBUG
-		cmn_err(CE_CONT, "nfs_frlock: length < 0\n");
-#endif
-		return EINVAL;
-	}
-	if (bfp->l_len == 0)
-		bfp->l_end = MAXEND;
-
 	lh.lh_vp = vp;
 	lh.lh_servername = vtomi(vp)->mi_hostname;
 	bcopy((caddr_t)vtofh(vp), (caddr_t)&lh.lh_id, sizeof (fhandle_t));
 
 	error = klm_lockctl(&lh, bfp, cmd, cr, u.u_procp->p_pid);
 
-	/* Restore l_len */
-	if (bfp->l_end == MAXEND)
-		bfp->l_len = 0;
-	(void) convoff(vp, bfp, whence, offset);
-
-	if ((!error) && (cmd == F_SETLK || cmd == F_SETLKW) &&
-	    (bfp->l_type != F_UNLCK))
-		u.u_procp->p_flag |= SLKDONE;
-
 #ifdef NFSDEBUG
-	cmn_err(CE_CONT, "NFS_FRLOCK: error=%d\n", error);
+	printf("NFS_FRLOCK: error=%d\n", error);
 #endif
-	return (error);
-}
-
-/*
- * Free storage space associated with the specified vnode.  The portion
- * to be freed is specified by bfp->l_start and bfp->l_len (already
- * normalized to a "whence" of 0).
- *
- * This is an experimental facility whose continued existence is not
- * guaranteed.  Currently, we only support the special case
- * of l_len == 0, meaning free to end of file.
- */
-/* ARGSUSED */
-STATIC int
-nfs_space(vp, cmd, bfp, flag, offset, cr)
-	struct vnode *vp;
-	int cmd;
-	struct flock *bfp;
-	int flag;
-	off_t offset;
-	struct cred *cr;
-{
-	int error;
-
-	ASSERT(vp->v_type == VREG);
-	if (cmd != F_FREESP)
-		return (EINVAL);
-
-	if ((error = convoff(vp, bfp, 0, offset)) == 0) {
-		ASSERT(bfp->l_start >= 0);
-		if (bfp->l_len == 0) {
-			struct vattr va;
-
-			va.va_size = bfp->l_start;
-			va.va_mask = AT_SIZE;
-			error = nfs_setattr(vp, &va, 0, cr);
-		}
-		else
-			error = EINVAL;
-	}
-
 	return (error);
 }
 
@@ -2849,11 +2841,11 @@ nfs_realvp(vp, vpp)
 
 /*ARGSUSED*/
 STATIC int
-nfs_delmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
+nfs_delmap(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	addr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;
@@ -2874,8 +2866,7 @@ nfs_lockrelease(vp, flag, offset, cred)
 	struct cred *cred;
 {
 #ifdef NFSDEBUG
-	cmn_err(CE_CONT, "enter nfs_lockrelease(): flag %d offset %d\n",
-		flag, offset);
+	printf ("enter nfs_lockrelease(): flag %d offset %d\n", flag, offset);
 #endif
 	/*
 	 * Only do extra work if the process has done record-locking.
@@ -2892,7 +2883,7 @@ nfs_lockrelease(vp, flag, offset, cred)
 		 * Check all open files to see if there's a lock
 		 * possibly held for this vnode.
 		 */
-		for (ufpp = &u.u_flist; ufpp != NULL; ufpp = ufpp->uf_next)
+		for (ufpp = &u.u_flist; ufpp->uf_next; ufpp = ufpp->uf_next)
 			for (i=0; i < NFPCHUNK; i++) {
 				if (((ufppp = ufpp->uf_ofile[i]) != NULL) &&
 				    (ufpp->uf_pofile[i] & UF_FDLOCK)) {

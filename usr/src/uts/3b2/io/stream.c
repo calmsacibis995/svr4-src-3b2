@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/stream.c	1.45"
+#ident	"@(#)kernel:io/stream.c	1.37"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -32,8 +32,6 @@
 
 extern struct mdbblock 	*mdbfreelist;
 extern struct msgb	*msgfreelist;
-extern struct strinfo	Strinfo[];	/* dynamic resource info */
-extern long Strcount;
 
 
 extern queue_t *qhead;
@@ -48,18 +46,11 @@ struct mdbblock *xmdballoc();
 struct msgb	*xmsgalloc();
 
 
-#ifdef	DEBUG
-int	_streams_crash = 1; /* to signal the crash routines */   
-#else
-int	_streams_crash = 0;
-#endif
-
-
 /*
  *	Pointer types:
  *			(struct mdbblock *)	mdbfreelist
  *			(struct msgb *)		msgfreelist
- *			(struct mbinfo *)	m_prev, m_next
+ *			(struct msgb *)		m_prev, m_next
  */
 
 
@@ -67,14 +58,12 @@ int	_streams_crash = 0;
 	((struct msgb *)(mdbp))->b_next = (struct msgb *) mdbfreelist; \
 	mdbfreelist = (mdbp); \
 	strst.mdbblock.use--; \
-	_DELETE_MDB_INUSE(mdbp); \
 }
 
 #define	FREEMSGBLOCK( mesgp )	{ \
 	(mesgp)->b_next = (struct msgb *) msgfreelist; \
 	msgfreelist = mesgp; \
 	strst.msgblock.use--; \
-	_DELETE_MSG_INUSE((struct mbinfo *)mesgp); \
 }
 
 
@@ -82,7 +71,6 @@ int	_streams_crash = 0;
 	mdbp = mdbfreelist; \
 	mdbfreelist = (struct mdbblock *)(((struct msgb *)mdbp)->b_next );\
 	BUMPUP(strst.mdbblock);	\
-	_INSERT_MDB_INUSE(mdbp); \
 }
 
 
@@ -90,7 +78,6 @@ int	_streams_crash = 0;
 	mesgp = msgfreelist; \
 	msgfreelist = mesgp->b_next; \
 	BUMPUP(strst.msgblock);	\
-	_INSERT_MSG_INUSE((struct mbinfo *)mesgp); \
 }
 
 /* Status flags for triplets */
@@ -104,28 +91,6 @@ int	_streams_crash = 0;
 #define		_NOT_D		2
 #define		_XCONN		3
 
-
-/* Convenient macros for accessing fields */
-
-#define	m_bdatap	m_mblock.b_datap
-#define m_bnext		m_mblock.b_next
-#define m_bprev		m_mblock.b_prev
-#define	m_bcont		m_mblock.b_cont
-#define m_brptr		m_mblock.b_rptr
-#define	m_bwptr		m_mblock.b_wptr
-#define	m_bband		m_mblock.b_band
-#define	m_bflag		m_mblock.b_flag
-
-#define	d_dbfreep	d_dblock.db_freep
-#define d_dbfrtnp	d_dblock.db_frtnp
-#define	d_dbbase	d_dblock.db_base
-#define	d_dblim		d_dblock.db_lim
-#define	d_dbref		d_dblock.db_ref
-#define	d_dbtype	d_dblock.db_type
-#define d_dbiswhat	d_dblock.db_iswhat
-#define	d_dbsize	d_dblock.db_size
-#define	d_dbmsgaddr	d_dblock.db_msgaddr
-
 #define	 _DUPB( newbp, oldbp) { \
 	ASSERT((oldbp)); \
 	if (!msgfreelist){ \
@@ -133,7 +98,6 @@ int	_streams_crash = 0;
 	} \
 	else { \
 		ALLOCMSGBLOCK( newbp ); \
-		saveaddr(&(((struct mbinfo *)newbp)->m_func)); \
 		((newbp)->b_datap = (oldbp)->b_datap)->db_ref++; \
 		(newbp)->b_next = NULL; \
 		(newbp)->b_prev = NULL; \
@@ -154,111 +118,29 @@ int	_streams_crash = 0;
 		FREEMSGBLOCK(msgp); \
 	} \
 	else { \
-		if (((struct mdbblock *)msgp)->datblk.d_dbiswhat == _NOT_D) { \
+		if (((struct mdbblock *)msgp)->datblk.db_iswhat == _NOT_D) { \
 			FREEMDBBLOCK((struct mdbblock *)msgp); \
 		} \
-		else ((struct mdbblock *)msgp)->datblk.d_dbiswhat = _NOT_M; \
+		else ((struct mdbblock *)msgp)->datblk.db_iswhat = _NOT_M; \
 	} \
 	if ( --(dbp->db_ref) == 0 ) { \
-		if ((char *)dbp + sizeof(struct dbinfo) != (char *)(dbp->db_base)) { \
-			if (dbp->db_frtnp == NULL) { \
+		if ((char *)dbp + sizeof(struct datab) != (char *)(dbp->db_base)) { \
+			if (dbp->db_frtnp == NULL) \
 				kmem_free(dbp->db_base, \
 				   ((char *)(dbp->db_lim) - (char *)(dbp->db_base))); \
-				Strcount -= (dbp->db_lim - dbp->db_base); \
-			} \
 			else { \
 				if (dbp->db_frtnp->free_func) \
 				 (*dbp->db_frtnp->free_func)(dbp->db_frtnp->free_arg); \
 			} \
 		} \
 		if (dbp->db_iswhat == _NOT_M) { \
-			msgp = (struct msgb *)((char *)dbp - sizeof(struct mbinfo)); \
+			msgp = (struct msgb *)((char *)dbp - sizeof(struct msgb)); \
 			FREEMDBBLOCK((struct mdbblock *)msgp); \
 		} \
 		else \
 			dbp->db_iswhat = _NOT_D; \
 	} \
 }
-
-# ifdef DEBUG
-
-/* routines for managing in-use lists : only in DEBUG mode */
-
-delete_msg_inuse(msgptr)
-register struct	mbinfo 	*msgptr;
-{
-	if (msgptr->m_prev) { 
-		msgptr->m_prev->m_next = msgptr->m_next; 
-		if (msgptr->m_next) 
-			msgptr->m_next->m_prev = msgptr->m_prev; 
-	} 
-	else { 
-		Strinfo[DYN_MSGBLOCK].sd_head = (void *)(msgptr->m_next); 
-		if (msgptr->m_next) 
-			msgptr->m_next->m_prev = NULL;
-	} 
-}
-
-delete_mdb_inuse(mdbptr)
-struct mdbblock *mdbptr;
-{
-	register struct mbinfo *msgptr = &(mdbptr->msgblk);
-	register struct dbinfo *datptr = &(mdbptr->datblk);
-
-	if (msgptr->m_prev) { 
-		msgptr->m_prev->m_next = msgptr->m_next; 
-		if (msgptr->m_next) 
-			msgptr->m_next->m_prev = msgptr->m_prev; 
-	} 
-	else { 
-		Strinfo[DYN_MSGBLOCK].sd_head = (void *)(msgptr->m_next); 
-		if (msgptr->m_next) 
-			msgptr->m_next->m_prev = NULL;
-	} 
-	if (datptr->d_prev) { 
-		datptr->d_prev->d_next = datptr->d_next; 
-		if (datptr->d_next) 
-			datptr->d_next->d_prev = datptr->d_prev; 
-	} 
-	else { 
-		Strinfo[DYN_MDBBLOCK].sd_head = (void *)(datptr->d_next); 
-		if (datptr->d_next) 
-			datptr->d_next->d_prev = NULL;
-	} 
-}
-
-insert_msg_inuse(msgptr)
-register struct mbinfo *msgptr;
-{
-	msgptr->m_next = (struct mbinfo *)(Strinfo[DYN_MSGBLOCK].sd_head);
-	Strinfo[DYN_MSGBLOCK].sd_head = (void *)(msgptr);
-	if (msgptr->m_next)
-		msgptr->m_next->m_prev = (struct mbinfo *)msgptr;
-	msgptr->m_prev = NULL;
-}
-
-insert_mdb_inuse(mdbptr)
-struct mdbblock *mdbptr;
-{
-	register struct mbinfo *msgptr = &(mdbptr->msgblk);
-	register struct dbinfo *datptr = &(mdbptr->datblk);
-
-	msgptr->m_next = (struct mbinfo *)(Strinfo[DYN_MSGBLOCK].sd_head);
-	Strinfo[DYN_MSGBLOCK].sd_head = (void *)(msgptr);
-	if (msgptr->m_next)
-		msgptr->m_next->m_prev = (struct mbinfo *)msgptr;
-	msgptr->m_prev = NULL;
-
-	datptr->d_next = (struct dbinfo *)(Strinfo[DYN_MDBBLOCK].sd_head);
-	Strinfo[DYN_MDBBLOCK].sd_head = (void *)(datptr);
-	if (datptr->d_next)
-		datptr->d_next->d_prev = (struct dbinfo *)datptr;
-	datptr->d_prev = NULL;
-}
-
-# endif
-
-
 
 /*
  * NOTE: Some code in streamio.c relies on knowledge of the underlying
@@ -292,22 +174,20 @@ uint pri;
 		}
 	splx(s);
 
-	/* save return address */
-	saveaddr(&(((struct mbinfo *)mdbptr)->m_func));
 
 	((struct msgb *)mdbptr)->b_datap = 
-		(struct datab *)(((char *)mdbptr) + sizeof(struct mbinfo)); 
+		(struct datab *)(((char *)mdbptr) + sizeof(struct msgb)); 
 	((struct msgb *)mdbptr)->b_next = NULL;
 	((struct msgb *)mdbptr)->b_prev = NULL;
 	((struct msgb *)mdbptr)->b_cont = NULL;
-	mdbptr->datblk.d_dbfrtnp = NULL;
+	mdbptr->datblk.db_frtnp	 = NULL;
 	((struct msgb *)mdbptr)->b_band = 0;
 	((struct msgb *)mdbptr)->b_flag = 0;
 
-	(mdbptr->datblk).d_dbtype = M_DATA;
-	(mdbptr->datblk).d_dbref = 1;
-	(mdbptr->datblk).d_dbmsgaddr = (caddr_t)mdbptr;
-	(mdbptr->datblk).d_dbiswhat = _MDBBLK;
+	(mdbptr->datblk).db_type = M_DATA;
+	(mdbptr->datblk).db_ref = 1;
+	(mdbptr->datblk).db_msgaddr = (caddr_t)mdbptr;
+	(mdbptr->datblk).db_iswhat = _MDBBLK;
 
 	if (size > (int)FASTBUF) {
 		if ((buf = kmem_alloc(size, KM_NOSLEEP)) == NULL ) {
@@ -319,24 +199,23 @@ uint pri;
 		else {
 			((struct msgb *)mdbptr)->b_rptr = 
 				((struct msgb *)mdbptr)->b_wptr = 
-					(mdbptr->datblk).d_dbbase = buf;
-			(mdbptr->datblk).d_dbsize = size;	
-			(mdbptr->datblk).d_dblim = ((unsigned char *)buf) + size;
-			Strcount += size;
+					(mdbptr->datblk).db_base = buf;
+			(mdbptr->datblk).db_size = size;	
+			(mdbptr->datblk).db_lim = ((unsigned char *)buf) + size;
 		}
 	}
 	else	{
 
 		((struct msgb *)mdbptr)->b_rptr = 
 			((struct msgb *)mdbptr)->b_wptr = 
-				(mdbptr->datblk).d_dbbase = 
+				(mdbptr->datblk).db_base = 
 				 	(unsigned char *)(&(mdbptr->databuf));
 		if (size == 0 )
-			(mdbptr->datblk).d_dbsize = 4;
+			(mdbptr->datblk).db_size =  4;
 		else
-			(mdbptr->datblk).d_dbsize = size;
+			(mdbptr->datblk).db_size = size;
 
-		(mdbptr->datblk).d_dblim = 
+		(mdbptr->datblk).db_lim = 
 			(unsigned char *)mdbptr + sizeof(struct mdbblock);
 	}
 
@@ -532,11 +411,11 @@ freeb(bp)
 		FREEMSGBLOCK(bp);
 	}
 	else {
-		if (((struct mdbblock *)bp)->datblk.d_dbiswhat == _NOT_D) {
+		if (((struct mdbblock *)bp)->datblk.db_iswhat == _NOT_D) {
 			FREEMDBBLOCK((struct mdbblock *)bp);
 		}
 		else 
-			((struct mdbblock *)bp)->datblk.d_dbiswhat = _NOT_M;
+			((struct mdbblock *)bp)->datblk.db_iswhat = _NOT_M;
 	}
 
 	if ( --(dbp->db_ref) > 0 ) {
@@ -545,12 +424,10 @@ freeb(bp)
 	}
 
 	/* seperate databuffer? */
-	if ((char *)dbp + sizeof(struct dbinfo) != (char *)(dbp->db_base)) {
-		if (dbp->db_frtnp == NULL) {
+	if ((char *)dbp + sizeof(struct datab) != (char *)(dbp->db_base)) {
+		if (dbp->db_frtnp == NULL) 
 			kmem_free(dbp->db_base, 
 			   ((char *)(dbp->db_lim) - (char *)(dbp->db_base) ));
-			Strcount -= (dbp->db_lim - dbp->db_base);
-		}
 		else {
 			if (dbp->db_frtnp->free_func)
 				(*dbp->db_frtnp->free_func)(dbp->db_frtnp->free_arg);
@@ -562,7 +439,7 @@ freeb(bp)
 	 * not in use
 	 */
 	if (dbp->db_iswhat == _NOT_M) {
-		bp = (struct msgb *)((char *)dbp - sizeof(struct mbinfo));
+		bp = (struct msgb *)((char *)dbp - sizeof(struct msgb));
 		FREEMDBBLOCK((struct mdbblock *)bp);
 	}
 	else 	/*
@@ -624,9 +501,6 @@ dupb(bp)
 		}
 	(nbp->b_datap = bp->b_datap)->db_ref++;
 	splx(s);
-
-	/* save return address */
-	saveaddr(&(((struct mbinfo *)nbp)->m_func));
 
 	nbp->b_next = NULL;
 	nbp->b_prev = NULL;
@@ -886,10 +760,7 @@ register int len;
 					
 		if ((newmp = allocb(len, BPRI_MED)) == NULL )
 			return(0);
-		/* save return address */
-		saveaddr(&(((struct mbinfo *)newmp)->m_func));
-
-		((struct mdbblock *)newmp)->datblk.d_dbtype = dbp->db_type;
+		((struct mdbblock *)newmp)->datblk.db_type = dbp->db_type;
 		--( dbp->db_ref );	
 		
 		/*--- copy the data into the new data buffer ---*/
@@ -921,11 +792,11 @@ register int len;
 		s = splstr();
 
 		if (dbp->db_msgaddr == (caddr_t)mp) {
-			((struct mdbblock *)newmp)->datblk.d_dbmsgaddr = (caddr_t)mp;
-			if (((struct mdbblock *)mp)->datblk.d_dbiswhat != _NOT_D)
-			   ((struct mdbblock *)mp)->datblk.d_dbiswhat = _XCONN;
+			((struct mdbblock *)newmp)->datblk.db_msgaddr = (caddr_t)mp;
+			if (((struct mdbblock *)mp)->datblk.db_iswhat != _NOT_D)
+			   ((struct mdbblock *)mp)->datblk.db_iswhat = _XCONN;
 		}
-		((struct mdbblock *)newmp)->datblk.d_dbiswhat = _NOT_M;
+		((struct mdbblock *)newmp)->datblk.db_iswhat = _NOT_M;
 
 		mp->b_datap = newmp->b_datap;
 		mp->b_rptr = newmp->b_rptr;
@@ -948,7 +819,6 @@ register int len;
 		 * set the db_lim.
 		 */
 		dbp->db_size = len;
-		Strcount += len;
 
 		/*
 		 * Copy data into the new data buffer.
@@ -974,13 +844,11 @@ register int len;
 		/* Release previous data buffer is it was seperate
 		 * from the data header.
 		 */
-		if ((unsigned char *)dbp + sizeof(struct dbinfo)
+		if ((unsigned char *)dbp + sizeof(struct datab)
 				!= dbp->db_base) {
-			if (dbp->db_frtnp == NULL) {
+			if (dbp->db_frtnp == NULL)
 				kmem_free(dbp->db_base, ((char *)(dbp->db_lim) 
 					- (char *)(dbp->db_base)));
-				Strcount -= (dbp->db_lim - dbp->db_base);
-			}
 			else {
 				if (dbp->db_frtnp->free_func)
 					(*dbp->db_frtnp->free_func)(dbp->db_frtnp->free_arg);
@@ -1033,7 +901,7 @@ adjmsg(mp, len)
 
 	if (fromhead) {
 		bp = mp;
-		while (len) {
+		while (len && bp) {
 			ASSERT(bp->b_wptr >= bp->b_rptr);
 			n = min(bp->b_wptr - bp->b_rptr, len);
 			bp->b_rptr += n;
@@ -1045,7 +913,8 @@ adjmsg(mp, len)
 		register unsigned char type;
 
 		type = mp->b_datap->db_type;
-		while (len) {
+		bp = mp;
+		while (len && bp) {
 			bp = mp;
 			save_bp = NULL;
 			while (bp && bp->b_datap->db_type == type) {
@@ -1191,7 +1060,7 @@ getq(q)
 			;
 		if (q) {
 			qenable(q);
-			setqback(q, bp ? bp->b_band : 0);
+			setqback(q, bp->b_band);
 		}
 	}
 	splx(s);
@@ -1448,12 +1317,6 @@ flushband(q, pri, flag)
 				}
 			}
 			mp = nmp;
-		}
-		if (mp && mp->b_band == pri) {
-			if (flag || datamsg(mp->b_datap->db_type)) {
-				rmvq(q, mp);
-				freemsg(mp);
-			}
 		}
 	}
 	splx(s);
@@ -2002,7 +1865,7 @@ putctl(q, type)
 {
 	register mblk_t *bp;
 
-	if ((datamsg(type) && (type != M_DELAY)) || !(bp = allocb(0, BPRI_HI)))
+	if (datamsg(type) || !(bp = allocb(0, BPRI_HI)))
 		return(0);
 	bp->b_datap->db_type = type;
 	(*q->q_qinfo->qi_putp)(q, bp);
@@ -2018,7 +1881,7 @@ putctl1(q, type, param)
 {
 	register mblk_t *bp;
 
-	if ((datamsg(type) && (type != M_DELAY)) || !(bp = allocb(1, BPRI_HI)))
+	if (datamsg(type) ||!(bp = allocb(1, BPRI_HI)))
 		return(0);
 	bp->b_datap->db_type = type;
 	*bp->b_wptr++ = param;

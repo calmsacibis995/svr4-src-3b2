@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.face:postremove	1.4"
+#ident	"@(#)pkg.face:postremove	1.2"
 
 trap 'exit 3' 1 2 3 15
 

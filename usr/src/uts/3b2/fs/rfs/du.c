@@ -5,7 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/du.c	1.20"
+#ident	"@(#)fs:fs/rfs/du.c	1.13.1.1"
+
 #include "sys/types.h"
 #include "sys/sysinfo.h"
 #include "sys/fs/rf_acct.h"
@@ -54,8 +55,6 @@
 #include "rf_auth.h"
 #include "du.h"
 #include "sys/inline.h"
-#include "sys/buf.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 
 /*
@@ -99,7 +98,6 @@ STATIC int	dusys_utime();
 STATIC int	dusys_utime_pass();
 STATIC int	dusys_statfs();
 STATIC void	du_stat_to_vattr();
-STATIC int	du_fs_to_vfs();
 STATIC int	du_o_flock_to_flock();
 STATIC int	dusr_vn_open();
 STATIC int	dusr_vn_create();
@@ -349,7 +347,7 @@ dusys_chdirec(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			register rf_message_t *msg = RF_MSG(bp);
 
 			if (!(msg->m_stat & RF_GIFT)) {
-				gdp_j_accuse("dusys_chdirec: no file reference",
+				gdp_discon("dusys_chdirec: no file reference",
 				  QPTOGP((queue_t *)msg->m_queue));
 				error = EPROTO;
 				goto out;
@@ -359,7 +357,8 @@ dusys_chdirec(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			/*
 			 * Set up for rfcl_findsndd or del_sndd
 			 */
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+			sndd_set(giftsdp, (queue_t *)msg->m_queue,
+			  msg->m_giftid);
 			if (!(error = rfcl_findsndd(&giftsdp, crp,
 			  bp, dvp->v_vfsp))) {
 				*vpp = SDTOV(giftsdp);
@@ -419,7 +418,7 @@ dusys_exec(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			register rf_message_t *msg = RF_MSG(bp);
 
 			if (!(msg->m_stat & RF_GIFT)) {
-				gdp_j_accuse("dusys_exec: no file reference",
+				gdp_discon("dusys_exec: no file reference",
 				  QPTOGP((queue_t *)msg->m_queue));
 				error = EPROTO;
 				goto out;
@@ -429,7 +428,8 @@ dusys_exec(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			/*
 			 * Set up for rfcl_findsndd or del_sndd
 			 */
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+			sndd_set(giftsdp, (queue_t *)msg->m_queue,
+			  msg->m_giftid);
 			if ((error = rfcl_findsndd(&giftsdp, crp,
 			  bp, dvp->v_vfsp)) == 0) {
                         	register dustash_t	*dstp = dst_alloc();
@@ -586,7 +586,7 @@ dusys_rmount(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 				error = ducl_resetpath(bp, pnp, dvp, vpp);
 			} else {
 				pn_setlast(pnp);
-				gdp_discon("dusys_rmount mount on remote name",
+				gdp_discon("dusys_rmount bad response header",
 				  QPTOGP(chansdp->sd_queue));
 				error = EPROTO;
 			}
@@ -664,12 +664,10 @@ dusys_stat(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 
 	rqarg.rqstat_op.buf = (long)&sb;
 	datasz = gp->hetero == NO_CONV ? sizeof(struct stat) :
-	  sizeof(struct stat) + STAT_XP;
+	  sizeof(struct stat) + STAT_XP - MINXPAND;
 	if ((error = ducl_namemsg(chansdp, rdirvp, pnp, comp, crp, DUSTAT,
 	   &rqarg, &bp)) == 0 &&
 	  (error = RF_RESP(bp)->rp_errno) == 0) {
-		register dustash_t	*dstp;
-		caddr_t			rpdata;
 
 		/*
 		 * Either RFDOTDOT or valid stat data was received.
@@ -680,45 +678,39 @@ dusys_stat(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 
 		if (RF_COM(bp)->co_opcode != DUSTAT) {
 			error = ducl_resetpath(bp, pnp, dvp, vpp);
-			goto out;
-		}
-		
-		if (RF_PULLUP(bp, RFV1_MINRESP, datasz)) {
-			gdp_j_accuse("dusys_stat bad data", gp);
-			error = EPROTO;
-			goto out;
-		}
-		dstp = dst_alloc();
-		rpdata = rf_msgdata(bp, RFV1_MINRESP);
-		dstp->dst_pid = u.u_procp->p_pid;
-		if (gp->hetero != NO_CONV) {
-			if (!rf_fcanon(STAT_FMT, rpdata, rpdata +
-			  datasz, (caddr_t)&dstp->DST_STAT)) {
-				gdp_j_accuse("dusys_stat bad data", gp);
-				error = EPROTO;
-				goto out;
+		} else if ((error = RF_PULLUP(bp, RFV1_MINRESP, datasz)) == 0) {
+			register dustash_t	*dstp;
+			caddr_t			rpdata;
+
+			dstp = dst_alloc();
+			rpdata = rf_msgdata(bp, RFV1_MINRESP);
+			dstp->dst_pid = u.u_procp->p_pid;
+			if (gp->hetero != NO_CONV) {
+				if (!rf_fcanon(STAT_FMT, rpdata, rpdata +
+				  datasz, (caddr_t)&dstp->DST_STAT)) {
+					gdp_discon("dusys_stat bad response",
+					  gp);
+					error = EPROTO;
+					goto out;
+				}
+			} else {
+				dstp->DST_STAT = *(struct stat *)rpdata;
 			}
-		} else {
-			dstp->DST_STAT = *(struct stat *)rpdata;
+			hibyte(dstp->DST_STAT.st_dev) = ~(gp - gdp);
+			/*
+			 * Stash under current vnode when don't have
+			 * a new gift.
+			 */
+			DST_LINK(chansdp, dstp);
+			pnp->pn_path += pnp->pn_pathlen;
+			pnp->pn_pathlen = 0;
+			/*
+			 * Upper level expects back a reference, will
+			 * VN_RELE
+			 */
+			VN_HOLD(dvp);
+			*vpp = dvp;
 		}
-		hibyte(dstp->DST_STAT.st_dev) = ~(gp - gdp);
-
-		/*
-		 * Stash under current vnode when don't have
-		 * a new gift.
-		 */
-
-		DST_LINK(chansdp, dstp);
-		pnp->pn_path += pnp->pn_pathlen;
-		pnp->pn_pathlen = 0;
-
-		/*
-		 * Upper level expects back a reference, will
-		 * VN_RELE
-		 */
-
-		VN_HOLD(dvp);
-		*vpp = dvp;
 	}
 out:
 	if (error) {
@@ -796,7 +788,7 @@ dusys_link(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			register rf_message_t *msg = RF_MSG(bp);
 
 			if (!(msg->m_stat & RF_GIFT)) {
-				gdp_j_accuse("dulink: no file reference",
+				gdp_discon("dulink: no file reference",
 				  QPTOGP((queue_t *)msg->m_queue));
 				error = EPROTO;
 				goto out;
@@ -806,7 +798,8 @@ dusys_link(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			/*
 			 * Set up for rfcl_findsndd or del_sndd
 			 */
-			sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
+			sndd_set(giftsdp, (queue_t *)msg->m_queue,
+			  msg->m_giftid);
 			if (!(error = rfcl_findsndd(&giftsdp, crp,
 			  bp, dvp->v_vfsp))) {
 				*vpp = SDTOV(giftsdp);
@@ -1015,7 +1008,7 @@ dusys_unlink(dvp, comp, vpp, pnp, flags, rdirvp, crp)
  * Faking VOP_RENAME is complicated for the system call protocol.
  *
  * In the normal case, it involves four calls to du_lookup, hence to
- * dusys_rename.
+ *dusys_rename.
  *
  *	1.  Get a reference to the existing file's parent directory.
  *	2.  Get a reference to the existing file.
@@ -1046,40 +1039,30 @@ dusys_rename(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 	register int		error;
 
 	if (*pnp->pn_path == '\0') {
-
 		/*
 		 * This is a lookup on a non-directory file.  Turning
-		 * off LOOKUP_DIR will coerce dusys_link to get a reference
+		 * off LOOKUP_DIR will coercedusys_link to get a reference
 		 * to the file.
 		 */
-
 		if ((error =dusys_link(dvp, comp, vpp, pnp, flags & ~LOOKUP_DIR,
 		  rdirvp, crp)) == ENOENT) {
-
 			/*
 			 * Zap the pathname so a lookup that is really
 			 * interested only in the directory will pass.
 			 */
-
 			pnp->pn_path += pnp->pn_pathlen;
 			pnp->pn_pathlen = 0;
 		} else if (!error && (*vpp)->v_type == VDIR) {
-
 			/*
-			 * In general, to link directories is unsafe, because
-			 * ".." needs to be reconstructed, but we are not
-			 * prepared to make that effort.  (Note that this
-			 * would succeed on the server only if the current
-			 * iuid maps into root, anyway.)
+			 * Link will do things to directories that rename
+			 * won't, so we fail here to be safe.
 			 */
-
 			error = EISDIR;
-			VN_RELE(*vpp);
 		}
 	} else {
-
-		/* This is a lookup on a directory. */
-
+		/*
+		 * This is a lookup on a directory.
+		 */
 		ASSERT(flags & LOOKUP_DIR);
 		error = du_link_chdir(dvp, comp, vpp, pnp, flags, rdirvp, crp);
 	}
@@ -1322,6 +1305,7 @@ dusys_utime(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 	for (ntries = nacked = 1; ntries < RFCL_MAXTRIES && nacked; ntries++) {
 		register rf_request_t	*reqp;
 		register char		*datap;
+		register long		rdirsd_connid;
 
 		if ((error = rf_allocmsg(RFV1_MINREQ, datasz, BPRI_LO, TRUE,
 		  NULLCADDR, NULLFRP, &bp)) != 0) {
@@ -1331,10 +1315,11 @@ dusys_utime(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 		reqp = RF_REQ(bp);
 		reqp->rq_utime.buf = (long)iov.iov_base;
 		if (rdirvp && ISRFSVP(rdirvp) &&
-		  rdirvp->v_vfsp == dvp->v_vfsp) {
-			reqp->rq_rrdir_id = VTOSD(rdirvp)->sd_gift.gift_id;
+		  (rdirsd_connid = (VTOSD(rdirvp))->sd_connid) ==
+		  chansdp->sd_connid) {
+			reqp->rq_rrdir = rdirsd_connid;
 		} else {
-			reqp->rq_rrdir_id = 0;
+			reqp->rq_rrdir = 0;
 		}
 		datap = rf_msgdata(bp, RFV1_MINREQ);
 		(void)strcpy(datap, comp);
@@ -1389,7 +1374,7 @@ dusys_statfs(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 	}			*uargp = (struct a *)u.u_ap;
 
 	datasz = gp->hetero == NO_CONV ? sizeof(struct statfs) :
-	  sizeof(struct statfs) + STATFS_XP;
+	  sizeof(struct statfs) + STATFS_XP - MINXPAND;
 	rqarg.rqstatfs_op.buf = (long)&uargp->sbp;
 	rqarg.rqstatfs_op.len = sizeof(struct statfs);
 	rqarg.rqstatfs_op.fstyp = 0;
@@ -1401,10 +1386,7 @@ dusys_statfs(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 		 */
 		if (RF_COM(bp)->co_opcode != DUSTATFS) {
 			error = ducl_resetpath(bp, pnp, dvp, vpp);
-		} else if (RF_PULLUP(bp, RFV1_MINRESP, datasz)) {
-			gdp_j_accuse("dusys_statfs bad data", gp);
-			error = EPROTO;
-		} else {
+		} else if ((error = RF_PULLUP(bp, RFV1_MINRESP, datasz)) == 0) {
 			register dustash_t	*dstp = dst_alloc();
 			register caddr_t	rpdata =
 						  rf_msgdata(bp, RFV1_MINRESP);
@@ -1412,7 +1394,7 @@ dusys_statfs(dvp, comp, vpp, pnp, flags, rdirvp, crp)
 			if (gp->hetero != NO_CONV) {
 				if (!rf_fcanon(STATFS_FMT, rpdata, rpdata +
 				  datasz, (caddr_t)&dstp->DST_STATFS)) {
-					gdp_j_accuse("dusys_statfs bad data",
+					gdp_discon("dusys_statfs bad response",
 					  gp);
 					error = EPROTO;
 					goto out;
@@ -1555,26 +1537,17 @@ du_fcntl(op, vp, cmd, arg, flag, offset, crp)
 	int			nacked;
 	mblk_t			*bp = NULL;
 	rcvd_t			*rdp;
-	register sndd_t		*chansdp = VTOSD(vp);
+	register sndd_t		*chansdp  = VTOSD(vp);
 	register gdp_t		*gp = QPTOGP(chansdp->sd_queue);
-	register size_t		datasz = 0;
+	register size_t		datasz = sizeof(o_flock_t);
 	register size_t		rqsz;
 	flock_t			*flp = (flock_t *)arg;
 	int			canon = gp->hetero != NO_CONV;
 	o_flock_t		oflock;
 	o_flock_t		*oflp;
-	int			sendflock = 0;
 
-	switch (cmd) {
-	case	F_O_GETLK:
-	case	F_SETLK:
-	case	F_SETLKW:
-	case	F_FREESP:
-		sendflock = 1;
-		datasz = sizeof(o_flock_t);
-		if (canon) {
-			datasz += OFLOCK_XP;
-		}
+	if (canon) {
+		datasz += OFLOCK_XP - MINXPAND;
 	}
 	rqsz = RFV1_MINREQ + datasz;
 
@@ -1607,7 +1580,11 @@ du_fcntl(op, vp, cmd, arg, flag, offset, crp)
 		 * F_FREESP uses the same structure, so let it go along
 		 * for the ride.
 		 */
-		if (sendflock) {
+		switch (cmd) {
+		case	F_O_GETLK:
+		case	F_SETLK:
+		case	F_SETLKW:
+		case	F_FREESP:
 			reqp->rq_fcntl.fflag |= DUFRPREWRITE;
 			rqdatap = rf_msgdata(bp, RFV1_MINREQ);
 			if (canon) {
@@ -1690,23 +1667,16 @@ du_getattr(vp, vap, flags, crp)
 	}
 
 	datasz = gp->hetero == NO_CONV ? sizeof(struct stat) :
-	  sizeof(struct stat) + STAT_XP;
+	  sizeof(struct stat) + STAT_XP - MINXPAND;
 	rqarg.rqstat_op.buf = (long)&sbuf;	/* woof */
 	if ((error = rfcl_op(sdp, crp, DUFSTAT, &rqarg, &bp, TRUE)) == 0 &&
-	  (error = RF_RESP(bp)->rp_errno) == 0) {
-		caddr_t		rpdata;
-
-		if (RF_PULLUP(bp, RFV1_MINRESP, datasz)) {
-			gdp_j_accuse("du_getattr bad data", gp);
-			error = EPROTO;
-			goto out;
-		}
-
-		rpdata = rf_msgdata(bp, RFV1_MINRESP);
+	  (error = RF_RESP(bp)->rp_errno) == 0 &&
+	  (error = RF_PULLUP(bp, RFV1_MINRESP, datasz)) == 0) {
+		caddr_t		rpdata = rf_msgdata(bp, RFV1_MINRESP);
 
 		if (gp->hetero != NO_CONV &&
 		  !rf_fcanon(STAT_FMT, rpdata, rpdata + datasz, rpdata)) {
-			gdp_j_accuse("du_getattr bad data", gp);
+			gdp_discon("du_getattr bad server data", gp);
 			error = EPROTO;
 			goto out;
 		}
@@ -1814,7 +1784,6 @@ du_rename(fdvp, fnm, tdvp, tnm, crp)
 	 * We have to reaquire a reference to the existing file, because
 	 * it doesn't come through the interface.
 	 */
-
 	pathname_t		pathname;
 	vnode_t			*fvp;
 	vnode_t			*tvp;
@@ -1826,34 +1795,26 @@ du_rename(fdvp, fnm, tdvp, tnm, crp)
 	if (error = pn_get(fnm, UIO_SYSSPACE, &pathname)) {
 		return error;
 	}
-
 	ASSERT(pn_peekchar(&pathname) != '/');
-
 	pathname.pn_path += pathname.pn_pathlen;
 	pathname.pn_pathlen = 0;
 	if (strlen(fnm) + 1 > DU_DATASIZE) {
 		error = ENOMEM;
 		goto freepn;
 	}
-
 	if ((error =
 	  dusys_link(fdvp, fnm, &fvp, &pathname, 0, rdir, crp)) != 0) {
 		goto freepn;
 	}
 	VN_RELE(fvp);		/* get rid of redundant reference */
 
-	if (fvp->v_type == VDIR) {
-		error = ENOSYS;
-		goto freepn;
-	}
-
+	/*
+	 * Unlink the target file.
+	 */
 	if (strlen(tnm) + 1 > DU_DATASIZE) {
 		error = ENOMEM;
 		goto freepn;
 	}
-
-	/* Unlink the target file. */
-
 	if ((error =
 	  dusys_unlink(tdvp, tnm, &tvp, &pathname, 0, rdir, crp)) != 0 &&
 	  error != ENOENT) {
@@ -1862,26 +1823,26 @@ du_rename(fdvp, fnm, tdvp, tnm, crp)
 		VN_RELE(tvp);	/* dusys_unlink fakes a lookup */
 	}
 
-	/* Link the "from" file to the target. */
-
+	/*
+	 * Link the "from" file to the target.
+	 */
 	if (error = rf_link(tdvp, fvp, tnm, crp)) {
 		goto freepn;
 	}
 
-	/* Unlink the "from" file. */
-
+	/*
+	 * Unlink the "from" file.
+	 */
 	pathname.pn_path += pathname.pn_pathlen;
 	pathname.pn_pathlen = 0;
 	if (strlen(fnm) + 1 > DU_DATASIZE) {
 		error = ENOMEM;
 		goto freepn;
 	}
-
 	if ((error =
 	  dusys_unlink(fdvp, fnm, &fvp, &pathname, 0, rdir, crp)) == 0) {
 		VN_RELE(fvp);	/* dusys_unlink fakes a lookup */
 	}
-
 freepn:
 	pn_free(&pathname);
 	return error;
@@ -1990,49 +1951,36 @@ du_fstatfs(vfsp, stvfsp)
 	register gdp_t		*gp = QPTOGP(sdp->sd_queue);
 	size_t			datasz;
 
+	void			fs_to_vfs();
+
 	/*
 	 * Stashed struct statfs might be associated with the send descriptor
 	 * by prior lookup going through du_statfs().
 	 */
 	if ((dstp = dst_unlink(sdp, u.u_procp->p_pid)) != NULL) {
-		error = du_fs_to_vfs(&dstp->DST_STATFS, stvfsp, vfsp);
+		fs_to_vfs(&dstp->DST_STATFS, stvfsp, vfsp);
 		dst_free(dstp);		/* done with this stash */
-		if (error) {
-			gdp_j_accuse("du_fstatfs bad server data", gp);
-			error = EPROTO;
-		}
-		return error;
+		return 0;
 	}
 
 	VN_HOLD(vp);	/* so it won't disappear (impossible?) */
 	datasz = gp->hetero == NO_CONV ? sizeof(struct statfs) :
-	  sizeof(struct statfs) + STATFS_XP;
+	  sizeof(struct statfs) + STATFS_XP - MINXPAND;
 	rqarg.rqstatfs_op.buf = (long)stvfsp;	/* server wants an address */
 	rqarg.rqstatfs_op.len = sizeof(struct statfs);
 	rqarg.rqstatfs_op.fstyp = 0;
 	if ((error = rfcl_op(sdp, u.u_cred, DUFSTATFS, &rqarg, &bp, TRUE))
 	   == 0 &&
-	  (error = RF_RESP(bp)->rp_errno) == 0) {
-		if (RF_PULLUP(bp, RFV1_MINRESP, datasz)) {
-			gdp_j_accuse("du_fstatfs bad server data", gp);
+	  (error = RF_RESP(bp)->rp_errno) == 0 &&
+	  (error = RF_PULLUP(bp, RFV1_MINRESP, datasz)) == 0) {
+		caddr_t		rpdata = rf_msgdata(bp, RFV1_MINRESP);
+
+		if (gp->hetero != NO_CONV &&
+		  !rf_fcanon(STATFS_FMT, rpdata, rpdata + datasz, rpdata)) {
+			gdp_discon("du_fstatfs bad server data", gp);
 			error = EPROTO;
-		} else {
-			caddr_t	rpdata;
-
-			rpdata = rf_msgdata(bp, RFV1_MINRESP);
-
-			if (gp->hetero != NO_CONV  &&
-			  !rf_fcanon(STATFS_FMT, rpdata, rpdata + datasz,
-			   rpdata)) {
-				gdp_j_accuse("du_fstatfs bad server data", gp);
-				error = EPROTO;
-			}
-			if (!error &&
-			  (error = du_fs_to_vfs((struct statfs *)rpdata, stvfsp,
-			    vfsp))) {
-				gdp_j_accuse("du_fstatfs bad server data", gp);
-			}
 		}
+		fs_to_vfs((struct statfs *)rpdata, stvfsp, vfsp);
 		rf_freemsg(bp);
 	}
 	VN_RELE(vp);
@@ -2219,7 +2167,7 @@ dusys_utime_pass(pnp, bpp, rdp, replysdp, uiop, dvp, vpp)
 }
 
 /*
- * pure lookup via chdir for links only, this is not generally useable.
+ * "pure" lookup via chdir for links only, this is not generally useable.
  */
 STATIC int
 du_link_chdir(dvp, comp, vpp, pnp, flags, rdirvp, crp)
@@ -2304,20 +2252,20 @@ dusys_copen_resp(bp, pnp, dvp, vpp, crp, rqop, giftsdp, fmode)
 	} else if ((error = rp->rp_errno) != 0) {
 		rfcl_giftfree(bp, &giftsdp, crp);
 	} else if (!(msg->m_stat & RF_GIFT)) {
-		gdp_j_accuse("dusys_copen_resp: no file reference",
+		gdp_discon("dusys_copen_resp: no file reference",
 		  QPTOGP((queue_t *)msg->m_queue));
 		sndd_free(&giftsdp);
 		error = EPROTO;
 	} else {
-		sndd_set(giftsdp, msg->m_queue, &msg->m_gift);
-		if ((error = rfcl_findsndd(&giftsdp, crp, bp, dvp->v_vfsp))
-		  == 0) {
+		sndd_set(giftsdp, (queue_t *)msg->m_queue, msg->m_giftid);
+		if (!(error = rfcl_findsndd(&giftsdp, crp, bp,
+		  dvp->v_vfsp))) {
 
 			/*
 			 * We can update the out parameter consistently, and
-			 * with impunity, with the correct result vp.  The
+			 * with impunity with the correct result vp.  The
 			 * current implementations of lookuppn and vn_create
-			 * will discard the reference if they are interested
+			 * will discard the reference if the are interested
 			 * in the parent, and not the child.  We don't have to
 			 * worry about the vnode disappearing in that case,
 			 * because we bump the count when stashing it.  If this
@@ -2329,114 +2277,46 @@ dusys_copen_resp(bp, pnp, dvp, vpp, crp, rqop, giftsdp, fmode)
 			 */
 
 			vp = *vpp = SDTOV(giftsdp);
+			giftsdp->sd_fhandle = rp->rp_fhandle;  /* for caching */
+			if (rqop == RFOPEN && (vp->v_flag & VTEXT) &&
+			  (fmode & FWRITE) &&
+			  !(fmode & FEXCL && fmode & FCREAT)) {
 
-			giftsdp->sd_fhandle = rp->rp_fhandle;
-			if (rp->rp_cache & RP_MNDLCK) {
-				giftsdp->sd_stat |= SDMNDLCK;
+				/*
+				 * Local text associated with the vnode might
+				 * not have been detected on the server.
+				 */
+
+				ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
+				ASSERT(fmode & FCREAT || vp->v_type != VDIR &&
+				  !vp->v_filocks);
+
+				xrele(vp);
+				if (vp->v_flag & VTEXT) {
+					VN_RELE(vp);
+					error = ETXTBSY;
+				}
 			}
-
-			pnp->pn_path += pnp->pn_pathlen;
-			pnp->pn_pathlen = 0;
-			if (rqop == RFCREATE || rqop == DUCOREDUMP ||
-			  fmode & FCREAT) {
-
-				/* Need to stash only for creates */
-
-				VN_HOLD(vp);
-				dstp = dst_alloc();
-				dstp->DST_VP = vp;
-				dstp->dst_pid = u.u_procp->p_pid;
-				DST_LINK(VTOSD(dvp), dstp);
+			if (!error) {
+				pnp->pn_path += pnp->pn_pathlen;
+				pnp->pn_pathlen = 0;
+				if (rqop == RFCREATE || rqop == DUCOREDUMP ||
+				  fmode & FCREAT) {
+					/*
+					 * Need to stash only for creates
+					 */
+					VN_HOLD(vp);
+					dstp = dst_alloc();
+					dstp->DST_VP = vp;
+					dstp->dst_pid = u.u_procp->p_pid;
+					DST_LINK(VTOSD(dvp), dstp);
+				}
 			}
 		} else {
 			*vpp = NULLVP;
 		}
 	}
 	return error;
-}
-
-/*
- * Copy the member fields from the referenced statfs structure into the
- * referenced statvfs structure, zeroing other fields of the statvfs.
- * Returns 0 for success, errno for failure.
- */
-STATIC int
-du_fs_to_vfs(sfp, svp, vfsp)
-	register struct statfs	*sfp;
-	register struct statvfs	*svp;
-	register vfs_t		*vfsp;
-{
-	register int		i;
-	register char		*cp;
-	register char		*cp2;
-	register int		bmul;
-
-	if (!sfp->f_bsize) {
-		return EPROTO;
-	}
-
-	bzero((caddr_t)svp, sizeof(struct statvfs));
-	svp->f_bsize = sfp->f_bsize;
-	svp->f_frsize = !sfp->f_frsize ? sfp->f_bsize : sfp->f_frsize;
-
-	/* statfs blocks/bfree is in terms of 512 byte blocks. */
-
-	if (svp->f_frsize >= 512) {
-		bmul = svp->f_frsize / 512;
-		svp->f_blocks = sfp->f_blocks / bmul;
-		svp->f_bavail = svp->f_bfree = sfp->f_bfree / bmul;
-	} else {
-		bmul = 512 / svp->f_frsize;
-		svp->f_blocks = sfp->f_blocks * bmul;
-		svp->f_bavail = svp->f_bfree = sfp->f_bfree * bmul;
-	}
-
-	svp->f_files = sfp->f_files;
-	svp->f_ffree = sfp->f_ffree;
-	svp->f_favail = sfp->f_ffree;
-	svp->f_fsid = vfsp->vfs_dev;
-
-	/*
-	 * We can't provide the base type because the old statfs structure
-	 * supplies only an fstype number, which is meaningless on the
-	 * client.
-	 */
-
-	strcpy((caddr_t)svp->f_basetype, "unknown");
-	svp->f_flag = vf_to_stf(vfsp->vfs_flag);
-
-	/* Fill f_name, f_pack from variable length strings in f_fstr. */
-
-	cp = svp->f_fstr;
-	cp2 = sfp->f_fname;
-	for (i = 0; i < sizeof(sfp->f_fname); i++, cp2++) {
-		if (*cp != '\0') {
-			*cp2 = *cp++;
-		} else {
-			*cp2 = '\0';
-		}
-	}
-	while (cp++ != '\0' && i < sizeof(svp->f_fstr) - 
-	  sizeof(sfp->f_fpack)) {
-		i++;
-	}
-	cp2 = sfp->f_fpack;
-	for (i = 0; i < sizeof(sfp->f_fpack); i++, cp2++) {
-		if (*cp != '\0') {
-			*cp2 = *cp++;
-		} else {
-			*cp2 = '\0';
-		}
-	}
-
-	/*
-	 * Set namemax to 14, which is DIRSIZ in SVR3.x.  This isn't generally
-	 * correct, but the protocol doesn't provide the information.
-	 */
-
-	svp->f_namemax = 14;
-
-	return 0;
 }
 
 int
@@ -2500,7 +2380,10 @@ dusr_chdirec(stp, ctrlp)
 	}
 	ASSERT(!stp->sr_out_bp);
 	stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-	return rfsr_gift_setup(stp, vp, u.u_srchan);
+	if (error = rfsr_gift_setup(stp, vp, u.u_srchan)) {
+		VN_RELE(vp);
+	}
+	return error;
 }
 
 int
@@ -2551,10 +2434,26 @@ dusr_coredump(stp, ctrlp)
 	register rfsr_state_t	*stp;
 	register rfsr_ctrl_t	*ctrlp;
 {
+	mblk_t	*corebp;
+
 	rfsr_fsinfo.fsivop_open++;
 	rfsr_fsinfo.fsivop_create++;
 	rfsr_fsinfo.fsivop_lookup++;
 
+	/*
+	 * Kluge to keep interfaces sane for normal ops.
+	 * Assumes absence of data part in block containing
+	 * RFS headers.
+	 */
+
+	(void)rf_allocmsg((size_t)0, sizeof("core"), BPRI_MED, FALSE, NULLCADDR,
+	  NULLFRP, &corebp);
+	ASSERT(corebp);
+	strcpy("core", (caddr_t)corebp->b_rptr);
+	corebp->b_wptr += sizeof("core");
+	RF_MSG(stp->sr_in_bp)->m_size += sizeof("core");
+	corebp->b_cont = stp->sr_in_bp->b_cont;
+	stp->sr_in_bp->b_cont = corebp->b_cont;
 	return dusr_vn_open(FREAD|FWRITE|FCREAT,
 	  0666 & MODEMASK & (int)~RF_REQ(stp->sr_in_bp)->rq_coredump.cmask,
 	  stp, ctrlp);
@@ -2591,12 +2490,9 @@ dusr_exec(stp, ctrlp)
 	rfsr_fsinfo.fsivop_lookup++;
 	rfsr_fsinfo.fsivop_open++;
 
-	if (RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
-	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) {
-		return rfsr_j_accuse("dusr_exec bad data", stp);
-	}
-
-	if ((error =
+	if ((error = RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
+	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) != 0 ||
+	  (error =
 	   pn_get(rf_msgdata(stp->sr_in_bp, RFV1_MINREQ), UIO_SYSSPACE, &pn))
 	  != 0) {
 		return error;
@@ -2612,24 +2508,29 @@ dusr_exec(stp, ctrlp)
 		VN_RELE(vp);
 		return EACCES;
 	}
+	if (!(vp->v_flag & VTEXT) && vp->v_count != 1 && filesearch(vp)) {
+		VN_RELE(vp);
+		return ETXTBSY;
+	}
+	vp->v_flag |= VTEXT;
 
 	len = pn.pn_pathlen + 1;
 	ASSERT(!stp->sr_out_bp);
 	stp->sr_out_bp = rfsr_rpalloc(len, stp->sr_vcver);
 	rsp = RF_RESP(stp->sr_out_bp);
-	rsp->rp_v1giftinfo.mode = 0;
+	rsp->rp_v1gift.mode = 0;
 	vattr.va_mask = AT_MODE;
 	if (error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred)) {
 		return error;
 	}
 	if (vattr.va_mode & VSUID) {
-		rsp->rp_v1giftinfo.mode |= VSUID;
+		rsp->rp_v1gift.mode |= VSUID;
 	}
 	if (vattr.va_mode & VSGID) {
-		rsp->rp_v1giftinfo.mode |= VSGID;
+		rsp->rp_v1gift.mode |= VSGID;
 	}
 	if (vattr.va_mode & VSVTX) {
-		rsp->rp_v1giftinfo.mode |= VSVTX;
+		rsp->rp_v1gift.mode |= VSVTX;
 	}
 	bcopy((caddr_t)pn.pn_path,
 	  (caddr_t)rf_msgdata(stp->sr_out_bp, RFV1_MINRESP), len);
@@ -2637,9 +2538,10 @@ dusr_exec(stp, ctrlp)
 	/*
 	 * Do this last because it commits resources
 	 */
-	if (!(error = rfsr_gift_setup(stp, vp, u.u_srchan))) {
-		stp->sr_gift->rd_stat |= RDTEXT;
+	if (error = rfsr_gift_setup(stp, vp, u.u_srchan)) {
+		VN_RELE(vp);
 	}
+	stp->sr_gift->rd_stat |= RDTEXT;
 	return error;
 }
 
@@ -2686,7 +2588,7 @@ dusr_fcntl(stp, ctrlp)
 			SR_FREEMSG(stp);
 			ASSERT(!stp->sr_out_bp);
 			stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-			RF_RESP(stp->sr_out_bp)->rp_cache |= RP_MNDLCK;
+			RF_RESP(stp->sr_out_bp)->rp_cache = RP_MNDLCK;
 			*ctrlp = SR_NACK_RESP;
 			return ENOMEM;
 		}
@@ -2725,7 +2627,8 @@ dusr_fcntl(stp, ctrlp)
 		} else if (canon &&
 		  !rf_fcanon(O_FLOCK_FMT, (caddr_t)&oflock,
 		   (caddr_t)&oflock + sizeof(oflock), (caddr_t)&oflock)) {
-			return rfsr_j_accuse("dusr_fcntl bad data", stp);
+			return rfsr_discon("dusr_fcntl bad data from client",
+			  stp);
 		}
 
 		/*
@@ -2792,7 +2695,7 @@ dusr_fcntl(stp, ctrlp)
 
 			ASSERT(!stp->sr_out_bp);
 			stp->sr_out_bp = rfsr_rpalloc(canon ?
-			  sizeof(o_flock_t) + OFLOCK_XP :
+			  sizeof(o_flock_t) + OFLOCK_XP - MINXPAND :
 			  sizeof(o_flock_t), stp->sr_vcver);
 			rp = RF_RESP(stp->sr_out_bp);
 			rpdata = rf_msgdata(stp->sr_out_bp, RFV1_MINRESP);
@@ -2896,7 +2799,9 @@ dusr_link(stp, ctrlp)
 	if (!(error) && *ctrlp == SR_NORMAL) {
 		ASSERT(!stp->sr_out_bp);
 		stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-		error = rfsr_gift_setup(stp, vp, u.u_srchan);
+		if (error = rfsr_gift_setup(stp, vp, u.u_srchan)) {
+			VN_RELE(vp);
+		}
 	}
 	return error;
 }
@@ -2912,24 +2817,30 @@ dusr_link1(stp, ctrlp)
 	register rfsr_ctrl_t	*ctrlp;
 {
 	register vnode_t	*from_vp;
+	register int		rcvindx;
 	register int		error = 0;
 
 	rfsr_fsinfo.fsivop_lookup++;
 	rfsr_fsinfo.fsivop_lookup++;
 	rfsr_fsinfo.fsivop_other++;
-
-	if ((from_vp =
-	   rf_gifttovp(&RF_REQ(stp->sr_in_bp)->rq_link.from, RFS1DOT0)) ==
-	  NULL) {
-
+	if ((rcvindx = RF_REQ(stp->sr_in_bp)->rq_rflink.link) != 0) {
+		/*
+		 * The existing file is on this server.
+		 */
+		from_vp = rcvd[rcvindx].rd_vp;
+		ASSERT(from_vp);
+	} else {
 		/*
 		 * The existing file is not on this server, but we can't
 		 * just fail the operation outright, because the target
 		 * pathname  still might cross back to the client.  So
 		 * we do a lookup and return EXDEV if the pathname
 		 * ends on this server.
+		 *
+		 * This game is needed for 3.X clients because they
+		 * send an arbitrarily long pathname, not just a
+		 * single component.
 		 */
-
 		error =
 		  rfsr_lookupname(NO_FOLLOW, stp, NULLVPP, NULLVPP, ctrlp);
 		if (*ctrlp == SR_NORMAL && (!error || error == ENOENT)) {
@@ -2937,12 +2848,10 @@ dusr_link1(stp, ctrlp)
 		}
 		return error;
 	}
-
 	/*
 	 * dusr_vn_link is prepared to deal with pathnames crossing
 	 * back to the client.
 	 */
-
 	return dusr_vn_link(from_vp, rf_msgdata(stp->sr_in_bp, RFV1_MINREQ),
 	  stp, ctrlp);
 }
@@ -3169,7 +3078,7 @@ dusr_utime(stp, ctrlp)
 			if (gdpp->hetero != NO_CONV &&
 			  !rf_fcanon("ll", (caddr_t)stv,
 			    (caddr_t)stv + sizeof(stv), (caddr_t)stv)) {
-				return rfsr_j_accuse("dusr_utime bad data",
+				return rfsr_discon("dusr_utime bad client data",
 				  stp);
 			}
 			stv[0] -= gdpp->timeskew_sec;
@@ -3209,6 +3118,7 @@ dusr_vn_open(filemode, createmode, stp, sr_ctrlp)
 	vnode_t		*vp;
 	register int	mode  = 0;
 	register int	error = 0;
+	register int	op = RF_COM(stp->sr_in_bp)->co_opcode;
 	vattr_t		vattr;
 
 	if (!(filemode & (FREAD|FWRITE))) {
@@ -3247,7 +3157,8 @@ dusr_vn_open(filemode, createmode, stp, sr_ctrlp)
 		/*
 		 * Plain open; just look up the name for now.
 		 */
-		error = rfsr_lookupname(FOLLOW, stp, NULLVPP, &vp, sr_ctrlp);
+		error = rfsr_lookupname(FOLLOW, stp, (vnode_t **)0,
+		  &vp, sr_ctrlp);
 		SR_FREEMSG(stp);
 		if (error || *sr_ctrlp != SR_NORMAL) {
 			return error;
@@ -3269,6 +3180,18 @@ dusr_vn_open(filemode, createmode, stp, sr_ctrlp)
 			if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
 				VN_RELE(vp);
 				return EROFS;
+			}
+			/*
+			 * If there's shared text associated with
+			 * the vnode, try to free it up once.
+			 * If we fail, we can't allow writing.
+			 */
+			if (vp->v_flag & VTEXT) {
+				xrele(vp);
+				if (vp->v_flag & VTEXT) {
+					VN_RELE(vp);
+					return ETXTBSY;
+				}
 			}
 			/*
 			 * Can't truncate files on which mandatory locking
@@ -3312,13 +3235,11 @@ dusr_vn_open(filemode, createmode, stp, sr_ctrlp)
 		 */
 		sndd_t	*srchan = u.u_srchan;
 
-		VN_HOLD(vp);
 		ASSERT(!stp->sr_out_bp);
 		stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
 		if (!(error = rfsr_gift_setup(stp, vp, srchan))) {
 			rdu_open(stp->sr_gift, stp->sr_gdpp->sysid,
-			  srchan->sd_mntid, filemode);
-			VN_RELE(vp);
+			  srchan->sd_mntid, op, filemode);
 		}
 	}
 	if (error) {
@@ -3326,7 +3247,7 @@ dusr_vn_open(filemode, createmode, stp, sr_ctrlp)
 		 * Errors with an open file collected here.
 		 * Don't overwrite error
 		 */
-		(void)VOP_CLOSE(vp, filemode, 1, 0, stp->sr_cred);
+		(void) VOP_CLOSE(vp, 0, 1, 0, stp->sr_cred);
 		VN_RELE(vp);
 	}
 	return error;
@@ -3362,24 +3283,19 @@ dusr_vn_create(vap, excl, mode, vpp, why, stp, sr_ctrlp)
 	dvp = NULL;
 	*vpp = NULL;
 
-	if (RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
-	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) {
-		return rfsr_j_accuse("dusr_vn_create bad request", stp);
-	}
-
-	if ((error =
+	if ((error = RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
+	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) != 0 ||
+	  (error =
 	   pn_get(rf_msgdata(stp->sr_in_bp, RFV1_MINREQ), UIO_SYSSPACE, &pn))
 	  != 0) {
 		return error;
 	}
-
 	/*
 	 * lookup will find the parent directory for the vnode.
 	 * When it is done the pn holds the name of the entry
 	 * in the directory.
 	 * If this is a non-exclusive create we also find the node itself.
 	 */
-
 	if (excl == EXCL) {
 		error = rfsr_lookuppn(&pn, NO_FOLLOW, stp, &dvp,
 		  NULLVPP, sr_ctrlp);
@@ -3403,10 +3319,21 @@ dusr_vn_create(vap, excl, mode, vpp, why, stp, sr_ctrlp)
 			VN_RELE(*vpp);
 		}
 		error = EROFS;
-	} else if (excl == NONEXCL && *vpp != NULLVP) {
+	} else if (excl == NONEXCL && *vpp != (vnode_t *)0) {
 		/*
 		 * The file is already there.
-		 * We throw the vnode away to let VOP_CREATE truncate the
+		 * If we are writing, and there's a shared text
+		 * associated with the vnode, try to free it up once.
+		 * If we fail, we can't allow writing.
+		 */
+		if ((mode & VWRITE) && ((*vpp)->v_flag & VTEXT)) {
+			xrele(*vpp);
+			if ((*vpp)->v_flag & VTEXT) {
+				error = ETXTBSY;
+			}
+		}
+		/*
+		 * we throw the vnode away to let VOP_CREATE truncate the
 		 * file in a non-racy manner.
 		 */
 		VN_RELE(*vpp);
@@ -3448,7 +3375,7 @@ dusr_vn_link(fvp, to, stp, sr_ctrlp)
 	struct pathname	pn;
 	register int	error;
 
-	tdvp = NULLVP;
+	tdvp = (vnode_t *)0;
 	if (error = pn_get(to, UIO_SYSSPACE, &pn)) {
 		return error;
 	}
@@ -3505,12 +3432,9 @@ dusr_vn_remove(dirflag, stp, sr_ctrlp)
 
 	vp = NULL;
 
-	if (RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
-	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) {
-		return rfsr_j_accuse("dusr_vn_remove bad request", stp);
-	}
-
-	if ((error =
+	if ((error = RF_PULLUP(stp->sr_in_bp, RFV1_MINREQ,
+	   (size_t)RF_MSG(stp->sr_in_bp)->m_size - RFV1_MINREQ)) != 0 ||
+	  (error =
 	   pn_get(rf_msgdata(stp->sr_in_bp, RFV1_MINREQ), UIO_SYSSPACE, &pn))
 	  != 0) {
 		return error;
@@ -3686,8 +3610,6 @@ dusr_cstatfs(stp, vfsp, len, fstyp, csbp)
 		register vfssw_t	*vswp;
 		register struct statfs	*sbp;
 		struct statfs		statfs;
-		register char		*cp, *cp2;
-		register int		i;
 
 		if (canon) {
 			sbp = &statfs;
@@ -3701,31 +3623,10 @@ dusr_cstatfs(stp, vfsp, len, fstyp, csbp)
 		sbp->f_bfree = statvfs.f_bfree * (statvfs.f_frsize / 512);
 		sbp->f_files = statvfs.f_files;
 		sbp->f_ffree = statvfs.f_ffree;
-
-		/*
-		 * Fill f_name, f_pack from variable length strings in f_fstr.
-		 */
-		cp = statvfs.f_fstr;
-		cp2 = sbp->f_fname;
-		for (i = 0; i < sizeof(sbp->f_fname); i++, cp2++) {
-			if (*cp != '\0') {
-				*cp2 = *cp++;
- 			} else {
-				*cp2 = '\0';
-			}
-		}
-		while (cp++ != '\0' && i < sizeof(statvfs.f_fstr) - 
-		  sizeof(sbp->f_fpack)) {
-			i++;
-		}
-		cp2 = sbp->f_fpack;
-		for (i = 0; i < sizeof(sbp->f_fpack); i++, cp2++) {
-			if (*cp != '\0') {
-				*cp2 = *cp++;
-			} else {
-				*cp2 = '\0';
-			}
-		}
+		bcopy(&statvfs.f_fstr[0], sbp->f_fname,
+		  sizeof(sbp->f_fname));
+		bcopy(&statvfs.f_fstr[sizeof(sbp->f_fname)], sbp->f_fpack,
+		  sizeof(sbp->f_fpack));
 		if ((vswp = vfs_getvfssw(statvfs.f_basetype)) == NULL) {
 			sbp->f_fstyp = 0;
 		} else {
@@ -3761,7 +3662,7 @@ dusr_namesetattr(followlink, vap, flags, stp, sr_ctrlp)
 	vnode_t		*vp;
 	register int	error;
 
-	error = rfsr_lookupname(followlink, stp, NULLVPP, &vp, sr_ctrlp);
+	error = rfsr_lookupname(followlink, stp, (vnode_t **)0, &vp, sr_ctrlp);
 	SR_FREEMSG(stp);
 	if (error || *sr_ctrlp != SR_NORMAL) {
 		return error;
@@ -3797,6 +3698,7 @@ ducl_namemsg(chansdp, rdirvp, pnp, comp, crp, opcode, rqargp, bpp)
 	size_t		rqsize;
 	int		complen = strlen(comp);
 	size_t		datasz = complen + pnp->pn_pathlen + 1;
+	sndd_t		*rootsdp;
 	rcvd_t		*rdp;
 	char		*data;
 	int		ntries;
@@ -3820,12 +3722,12 @@ ducl_namemsg(chansdp, rdirvp, pnp, comp, crp, opcode, rqargp, bpp)
 		rqp = RF_REQ(*bpp);
 		rqp->rq_arg = *rqargp;
 		data = rf_msgdata(*bpp, RFV1_MINREQ);
-		if (rdirvp && ISRFSVP(rdirvp) &&
-		  rdirvp->v_vfsp == SDTOV(chansdp)->v_vfsp) {
-			rqp->rq_rrdir_id = VTOSD(rdirvp)->sd_gift.gift_id;
-		} else {
-			rqp->rq_rrdir_id = 0;
-		}
+	 	if (rdirvp && ISRFSVP(rdirvp) &&
+	 	  (rootsdp = VTOSD(rdirvp))->sd_connid == chansdp->sd_connid) {
+	 		rqp->rq_rrdir = rootsdp->sd_connid;
+	 	} else {
+	 		rqp->rq_rrdir = 0;
+	 	}
 	 	(void)strcpy(data, comp);
 		(void)strcpy(data + complen, pnp->pn_path);
 		error = rfcl_xac(bpp, rqsize, rdp, RFS1DOT0, FALSE, &nacked);
@@ -3855,15 +3757,11 @@ ducl_resetpath(bp, pnp, dvp, vpp)
 
 	if ((error = RF_PULLUP(bp, RFV1_MINRESP,
 	  (size_t)RF_MSG(bp)->m_size - RFV1_MINRESP)) != 0) {
-		gdp_j_accuse("ducl_resetpath bad response",
-		  QPTOGP(VTOSD(dvp)->sd_queue));
-		return EPROTO;
+		return error;
 	}
-
 	datalen = strlen(rf_msgdata(bp, RFV1_MINRESP));
-
 	if (pnp->pn_pathlen < datalen || RF_COM(bp)->co_opcode != RFDOTDOT) {
-		gdp_j_accuse("ducl_resetpath bad response",
+		gdp_discon("ducl_resetpath:  invalid response",
 		  QPTOGP(VTOSD(dvp)->sd_queue));
 		return EPROTO;
 	}
@@ -3967,16 +3865,7 @@ du_stat_to_vattr(statp, vap)
 	vap->va_mode = statp->st_mode & MODEMASK;
 	vap->va_uid = (uid_t)statp->st_uid;
 	vap->va_gid = (gid_t)statp->st_gid;
-
-	hiword(vap->va_fsid) = hibyte(statp->st_dev);
-	loword(vap->va_fsid) = lobyte(statp->st_dev);
-
-	/* Nasty machine-dependency:  sign-extend a character. */
-
-	ASSERT(hiword(vap->va_fsid) & 0x80);
-
-	hiword(vap->va_fsid) |= 0xff00;
-
+	vap->va_fsid = (dev_t)statp->st_dev;
 	vap->va_nodeid = (ino_t)statp->st_ino;
 	vap->va_nlink = (nlink_t)statp->st_nlink;
 	vap->va_size = statp->st_size;
@@ -3988,7 +3877,7 @@ du_stat_to_vattr(statp, vap)
 	vap->va_ctime.tv_nsec = 0;
 	vap->va_rdev = expdev(statp->st_rdev);
 	vap->va_blksize = DU_DATASIZE;
-	vap->va_nblocks = btod(statp->st_size);
+	vap->va_nblocks = (statp->st_size + DU_DATASIZE - 1) / DU_DATASIZE;
 	vap->va_vcode = 0;
 }
 
@@ -4003,27 +3892,23 @@ du_o_flock_to_flock(bp, flp)
 	register struct flock	*flp;
 {
 	size_t			datasz;
+	int			error;
 	register struct o_flock	*oflp;
 	gdp_t			*gp;
 
 	gp = QPTOGP((queue_t *)RF_MSG(bp)->m_queue);
 	datasz = gp->hetero == NO_CONV ? sizeof(struct o_flock) :
-	  sizeof(struct o_flock) + STATFS_XP;
-
-	if (RF_PULLUP(bp, RFV1_MINRESP, datasz)) {
-		gdp_j_accuse("du_o_flock_to_flock bad data", gp);
-		return EPROTO;
+	  sizeof(struct o_flock) + STATFS_XP - MINXPAND;
+	if ((error = RF_PULLUP(bp, RFV1_MINRESP, datasz)) != 0) {
+		return error;
 	}
-
 	oflp = (struct o_flock *)rf_msgdata(bp, RFV1_MINRESP);
-
 	if (gp->hetero != NO_CONV &&
 	  !rf_fcanon(O_FLOCK_FMT, (caddr_t)oflp, (caddr_t)oflp + datasz,
 	   (caddr_t)oflp)) {
-		gdp_j_accuse("du_o_flock_to_flock bad data", gp);
+		gdp_discon("du_o_flock_to_flock bad data", gp);
 		return EPROTO;
 	}
-
 	flp->l_type = oflp->l_type;
 	flp->l_whence = oflp->l_whence;
 	flp->l_start = oflp->l_start;

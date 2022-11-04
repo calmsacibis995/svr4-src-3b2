@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:m32/binder.c	1.4"
+#ident	"@(#)rtld:m32/binder.c	1.2"
 
 
 /* function binding routine - invoked on the first call
@@ -41,7 +41,7 @@
 	DPRINTF((LIST|DRELOC),(2, "rtld: _binder(0x%x, 0x%x)\n", reloc, lm));
 
 	if (!lm) {
-		_rtfprintf(2, "%s: %s: unidentifiable procedure reference\n",(char*) _rt_name,_proc_name);
+		_rtfprintf(2, "ld.so: %s: unidentifiable procedure reference\n",_proc_name);
 		(void)_kill(_getpid(), SIGKILL);
 	}
 	
@@ -53,7 +53,7 @@
 
 	/* find definition for symbol */
 	if ((nsym = _lookup(symname, 0, _ld_loaded, &nlm)) == (Elf32_Sym *)0) {
-		_rtfprintf(2, "%s: %s: symbol not found: %s\n",(char*) _rt_name,_proc_name,symname);
+		_rtfprintf(2, "ld.so: %s: symbol not found: %s\n",_proc_name,symname);
 		(void)_kill(_getpid(), SIGKILL);
 	}
 	

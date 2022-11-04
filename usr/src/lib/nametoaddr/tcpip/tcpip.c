@@ -5,10 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)nametoaddr:tcpip/tcpip.c	1.5"
+#ident	"@(#)nametoaddr:tcpip/tcpip.c	1.4"
 
 #if !defined(lint) && defined(SCCSIDS)
-static  char sccsid[] = "@(#)tcpip.c 1.5 89/10/09  Copyr 1989 Sun Micro";
+static  char sccsid[] = "@(#)tcpip.c 1.4 89/06/16  Copyr 1989 Sun Micro";
 #endif
 
 /*
@@ -38,7 +38,6 @@ static  char sccsid[] = "@(#)tcpip.c 1.5 89/10/09  Copyr 1989 Sun Micro";
 #include <net/if.h>
 #include <stropts.h>
 #include <sys/ioctl.h>
-#include <rpc/types.h>
 #ifdef SYSLOG
 #include <sys/syslog.h>
 #else
@@ -195,8 +194,8 @@ _netdir_getbyname(tp, serv)
 			return (NULL);
 		}
 		/* Vendor specific, that is why it's here and hard coded */
-		na->maxlen = sizeof(struct sockaddr_in);
-		na->len = sizeof(struct sockaddr_in);
+		na->maxlen = 8;
+		na->len = 8;
 		na->buf = (char *)sa;
 		sa->sin_family = AF_INET;
 		sa->sin_port = server_port;
@@ -557,8 +556,8 @@ _uaddr2taddr(tp, addr)
 		return (0);
 	}
 	result->buf = (char *)(sa);
-	result->maxlen = sizeof(struct sockaddr_in);
-	result->len = sizeof(struct sockaddr_in);
+	result->maxlen = 8;
+	result->len = 8;
 
 	/* XXX there is probably a better way to do this. */
 	sscanf(addr,"%d.%d.%d.%d.%d.%d", &h1, &h2, &h3, &h4, &p1, &p2);

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/in_pcb.c	1.7"
+#ident	"@(#)netinet:netinet/in_pcb.c	1.4"
 
 /*
  * System V STREAMS TCP - Release 2.0
@@ -116,7 +116,7 @@ in_pcbbind(inp, nam)
 	mblk_t         *nam;
 {
 	register struct inpcb *head = inp->inp_head;
-	register struct sockaddr_in *sin;
+	register struct taddr_in *sin;
 	u_short         lport = 0;
 
 	if (inp->inp_lport || inp->inp_laddr.s_addr != INADDR_ANY)
@@ -125,7 +125,7 @@ in_pcbbind(inp, nam)
 		STRLOG(IPM_ID, 1, 5, SL_TRACE, "null in_pcbbind");
 		goto noname;
 	}
-	sin = (struct sockaddr_in *) nam->b_rptr;
+	sin = (struct taddr_in *) nam->b_rptr;
 	if ((nam->b_wptr - nam->b_rptr) < sizeof(*sin))
 		return (EINVAL);
 	STRLOG(IPM_ID, 1, 6, SL_TRACE, "in_pcbbind port %d addr %x",
@@ -184,11 +184,9 @@ in_pcbconnect(inp, nam)
 {
 	register struct ip_provider *prov;
 	struct ip_provider *first_prov = (struct ip_provider *) NULL, tempprov;
-	register struct sockaddr_in *sin = (struct sockaddr_in *) nam->b_rptr;
-	int	len;
+	register struct taddr_in *sin = (struct taddr_in *) nam->b_rptr;
 
-	len = nam->b_wptr - nam->b_rptr;
-	if (!in_chkaddrlen(len))
+	if ((nam->b_wptr - nam->b_rptr) != sizeof(*sin))
 		return (EINVAL);
 	if (sin->sin_family != AF_INET)
 		return (EAFNOSUPPORT);
@@ -249,9 +247,9 @@ in_pcbconnect(inp, nam)
 		 */
 		ro = &inp->inp_route;
 		if (ro->ro_rt &&
-		    (satosin(&ro->ro_dst)->sin_addr.s_addr != 
-		     sin->sin_addr.s_addr ||
-		     inp->inp_protoopt & SO_DONTROUTE)) {
+		    satosin(&ro->ro_dst)->sin_addr.s_addr != 
+		    sin->sin_addr.s_addr ||
+		    inp->inp_protoopt & SO_DONTROUTE) {
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = (mblk_t *) 0;
 		}
@@ -298,14 +296,14 @@ in_pcbconnect(inp, nam)
 		inp->inp_laddr = *PROV_INADDR(prov);
 	}
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
-		mblk_t         *bp = allocb(sizeof(struct sockaddr_in), BPRI_HI);
-		struct sockaddr_in *sin1 = (struct sockaddr_in *) bp->b_rptr;
+		mblk_t         *bp = allocb(sizeof(struct taddr_in), BPRI_HI);
+		struct taddr_in *sin1 = (struct taddr_in *) bp->b_rptr;
 		int             error;
 
 		if (bp == (mblk_t *) NULL) {
 			return (ENOSR);
 		}
-		bp->b_wptr += sizeof(struct sockaddr_in);
+		bp->b_wptr += sizeof(struct taddr_in);
 		sin1->sin_family = AF_INET;
 		sin1->sin_addr = *PROV_INADDR(prov);
 		sin1->sin_port = inp->inp_lport;
@@ -351,7 +349,7 @@ in_setsockaddr(inp, nam)
 	register struct inpcb *inp;
 	mblk_t         *nam;
 {
-	register struct sockaddr_in *sin = (struct sockaddr_in *) nam->b_rptr;
+	register struct taddr_in *sin = (struct taddr_in *) nam->b_rptr;
 
 	nam->b_wptr = nam->b_rptr + sizeof(*sin);
 	bzero((caddr_t) sin, sizeof(*sin));
@@ -364,7 +362,7 @@ in_setpeeraddr(inp, nam)
 	register struct inpcb *inp;
 	mblk_t         *nam;
 {
-	register struct sockaddr_in *sin = (struct sockaddr_in *) nam->b_rptr;
+	register struct taddr_in *sin = (struct taddr_in *) nam->b_rptr;
 
 	nam->b_wptr = nam->b_rptr + sizeof(*sin);
 	bzero((caddr_t) sin, sizeof(*sin));
@@ -380,7 +378,7 @@ in_setpeeraddr(inp, nam)
  */
 in_pcbnotify(head, dst, errno, notify)
 	struct inpcb   *head;
-	register struct sockaddr_in *dst;
+	register struct taddr_in *dst;
 	int             errno, (*notify) ();
 {
 	register struct inpcb *inp, *oinp;

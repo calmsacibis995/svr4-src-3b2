@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/main.c	1.31"
+#ident	"@(#)kernel:os/main.c	1.28"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/psw.h"
@@ -33,17 +33,10 @@
 #include "sys/var.h"
 #include "sys/debug.h"
 #include "sys/conf.h"
-#include "sys/utsname.h"
 #include "sys/cmn_err.h"
 
 #include "vm/as.h"
 #include "vm/seg_vn.h"
-
-/* well known processes */
-proc_t *proc_sched;		/* memory scheduler */
-proc_t *proc_init;		/* init */
-proc_t *proc_pageout;		/* pageout daemon */
-proc_t *proc_bdflush;		/* buffer cache flush daemon */
 
 int	physmem;	/* Physical memory size in clicks.	*/
 int	maxmem;		/* Maximum available memory in clicks.	*/
@@ -79,7 +72,6 @@ main()
 	int error = 0;
 
 	startup();
-	inituname();
 	clkstart();
 	cred_init();
 	dnlc_init();
@@ -108,10 +100,6 @@ main()
 	u.u_error = 0;		/* XXX kludge for SCSI driver */
 	vfs_mountroot();	/* Mount the root file system */
 
-
-	cmn_err(CE_CONT, "\nUNIX(R) System V Release %s AT&T %s Version %s\n",
-	   utsname.release, utsname.machine, utsname.version);
-	cmn_err(CE_CONT, "Total real memory  = %d\n", ctob(physmem));
 	cmn_err(CE_CONT,
 		"Available memory   = %d\n\n", ctob(freemem));
 
@@ -126,6 +114,12 @@ main()
 
 
 	u.u_start = hrestime.tv_sec;
+
+	/*
+	 * This call to inituname must come after 
+	 * root has been mounted.
+	 */
+	inituname();
 
 	/*
 	 * This call to swapconf must come after 
@@ -147,7 +141,6 @@ main()
 
 	if (newproc(NP_INIT, NULL, &error)) {
 		register proc_t *p = u.u_procp;
-		proc_init = p;
 
 		p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
 
@@ -181,11 +174,9 @@ main()
 		u.u_pcb.sub = (int *)((uint)userstack + ctob(SSIZE));
 		return UVTEXT;
 	}
-
 	if (newproc(NP_SYSPROC, NULL, &error)) {
-		register proc_t *p = u.u_procp;
-		proc_pageout = p;
-		p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
+		u.u_procp->p_cstime = u.u_procp->p_stime = 0;
+		u.u_procp->p_cutime = u.u_procp->p_utime = 0;
 		bcopy("pageout", u.u_psargs, 8);
 		bcopy("pageout", u.u_comm, 7);
 		pageout();
@@ -193,9 +184,8 @@ main()
 	}
 
 	if (newproc(NP_SYSPROC, NULL, &error)) {
-		register proc_t *p = u.u_procp;
-		proc_bdflush = p;
-		p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
+		u.u_procp->p_cstime = u.u_procp->p_stime = 0;
+		u.u_procp->p_cutime = u.u_procp->p_utime = 0;
 		bcopy("fsflush", u.u_psargs, 8);
 		bcopy("fsflush", u.u_comm, 7);
 		fsflush();
@@ -219,8 +209,6 @@ main()
 		kmem_freepool();
 		cmn_err(CE_PANIC, "main: return from kmem_freepool()");
 	}
-
-	pid_setmin();
 
 	bcopy("sched", u.u_psargs, 6);
 	bcopy("sched", u.u_comm, 5);

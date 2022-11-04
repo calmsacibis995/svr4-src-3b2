@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/tfind.c	1.10"
+#ident	"@(#)libc-port:gen/tfind.c	1.9"
 /*LINTLIBRARY*/
 /*
  * Tree search algorithm, generalized from Knuth (6.2.2) Algorithm T.
@@ -29,7 +29,7 @@ typedef struct node { POINTER key; struct node *llink, *rlink; } NODE;
 VOID *
 tfind(ky, rtp, compar)
 const VOID *ky;	/* Key to be located */
-VOID *const *rtp;		/* Address of the root of the tree */
+VOID **rtp;		/* Address of the root of the tree */
 int	(*compar)();	/* Comparison function */
 {
 	POINTER key = (char *)ky;

@@ -8,9 +8,11 @@
 #ifndef _MATH_H
 #define _MATH_H
 
-#ident	"@(#)head:math.h	2.11.1.24"
+#ident	"@(#)head:math.h	2.11.1.20"
 
-#if __STDC__ - 0 == 0 && !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#if __STDC__ - 0 == 0	/* not ANSI conforming */
+extern int signgam;
+
 struct exception {
 	int type;
 	char *name;
@@ -121,6 +123,7 @@ extern double hypot(double, double);
 extern double j0(double); 
 extern double j1(double); 
 extern double jn(int, double); 
+extern int matherr(struct exception *);
 extern double y0(double); 
 extern double y1(double); 
 extern double yn(int, double); 
@@ -139,10 +142,6 @@ extern double rint(double);
 extern double remainder(double, double);
 extern int unordered(double, double);
 extern int finite(double);
-
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
-extern int matherr(struct exception *);
-#endif
 
 #endif	/* __STDC__ == 0 */
 
@@ -198,8 +197,6 @@ extern _h_val __huge_val;
 #endif	/* __STDC__ */	
 
 #if __STDC__ - 0 == 0 || defined(_POSIX_SOURCE) || defined(_XOPEN_SOURCE)
-
-extern int signgam;
 
 /* some useful constants */
 #define M_E		2.7182818284590452354

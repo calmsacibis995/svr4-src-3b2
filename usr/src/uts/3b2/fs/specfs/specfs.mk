@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/specfs/specfs.mk	1.25"
+#ident	"@(#)fs:fs/specfs/specfs.mk	1.23"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -21,7 +21,7 @@ DEFLIST =
 FRC =
 
 FILES = \
-	specgetsz.o \
+	specgetsizes.o \
 	specsubr.o \
 	specvfsops.o \
 	specvnops.o
@@ -47,7 +47,7 @@ clobber:	clean
 # Header dependencies
 #
 
-specgetsz.o: specgetsz.c \
+specgetsizes.o: specgetsizes.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/vnode.h \
 	$(INC)/sys/fs/snode.h \
@@ -72,9 +72,6 @@ specsubr.o: specsubr.c \
 	$(INC)/sys/file.h \
         $(INC)/sys/open.h \
         $(INC)/sys/user.h \
-        $(INC)/sys/termios.h \
-        $(INC)/sys/stream.h \
-        $(INC)/sys/strsubr.h \
 	$(FRC)
 
 specvfsops.o: specvfsops.c \

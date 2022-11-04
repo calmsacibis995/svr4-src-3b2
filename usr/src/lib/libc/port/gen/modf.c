@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/modf.c	1.10.1.5"
+#ident	"@(#)libc-port:gen/modf.c	1.10.1.4"
 /*LINTLIBRARY*/
 /*
  * modf(value, iptr) returns the signed fractional part of value
@@ -13,13 +13,10 @@
  *
  */
 
-#ifdef __STDC__
-	#pragma weak modf = _modf
-#endif
-#include "synonyms.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
+#include "synonyms.h"
 #include <values.h>
 #include <nan.h>
 

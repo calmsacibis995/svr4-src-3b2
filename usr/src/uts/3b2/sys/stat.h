@@ -8,7 +8,7 @@
 #ifndef _SYS_STAT_H
 #define _SYS_STAT_H
 
-#ident	"@(#)head.sys:sys/stat.h	11.24"
+#ident	"@(#)head.sys:sys/stat.h	11.22"
 
 #include "sys/time.h"
 
@@ -116,7 +116,6 @@ struct	stat {
 #define		S_IFBLK	0x6000	/* block special */
 #define		S_IFREG	0x8000	/* regular */
 #define		S_IFLNK	0xA000	/* symbolic link */
-#define		S_IFSOCK 0140000/* socket */
 #define	S_ISUID	04000		/* set user id on execution */
 #define	S_ISGID	02000		/* set group id on execution */
 #define	S_ISVTX	01000		/* save swapped text even after use */
@@ -139,11 +138,11 @@ struct	stat {
 
 /* the following macros are for POSIX conformance */
 
-#define S_ISFIFO(mode)	((mode&S_IFMT) == S_IFIFO)
-#define S_ISCHR(mode)	((mode&S_IFMT) == S_IFCHR)
-#define S_ISDIR(mode)	((mode&S_IFMT) == S_IFDIR)
-#define S_ISBLK(mode)	((mode&S_IFMT) == S_IFBLK)
-#define S_ISREG(mode)	((mode&S_IFMT) == S_IFREG) 
+#define S_ISFIFO(mode)	(mode & S_IFIFO)
+#define S_ISCHR(mode)	(mode & S_IFCHR)
+#define S_ISDIR(mode)	(mode & S_IFDIR)
+#define S_ISBLK(mode)	(mode & S_IFBLK)
+#define S_ISREG(mode)	(mode & S_IFREG) 
 
 
 /* a version number is part of the new stat function interface */

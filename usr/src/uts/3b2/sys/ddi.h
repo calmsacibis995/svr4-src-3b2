@@ -8,7 +8,7 @@
 #ifndef _SYS_DDI_H
 #define _SYS_DDI_H
 
-#ident	"@(#)head.sys:sys/ddi.h	1.19"
+#ident	"@(#)head.sys:sys/ddi.h	1.18"
 
 /* ddi.h -- the flag and function definitions needed by DDI-conforming
  * drivers.  This header file contains #undefs to undefine macros that
@@ -84,6 +84,11 @@ extern int physiock();
 #undef cmpdev
 #undef expdev
 
+#undef btoc
+#undef ctob
+
+extern unsigned long btoc();	
+extern unsigned long ctob();
 extern major_t getemajor();
 extern minor_t geteminor();
 extern major_t getmajor();

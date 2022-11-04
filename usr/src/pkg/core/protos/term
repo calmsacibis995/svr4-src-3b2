@@ -1,27 +1,26 @@
-
-#ident	"@(#)pkgcore:protos/term	1.7"
+#ident	"@(#)pkgcore:protos/term	1.2"
 
 !CORETERM=/usr/share/lib/.COREterm
 !TERMINFO=/usr/share/lib/terminfo
+!termsrc=/usr/lib/terminfo
 
 d term /usr/share/lib 0755 root sys
 
 s sysutil /usr/lib/.COREterm=$TERMINFO
 d term $TERMINFO 0775 bin bin
-s term /usr/lib/terminfo=$TERMINFO
 d term $TERMINFO/1 0775 bin bin
-f term $TERMINFO/1/1620 0644 bin bin
+f term $TERMINFO/1/1620=$termsrc/1/1620 0644 bin bin
 l term $TERMINFO/1/1640=$TERMINFO/1/1620
 d term $TERMINFO/2 0775 bin bin
-f term $TERMINFO/2/2621 0644 bin bin
-f term $TERMINFO/2/2622 0644 bin bin
-f term $TERMINFO/2/2623 0644 bin bin
-f term $TERMINFO/2/2624 0644 bin bin
-f term $TERMINFO/2/2626 0644 bin bin
-f term $TERMINFO/2/2640 0644 bin bin
-f term $TERMINFO/2/2640b 0644 bin bin
-f term $TERMINFO/2/2645 0644 bin bin
-f term $TERMINFO/2/2648 0644 bin bin
+f term $TERMINFO/2/2621=$termsrc/2/2621 0644 bin bin
+f term $TERMINFO/2/2622=$termsrc/2/2622 0644 bin bin
+f term $TERMINFO/2/2623=$termsrc/2/2623 0644 bin bin
+f term $TERMINFO/2/2624=$termsrc/2/2624 0644 bin bin
+f term $TERMINFO/2/2626=$termsrc/2/2626 0644 bin bin
+f term $TERMINFO/2/2640=$termsrc/2/2640 0644 bin bin
+f term $TERMINFO/2/2640b=$termsrc/2/2640b 0644 bin bin
+f term $TERMINFO/2/2645=$termsrc/2/2645 0644 bin bin
+f term $TERMINFO/2/2648=$termsrc/2/2648 0644 bin bin
 l term $TERMINFO/2/2621-wl=$TERMINFO/2/2621
 l term $TERMINFO/2/2621A=$TERMINFO/2/2621
 l term $TERMINFO/2/2621a=$TERMINFO/2/2621
@@ -39,25 +38,26 @@ l term $TERMINFO/2/2644a=$TERMINFO/2/2640b
 l term $TERMINFO/2/2648A=$TERMINFO/2/2648
 l term $TERMINFO/2/2648a=$TERMINFO/2/2648
 d term $TERMINFO/3 0775 bin bin
-f term $TERMINFO/3/31 0644 bin bin
-f term $TERMINFO/3/36 0644 bin bin
-f term $TERMINFO/3/3a 0644 bin bin
+f term $TERMINFO/3/31=$termsrc/3/31 0644 bin bin
+f term $TERMINFO/3/36=$termsrc/3/36 0644 bin bin
+f term $TERMINFO/3/3a=$termsrc/3/3a 0644 bin bin
 d term $TERMINFO/4 0775 bin bin
-f term $TERMINFO/4/4012 0644 bin bin
-f term $TERMINFO/4/4013 0644 bin bin
-f term $TERMINFO/4/4014 0644 bin bin
-f term $TERMINFO/4/4015 0644 bin bin
-f term $TERMINFO/4/4023 0644 bin bin
-f term $TERMINFO/4/4024 0644 bin bin
-f term $TERMINFO/4/4112 0644 bin bin
-f term $TERMINFO/4/4115 0644 bin bin
-f term $TERMINFO/4/42 0644 bin bin
-f term $TERMINFO/4/4410 0644 bin bin
-f term $TERMINFO/4/4415 0644 bin bin
-f term $TERMINFO/4/4418 0644 bin bin
-f term $TERMINFO/4/4424 0644 bin bin
-f term $TERMINFO/4/4425 0644 bin bin
-f term $TERMINFO/4/4426 0644 bin bin
+f term $TERMINFO/4/4012=$termsrc/4/4012 0644 bin bin
+f term $TERMINFO/4/4013=$termsrc/4/4013 0644 bin bin
+f term $TERMINFO/4/4014=$termsrc/4/4014 0644 bin bin
+f term $TERMINFO/4/4015=$termsrc/4/4015 0644 bin bin
+f term $TERMINFO/4/4023=$termsrc/4/4023 0644 bin bin
+f term $TERMINFO/4/4024=$termsrc/4/4024 0644 bin bin
+f term $TERMINFO/4/4112=$termsrc/4/4112 0644 bin bin
+f term $TERMINFO/4/4115=$termsrc/4/4115 0644 bin bin
+f term $TERMINFO/4/42=$termsrc/4/42 0644 bin bin
+f term $TERMINFO/4/4410=$termsrc/4/4410 0644 bin bin
+f term $TERMINFO/4/4415=$termsrc/4/4415 0644 bin bin
+f term $TERMINFO/4/4418=$termsrc/4/4418 0644 bin bin
+f term $TERMINFO/4/4424=$termsrc/4/4424 0644 bin bin
+f term $TERMINFO/4/4424-2=$termsrc/4/4424-2 0644 bin bin
+f term $TERMINFO/4/4425=$termsrc/4/4425 0644 bin bin
+f term $TERMINFO/4/4426=$termsrc/4/4426 0644 bin bin
 l term $TERMINFO/4/450=$TERMINFO/1/1620
 l term $TERMINFO/4/4025=$TERMINFO/4/4024
 l term $TERMINFO/4/4025cu=$TERMINFO/4/4024
@@ -69,11 +69,11 @@ l term $TERMINFO/4/4114=$TERMINFO/4/4112
 l term $TERMINFO/4/4424-1=$TERMINFO/4/4424
 l term $TERMINFO/4/4424-3=$TERMINFO/4/4424
 d term $TERMINFO/5 0775 bin bin
-f term $TERMINFO/5/505 0644 bin bin
-f term $TERMINFO/5/513bct 0644 bin bin
-f term $TERMINFO/5/5420_2 0644 bin bin
-f term $TERMINFO/5/5620 0644 bin bin
-f term $TERMINFO/5/5630 0644 bin bin
+f term $TERMINFO/5/505=$termsrc/5/505 0644 bin bin
+f term $TERMINFO/5/513bct=$termsrc/5/513bct 0644 bin bin
+f term $TERMINFO/5/5420_2=$termsrc/5/5420_2 0644 bin bin
+f term $TERMINFO/5/5620=$termsrc/5/5620 0644 bin bin
+f term $TERMINFO/5/5630=$termsrc/5/5630 0644 bin bin
 l term $TERMINFO/5/5410=$TERMINFO/4/4410
 l term $TERMINFO/5/5420=$TERMINFO/4/4415
 l term $TERMINFO/5/5418=$TERMINFO/4/4418
@@ -81,10 +81,10 @@ l term $TERMINFO/5/5425=$TERMINFO/4/4425
 l term $TERMINFO/5/5430=$TERMINFO/5/505
 l term $TERMINFO/5/5630DMD=$TERMINFO/5/5630
 d term $TERMINFO/6 0775 bin bin
-f term $TERMINFO/6/605 0644 bin bin
-f term $TERMINFO/6/610 0644 bin bin
-f term $TERMINFO/6/615 0644 bin bin
-f term $TERMINFO/6/620 0644 bin bin
+f term $TERMINFO/6/605=$termsrc/6/605 0644 bin bin
+f term $TERMINFO/6/610=$termsrc/6/610 0644 bin bin
+f term $TERMINFO/6/615=$termsrc/6/615 0644 bin bin
+f term $TERMINFO/6/620=$termsrc/6/620 0644 bin bin
 l term $TERMINFO/6/630=$TERMINFO/5/5630
 l term $TERMINFO/6/630MTG=$TERMINFO/5/5630
 l term $TERMINFO/6/605bct=$TERMINFO/6/605
@@ -92,9 +92,10 @@ l term $TERMINFO/6/610bct=$TERMINFO/6/610
 l term $TERMINFO/6/615mt=$TERMINFO/6/615
 l term $TERMINFO/6/620mtg=$TERMINFO/6/620
 d term $TERMINFO/9 0775 bin bin
-f term $TERMINFO/9/925 0644 bin bin
-f term $TERMINFO/9/950 0644 bin bin
+f term $TERMINFO/9/925=$termsrc/9/925 0644 bin bin
+f term $TERMINFO/9/950=$termsrc/9/950 0644 bin bin
 d term $TERMINFO/A 0775 bin bin
+f term $TERMINFO/A/ATTPT505=$termsrc/A/ATTPT505 0644 bin bin
 l term $TERMINFO/A/ATT4410=$TERMINFO/4/4410
 l term $TERMINFO/A/ATT5410=$TERMINFO/4/4410
 l term $TERMINFO/A/ATT4415=$TERMINFO/4/4415
@@ -102,6 +103,7 @@ l term $TERMINFO/A/ATT5420=$TERMINFO/4/4415
 l term $TERMINFO/A/ATT4418=$TERMINFO/4/4418
 l term $TERMINFO/A/ATT5418=$TERMINFO/4/4418
 l term $TERMINFO/A/ATT4424=$TERMINFO/4/4424
+l term $TERMINFO/A/ATT4424-2=$TERMINFO/4/4424-2
 l term $TERMINFO/A/ATT4425=$TERMINFO/4/4425
 l term $TERMINFO/A/ATT5425=$TERMINFO/4/4425
 l term $TERMINFO/A/ATT4426=$TERMINFO/4/4426
@@ -113,7 +115,7 @@ l term $TERMINFO/A/ATT610=$TERMINFO/6/610
 l term $TERMINFO/A/ATT615=$TERMINFO/6/615
 l term $TERMINFO/A/ATT620=$TERMINFO/6/620
 d term $TERMINFO/a 0775 bin bin
-f term $TERMINFO/a/adm3 0644 bin bin
+f term $TERMINFO/a/adm3=$termsrc/a/adm3 0644 bin bin
 l term $TERMINFO/a/adm31=$TERMINFO/3/31
 l term $TERMINFO/a/adm36=$TERMINFO/3/36
 l term $TERMINFO/a/adm3a=$TERMINFO/3/3a
@@ -125,6 +127,7 @@ l term $TERMINFO/a/att5420=$TERMINFO/4/4415
 l term $TERMINFO/a/att4418=$TERMINFO/4/4418
 l term $TERMINFO/a/att5418=$TERMINFO/4/4418
 l term $TERMINFO/a/att4424=$TERMINFO/4/4424
+l term $TERMINFO/a/att4424-2=$TERMINFO/4/4424-2
 l term $TERMINFO/a/att4425=$TERMINFO/4/4425
 l term $TERMINFO/a/att5425=$TERMINFO/4/4425
 l term $TERMINFO/a/att4426=$TERMINFO/4/4426
@@ -136,11 +139,12 @@ l term $TERMINFO/a/att605=$TERMINFO/6/605
 l term $TERMINFO/a/att610=$TERMINFO/6/610
 l term $TERMINFO/a/att615=$TERMINFO/6/615
 l term $TERMINFO/a/att620=$TERMINFO/6/620
+l term $TERMINFO/a/attpt505=$TERMINFO/A/ATTPT505
 d term $TERMINFO/b 0775 bin bin
-f term $TERMINFO/b/bantam 0644 bin bin
+f term $TERMINFO/b/bantam=$termsrc/b/bantam 0644 bin bin
 d term $TERMINFO/c 0775 bin bin
-f term $TERMINFO/c/c100 0644 bin bin
-f term $TERMINFO/c/c108 0644 bin bin
+f term $TERMINFO/c/c100=$termsrc/c/c100 0644 bin bin
+f term $TERMINFO/c/c108=$termsrc/c/c108 0644 bin bin
 l term $TERMINFO/c/c100-4p=$TERMINFO/c/c100
 l term $TERMINFO/c/c104=$TERMINFO/c/c100
 l term $TERMINFO/c/concept=$TERMINFO/c/c100
@@ -149,11 +153,11 @@ l term $TERMINFO/c/c108-8p=$TERMINFO/c/c108
 l term $TERMINFO/c/concept108=$TERMINFO/c/c108
 l term $TERMINFO/c/concept108-8p=$TERMINFO/c/c108
 d term $TERMINFO/d 0775 bin bin
-f term $TERMINFO/d/decwriter 0644 bin bin
-f term $TERMINFO/d/dumb 0644 bin bin
-f term $TERMINFO/d/dw1 0644 bin bin
-f term $TERMINFO/d/dw3 0644 bin bin
-f term $TERMINFO/d/dw4 0644 bin bin
+f term $TERMINFO/d/decwriter=$termsrc/d/decwriter 0644 bin bin
+f term $TERMINFO/d/dumb=$termsrc/d/dumb 0644 bin bin
+f term $TERMINFO/d/dw1=$termsrc/d/dw1 0644 bin bin
+f term $TERMINFO/d/dw3=$termsrc/d/dw3 0644 bin bin
+f term $TERMINFO/d/dw4=$termsrc/d/dw4 0644 bin bin
 l term $TERMINFO/d/diablo=$TERMINFO/1/1620
 l term $TERMINFO/d/dmd=$TERMINFO/5/5620
 l term $TERMINFO/d/dw=$TERMINFO/d/decwriter
@@ -161,7 +165,7 @@ l term $TERMINFO/d/dw2=$TERMINFO/d/decwriter
 d term $TERMINFO/g 0775 bin bin
 l term $TERMINFO/g/gs5430=$TERMINFO/5/505
 d term $TERMINFO/h 0775 bin bin
-f term $TERMINFO/h/hp262x 0644 bin bin
+f term $TERMINFO/h/hp262x=$termsrc/h/hp262x 0644 bin bin
 l term $TERMINFO/h/hp2621=$TERMINFO/2/2621
 l term $TERMINFO/h/hp2621-wl=$TERMINFO/2/2621
 l term $TERMINFO/h/hp2621A=$TERMINFO/2/2621
@@ -185,23 +189,29 @@ l term $TERMINFO/h/hp45=$TERMINFO/2/2645
 l term $TERMINFO/h/hp2648=$TERMINFO/2/2648
 l term $TERMINFO/h/hp2648a=$TERMINFO/2/2648
 d term $TERMINFO/i 0775 bin bin
-f term $TERMINFO/i/intext 0644 bin bin
-f term $TERMINFO/i/intext2 0644 bin bin
+f term $TERMINFO/i/intext=$termsrc/i/intext 0644 bin bin
+f term $TERMINFO/i/intext2=$termsrc/i/intext2 0644 bin bin
 l term $TERMINFO/i/intextii=$TERMINFO/i/intext2
 d term $TERMINFO/l 0775 bin bin
+f term $TERMINFO/l/lp=$termsrc/l/lp 0644 bin bin
 l term $TERMINFO/l/la120=$TERMINFO/d/dw3
+l term $TERMINFO/l/lpr=$TERMINFO/l/lp
 d term $TERMINFO/p 0775 bin bin
 l term $TERMINFO/p/pe550=$TERMINFO/b/bantam
 l term $TERMINFO/p/pe6100=$TERMINFO/b/bantam
+l term $TERMINFO/p/pt505=$TERMINFO/A/ATTPT505
+l term $TERMINFO/p/print=$TERMINFO/l/lp
+l term $TERMINFO/p/printer=$TERMINFO/l/lp
+l term $TERMINFO/p/printing=$TERMINFO/l/lp
 d term $TERMINFO/r 0775 bin bin
-f term $TERMINFO/r/regent100 0644 bin bin
-f term $TERMINFO/r/regent20 0644 bin bin
-f term $TERMINFO/r/regent200 0644 bin bin
-f term $TERMINFO/r/regent25 0644 bin bin
-f term $TERMINFO/r/regent40 0644 bin bin
+f term $TERMINFO/r/regent100=$termsrc/r/regent100 0644 bin bin
+f term $TERMINFO/r/regent20=$termsrc/r/regent20 0644 bin bin
+f term $TERMINFO/r/regent200=$termsrc/r/regent200 0644 bin bin
+f term $TERMINFO/r/regent25=$termsrc/r/regent25 0644 bin bin
+f term $TERMINFO/r/regent40=$termsrc/r/regent40 0644 bin bin
 l term $TERMINFO/r/regent60=$TERMINFO/r/regent200
 d term $TERMINFO/t 0775 bin bin
-f term $TERMINFO/t/teletec 0644 bin bin
+f term $TERMINFO/t/teletec=$termsrc/t/teletec 0644 bin bin
 l term $TERMINFO/t/tek=$TERMINFO/4/4012
 l term $TERMINFO/t/tek4012=$TERMINFO/4/4012
 l term $TERMINFO/t/tek4013=$TERMINFO/4/4013
@@ -216,6 +226,7 @@ l term $TERMINFO/t/tek4112=$TERMINFO/4/4112
 l term $TERMINFO/t/tty5410=$TERMINFO/4/4410
 l term $TERMINFO/t/tty5420=$TERMINFO/4/4415
 l term $TERMINFO/t/tty4424=$TERMINFO/4/4424
+l term $TERMINFO/t/tty4424-2=$TERMINFO/4/4424-2
 l term $TERMINFO/t/tty5425=$TERMINFO/4/4425
 l term $TERMINFO/t/tty4426=$TERMINFO/4/4426
 l term $TERMINFO/t/tty5620=$TERMINFO/5/5620
@@ -223,16 +234,11 @@ l term $TERMINFO/t/ttydmd=$TERMINFO/5/5620
 l term $TERMINFO/t/tvi925=$TERMINFO/9/925
 l term $TERMINFO/t/televideo950=$TERMINFO/9/950
 l term $TERMINFO/t/tvi950=$TERMINFO/9/950
-d term $TERMINFO/u 0775 bin bin
-f term $TERMINFO/u/unknown 0644 bin bin
 d term $TERMINFO/v 0775 bin bin
-f term $TERMINFO/v/viewpoint 0644 bin bin
-f term $TERMINFO/v/vt100 0644 bin bin
-f term $TERMINFO/v/vt52 0644 bin bin
+f term $TERMINFO/v/viewpoint=$termsrc/v/viewpoint 0644 bin bin
+f term $TERMINFO/v/vt100=$termsrc/v/vt100 0644 bin bin
+f term $TERMINFO/v/vt52=$termsrc/v/vt52 0644 bin bin
 l term $TERMINFO/v/vt100-am=$TERMINFO/v/vt100
-d term $TERMINFO/x 0775 bin bin
-f term $TERMINFO/x/xterm 0644 bin bin
-f term $TERMINFO/x/xtermm 0644 bin bin
 d term $CORETERM 0775 bin bin
 d term $CORETERM/1 0775 bin bin
 l term $CORETERM/1/1620=$TERMINFO/1/1620
@@ -281,6 +287,7 @@ l term $CORETERM/4/4410=$TERMINFO/4/4410
 l term $CORETERM/4/4415=$TERMINFO/4/4415
 l term $CORETERM/4/4418=$TERMINFO/4/4418
 l term $CORETERM/4/4424=$TERMINFO/4/4424
+l term $CORETERM/4/4424-2=$TERMINFO/4/4424-2
 l term $CORETERM/4/4425=$TERMINFO/4/4425
 l term $CORETERM/4/4426=$TERMINFO/4/4426
 l term $CORETERM/4/450=$TERMINFO/1/1620
@@ -320,6 +327,7 @@ d term $CORETERM/9 0775 bin bin
 l term $CORETERM/9/925=$TERMINFO/9/925
 l term $CORETERM/9/950=$TERMINFO/9/950
 d term $CORETERM/A 0775 bin bin
+l term $CORETERM/A/ATTPT505=$TERMINFO/A/ATTPT505
 l term $CORETERM/A/ATT4410=$TERMINFO/4/4410
 l term $CORETERM/A/ATT5410=$TERMINFO/4/4410
 l term $CORETERM/A/ATT4415=$TERMINFO/4/4415
@@ -327,6 +335,7 @@ l term $CORETERM/A/ATT5420=$TERMINFO/4/4415
 l term $CORETERM/A/ATT4418=$TERMINFO/4/4418
 l term $CORETERM/A/ATT5418=$TERMINFO/4/4418
 l term $CORETERM/A/ATT4424=$TERMINFO/4/4424
+l term $CORETERM/A/ATT4424-2=$TERMINFO/4/4424-2
 l term $CORETERM/A/ATT4425=$TERMINFO/4/4425
 l term $CORETERM/A/ATT5425=$TERMINFO/4/4425
 l term $CORETERM/A/ATT4426=$TERMINFO/4/4426
@@ -350,6 +359,7 @@ l term $CORETERM/a/att5420=$TERMINFO/4/4415
 l term $CORETERM/a/att4418=$TERMINFO/4/4418
 l term $CORETERM/a/att5418=$TERMINFO/4/4418
 l term $CORETERM/a/att4424=$TERMINFO/4/4424
+l term $CORETERM/a/att4424-2=$TERMINFO/4/4424-2
 l term $CORETERM/a/att4425=$TERMINFO/4/4425
 l term $CORETERM/a/att5425=$TERMINFO/4/4425
 l term $CORETERM/a/att4426=$TERMINFO/4/4426
@@ -361,6 +371,7 @@ l term $CORETERM/a/att605=$TERMINFO/6/605
 l term $CORETERM/a/att610=$TERMINFO/6/610
 l term $CORETERM/a/att615=$TERMINFO/6/615
 l term $CORETERM/a/att620=$TERMINFO/6/620
+l term $CORETERM/a/attpt505=$TERMINFO/A/ATTPT505
 d term $CORETERM/b 0775 bin bin
 l term $CORETERM/b/bantam=$TERMINFO/b/bantam
 d term $CORETERM/c 0775 bin bin
@@ -383,8 +394,6 @@ l term $CORETERM/d/diablo=$TERMINFO/1/1620
 l term $CORETERM/d/dmd=$TERMINFO/5/5620
 l term $CORETERM/d/dw=$TERMINFO/d/decwriter
 l term $CORETERM/d/dw2=$TERMINFO/d/decwriter
-d term $CORETERM/g 0775 bin bin
-l term $CORETERM/g/gs5430=$TERMINFO/5/505
 d term $CORETERM/h 0775 bin bin
 l term $CORETERM/h/hp262x=$TERMINFO/h/hp262x
 l term $CORETERM/h/hp2621=$TERMINFO/2/2621
@@ -414,10 +423,16 @@ l term $CORETERM/i/intext=$TERMINFO/i/intext
 l term $CORETERM/i/intext2=$TERMINFO/i/intext2
 l term $CORETERM/i/intextii=$TERMINFO/i/intext2
 d term $CORETERM/l 0775 bin bin
+l term $CORETERM/l/lp=$TERMINFO/l/lp
 l term $CORETERM/l/la120=$TERMINFO/d/dw3
+l term $CORETERM/l/lpr=$TERMINFO/l/lp
 d term $CORETERM/p 0775 bin bin
 l term $CORETERM/p/pe550=$TERMINFO/b/bantam
 l term $CORETERM/p/pe6100=$TERMINFO/b/bantam
+l term $CORETERM/p/pt505=$TERMINFO/A/ATTPT505
+l term $CORETERM/p/print=$TERMINFO/l/lp
+l term $CORETERM/p/printer=$TERMINFO/l/lp
+l term $CORETERM/p/printing=$TERMINFO/l/lp
 d term $CORETERM/r 0775 bin bin
 l term $CORETERM/r/regent100=$TERMINFO/r/regent100
 l term $CORETERM/r/regent20=$TERMINFO/r/regent20
@@ -441,6 +456,7 @@ l term $CORETERM/t/tek4112=$TERMINFO/4/4112
 l term $CORETERM/t/tty5410=$TERMINFO/4/4410
 l term $CORETERM/t/tty5420=$TERMINFO/4/4415
 l term $CORETERM/t/tty4424=$TERMINFO/4/4424
+l term $CORETERM/t/tty4424-2=$TERMINFO/4/4424-2
 l term $CORETERM/t/tty5425=$TERMINFO/4/4425
 l term $CORETERM/t/tty4426=$TERMINFO/4/4426
 l term $CORETERM/t/tty5620=$TERMINFO/5/5620
@@ -448,13 +464,10 @@ l term $CORETERM/t/ttydmd=$TERMINFO/5/5620
 l term $CORETERM/t/tvi925=$TERMINFO/9/925
 l term $CORETERM/t/televideo950=$TERMINFO/9/950
 l term $CORETERM/t/tvi950=$TERMINFO/9/950
-d term $CORETERM/u 0775 bin bin
-l term $CORETERM/u/unknown=$TERMINFO/u/unknown
 d term $CORETERM/v 0775 bin bin
 l term $CORETERM/v/viewpoint=$TERMINFO/v/viewpoint
 l term $CORETERM/v/vt100=$TERMINFO/v/vt100
 l term $CORETERM/v/vt52=$TERMINFO/v/vt52
 l term $CORETERM/v/vt100-am=$TERMINFO/v/vt100
-d term $CORETERM/x 0775 bin bin
-l term $CORETERM/x/xterm=$TERMINFO/x/xterm
-l term $CORETERM/x/xtermm=$TERMINFO/x/xtermm
+d term $CORETERM/g 0775 bin bin
+l term $CORETERM/g/gs5430=$TERMINFO/5/505

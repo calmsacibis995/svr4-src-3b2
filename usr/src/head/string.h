@@ -8,7 +8,7 @@
 #ifndef _STRING_H
 #define _STRING_H
 
-#ident	"@(#)head:string.h	1.7.1.11"
+#ident	"@(#)head:string.h	1.7.1.7"
 
 #ifndef _SIZE_T
 #define _SIZE_T
@@ -82,7 +82,6 @@ extern char
 	*memccpy(),
 	*memchr(),
 	*memcpy(),
-	*memmove(),
 	*memset();
 extern int memcmp();
 

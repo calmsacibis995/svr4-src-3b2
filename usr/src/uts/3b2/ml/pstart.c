@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:ml/pstart.c	1.12"
+#ident	"@(#)kernel:ml/pstart.c	1.11"
 
 #include "sys/types.h"
 #include "sys/psw.h"
@@ -47,10 +47,14 @@ extern void cdump();
 struct pcb phys_pcb = { KPSW0, 0, 0, 0, 0, {0,0,0,0,0,0,0,0,0,0,0}, 0};
 
 /*
- * These addresses are set by cunix
- * based on the addresses indicated in the COFF
- * ifile or ELF mapfile.
+ * Virtual addresses
  */
+
+	/*
+	**	These addresses are set by cunix
+	**	based on the addresses indicated in the COFF
+	**	ifile or ELF mapfile.
+	*/
 
 int sgate = 0x0;
 int sboot = 0x0;
@@ -96,10 +100,9 @@ STATIC int crashsw = 0;		/* software switch for crash dump
 				   dump may be made */
 
 
-/*
- * Physical start-up routine;  this routine is the very first C routine
- * executed immediately after control is transferred to SPMEM from boot.
- */
+/* Physical start-up routine;  this routine is the very first C routine
+** executed immediately after control is transferred to SPMEM from boot.
+*/
 
 void
 pstart()
@@ -116,8 +119,8 @@ pstart()
 	struct user	*pu;
 
 	/*
-	 *	Set the physical addresses
-	 */
+	**	Set the physical addresses
+	*/
 
 	Sgate = (((sboot + 2047 >> 11) + 
 	  (((int)bootSIZE + 2047) >> 11)) << 11);
@@ -129,23 +132,27 @@ pstart()
 	Ebss  = Sbss + (int)bssSIZE -1;
 	END   = Sbss + (int)bssSIZE - 1;
 
-	if (SERNO->serial0 > 0xB && SERNO->serial0 < 0x20
-	  && ((int)SERNO) == 0xfff0)
-		P_SYMTELL((char *)Sdata + ((char *)&sys3bsym - (char *)sdata));
+	/* check to see if this is the second time this point
+	   has been reached since boot. If so, generate a crash dump */
 
-	/*
-	 * Check to see if this is the second time this point
-	 * has been reached since boot. If so, generate a crash dump.
-	 */
-
-	if (crashsw == 1) {	/* generate crash dump */
+	if (crashsw == 1)
+	{	/* generate crash dump */
 		cdump();
 
 		/* return to firmware control */
 		RUNFLG = REENTRY;
 		RST = ON;
-	} else {		/* first time */
+	}
+
+	else 	/* first time */
+	{
 		crashsw = 1;
+		if (SERNO->serial0 > 0xB && SERNO->serial0 < 0x20 &&
+			((int)SERNO) == 0xfff0)
+			P_SYMTELL((char *)Sdata +
+				  ((char *)&sys3bsym -
+				  (char *)sdata));
+
 		/* set runflag in case of hw reset */
 
 		RUNFLG = FATAL;
@@ -161,19 +168,17 @@ pstart()
 
 
 
-	/*
-	 * Clear mmu configuration register so that ste
-	 * reference and modify bits are mot set.
-	 */
+	/* 	Clear mmu configuration register so that ste
+	** 	reference and modify bits are mot set.
+	*/
 
 	*(int *)&mmucr = 0;
 	*(int *)&mmufltcr = 0;
 	*(int *)&mmufltar = 0;
 
-	/*
-	 * The first available free memory after the kernel
-	 * .bss section 
-	 */
+	/* The first available free memory after the kernel
+	** .bss section 
+	*/
 
 	 mmst = btoc(END);
 
@@ -353,7 +358,7 @@ pstart()
 }
 
 STATIC void
-mmusetup(vaddr, paddr, clks, prot, valid)
+mmusetup(vaddr,paddr,clks,prot,valid)
 int vaddr, paddr, clks, prot, valid;
 {
 	register sde_t	*sde;
@@ -395,19 +400,22 @@ int vaddr, paddr, clks, prot, valid;
 	}
 }
 
-/* Zero a word aligned area of memory.  We can't use
- * the bzero routine because it is in the virtual
- * address space which isn't mapped yet.
- *
- *	wzero(adr, byte_count);
- */
+/*	Zero a word aligned area of memory.  We can't use
+**	the bzero routine because it is in the virtual
+**	address space which isn't mapped yet.
+**
+**		wzero(adr, byte_count);
+*/
 
 STATIC void
 wzero(ptr, count)
-	register int	*ptr;
-	register int	count;
+register int	*ptr;
+register int	count;
 {
-	count >>= 2;	/* Convert byte count to words. */
+	/*	Convert byte count to words.
+	*/
+
+	count >>= 2;
 
 	while (count--)
 		*ptr++ = 0;

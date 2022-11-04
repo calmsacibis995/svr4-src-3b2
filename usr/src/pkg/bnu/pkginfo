@@ -1,6 +1,6 @@
-#ident	"@(#)pkg.bnu:pkginfo	1.6"
+#ident	"@(#)pkg.bnu:pkginfo	1.5"
 
-ARCH="3B2"
+ARCH="3b2"
 # BASEDIR="/"
 CATEGORY="system"
 CLASSES="none need OAMadmin OAMmif"

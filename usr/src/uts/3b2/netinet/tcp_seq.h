@@ -8,7 +8,7 @@
 #ifndef _NETINET_TCP_SEQ_H
 #define _NETINET_TCP_SEQ_H
 
-#ident	"@(#)head.sys:sys/netinet/tcp_seq.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/tcp_seq.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -32,42 +32,14 @@
  */
 
 /*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
-
-/*
  * TCP sequence numbers are 32 bit integers operated
  * on with modular arithmetic.  These macros can be
  * used to compare such integers.
  */
-
-#ifdef vax
 #define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
 #define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
 #define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
 #define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
-#else
-#define	SEQ_LT(a,b)	(((a)-(b))&0x80000000)
-#define	SEQ_LEQ(a,b)	(!SEQ_GT(a,b))
-#define	SEQ_GT(a,b)	SEQ_LT(b,a)
-#define	SEQ_GEQ(a,b)	(!SEQ_LT(a,b))
-#endif
 
 /*
  * Macros to initialize tcp sequence numbers for
@@ -84,7 +56,7 @@
 #define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
 
 #ifdef _KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
+tcp_seq	tcp_iss;		/* tcp initial send seq # */
 #endif
 
 #endif	/* _NETINET_TCP_SEQ_H */

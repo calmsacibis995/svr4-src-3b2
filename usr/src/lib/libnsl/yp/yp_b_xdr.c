@@ -5,9 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_b_xdr.c	1.2"
-
+#ident	"@(#)libyp:yp_b_xdr.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -30,8 +28,63 @@
 *          All rights reserved.
 */ 
 #include <rpc/rpc.h>
-#include <netconfig.h>
 #include "yp_b.h"
+
+
+bool_t
+xdr_netconfigx(xdrs, objp)
+	XDR *xdrs;
+	netconfigx *objp;
+{
+	if (!xdr_string(xdrs, &objp->nc_netid, ~0)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_semantics)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_flag)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_protofmly)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_proto)) {
+		return (FALSE);
+	}
+	if (!xdr_string(xdrs, &objp->nc_device, ~0)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_nlookups)) {
+		return (FALSE);
+	}
+	if (!xdr_u_long(xdrs, &objp->nc_lookups)) {
+		return (FALSE);
+	}
+	if (!xdr_vector(xdrs, (char *)objp->nc_unused, 8, sizeof(u_long), xdr_u_long)) {
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+
+
+
+bool_t
+xdr_netbufx(xdrs, objp)
+	XDR *xdrs;
+	netbufx *objp;
+{
+	if (!xdr_u_int(xdrs, &objp->maxlen)) {
+		return (FALSE);
+	}
+	if (!xdr_bytes(xdrs, (char **)&objp->buf.buf_val, (u_int *)&objp->buf.buf_len, ~0)) {
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+
+
 
 bool_t
 xdr_ypbind_resptype(xdrs, objp)
@@ -76,7 +129,7 @@ xdr_ypbind_binding(xdrs, objp)
 	if (!xdr_pointer(xdrs, (char **)&objp->ypbind_nconf, sizeof(struct netconfig), xdr_netconfig)) {
 		return (FALSE);
 	}
-	if (!xdr_pointer(xdrs, (char **)&objp->ypbind_svcaddr, sizeof(struct netbuf), xdr_netbuf)) {
+	if (!xdr_pointer(xdrs, (char **)&objp->ypbind_svcaddr, sizeof(netbufx), xdr_netbufx)) {
 		return (FALSE);
 	}
 	if (!xdr_string(xdrs, &objp->ypbind_servername, ~0)) {

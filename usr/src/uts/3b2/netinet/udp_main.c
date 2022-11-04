@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/udp_main.c	1.3.3.3"
+#ident	"@(#)netinet:netinet/udp_main.c	1.3.4.1"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -316,7 +316,7 @@ udpioctl(q, bp)
 	mblk_t         *bp;
 {
 	struct iocblk  *iocbp;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	struct inpcb   *inp;
 
 	iocbp = (struct iocblk *) bp->b_rptr;
@@ -410,22 +410,22 @@ udpioctl(q, bp)
 
 	case SIOCGETNAME:	/* obsolete - replaced by TI_GETMYNAME */
 		iocbp->ioc_count = 0;
-		if ((bp->b_cont = allocb(sizeof(struct sockaddr_in), BPRI_LO))
+		if ((bp->b_cont = allocb(sizeof(struct taddr_in), BPRI_LO))
 		    == NULL) {
 			bp->b_datap->db_type = M_IOCNAK;
 			iocbp->ioc_error = ENOSR;
 			qreply(q, bp);
 			return;
 		}
-		bp->b_cont->b_wptr += sizeof(struct sockaddr_in);
-		sin = (struct sockaddr_in *) bp->b_cont->b_rptr;
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+		bp->b_cont->b_wptr += sizeof(struct taddr_in);
+		sin = (struct taddr_in *) bp->b_cont->b_rptr;
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		inp = qtoinp(q);
 		sin->sin_family = AF_INET;
 		sin->sin_port = inp->inp_lport;
 		sin->sin_addr = inp->inp_laddr;
 		bp->b_datap->db_type = M_IOCACK;
-		iocbp->ioc_count = sizeof(struct sockaddr_in);
+		iocbp->ioc_count = sizeof(struct taddr_in);
 		qreply(q, bp);
 		return;
 
@@ -438,21 +438,21 @@ udpioctl(q, bp)
 			qreply(q, bp);
 			return;
 		}
-		if ((bp->b_cont = allocb(sizeof(struct sockaddr_in), BPRI_LO))
+		if ((bp->b_cont = allocb(sizeof(struct taddr_in), BPRI_LO))
 		    == NULL) {
 			bp->b_datap->db_type = M_IOCNAK;
 			iocbp->ioc_error = ENOSR;
 			qreply(q, bp);
 			return;
 		}
-		bp->b_cont->b_wptr += sizeof(struct sockaddr_in);
-		sin = (struct sockaddr_in *) bp->b_cont->b_rptr;
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+		bp->b_cont->b_wptr += sizeof(struct taddr_in);
+		sin = (struct taddr_in *) bp->b_cont->b_rptr;
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_port = inp->inp_fport;
 		sin->sin_addr = inp->inp_faddr;
 		bp->b_datap->db_type = M_IOCACK;
-		iocbp->ioc_count = sizeof(struct sockaddr_in);
+		iocbp->ioc_count = sizeof(struct taddr_in);
 		qreply(q, bp);
 		return;
 
@@ -636,7 +636,7 @@ struct inpcb *inp;
 {
 	mblk_t *mp;
 	struct T_uderror_ind *uderr;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 
 	if (!inp->inp_q)
 		return;
@@ -651,7 +651,7 @@ struct inpcb *inp;
 	uderr->OPT_length = 0;
 	uderr->OPT_offset = 0;
 	uderr->ERROR_type = inp->inp_error;
-	sin = (struct sockaddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
+	sin = (struct taddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
 	bzero((caddr_t)sin, sizeof(*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_addr = inp->inp_faddr;
@@ -668,7 +668,7 @@ udp_uderr(bp)
 mblk_t *bp;
 {
 	struct N_uderror_ind *uderr;
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 
 	uderr = (struct N_uderror_ind *) bp->b_rptr;
 	if (uderr->ERROR_type == ENOSR) {

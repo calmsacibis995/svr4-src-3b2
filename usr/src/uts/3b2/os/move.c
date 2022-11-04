@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/move.c	1.12"
+#ident	"@(#)kernel:os/move.c	1.9.1.2"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -238,60 +238,6 @@ uioskip(uiop, n)
 		uiop->uio_resid -= niovb;
 		n -= niovb;
 	}
-}
-
-/*
- * Move MIN(ruio->uio_resid, wuio->uio_resid) bytes from addresses described
- * by ruio to those described by wuio.  Both uio structures are updated to
- * reflect the move. Returns 0 on success or a non-zero errno on failure.
- */
-int
-uiomvuio(ruio, wuio)
-	register uio_t *ruio;
-	register uio_t *wuio;
-{
-	register iovec_t *riov;
-	register iovec_t *wiov;
-	register long n;
-	uint cnt;
-	int kerncp;
-
-	n = MIN(ruio->uio_resid, wuio->uio_resid);
-	kerncp = ruio->uio_segflg == UIO_SYSSPACE &&
-	  wuio->uio_segflg == UIO_SYSSPACE;
-
-	riov = ruio->uio_iov;
-	wiov = wuio->uio_iov;
-	while (n) {
-		while (!wiov->iov_len) {
-			wiov = ++wuio->uio_iov;
-			wuio->uio_iovcnt--;
-		}
-		while (!riov->iov_len) {
-			riov = ++ruio->uio_iov;
-			ruio->uio_iovcnt--;
-		}
-		cnt = MIN(wiov->iov_len, MIN(riov->iov_len, n));
-
-		if (kerncp)
-			bcopy(riov->iov_base, wiov->iov_base, cnt);
-		else if (ruio->uio_segflg == UIO_SYSSPACE) {
-			if (copyout(riov->iov_base, wiov->iov_base, cnt))
-				return EFAULT;
-		} else if (copyin(riov->iov_base, wiov->iov_base, cnt))
-			return EFAULT;
-
-		riov->iov_base += cnt;
-		riov->iov_len -= cnt;
-		ruio->uio_resid -= cnt;
-		ruio->uio_offset += cnt;
-		wiov->iov_base += cnt;
-		wiov->iov_len -= cnt;
-		wuio->uio_resid -= cnt;
-		wuio->uio_offset += cnt;
-		n -= cnt;
-	}
-	return 0;
 }
 
 /*

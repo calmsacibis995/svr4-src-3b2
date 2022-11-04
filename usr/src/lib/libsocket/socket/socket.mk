@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libsocket:socket/socket.mk	1.3"
+#ident	"@(#)libsocket:socket/socket.mk	1.2"
 
 #
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -32,8 +32,7 @@
 INC=		$(ROOT)/usr/include
 
 DASHO=		-O
-PICOPT=		-Kpic
-CFLAGS=		$(DASHO) $(MORECPP) -DSYSV $(PICOPT) -I$(INC)
+CFLAGS=		$(DASHO) $(MORECPP) -DSYSV -Kpic -I$(INC)
 
 
 OBJS=		accept.o bind.o connect.o socket.o socketpair.o \

@@ -5,13 +5,14 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rfsr_ops.c	1.3.1.14"
+#ident	"@(#)fs:fs/rfs/rfsr_ops.c	1.3.1.6"
+
 /*
  * Operations for kernel daemon process that handles requests
- * for file activity from RFSs.
+ * for file activity from remote unix systems.
  */
-#include "sys/types.h"
 #include "sys/list.h"
+#include "sys/types.h"
 #include "sys/sysinfo.h"
 #include "sys/time.h"
 #include "sys/fs/rf_acct.h"
@@ -27,7 +28,6 @@
 #include "sys/stream.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/psw.h"
 #include "sys/pcb.h"
@@ -37,6 +37,7 @@
 #include "sys/nserve.h"
 #include "sys/rf_cirmgr.h"
 #include "sys/idtab.h"
+#include "sys/rf_messg.h"
 #include "sys/var.h"
 #include "sys/file.h"
 #include "sys/fstyp.h"
@@ -64,11 +65,9 @@
 #include "vm/seg_map.h"
 #include "rf_canon.h"
 #include "sys/mman.h"
-#include "vm/page.h"
 #include "rf_cache.h"
 #include "du.h"
 #include "sys/kmem.h"
-#include "fs/fs_subr.h"
 
 /*
  * Table indexed by opcode points to these functions, which handle
@@ -98,24 +97,6 @@ rfsr_access(stp, ctrlp)
 }
 
 /*
- * VOP_PATHCONF
- */
-/* ARGSUSED */
-STATIC int
-rfsr_pathconf(stp, ctrlp)
-	register rfsr_state_t *stp;
-	register rfsr_ctrl_t *ctrlp;
-{
-	register rf_request_t *req = RF_REQ(stp->sr_in_bp);
-	vnode_t *vp = stp->sr_rdp->rd_vp;
-	register int cmd = req->rq_pathconf.cmd;
-
-	rfsr_fsinfo.fsivop_other++;
-	SR_FREEMSG(stp);
-	return VOP_PATHCONF(vp, cmd, (u_long *)&stp->sr_ret_val, stp->sr_cred);
-}
-
-/*
  * VOP_CLOSE
  */
 /* ARGSUSED */
@@ -129,107 +110,103 @@ rfsr_close(stp, ctrlp)
 	register vnode_t 	*vp = rdp->rd_vp;
 	rd_user_t		*rdup;
 	int			error = 0;
-	register int		fmode = req->rq_close.fmode & (FREAD | FWRITE);
+	int 			inflated = 0;		/* flag; see below */
 	vattr_t			vattr;
 
 	rfsr_fsinfo.fsivop_close++;
-	if (!(rdup = rdu_find(rdp, u.u_procp->p_sysid, u.u_srchan->sd_mntid,
-	  (rd_user_t **)NULL)) || (int)(rdup->ru_frwcnt + rdup->ru_frcnt +
-	  rdup->ru_fwcnt) < 1 || req->rq_close.count < 1 ||
-	  fmode & FREAD && !(rdup->ru_frwcnt + rdup->ru_frcnt) ||
-	  fmode & FWRITE && !(rdup->ru_frwcnt + rdup->ru_fwcnt)) {
-		return rfsr_j_accuse("rfsr_close:  close unmatched with open",
-		  stp);
+	rdup = rdu_find(rdp, u.u_procp->p_sysid, u.u_srchan->sd_mntid,
+	  (rd_user_t **)NULL);
+	if (!rdup) {
+		cmn_err(CE_NOTE, "rfsr_close cannot find rd_user structure");
 	}
-
-	/* Use file table values of client */
-
-	error = VOP_CLOSE(vp, fmode, req->rq_close.count,
-	  req->rq_close.foffset, stp->sr_cred);
-
+	if (rdup && rdup->ru_fcount > 1) {
+		/*
+		 * This may be the last close for some file table entry on
+		 * the client, but is not the last file table entry on the
+		 * client for this file.  Inflate the reference count on
+		 * the vnode to avoid losing it.
+		 */
+		VN_HOLD(vp);
+		inflated = 1;
+	}
+	/*
+	 * Use file table values of client
+	 */
+	error = VOP_CLOSE(vp, req->rq_close.fmode, req->rq_close.count,
+				req->rq_close.foffset, stp->sr_cred);
+	if (inflated) {
+		VN_RELE(vp);
+	}
 	if (req->rq_close.count == 1) {
-
 		/*
 		 * Last reference from a file table entry on client
 		 * corresponds to last reference for some giving of this
 		 * gift; give up corresponding reference in rduser structure.
 		 */
-
-		if ((fmode & (FREAD | FWRITE)) == (FREAD | FWRITE)) {
-			--rdup->ru_frwcnt;
-		} else if (fmode & FREAD) {
-			--rdup->ru_frcnt;
-		} else {
-			--rdup->ru_fwcnt;
-		}
+		rdu_close(rdp, stp->sr_gdpp->sysid, u.u_srchan->sd_mntid,
+		  req->rq_close.fmode);
 	}
-
 	/*
 	 * 3.2 clients need vcode in return value continue cacheing a file upon
 	 * each close.
 	 */
-
 	if (!error) {
 		vattr.va_mask = AT_VCODE;
 		if (!(error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred))) {
 			stp->sr_ret_val = vattr.va_vcode;
 		}
 	}
-
-	ASSERT(!stp->sr_out_bp);
-	stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-
-	/* In vnode protocol, clients give up last reference with last close */
-
 	if (stp->sr_vcver > RFS1DOT0 && req->rq_close.lastclose) {
 		STATIC int rfsr_inactive();
 
 		error = rfsr_inactive(stp, ctrlp);
-		*ctrlp = SR_NORMAL;
 	} else {
 		SR_FREEMSG(stp);
 	}
 	return error;
 }
 
+/*
+ * 3.x clients give up their only vnode reference with RFINACTIVE.  4.0 clients
+ * give up vcount references at a time.
+ */
+/* ARGSUSED */
 STATIC int
 rfsr_inactive(stp, ctrlp)
 	register rfsr_state_t	*stp;
 	register rfsr_ctrl_t	*ctrlp;
 {
+	register vnode_t	*vp = stp->sr_rdp->rd_vp;
 	register long		vcount;
 	register long		mntid = RF_COM(stp->sr_in_bp)->co_mntid;
 	register sysid_t	sysid = stp->sr_gdpp->sysid;
 
 	rfsr_fsinfo.fsivop_other++;
-
 	if (stp->sr_vcver == RFS1DOT0) {
 		vcount = 1;
 	} else {
                 vcount = RF_REQ(stp->sr_in_bp)->rq_rele.vcount;
-		*ctrlp = SR_NO_RESP;
 	}
-
 	SR_FREEMSG(stp);
 	if (vcount < 1 || stp->sr_srmp->srm_refcnt < vcount + 1 ||
           !(stp->sr_rdp->rd_stat & RDUSED)) {
-		return rfsr_j_accuse("rfsr_inactive redundant VN_RELE", stp);
+		return rfsr_discon("rfsr_inactive redundant VN_RELE", stp);
 	}
-
+	ASSERT(!stp->sr_out_bp);
+	stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
 	/*
-	 * There is no need to allocate response for new clients.  Either
-	 * we got in here via a VOP_CLOSE, which already allocated a
-	 * response, or we got called via VOP_INACTIVE, in which case no
-	 * response is expected by the client.
+	 * rf_serve() calls rfsr_cacheck too, but in the case of this op, our
+	 * operand vp will be gone.  rfsr_cacheck() can fail, but its
+	 * return is discarded so the client will stay happy.
 	 */
-
-	if (stp->sr_vcver < RFS2DOT0) {
-		ASSERT(!stp->sr_out_bp);
-		stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
+	if (stp->sr_vcver >= RFS2DOT0) {
 		(void)rfsr_cacheck(stp, mntid);
 	}
- 	stp->sr_srmp->srm_refcnt -= vcount;
-	rcvd_delete(&stp->sr_rdp, sysid, mntid, (int)vcount);
+	while (vcount--) {
+		--stp->sr_srmp->srm_refcnt;
+		rcvd_delete(&stp->sr_rdp, sysid, mntid);
+		VN_RELE(vp);
+	}
 	return 0;
 }
 
@@ -255,8 +232,8 @@ rfsr_create(stp, ctrlp)
 	}
 	rfsr_fsinfo.fsivop_create++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		return rfsr_j_accuse("rfsr_create bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
+		return error;
 	}
 
 	req = RF_REQ(stp->sr_in_bp);
@@ -264,7 +241,7 @@ rfsr_create(stp, ctrlp)
 	if (stp->sr_gdpp->hetero != NO_CONV &&
 	  !rf_fcanon(MKDENT_FMT, (caddr_t)rqdp, (caddr_t)rqdp + datasz,
 	  (caddr_t)rqdp)) {
-		return rfsr_j_accuse("rfsr_create bad data", stp);
+		return rfsr_discon("rfsr_create bad data", stp);
 	}
 	rftov_attr(&vattr, &rqdp->attr);
 	vattr.va_atime.tv_sec -= stp->sr_gdpp->timeskew_sec;
@@ -275,8 +252,9 @@ rfsr_create(stp, ctrlp)
 	SR_FREEMSG(stp);
 	ASSERT(!stp->sr_out_bp);
 	stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-	if (!error) {
-		error = rfsr_gift_setup(stp, vp, u.u_srchan);
+	if (!error &&
+	  (error = rfsr_gift_setup(stp, vp, u.u_srchan))) {
+		VN_RELE(vp);
 	}
 	return error;
 }
@@ -430,18 +408,17 @@ rfsr_getattr(stp, ctrlp)
 	register int		error = 0;
 	register rf_response_t	*rp;
 	int			canon = stp->sr_gdpp->hetero != NO_CONV;
-	int			flags;
 	vattr_t			vattr;
 
 	rfsr_fsinfo.fsivop_other++;
 	vattr.va_mask = req->rq_getattr.mask;
-	flags = req->rq_getattr.flags & (ATTR_EXEC | ATTR_COMM);
 	SR_FREEMSG(stp);
 	ASSERT(!stp->sr_out_bp);
 	stp->sr_out_bp = rfsr_rpalloc(stp->sr_gdpp->hetero != NO_CONV ?
-	  sizeof(rf_attr_t) + ATTR_XP : sizeof(rf_attr_t), stp->sr_vcver);
+			   sizeof(rf_attr_t) + ATTR_XP : sizeof(rf_attr_t),
+			   stp->sr_vcver);
 	rp = RF_RESP(stp->sr_out_bp);
-	if ((error = VOP_GETATTR(rvp, &vattr, flags, stp->sr_cred)) != 0 ||
+	if ((error = VOP_GETATTR(rvp, &vattr, 0, stp->sr_cred)) != 0 ||
 	  (error = rfsr_vattr_map(stp, &vattr)) != 0) {
 		/* reset these to reflect the failure */
 		rp->rp_count = 0;
@@ -477,15 +454,15 @@ rfsr_setattr(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 	datasz = hetero == NO_CONV ? sizeof(rf_attr_t) :
-	  sizeof(rf_attr_t) + ATTR_XP;
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		return rfsr_j_accuse("rfsr_setattr bad data", stp);
+	  sizeof(rf_attr_t) + ATTR_XP - MINXPAND;
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
+		return error;
 	}
 	rap = (rf_attr_t *)rf_msgdata(stp->sr_in_bp, hdrsz);
 	if (hetero != NO_CONV &&
 	  !rf_fcanon(ATTR_FMT, (caddr_t)rap, (caddr_t)rap + datasz,
 	   (caddr_t)rap)) {
-		return rfsr_j_accuse("rfsr_setattr bad data", stp);
+		return rfsr_discon("rfsr_setattr bad data", stp);
 	}
 	rap->rfa_uid = gluid(stp->sr_gdpp, rap->rfa_uid);
 	rap->rfa_gid = glgid(stp->sr_gdpp, rap->rfa_gid);
@@ -688,20 +665,10 @@ rfsr_ioctl(stp, ctrlp)
 		if (!stp->sr_out_bp) {
 			stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
 		}
-		if (error) {
+		if (error || (error = rfsr_gift_setup(stp, nvp, u.u_srchan))) {
 			closef(fp);
 		} else {
-			VN_HOLD(nvp);
-			if ((error = rfsr_gift_setup(stp, nvp, u.u_srchan))) {
-				closef(fp);
-			} else {
-				ASSERT(stp->sr_gift);
-				rdu_open(stp->sr_gift, stp->sr_gdpp->sysid,
-				  u.u_srchan->sd_mntid,
-		  		  (int)(fp->f_flag & (FREAD | FWRITE)));
-				unfalloc(fp);
-				VN_RELE(nvp);
-			}
+			unfalloc(fp);
 		}
 		setf(0, NULLFP);
 	}
@@ -718,6 +685,7 @@ rfsr_link(stp, ctrlp)
 {
 	register vnode_t	*dvp = stp->sr_rdp->rd_vp;
 	register vnode_t	*fvp;
+	int			rcvindx;
 	int			error = 0;
 	size_t			hdrsz = RF_MIN_REQ(stp->sr_vcver);
 
@@ -727,7 +695,7 @@ rfsr_link(stp, ctrlp)
 	rfsr_fsinfo.fsivop_other++;
 
 	/*
-	 * All pathnames are fully resolved, and the named target file
+	 *All pathnames are fully resolved, and the named target file
 	 * is a simple component in the directory represented by the
 	 * rd on which the request came.
 	 *
@@ -737,18 +705,15 @@ rfsr_link(stp, ctrlp)
 	 * they're in the same writable VFS.
 	 */
 
-	if ((fvp =
-	   rf_gifttovp(&RF_REQ(stp->sr_in_bp)->rq_link.from, stp->sr_vcver)) ==
-	  NULL) {
+	if ((rcvindx = RF_REQ(stp->sr_in_bp)->rq_rflink.link) == 0 ||
+	  (fvp = rcvd[rcvindx].rd_vp) == NULL) {
 		error = ENOENT;
 	} else if (fvp->v_vfsp != dvp->v_vfsp) {
 		error = EXDEV;
 	} else if (dvp->v_vfsp->vfs_flag & VFS_RDONLY) {
 		error =  EROFS;
-	} else if (RF_PULLUP(stp->sr_in_bp, hdrsz,
-	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) {
-		error = rfsr_j_accuse("rfsr_link bad data", stp);
-	} else {
+	} else if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz,
+	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) == 0) {
 		error = VOP_LINK(dvp, fvp, rf_msgdata(stp->sr_in_bp, hdrsz),
 		  stp->sr_cred);
 	}
@@ -782,9 +747,6 @@ rfsr_lookup(stp, ctrlp)
 	if (*ctrlp != SR_NORMAL || error) {
 		return error;
 	}
-
-	ASSERT(vp);
-
 	ASSERT(!stp->sr_out_bp);
 	if (hetero) {
 		stp->sr_out_bp = rfsr_rpalloc(sizeof(rflkc_info_t) +
@@ -793,16 +755,14 @@ rfsr_lookup(stp, ctrlp)
 		stp->sr_out_bp = rfsr_rpalloc(sizeof(rflkc_info_t),
 		  stp->sr_vcver);
 	}
-	VN_HOLD(vp);
-	if (!(error = rfsr_gift_setup(stp, vp, u.u_srchan))) {
+	if (error = rfsr_gift_setup(stp, vp, u.u_srchan)) {
+		VN_RELE(vp);
+	} else {
 		/*
 		 * Provide some commonly used information about vp.
 		 */
 		register rf_response_t *rp = RF_RESP(stp->sr_out_bp);
 		vattr_t			vattr;
-
-		ASSERT(vtord(vp));
-		ASSERT(vtord(vp)->rd_vp == vp);
 
 		vattr.va_mask = AT_ALL;
 		if (!VOP_GETATTR(vp, &vattr, 0, stp->sr_cred) &&
@@ -830,109 +790,26 @@ rfsr_lookup(stp, ctrlp)
 			rp->rp_nodata = 1;
 		}
 	}
-	VN_RELE(vp);
 	return error;
 }
 
-
-/*
- * Offset and len are page-normalized here because client and server page
- * sizes may vary (in particular the client may have smaller pages).
- */
 /* ARGSUSED */
 STATIC int
-rfsr_addmap(stp, ctrlp)
-	register rfsr_state_t	*stp;
-	register rfsr_ctrl_t	*ctrlp;
+rfsr_map(stp, ctrlp)
+	register rfsr_state_t *stp;
+	register rfsr_ctrl_t *ctrlp;
 {
-	register rf_request_t	*req = RF_REQ(stp->sr_in_bp);
-	register vnode_t	*vp = stp->sr_rdp->rd_vp;
-	uint			offset = req->rq_map.offset & PAGEMASK;
-	uint			len = (req->rq_map.len + PAGEOFFSET) & PAGEMASK;
-	uint			maxprot = req->rq_map.maxprot;
-	int			error = 0;
-	rd_user_t		*rdup;
-
-        if (vp->v_type != VREG && vp->v_type != VBLK) {
-		return ENODEV;
-	}
-        if (vp->v_filocks) {
-		return EAGAIN;
-	}
-        if (vp->v_flag & VNOMAP) {
-		return ENOSYS;
-	}
-	if ((int)offset < 0 || (int)(offset + len) < 0) {
-		return EINVAL;
-	}
-
-	/*
-	 * Since prot is manipulable above the file system interface, only
-	 * maxprot is sent.  Verify that the client references the file,
-	 * that if the client is attempting a writable mapping, that it
-	 * has opened the file for writing, or else that it has opened the
-	 * file in some way (to cover PROT_READ and PROT_EXEC mappings).
-	 */
-	rdup = rdu_find(stp->sr_rdp, stp->sr_gdpp->sysid, u.u_srchan->sd_mntid,
-	  (rd_user_t **)NULL);
-	if (rdup == NULL || ((maxprot & PROT_WRITE) >
-	  (uint)(rdup->ru_fwcnt + rdup->ru_frwcnt)
-	  || rdup->ru_fwcnt + rdup->ru_frcnt + rdup->ru_frwcnt == 0) &&
-	  !rfm_check(vp, stp->sr_cred, rdup, offset, len, maxprot)) {
-		/* 
-		 * The client should already have verified this stuff, what
-		 * is it trying to do?
-		 */
-		return rfsr_j_accuse("rfsr_addmap:  mapping not allowed", stp);
-	} 
-		
-	/*
-	 * Since prot is manipulable above the file system interface, only
-	 * maxprot is sent, and is used in the VOP_ADDMAP(DELMAP) below.
-	 */
-	if (!(error = VOP_ADDMAP(stp->sr_rdp->rd_vp, offset, (struct as *)NULL,
-	  (addr_t)NULL, len, maxprot, maxprot, 0, stp->sr_cred))) {
-		rfm_lock(rdup);
-		if ((error = rfm_addmap(rdup, offset, len, maxprot)) != 0) {
-			(void)VOP_DELMAP(stp->sr_rdp->rd_vp, offset,
-			  (struct as *)NULL, (addr_t)NULL, len,
-			  maxprot, maxprot, 0, stp->sr_cred);
-		}
-		rfm_unlock(rdup);
-	}
-	return error;
+	return VOP_ADDMAP(stp->sr_rdp->rd_vp, 0, (struct as *)NULL,
+	  (caddr_t *)NULL, 1, PROT_READ, PROT_READ, 0, stp->sr_cred);
 }
 
-/*
- * Offset and len are page-normalized here because client and server page
- * sizes may vary (in particular the client may have smaller pages).
- */
 /* ARGSUSED */
 STATIC int
-rfsr_delmap(stp, ctrlp)
-	register rfsr_state_t	*stp;
+rfsr_unmap(stp, ctrlp)
+	register rfsr_state_t *stp;
 {
-	register rf_request_t	*req = RF_REQ(stp->sr_in_bp);
-	uint			offset = req->rq_map.offset & PAGEMASK;
-	uint			len = (req->rq_map.len + PAGEOFFSET) & PAGEMASK;
-	uint			maxprot = req->rq_map.maxprot;
-	rd_user_t		*rdup = rdu_find(stp->sr_rdp,
-				  stp->sr_gdpp->sysid, u.u_srchan->sd_mntid,
-				  (rd_user_t **)NULL);
-		
-	/*
-	 * Since prot is manipulable above the file system interface, 
-	 * only maxprot is sent and used.
-	 */
-	if (rdup == NULL) {
-		return rfsr_j_accuse("rfsr_delmap:  no map found\n", stp);
-	} else {
-		rfm_lock(rdup);
-		rfm_delmap(rdup, offset, len, maxprot, stp->sr_rdp->rd_vp,
-		  stp->sr_cred);
-		rfm_unlock(rdup);
-		return 0;
-	}
+	return VOP_DELMAP(stp->sr_rdp->rd_vp, 0, (struct as *)NULL,
+	  (caddr_t *)NULL, 1, PROT_READ, PROT_READ, 0, stp->sr_cred);
 }
 
 /*
@@ -956,15 +833,16 @@ rfsr_mkdir(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		return rfsr_j_accuse("rfsr_mkdir bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
+		SR_FREEMSG(stp);
+		return error;
 	}
 
 	rqdp = (struct rqmkdent *)rf_msgdata(stp->sr_in_bp, hdrsz);
 	if (stp->sr_gdpp->hetero != NO_CONV &&
 	  !rf_fcanon(MKDENT_FMT, (caddr_t)rqdp, (caddr_t)rqdp + datasz,
 	   (caddr_t)rqdp)) {
-		return rfsr_j_accuse("rfsr_mkdir bad data", stp);
+		return rfsr_discon("rfsr_mkdir bad data", stp);
 	}
 	rftov_attr(&vattr, &rqdp->attr);
 	error = VOP_MKDIR(stp->sr_rdp->rd_vp, rqdp->nm,
@@ -973,7 +851,9 @@ rfsr_mkdir(stp, ctrlp)
 	if (!error) {
 		ASSERT(!stp->sr_out_bp);
 		stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-		error = rfsr_gift_setup(stp, vp, u.u_srchan);
+		if (error = rfsr_gift_setup(stp, vp, u.u_srchan)) {
+			VN_RELE(vp);
+		}
 	}
 	return error;
 }
@@ -990,73 +870,35 @@ rfsr_open(stp, ctrlp)
 	vnode_t			*vp;
 	vnode_t			*ovp;
 	int			error = 0;
-	rcvd_t			*rdp;
-	int			amode = 0;
 
 	if (stp->sr_vcver < RFS2DOT0) {
 		return dusr_open(stp, ctrlp);
 	}
 	rfsr_fsinfo.fsivop_open++;
-
-	rdp = stp->sr_rdp;
-	ovp = vp = rdp->rd_vp;
 	fmode = RF_REQ(stp->sr_in_bp)->rq_open.fmode;
+	ovp = vp = stp->sr_rdp->rd_vp;
 	SR_FREEMSG(stp);
-
-	if (fmode & FREAD) {
-		amode = VREAD;
-	} 
-	if (fmode & (FWRITE|FTRUNC)) {
-		amode |= VWRITE;
-		if (stp->sr_srmp->srm_flags & SRM_RDONLY) {
-			return EROFS;
-		}
-	}
-	if ((error = VOP_ACCESS(vp, amode, 0, stp->sr_cred)) != 0) {
-		return error;
-	}
-
 	/*
 	 * In case VOP_OPEN swaps vp with another, make sure
 	 * it doesn't disappear, because all of a single client's
 	 * contribute just 1 to the vnode reference count.
 	 */
-
 	VN_HOLD(ovp);
-	if ((error = VOP_OPEN(&vp, fmode, stp->sr_cred)) == 0) {
+	if ((error = VOP_OPEN(&vp, fmode, stp->sr_cred)) != 0) {
 		if (vp != ovp) {
-
 			/*
 			 * VOP_OPEN gave us a new vnode.  Client will
 			 * release old one in its time.
 			 */
-
 			ASSERT(!stp->sr_out_bp);
 			stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
-
-			/*
-			 * Hold vp for the case that rfsr_gift_setup fails and
-			 * releases it, we still need vp to VOP_CLOSE.
-			 */
-
-			VN_HOLD(vp);
-			if ((error = rfsr_gift_setup(stp, vp, u.u_srchan)) 
+			if ((error = rfsr_gift_setup(stp, vp, u.u_srchan))
 			  != 0) {
-				(void)VOP_CLOSE(vp, fmode, 1, (off_t)0, 
-				  stp->sr_cred);
-			} else {
-				rdu_open(stp->sr_gift, stp->sr_gdpp->sysid,
-				  u.u_srchan->sd_mntid, fmode);
+				VN_RELE(vp);
 			}
-			VN_RELE(vp);
-		} else {
-			rdu_open(rdp, stp->sr_gdpp->sysid,
-			  u.u_srchan->sd_mntid, fmode);
-			VN_RELE(ovp);
 		}
-	} else {
-		VN_RELE(ovp);
 	}
+	VN_RELE(ovp);
 	return error;
 }
 
@@ -1106,6 +948,25 @@ rfsr_read(stp, ctrlp)
 	if (!stp->sr_out_bp) {
 		stp->sr_out_bp = rfsr_rpalloc((size_t)0, stp->sr_vcver);
 	}
+
+	if (stp->sr_vcver == RFS1DOT0) {
+		if (stp->sr_opcode == RFREAD) {
+
+			/* Only call to rfsr_cacheck for 3.2 clients. */
+
+			error = rfsr_cacheck(stp, u.u_srchan->sd_mntid);
+		}
+		if (!error) {
+			vattr_t vattr;
+
+			vattr.va_mask = AT_SIZE;
+			if ((error = VOP_GETATTR(vp, &vattr, 0, stp->sr_cred))
+			  == 0) {
+				RF_RESP(stp->sr_out_bp)->rp_rdwr.isize =
+				  vattr.va_size;
+			}
+		}
+	}
 	return error;
 }
 
@@ -1145,13 +1006,11 @@ rfsr_readlink(stp, ctrlp)
 	iovec.iov_base = rpdata;
 	error = VOP_READLINK(vp, &uio, stp->sr_cred);
 	stp->sr_ret_val = resid - uio.uio_resid;
-
 	/*
 	 * rfsr_rpalloc assigned the following values; correct
 	 * them now that the actual
 	 * values are known.
 	 */
-
 	if ((resp->rp_count = stp->sr_ret_val) == 0) {
 		resp->rp_nodata = 1;
 	}
@@ -1177,15 +1036,15 @@ rfsr_symlink(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		return rfsr_j_accuse("rfsr_symlink bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
+		SR_FREEMSG(stp);
+		return error;
 	}
 	argp = (struct rqsymlink *)rf_msgdata(stp->sr_in_bp, hdrsz);
-
 	if (stp->sr_gdpp->hetero != NO_CONV &&
 	  !rf_fcanon(SYMLNK_FMT, (caddr_t)argp, (caddr_t)argp + datasz,
 	   (caddr_t)argp)) {
-		return rfsr_j_accuse("rfsr_symlink bad data", stp);
+		return rfsr_discon("rfsr_symlink bad data", stp);
 	}
 	if (req->rq_slink.tflag) {
 		strcpy(target, argp->target);
@@ -1229,14 +1088,11 @@ rfsr_remove(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz,
-	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) {
-		return rfsr_j_accuse("rfsr_remove bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz,
+	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) == 0) {
+		error = VOP_REMOVE(stp->sr_rdp->rd_vp,
+ 		  rf_msgdata(stp->sr_in_bp, hdrsz), stp->sr_cred);
 	}
-
-	error = VOP_REMOVE(stp->sr_rdp->rd_vp,
- 	  rf_msgdata(stp->sr_in_bp, hdrsz), stp->sr_cred);
-
 	SR_FREEMSG(stp);
 	return error;
 }
@@ -1255,35 +1111,42 @@ rfsr_rename(stp, ctrlp)
 	vnode_t			*tdvp;
 	char			*fnm;
 	char			*tnm;
+	int			frcvid;
+	int			trcvid;
 	size_t			hdrsz = RF_MIN_REQ(stp->sr_vcver);
 	int			error = 0;
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz,
-	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) {
-		return rfsr_j_accuse("rfsr_create bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz,
+	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) == 0) {
+
+		req = RF_REQ(stp->sr_in_bp);
+		frcvid = req->rq_rename.frdid;
+		trcvid = req->rq_rename.trdid;
+		fnm = rf_msgdata(stp->sr_in_bp, hdrsz);
+		tnm = fnm + strlen(fnm) + 1;
+
+		if (frcvid <= 0 ||
+		  frcvid >= nrcvd ||
+		  trcvid <= 0 ||
+		  trcvid >= nrcvd ||
+		  (fdvp = rcvd[frcvid].rd_vp) == NULL ||
+		  (tdvp = rcvd[trcvid].rd_vp) == NULL) {
+			error = ENOENT;
+		} else if (fdvp->v_vfsp != tdvp->v_vfsp) {
+			error = EXDEV;
+		} else if (tdvp->v_vfsp->vfs_flag & VFS_RDONLY) {
+			error = EROFS;
+		} else {
+			error = VOP_RENAME(fdvp, fnm, tdvp, tnm, stp->sr_cred);
+		}
 	}
-
-	req = RF_REQ(stp->sr_in_bp);
-	fnm = rf_msgdata(stp->sr_in_bp, hdrsz);
-	tnm = fnm + strlen(fnm) + 1;
-
-	if ((fdvp = rf_gifttovp(&req->rq_rename.from, stp->sr_vcver)) == NULL ||
-	  (tdvp = rf_gifttovp(&req->rq_rename.to, stp->sr_vcver)) == NULL) {
-		error = ENOENT;
-	} else if (fdvp->v_vfsp != tdvp->v_vfsp) {
-		error = EXDEV;
-	} else if (tdvp->v_vfsp->vfs_flag & VFS_RDONLY) {
-		error = EROFS;
-	} else {
-		error = VOP_RENAME(fdvp, fnm, tdvp, tnm, stp->sr_cred);
-	}
-
 	SR_FREEMSG(stp);
-
-	/* The vnodes (fdvp and tdvp) will be released by the client. */
-
+	/*
+	 * The vnodes (fdvp and tdvp) will be released by
+	 * the client.
+	 */
 	return error;
 }
 
@@ -1295,13 +1158,8 @@ rfsr_rsignal(stp, ctrlp)
 {
 	register rf_common_t	*cop = RF_COM(stp->sr_in_bp);
 	register proc_t		*procp;
-	int			s;
 
 	*ctrlp = SR_NO_RESP;
-
-	s = splstr();
-	ASSERT(!rfsr_active_lock++);
-
 	for (procp = rfsr_active_procp; procp; procp = procp->p_rlink) {
 		if (procp != u.u_procp &&
 		  procp->p_epid == (short)cop->co_pid &&
@@ -1309,14 +1167,10 @@ rfsr_rsignal(stp, ctrlp)
 			break;
 		}
 	}
-
 	if (!procp) {
 		/* didn't find surrogate of signalled client */
 		register mblk_t *sbp;
 		register sndd_t *srchan = u.u_srchan;
-
-		ASSERT(!--rfsr_active_lock);
-		splx(s);
 
 		srchan->sd_srvproc = NULL;
 		/* look for request message we are supposed to interrupt
@@ -1334,7 +1188,8 @@ rfsr_rsignal(stp, ctrlp)
 			stp->sr_in_bp = sbp;
 			msig = RF_MSG(sbp);
 			msig->m_stat |= RF_SIGNAL;
-			sndd_set(srchan, msig->m_queue, &msig->m_gift);
+			sndd_set(srchan, (queue_t *)msig->m_queue,
+			  msig->m_giftid);
 			*ctrlp = SR_OUT_OF_BAND;
 		} else {
 			/*
@@ -1344,12 +1199,7 @@ rfsr_rsignal(stp, ctrlp)
 			SR_FREEMSG(stp);
 		}
 	} else {
-
 		/* found surrogate of signalled client */
-
-		ASSERT(!--rfsr_active_lock);
-		splx(s);
-
 		psignal(procp, SIGTERM);
 		SR_FREEMSG(stp);
 	}
@@ -1364,9 +1214,9 @@ rfsr_rmdir(stp, ctrlp)
 	register rfsr_state_t	*stp;
 	register rfsr_ctrl_t	*ctrlp;
 {
+	long			connid = RF_REQ(stp->sr_in_bp)->rq_rmdir.connid;
 	int			error = 0;
 	size_t			hdrsz = RF_MIN_REQ(stp->sr_vcver);
-	rf_request_t		*req = RF_REQ(stp->sr_in_bp);
 
 	if (stp->sr_vcver < RFS2DOT0) {
 		return dusr_rmdir(stp, ctrlp);
@@ -1374,14 +1224,12 @@ rfsr_rmdir(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz,
-	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) {
-		return rfsr_j_accuse("rfsr_rmdir bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz,
+	  (size_t)RF_MSG(stp->sr_in_bp)->m_size - hdrsz)) == 0) {
+		error = VOP_RMDIR(stp->sr_rdp->rd_vp,
+	  	  rf_msgdata(stp->sr_in_bp, hdrsz),
+	  	  connid == 0 ? NULLVP : INXTORD(connid)->rd_vp, stp->sr_cred);
 	}
-
-	error = VOP_RMDIR(stp->sr_rdp->rd_vp, rf_msgdata(stp->sr_in_bp, hdrsz),
-	  rf_gifttovp(&req->rq_rmdir.dir, stp->sr_vcver), stp->sr_cred);
-
 	SR_FREEMSG(stp);
 	return error;
 }
@@ -1416,8 +1264,7 @@ rfsr_mount(stp, ctrlp)
 
 	rfsr_fsinfo.fsivop_other++;
 
-	if (RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) {
-		error = rfsr_j_accuse("rfsr_mount bad data", stp);
+	if ((error = RF_PULLUP(stp->sr_in_bp, hdrsz, datasz)) != 0) {
 		goto out;
 	}
 	req = RF_REQ(stp->sr_in_bp);
@@ -1432,7 +1279,7 @@ rfsr_mount(stp, ctrlp)
 	mdata = rf_msgdata(stp->sr_in_bp, hdrsz);
 	mflags = (int)req->rq_srmount.mntflag;
 	if (!rf_fcanon("c0", mdata, mdata + datasz, resname)) {
-		error = rfsr_j_accuse("rfsr_mount bad data", stp);
+		error = rfsr_discon("rfsr_mount bad data", stp);
 		goto out;
 	}
 	if ((error = srm_alloc(&stp->sr_srmp)) != 0) {
@@ -1462,10 +1309,12 @@ rfsr_mount(stp, ctrlp)
 		error = ENONET;
 		goto out;
 	}
+#ifdef UNNECESSARY_RESTRICTION_REMOVED
 	if (stp->sr_vcver < RFS2DOT0 && rp->r_rootvp->v_type != VDIR) {
 		error = ENOTDIR;
 		goto out;
 	}
+#endif
 	if (rp->r_flags & R_UNADV) {
 		error = ENONET;
 		goto out;
@@ -1487,11 +1336,7 @@ rfsr_mount(stp, ctrlp)
 		rp->r_mountp->srm_prevp = stp->sr_srmp;
 	}
 	rp->r_mountp = stp->sr_srmp;
-
-	VN_HOLD(rp->r_rootvp);
-	if (!(error = rfsr_gift_setup(stp, rp->r_rootvp, srchan))) {
-		gdpp->mntcnt++;
-	} else {
+	if ((error = rfsr_gift_setup(stp, rp->r_rootvp, srchan)) != 0) {
 		/*
 		 * As awkward as the following is, it is necessary because
 		 * rfsr_gift_setup may have slept, allowing our rp and/or srmp
@@ -1501,16 +1346,16 @@ rfsr_mount(stp, ctrlp)
 
 		if ((rp = name_to_rsc(resname)) != NULL &&
 		  (trash_srmp = id_to_srm(rp, my_sysid)) != NULL) {
- 			(void)srm_remove(&rp, &trash_srmp);
+			(void)srm_remove(&rp, trash_srmp);
 			stp->sr_srmp = NULL;
 		}
 	}
 out:
-	if (error) {
-		if (stp->sr_srmp) {
-			srm_free(&stp->sr_srmp);
-			stp->sr_srmp = NULL;
-		}
+	if (!error) {
+		gdpp->mntcnt++;
+		VN_HOLD(stp->sr_gift->rd_vp);
+	} else {
+		srm_free(&stp->sr_srmp);
 		stp->sr_gift = NULL;
 	}
 	SR_FREEMSG(stp);
@@ -1519,6 +1364,11 @@ out:
 
 /*
  * VFS_UMOUNT
+ *
+ * Make sure that the reference count in the srmount table for
+ * this system and this inode is zero.  Then free the srmount entry.
+ * Vnode is locked by routines that call this routine.  This routine
+ * is called by server and by rf_recovery.
  */
 /* ARGSUSED */
 STATIC int
@@ -1527,6 +1377,7 @@ rfsr_umount(stp, ctrlp)
 	register rfsr_ctrl_t	*ctrlp;
 {
 	register long		mntid = u.u_srchan->sd_mntid;
+	register vnode_t	*vp = stp->sr_rsrcp->r_rootvp;
 	register long		vcount;
 	register sysid_t	sysid = stp->sr_gdpp->sysid;
 	sr_mount_t		*srp = stp->sr_srmp;
@@ -1539,28 +1390,28 @@ rfsr_umount(stp, ctrlp)
                 vcount = RF_REQ(stp->sr_in_bp)->rq_rele.vcount;
 	}
 	SR_FREEMSG(stp);
-
-	DUPRINT2(DB_MNT_ADV, "rfsr_umount: resource %x\n", stp->sr_rsrcp);
-
+	DUPRINT3(DB_MNT_ADV,
+	  "rfsr_umount: resource %x, vnode %x \n", stp->sr_rsrcp, vp);
         if (srp->srm_refcnt != vcount) {
 		/*  still busy for client machine or recovery is going on */
 		return EBUSY;
 	}
-
-	srp->srm_refcnt -= vcount;
-
+        while (--vcount) {
+		--stp->sr_srmp->srm_refcnt;
+		rcvd_delete(&stp->sr_rdp, sysid, mntid);
+		VN_RELE(vp);
+	}
 	/*
-	 * Free sr_mount structure.  If R_UNADV flag is set
+	 *  Free rfsr_mount structure.  If R_UNADV flag is set
 	 * in the resource structure and this was the last
 	 * rfsr_mount structure, the resource structure will
 	 * also be deallocated.
 	 */
-
 	if (srp->srm_flags & SRM_FUMOUNT ||
-	  !(error = srm_remove(&stp->sr_rsrcp, &srp))) {
-		stp->sr_srmp = NULL;
-		rcvd_delete(&stp->sr_rdp, sysid, mntid, (int)vcount);
+	  !(error = srm_remove(&stp->sr_rsrcp, srp))) {
+		rcvd_delete(&stp->sr_rdp, sysid, mntid);
 		stp->sr_gdpp->mntcnt--;
+		VN_RELE(vp);
 	}
 	return error;
 }
@@ -1625,9 +1476,6 @@ rfsr_ustat(stp, ctrlp)
 	int			canon = stp->sr_gdpp->hetero != NO_CONV;
 	struct statvfs		statvfs;
 	struct ustat		ustat;
-	register int		i;
-	register char		*cp;
-	register char		*cp2;
 
 	vfsp = rfsr_dev_dtov((int)req->rq_ustat.dev);
 	SR_FREEMSG(stp);
@@ -1659,32 +1507,9 @@ rfsr_ustat(stp, ctrlp)
 	usp->f_tfree =
 	  (daddr_t)(statvfs.f_bfree * (statvfs.f_frsize/512));
 	usp->f_tinode = (o_ino_t)statvfs.f_ffree;
-
-	/*
-	 * Fill f_name, f_pack from variable length strings in f_fstr.
-	 */
-	cp = statvfs.f_fstr;
-	cp2 = usp->f_fname;
-	for (i = 0; i < sizeof(usp->f_fname); i++, cp2++) {
-		if (*cp != '\0') {
-			*cp2 = *cp++;
-		} else {
-			*cp2 = '\0';
-		}
-	}
-	while (cp++ != '\0' && i < sizeof(statvfs.f_fstr) - 
-	  sizeof(usp->f_fpack)) {
-		i++;
-	}
-	cp2 = usp->f_fpack;
-	for (i = 0; i < sizeof(usp->f_fpack); i++, cp2++) {
-		if (*cp != '\0') {
-			*cp2 = *cp++;
-		} else {
-			*cp2 = '\0';
-		}
-	}
-
+	bcopy(&statvfs.f_fstr[0], usp->f_fpack, sizeof(usp->f_fpack));
+	bcopy(&statvfs.f_fstr[sizeof(usp->f_fpack)], usp->f_fname,
+	  sizeof(usp->f_fname));
 	if (canon) {
 		rp->rp_count = rf_tcanon(USTAT_FMT, (caddr_t)usp, rpdata);
 	}
@@ -1719,7 +1544,7 @@ rfsr_write(stp, ctrlp)
 {
 	/* base is updated for old clients. */
 
-	register rf_request_t	*req = RF_REQ(stp->sr_in_bp);
+	rf_request_t		*req = RF_REQ(stp->sr_in_bp);
 	register vnode_t	*vp = stp->sr_rdp->rd_vp;
 	caddr_t			base = (caddr_t)req->rq_xfer.base;
 	register vtype_t	vtype = vp->v_type;
@@ -1730,20 +1555,12 @@ rfsr_write(stp, ctrlp)
 	iovec_t			iovec;
 	register int		error = 0;
 	long			prewrite = req->rq_xfer.prewrite;
-	rd_user_t		*rdup = rdu_find(stp->sr_rdp,
-				  u.u_procp->p_sysid, u.u_srchan->sd_mntid,
-				  (rd_user_t **)NULL);
 
 	if (stp->sr_opcode == RFPUTPAGE) {
-		req->rq_xfer.fmode = 0;		/* prevent FAPPEND */
 		rfsr_fsinfo.fsivop_putpage++;
-		if (rdup == NULL) {
-			return rfsr_j_accuse("rfsr_putpage: no map found\n",
-			  stp);
-		} else if (!rfm_check(vp, stp->sr_cred, rdup,
-		  (uint)req->rq_xfer.offset,
-		  (uint)req->rq_xfer.count, PROT_WRITE)) {
-			return EINVAL;
+		if (vp->v_flag & VNOMAP) {
+			SR_FREEMSG(stp);
+			return ENOSYS;
 		}
 	} else {
 		rfsr_fsinfo.fsivop_write++;
@@ -1824,7 +1641,7 @@ rfsr_getpage(stp, ctrlp)
 	register rfsr_state_t	*stp;
 	register rfsr_ctrl_t *ctrlp;
 {
-	rf_request_t	*req = RF_REQ(stp->sr_in_bp);
+	register rf_request_t *req = RF_REQ(stp->sr_in_bp);
 	vnode_t		*vp = stp->sr_rdp->rd_vp;
 	off_t		resid = req->rq_xfer.count;
 	off_t		oresid = resid;
@@ -1832,9 +1649,11 @@ rfsr_getpage(stp, ctrlp)
 	size_t		datasz = stp->sr_gdpp->datasz;
 	register int	error = 0;
 	unsigned	disabled;	/* flag cache is disabled */
-	rd_user_t	*rdup = rdu_find(stp->sr_rdp, u.u_procp->p_sysid,
-			  u.u_srchan->sd_mntid, (rd_user_t **)NULL);
+	rd_user_t	*rdup = rdu_find(stp->sr_rdp,
+			  u.u_procp->p_sysid, u.u_srchan->sd_mntid,
+			  (rd_user_t **)NULL);
 
+	ASSERT(rdup);
 	rfsr_fsinfo.fsivop_getpage++;
 	SR_FREEMSG(stp);
 
@@ -1846,15 +1665,11 @@ rfsr_getpage(stp, ctrlp)
 	if (resid <= 0) {
 		return EINVAL;
 	}
-	if (rdup == NULL) {
-		return EINVAL;
-	}
-	if (!rfm_check(vp, stp->sr_cred, rdup, (uint)offset,
-	  (uint)resid, PROT_READ)) {
-		return EINVAL;
+	if (vp->v_flag & VNOMAP) {
+		return ENOSYS;
 	}
 	disabled = stp->sr_srmp->srm_flags & SRM_CACHE &&
-	  rdup->ru_cflag & RU_CACHE_DISABLE;
+		   rdup->ru_cflag & RU_CACHE_DISABLE;
 
 	/*
 	 * Iteratively lock down ranges of addresses, esballoc streams
@@ -1927,14 +1742,14 @@ rfsr_undef_op(stp, ctrlp)
 	register rfsr_state_t	*stp;
 	register rfsr_ctrl_t	*ctrlp;
 {
-	return rfsr_j_accuse("rfs server undefined op", stp);
+	return rfsr_discon("rfs server undefined op", stp);
 }
 
 /* indexed by opcode */
 int (*rfsr_ops[])() = {
 	rfsr_setfl,	/* 0 RFSETFL */
-	rfsr_delmap,	/* 1 RFDELMAP */
-	rfsr_addmap,	/* 2 RFADDMAP */
+	rfsr_unmap,	/* 1 RFUNMAP */
+	rfsr_map,	/* 2 RFMAP */
 	rfsr_read,	/* 3 RFREAD */
 	rfsr_write,	/* 4 RFWRITE */
 	rfsr_open,	/* 5 DUOPEN */
@@ -1957,7 +1772,7 @@ int (*rfsr_ops[])() = {
 	rfsr_undef_op,	/* 22 UNUSED */
 	rfsr_setattr,	/* 23 RFSETATTR */
 	rfsr_access,	/* 24 RFACCESS */
-	rfsr_pathconf,	/* 25 RFPATHCONF */
+	rfsr_undef_op,	/* 25 UNUSED */
 	rfsr_undef_op,	/* 26 UNUSED */
 	rfsr_undef_op,	/* 27 UNUSED */
 	dusr_fstat,	/* 28 DUFSTAT */
@@ -2035,8 +1850,8 @@ int (*rfsr_ops[])() = {
 	rfsr_undef_op,	/* 100 UNUSED */
 	rfsr_undef_op,	/* 101 UNUSED */
 	rfsr_undef_op,	/* 102 UNUSED */
-	rfsr_undef_op,	/* 103 UNUSED */
-	rfsr_statvfs,	/* 104 RFSTATVFS */
+	rfsr_statvfs,	/* 103 RFSTATVFS */
+	rfsr_undef_op,	/* 104 UNUSED */
 	rfsr_undef_op,	/* 105 UNUSED */
 	rfsr_undef_op,	/* 106 RFCOPYIN */
 	rfsr_undef_op,	/* 107 RFCOPYOUT */

@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_output.c	1.8"
+#ident	"@(#)netinet:netinet/tcp_output.c	1.6"
+
+/*
+ * System V STREAMS TCP - Release 2.0 
+ *
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved. 
+ *
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code. 
+ *
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates. 
+ *
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies. 
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -26,25 +44,6 @@
  *  	(c) 1986,1987,1988,1989  Sun Microsystems, Inc.
  *  	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *  	          All rights reserved.
- */
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
  */
 
 #define STRNET
@@ -84,9 +83,7 @@
 #include <netinet/tcp_debug.h>
 #include <netinet/ip_str.h>
 #ifdef SYSV
-#ifdef SYSV
 #include <sys/cmn_err.h>
-#endif
 #endif SYSV
 
 /*
@@ -94,6 +91,7 @@
  */
 u_char          tcp_initopt[4] = {TCPOPT_MAXSEG, 4, 0x0, 0x0,};
 extern int      tcpcksum;
+/*extern void     bcopy();*/
 extern int      tcpalldebug;
 extern queue_t *tcp_qbot;
 mblk_t         *tcp_dupblks();
@@ -107,7 +105,6 @@ tcp_out(tp)
 	tcp_io(tp, TF_NEEDOUT, NULL);
 }
 
-struct tcpcb *
 tcp_output(tp)
 	register struct tcpcb *tp;
 {
@@ -188,10 +185,12 @@ again:
 	}
 	if (SEQ_LT(tp->snd_nxt + len, tp->snd_una + tp->t_qsize))
 		flags &= ~TH_FIN;
+#ifdef OSDEBUG
 	else if (flags & TH_FIN)
 		strlog(TCPM_ID, 1, 9, SL_TRACE,
 		       "FIN not suppressed: %d >= %d",
 		       tp->snd_nxt + len, tp->snd_una + tp->t_qsize);
+#endif				/* OSDEBUG */
 
 	/* calculate receive window */
 	win = recvspace - tp->t_iqsize;
@@ -272,7 +271,7 @@ again:
 	/*
 	 * No reason to send a segment, just return. 
 	 */
-	return(tp);
+	return;
 
 send:
 	/*
@@ -283,7 +282,7 @@ send:
 	bp = allocb(sizeof(struct tcpiphdr), BPRI_HI);
 	if (bp == NULL) {
 		bufcall(sizeof(struct tcpiphdr), BPRI_HI, tcp_out, (long) tp);
-		return(tp);
+		return;
 	}
 	bp->b_rptr = bp->b_datap->db_lim - sizeof(struct tcpiphdr);
 	bp->b_wptr = bp->b_datap->db_lim;
@@ -313,12 +312,12 @@ send:
 
 	ti = (struct tcpiphdr *) bp->b_rptr;
 	if (tp->t_template == 0)
-#ifdef SYSV
-		cmn_err(CE_PANIC, "tcp_output: null t_template");
+		
+#ifdef SYSV		
+		cmn_err(CE_PANIC, "tcp_output");
 #else
-		panic( "tcp_output: null t_template");
-#endif
-
+		panic ("tcp_output");
+#endif SYSV
 	bcopy((caddr_t) tp->t_template, (caddr_t) ti, sizeof(struct tcpiphdr));
 
 	/*
@@ -346,8 +345,6 @@ send:
 			opt[2] = mss >> 8 & 0xff;
 			opt[3] = mss & 0xff;
 		}
-		else
-			mss = IP_MSS - sizeof(struct tcpiphdr);
 	}
 	if (opt) {
 		bp0 = bp->b_cont;
@@ -356,7 +353,7 @@ send:
 			(void) freeb(bp);
 			freemsg(bp0);
 			bufcall(optlen + 4, BPRI_HI, tcp_out, (long) tp);
-			return(tp);
+			return;
 		}
 		bp->b_cont->b_cont = bp0;
 		bp0 = bp->b_cont;
@@ -478,7 +475,7 @@ send:
 		freemsg(bp);
 		bufcall(sizeof(struct ip_unitdata_req), BPRI_HI,
 			tcp_out, (long) tp);
-		return(tp);
+		return;
 	}
 	bp0->b_cont = bp;
 	bp = bp0;
@@ -513,7 +510,6 @@ send:
 	if (sendalot)
 		goto again;
 	tp->t_force = 0;
-	return(tp);
 }
 
 tcp_setpersist(tp)
@@ -522,11 +518,7 @@ tcp_setpersist(tp)
 	register t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
 
 	if (tp->t_timer[TCPT_REXMT])
-#ifdef SYSV
-		cmn_err(CE_PANIC,"tcp_output REXMT");
-#else
 		panic("tcp_output REXMT");
-#endif
 	/*
 	 * Start/restart persistance timer.
 	 */
@@ -551,7 +543,7 @@ tcp_dupblks(q, off, len)
 	mblk_t         *head, *newhead;
 	int		n; 
 	int		origoff = off;
-	int		blocks = 0;	/* count of data blocks we've dup'd */
+	int		blocks = 0;	/* count of data blocks we've duped */
 
 	STRLOG(TCPM_ID, 2, 9, SL_TRACE, "tcp_dupblks q %x off %d len %d",
 	       q, off, len);
@@ -594,8 +586,8 @@ tcp_dupblks(q, off, len)
 #ifdef SYSV
 		cmn_err(CE_PANIC, "tcp_dupblks");
 #else
-		panic( "tcp_dupblks");
-#endif
+		panic ("tcp_dupblks");
+#endif SYSV
 	}
 	nbp->b_wptr += len;	/* adjust to correct size  (len <= 0) */
 	nbp->b_cont = NULL;

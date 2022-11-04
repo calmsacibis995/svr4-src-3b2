@@ -8,7 +8,7 @@
 #ifndef _SYS_SYSCALL_H
 #define _SYS_SYSCALL_H
 
-#ident	"@(#)head.sys:sys/syscall.h	1.17"
+#ident	"@(#)head.sys:sys/syscall.h	1.12"
 
 /*
  *	system call numbers
@@ -184,20 +184,20 @@
 #define	SYS_evtrapret	102
 #define	SYS_statvfs	103
 #define	SYS_fstatvfs	104
-				/* 105 reserved */
-#define	SYS_nfssys	106
+#define	SYS_fmount	105
+#define	SYS_funmount	106
 #define	SYS_waitsys	107
 #define	SYS_sigsendsys	108
 #define	SYS_hrtsys	109
 #define	SYS_acancel	110
 #define	SYS_async	111
 #define	SYS_priocntlsys	112
-#define	SYS_pathconf	113
+#define	SYS_mctl	113
 #define	SYS_mincore	114
 #define	SYS_mmap	115
 #define	SYS_mprotect	116
 #define	SYS_munmap	117
-#define	SYS_fpathconf	118
+#define	SYS_getpagesize	118
 #define	SYS_vfork	119
 #define	SYS_fchdir	120
 #define	SYS_readv	121
@@ -215,11 +215,14 @@
 #define	SYS_putpmsg	133
 #define	SYS_rename	134
 #define	SYS_uname	135
-#define	SYS_setegid	136
-#define	SYS_sysconfig	137
-#define	SYS_adjtime	138
-#define	SYS_systeminfo	139
+#define SYS_sbrk	136
+#define SYS_sysconfig	137
+#define SYS_adjtime	138
+#define SYS_systeminfo	139
+#define	SYS_setegid	140
 #define	SYS_seteuid	141
+				/* 141-151 reserved for 3b4000 */
+#define SYS_nfssys	152
 
 #ifndef _SYS_SYS_S
 

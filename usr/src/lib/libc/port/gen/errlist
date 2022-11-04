@@ -1,10 +1,4 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-#ident	"@(#)libc-port:gen/errlist	1.10"
+#ident	"@(#)libc-port:gen/errlist	1.5"
 
 1	Not owner
 2	No such file or directory
@@ -75,7 +69,6 @@
 74	Multihop attempted
 77	Not a data message
 78	File name too long
-79	Value too large for defined data type
 80	Name not unique on network
 81	File descriptor in bad state
 82	Remote address changed
@@ -87,27 +80,27 @@
 89	Operation not applicable
 90	Number of symbolic links encountered during path name traversal exceeds MAXSYMLINKS
 93	Directory not empty
-94	Too many users
-95	Socket operation on non-socket
-96	Destination address required
-97	Message too long
-98	Protocol wrong type for socket
-99	Option not supported by protocol
-120	Protocol not supported
-121	Socket type not supported
-122	Operation not supported on transport endpoint
-123	Protocol family not supported
-124	Address family not supported by protocol family
-125	Address already in use
-126	Cannot assign requested address
-127	Network is down
-128	Network is unreachable
-129	Network dropped connection because of reset
-130	Software caused connection abort
-131	Connection reset by peer
-132	No buffer space available
-133	Transport endpoint is already connected
-134	Transport endpoint is not connected
+94	Protocol not support
+95	Option not support by protocol
+96	Socket operation on non-socket
+97	Destination address required
+98	Message too long
+99	Protocal wrong type for socket
+120	Socket type not supported
+121	Operation not supported on socket
+122	Protocol family not supported
+123	Address family not supported by protocol family
+124	Address already in use
+125	Cannot assign requested address
+126	Network is down
+127	Network is unreachable
+128	Network dropped connection because of reset
+129	Software caused connection abort
+130	Connection reset by peer
+131	No buffer space available
+132	Socket is already connected
+133	Socket is not connected
+134	Cannot send after socket shutdown
 135	Structure needs cleaning
 137	Not a name file
 138	Not available
@@ -115,12 +108,11 @@
 140	Remote I/O error
 141	Reserved for future use
 142
-143	Cannot send after socket shutdown
-144	Too many references: cannot splice
-145	Connection timed out
-146	Connection refused
-147	Host is down
-148	No route to host
-149	Operation already in progress
-150	Operation now in progress
-151	Stale NFS file handle
+143	Too many references: cannot splice
+144	Connection timed out
+145	Connection refused
+146	Host is down
+147	No route to host
+148	Operation already in progress
+149	Operation now in progress
+150	Stale NFS file handle

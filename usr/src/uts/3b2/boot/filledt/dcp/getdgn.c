@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/getdgn.c	1.3"
+#ident	"@(#)boot:boot/filledt/dcp/getdgn.c	1.2"
 
 /*	routine to  download standard and auxiliary files for diagnostics */
 
@@ -17,12 +17,12 @@
 #include <sys/diagnostic.h>
 #include <sys/inode.h>
 #include <sys/lboot.h>
-#include <sys/inline.h>
 
 extern void dgnerror(), sysreset();
 
 extern struct edt edt[];        /* equipped device table structure */
 extern char option[];		/* option (device) name for diag req */
+extern char *strcpy(), *strcat();
 
 /*    File Name variables    */
 
@@ -38,8 +38,7 @@ int i;		/* storage for return value from loadprog */
 
 /* construct path name for auxiliary diagnostic file */
 
-strcpy(Dirname,"dgn/X.");
-strcat(Dirname,filename);
+(void) strcat(strcpy(Dirname,"dgn/X."),filename);
 
 /* find the inode for the auxiliary diagnostic file */
 
@@ -78,8 +77,7 @@ struct phtab *phptr;	/* pointer to phase table */
 unsigned char i;
 long fileaddr;		/* address for data download */
 
-strcpy(Dirname,"dgn/X.");
-strcat(Dirname,filename);
+(void) strcat(strcpy(Dirname,"dgn/X."),filename);
 
 if ( findfile(Dirname) == NOTFOUND)
 	{
@@ -162,8 +160,7 @@ ld_sbd()
 { 
 /* construct path name for diagnostic file in dgn directory */
 
-strcpy(Dirname,"dgn/");
-strcat(Dirname,filename);
+(void) strcat(strcpy(Dirname,"dgn/"),filename);
 
 /* find the inode for the diagnostic file */
 

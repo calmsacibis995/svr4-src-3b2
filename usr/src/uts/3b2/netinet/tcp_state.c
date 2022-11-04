@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_state.c	1.9"
+#ident	"@(#)netinet:netinet/tcp_state.c	1.5"
+
+/*
+ * System V STREAMS TCP - Release 2.0
+ * 
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved.
+ * 
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code.
+ * 
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates.
+ * 
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies.
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -28,25 +46,6 @@
  *  	          All rights reserved.
  */
 
-/*
- * System V STREAMS TCP - Release 3.0
- * 
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved.
- * 
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code.
- * 
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates.
- * 
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies.
- */
-
 #define STRNET
 
 #ifdef INET
@@ -55,6 +54,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+
 #include <sys/stream.h>
 #include <sys/strlog.h>
 #include <sys/log.h>
@@ -89,9 +89,7 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
 #ifdef SYSV
-#ifdef SYSV
 #include <sys/cmn_err.h>
-#endif
 #endif SYSV
 
 #include <netinet/ip_str.h>
@@ -148,7 +146,7 @@ static char     ti_statetbl[TE_NOEVENTS + 2][TS_NOSTATES] = {
 		ti_statetbl[X][Y] )
 #endif				/* OSDEBUG */
 
-#define BADSTATE		nr	/* unreachable state */
+#define BADSTATE		127	/* unreachable state */
 
 /*
  * Mapping of TLI T_primitive types to state machine events
@@ -181,7 +179,6 @@ extern int      tcpalldebug;
 extern struct inpcb *in_pcballoc();
 extern struct tcpcb *tcp_newtcpcb();
 
-
 mblk_t         *reallocb();
 
 #define CHECKSIZE(bp,size) if (((bp) = reallocb((bp), (size),0)) == NULL) {\
@@ -205,11 +202,10 @@ tcp_state(q, bp)
 	queue_t        *newq;
 	mblk_t         *head;
 	short           ostate;	/* used for tracing */
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	int             otype;
 	register int    s;
 	short           tstate;
-	extern		int tcpopen();
 
 	tp = intotcpcb(inp);
 	ostate = tp->t_state;
@@ -241,7 +237,7 @@ tcp_state(q, bp)
 					  (struct tcpiphdr *) 0, T_DATA_REQ);
 		} else {
 			CHECKSIZE(bp, sizeof(struct T_error_ack));
-			bp->b_datap->db_type = M_PCPROTO;
+			bp->b_datap->db_type = M_PROTO;
 			t_prim = (union T_primitives *) bp->b_rptr;
 			bp->b_wptr = bp->b_rptr + sizeof(struct T_error_ack);
 			t_prim->type = T_ERROR_ACK;
@@ -271,12 +267,11 @@ tcp_state(q, bp)
 		t_prim->info_ack.ETSDU_size = 1;
 		t_prim->info_ack.CDATA_size = -2;	/* ==> not supported */
 		t_prim->info_ack.DDATA_size = -2;
-		t_prim->info_ack.ADDR_size = sizeof(struct sockaddr_in);
+		t_prim->info_ack.ADDR_size = sizeof(struct taddr_in);
 		t_prim->info_ack.OPT_size = -1;
 		t_prim->info_ack.TIDU_size = 16 * 1024;
 		t_prim->info_ack.SERV_type = T_COTS_ORD;
 		t_prim->info_ack.CURRENT_state = inp->inp_tstate;
-		bp->b_datap->db_type = M_PCPROTO;	/* make sure */
 		qreply(q, bp);
 		break;
 
@@ -289,7 +284,8 @@ tcp_state(q, bp)
 		if (t_prim->bind_req.ADDR_length == 0) {
 			error = in_pcbbind(inp, NULL);
 		} else {
-			if (!in_chkaddrlen(t_prim->bind_req.ADDR_length)) {
+			if (t_prim->bind_req.ADDR_length
+			    != sizeof(struct taddr_in)) {
 				T_errorack(q, bp, TBADADDR, 0);
 				break;
 			}
@@ -302,11 +298,6 @@ tcp_state(q, bp)
 			error = 0;
 			break;
 		}
-		else if (error == EINVAL) {
-			T_errorack(q, bp, TBADADDR, 0);
-			error = 0;
-			break;
-		}
 		else if (error)
 			break;
 		inp->inp_tstate = TS_IDLE;
@@ -316,23 +307,22 @@ tcp_state(q, bp)
 			inp->inp_protoopt |= SO_ACCEPTCONN;
 		}
 		if ((bp = reallocb(bp, sizeof(struct T_bind_ack)
-				   + sizeof(struct sockaddr_in), 1))
+				   + sizeof(struct taddr_in), 1))
 		    == NULL) {
 			return;
 		}
 		t_prim = (union T_primitives *) bp->b_rptr;
 		t_prim->bind_ack.PRIM_type = T_BIND_ACK;
-		t_prim->bind_ack.ADDR_length = sizeof(struct sockaddr_in);
+		t_prim->bind_ack.ADDR_length = sizeof(struct taddr_in);
 		t_prim->bind_ack.ADDR_offset = sizeof(struct T_bind_req);
-		sin = (struct sockaddr_in *)
+		sin = (struct taddr_in *)
 			(bp->b_rptr + sizeof(struct T_bind_ack));
 		bp->b_wptr = (unsigned char *)
-			(((caddr_t) sin) + sizeof(struct sockaddr_in));
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+			(((caddr_t) sin) + sizeof(struct taddr_in));
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_addr = inp->inp_laddr;
 		sin->sin_port = inp->inp_lport;
-		bp->b_datap->db_type = M_PCPROTO;
 		qreply(q, bp);
 		break;
 
@@ -372,15 +362,9 @@ tcp_state(q, bp)
 			break;
 		}
 		bp->b_rptr += t_prim->conn_req.DEST_offset;
-		error = in_pcbconnect(inp, bp);
+		if (error = in_pcbconnect(inp, bp))
+			break;
 		bp->b_rptr -= t_prim->conn_req.DEST_offset;
-		if (error == EINVAL) {
-			T_errorack(q, bp, TBADADDR, 0);
-			error = 0;
-			break;
-		}
-		else if (error)
-			break;
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			in_pcbdisconnect(inp);
@@ -410,19 +394,9 @@ tcp_state(q, bp)
 			T_errorack(q, bp, TOUTSTATE, 0);
 			break;
 		}
-		/*
-		 * Don't do this accept if it's not a TCP queue.
-		 */
-
-		newq = t_prim->conn_res.QUEUE_ptr;
-		if (newq->q_qinfo->qi_qopen != tcpopen) {
-			T_errorack(q, bp, TBADF, 0);
-			break;
-		}
-
 		inp->inp_tstate =
 			NEXTSTATE(prim_to_event[t_prim->type], inp->inp_tstate);
-
+		newq = t_prim->conn_res.QUEUE_ptr;
 		if (newq != RD(q)) {
 			newinp = (struct inpcb *) newq->q_ptr;
 			ASSERT(newinp);
@@ -489,8 +463,6 @@ tcp_state(q, bp)
 			T_errorack(q, bp, TOUTSTATE, 0);
 			break;
 		}
-		if (bp)
-			freemsg(bp);
 		tcp_disconnect(tp);
 		break;
 
@@ -572,19 +544,15 @@ tcp_state(q, bp)
 		tp = intotcpcb(inp);
 		head = bp;
 		bp = bp->b_cont;
-		if (bp == NULL) {
-			freeb(head);
+		freeb(head);
+		if (bp == NULL)
 			break;
-		}
 		s = splstr();
 		tp->t_qsize += msgdsize(bp);
-		if (((struct T_exdata_req *)head->b_rptr)->MORE_flag == 0) {
-			tp->snd_up = tp->snd_una + tp->t_qsize;
-			tp->t_force = 1;
-		}
+		tp->snd_up = tp->snd_una + tp->t_qsize;
+		tp->t_force = 1;
 		putq(q, bp);
 		splx(s);
-		freeb(head);
 		break;
 
 	default:
@@ -844,39 +812,42 @@ inpisconnected(inp)
 	register struct inpcb *head;
 	mblk_t         *bp;
 	struct T_conn_ind *conn_ind;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	int             cnt;
 
 	STRLOG(TCPM_ID, 1, 5, SL_TRACE, "inpisconn inp %x tp %x head %x",
 	       inp, tp, htp);
 
+	cnt = MAX((sizeof(struct T_conn_ind) + sizeof(struct taddr_in)),
+		  (sizeof(struct T_conn_con) + sizeof(struct taddr_in) +
+		   4));		/* sizeof (MSS option) == 4 */
+
+	if ((bp = allocb(cnt, BPRI_HI)) == NULL) {
+		STRLOG(TCPM_ID, 1, 2, SL_TRACE, "inpisconn alloc fail inp %x", inp);
+		return;
+	}
+	bp->b_wptr += cnt;
+	bp->b_datap->db_type = M_PROTO;
 
 	if (htp) {
 
 		head = htp->t_inpcb;
-		cnt = sizeof(struct T_conn_ind) + sizeof(struct sockaddr_in);
-		if ((bp = allocb(cnt, BPRI_HI)) == NULL) {
-			STRLOG(TCPM_ID, 1, 2, SL_TRACE, "inpisconn alloc fail inp %x", inp);
-			return;
-		}
-		bp->b_wptr += cnt;
-		bp->b_datap->db_type = M_PROTO;
 		head->inp_tstate = NEXTSTATE(TE_CONN_IND, head->inp_tstate);
 		inp->inp_tstate = TS_DATA_XFER;
 
 		if (tpqremque(tp, 0) == 0)
 #ifdef SYSV
-			cmn_err(CE_PANIC, "inpisconnected: tpqremque failed");
+			cmn_err(CE_PANIC, "soisconnected");
 #else
-			panic( "inpisconnected: tpqremque failed");
-#endif
+			panic ("soisconnected");
+#endif SYSV
 		tpqinsque(htp, tp, 1);
 
 		conn_ind = (struct T_conn_ind *) bp->b_rptr;
-		sin = (struct sockaddr_in *) (bp->b_rptr +
+		sin = (struct taddr_in *) (bp->b_rptr +
 					      sizeof(struct T_conn_ind));
 		conn_ind->PRIM_type = T_CONN_IND;
-		conn_ind->SRC_length = sizeof(struct sockaddr_in);
+		conn_ind->SRC_length = sizeof(struct taddr_in);
 		conn_ind->SRC_offset = sizeof(struct T_conn_ind);
 		conn_ind->OPT_length = 0;
 		conn_ind->OPT_offset = 0;
@@ -887,21 +858,13 @@ inpisconnected(inp)
 		caddr_t         p;
 		int             mss;
 
-		/* sizeof (MSS option) == 4 */
-		cnt = sizeof(struct T_conn_con) + sizeof(struct sockaddr_in) + 4;
-		if ((bp = allocb(cnt, BPRI_HI)) == NULL) {
-			STRLOG(TCPM_ID, 1, 2, SL_TRACE, "inpisconn alloc fail inp %x", inp);
-			return;
-		}
-		bp->b_wptr += cnt;
-		bp->b_datap->db_type = M_PROTO;
 		inp->inp_tstate = NEXTSTATE(TE_CONN_CON, inp->inp_tstate);
 
 		conn_con = (struct T_conn_con *) bp->b_rptr;
-		sin = (struct sockaddr_in *) (bp->b_rptr +
+		sin = (struct taddr_in *) (bp->b_rptr +
 					      sizeof(struct T_conn_con) + 4);
 		conn_con->PRIM_type = T_CONN_CON;
-		conn_con->RES_length = sizeof(struct sockaddr_in);
+		conn_con->RES_length = sizeof(struct taddr_in);
 		conn_con->RES_offset = sizeof(struct T_conn_con) + 4;
 		conn_con->OPT_length = 4;
 		conn_con->OPT_offset = sizeof(struct T_conn_con);
@@ -944,14 +907,15 @@ inpordrelind(inp)
 
 	STRLOG(TCPM_ID, 1, 5, SL_TRACE, "inpordrel inp %x", inp);
 
+	if ((bp = allocb(sizeof(struct T_ordrel_ind), BPRI_HI)) == NULL)
+		return 0;
+
 	if (NEXTSTATE(TE_ORDREL_IND, inp->inp_tstate) == BADSTATE) {
 		STRLOG(TCPM_ID, 1, 4, SL_TRACE,
 		       "inpordrel inp %x, bad state %d",
 		       inp, inp->inp_tstate);
 		return 1;
 	}
-	if ((bp = allocb(sizeof(struct T_ordrel_ind), BPRI_HI)) == NULL)
-		return 0;
 	inp->inp_tstate = NEXTSTATE(TE_ORDREL_IND, inp->inp_tstate);
 	bp->b_datap->db_type = M_PROTO;
 	ind = (struct T_ordrel_ind *) bp->b_rptr;
@@ -1023,7 +987,7 @@ tcp_uderr(bp)
 mblk_t *bp;
 {
 	struct N_uderror_ind *uderr;
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 
 	uderr = (struct N_uderror_ind *) bp->b_rptr;
 	if (uderr->ERROR_type == ENOSR)

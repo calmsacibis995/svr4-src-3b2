@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/rtld.h	1.6"
+#ident	"@(#)rtld:common/rtld.h	1.4"
 
 /* common header for run-time linker */
 
@@ -88,6 +88,7 @@ struct rel_copy	{
 
 /* debugger information version*/
 #define LD_DEBUG_VERSION 1
+
 
 #ifdef DEBUG
 #define MAXLEVEL	7	/* maximum debugging level */

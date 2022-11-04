@@ -6,11 +6,10 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:devtype.c	1.3.1.1"
+#ident	"@(#)libpkg:devtype.c	1.3"
 #include <stdio.h>
 #include <string.h>
 #include <pkgdev.h>
-#include <sys/stat.h>
 
 extern char	*devattr();
 extern void	logerr(),
@@ -22,21 +21,16 @@ devtype(alias, devp)
 char	*alias;
 struct pkgdev *devp;
 {
-	char *name;
-	struct stat statbuf;
 	devp->mntflg = 0;
 	devp->name = alias;
-	devp->dirname = devp->pathname = devp->mount = NULL;
+	devp->norewind = devp->dirname = devp->mount = NULL;
 	devp->fstyp = devp->cdevice = devp->bdevice = NULL;
 	devp->rdonly = 0;
-	devp->capacity = 0;
 
-	/* see if alias represents an existing file */
-	if(alias[0] == '/') {
-		if(!isdir(alias)) {
-			devp->dirname = devp->name;
-			return(0);
-		}
+	/* see if alias represents an existing directory */
+	if((alias[0] == '/') && !isdir(alias)) {
+		devp->dirname = devp->name;
+		return(0); /* directory */
 	}
 
 	/* see if alias represents a mountable device (e.g., a floppy) */
@@ -50,40 +44,43 @@ struct pkgdev *devp;
 			return(-1);
 		}
 		devp->dirname = devp->mount;
+		return(0);
 	} else if(devp->mount) {
 		free(devp->mount);
 		devp->mount = NULL;
 	}
 
 	devp->cdevice = devattr(alias, "cdevice");
-	if(devp->cdevice && devp->cdevice[0])  {
-		/* check for capacity */
-		if(name = devattr(alias, "capacity")) {
-			if(name[0])
-				devp->capacity = atol(name);
-			free(name);
+	if(!devp->cdevice || !devp->cdevice[0]) {
+		if(devp->cdevice) {
+			free(devp->cdevice);
+			devp->cdevice = NULL;
 		}
-		/* mountable devices will always have associated raw device */
-		return(0);
+		/*
+		 * if it is not a raw device, it must be a directory
+		 */
+		devp->dirname = devattr(alias, "pathname");
+		if(!devp->dirname || !devp->dirname[0] || 
+		    isdir(devp->dirname)) {
+			if(devp->dirname) {
+				free(devp->dirname);
+				devp->dirname = NULL;
+			}
+			return(-1);
+		}
+		return(0); /* directory */
 	}
-	if(devp->cdevice) {
-		free(devp->cdevice);
-		devp->cdevice = NULL;
-	}
-	/*
-	 * if it is not a raw device, it must be a directory or a regular file
+
+	/* 
+	 * device is not a directory and is not mountable
+	 * so it must be able to support a datastream
 	 */
-	name = devattr(alias, "pathname");
-	if(!name || !name[0]) {
-		/* Assume a regular file */
-		if(name)
-			free(name);
-		devp->pathname = alias;
-		return 0;
+	if((devp->norewind=devattr(alias,"norewind")) && devp->norewind[0]){
+		devp->dirname = NULL;
+		return(0); /* tempdir */
+	} else if(devp->norewind) {
+		free(devp->norewind);
+		devp->norewind = NULL;
 	}
-	if(!isdir(name))
-		devp->dirname = name;
-	else
-		devp->pathname = name;
-	return(0);
+	return(-1);
 }

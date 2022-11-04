@@ -8,7 +8,7 @@
 #ifndef _SYS_FS_RF_ACCT_H
 #define _SYS_FS_RF_ACCT_H
 
-#ident	"@(#)head.sys:sys/fs/rf_acct.h	1.8"
+#ident	"@(#)head.sys:sys/fs/rf_acct.h	1.6"
 
 #include "sys/types.h"
 #include "sys/sysinfo.h"
@@ -37,13 +37,13 @@ typedef struct rfc_info {
 
 typedef struct rf_srv_info {
 			/* ELEMENT FOR sar -Du */
-	time_t	rfsi_serve;	/* ticks in rfs server since boot */
+	time_t	rfsi_serve;		/* ticks in serve() since boot */
 			/* ELEMENTS FOR sar -S */
 	ulong	rfsi_nservers;	/* sum of all servers since boot */
 	ulong	rfsi_srv_que;	/* sum of server queue length since boot */
-	ulong	rfsi_srv_occ;	/* seconds server queue found occupied */
+	ulong	rfsi_srv_occ;	/* ticks server queue found occupied */
 	ulong	rfsi_rcv_que;	/* sum of server work list length since boot */
-	ulong	rfsi_rcv_occ;	/* seconds server work list found occupied */
+	ulong	rfsi_rcv_occ;	/* ticks server work list found occupied */
 } rf_srv_info_t;
 
 #if defined(_KERNEL)
@@ -53,13 +53,11 @@ extern fsinfo_t		rfcl_fsinfo;
 extern fsinfo_t		rfsr_fsinfo;
 extern rf_srv_info_t	rf_srv_info;
 
-extern time_t		*rfsi_servep;	/* SVID compliance hack for sar(1) */
-
-extern	int minserve;			/* tunable: server low water mark */
-extern	int maxserve;			/* tunable: server high water mark */
-extern	int rf_nservers;		/* total servers in system */
-extern	int n_idleserver;		/* idle servers in system */
-extern	int rf_n_sr_msgs;		/* rcvds in server work list */
+extern	int minserve;		/* RFS tunable: server low water mark */
+extern	int maxserve;		/* RFS tunable: server high water mark */
+extern	int rf_nservers;	/* total servers in system */
+extern	int n_idleserver;	/* idle servers in system */
+extern	int rf_n_sr_msgs;	/* receive descriptors in server work list */
 
 extern void rf_clock();
 

@@ -8,7 +8,7 @@
 #ifndef _SYS_RF_CIRMGR_H
 #define _SYS_RF_CIRMGR_H
 
-#ident	"@(#)head.sys:sys/rf_cirmgr.h	1.10"
+#ident	"@(#)head.sys:sys/rf_cirmgr.h	1.6"
 
 #define MAXTOKLEN sizeof(rf_token_t)       /* maximum token length in bytes */
 
@@ -45,7 +45,6 @@ struct gdp {
 	long		timeskew_sec;	/* time skew in sec */
 	rf_token_t	token;		/* circuit identification */
 	char		*idmap[2];	/* 0=uid=UID_DEV, 1=gid=GID_DEV */
-	ushort		timeout;
 	struct msgb	*hdr;		/* message header collected so far */
 	struct msgb	*idata;		/* request/response collected so far */
 	size_t		hlen;		/* header length yet to be collected */
@@ -54,10 +53,6 @@ struct gdp {
 	size_t		maxpsz;		/* max TIDU size of the provider */
 	int		ngroups_max;	/* max # suppl. groups per user */
 	size_t		datasz;		/* max data in RFS message */
-#ifdef DEBUG
-	ulong		outseq;
-	ulong		inseq;
-#endif
 };
 typedef struct gdp gdp_t;
 
@@ -70,7 +65,7 @@ typedef struct gdp gdp_t;
  * TO DO:  network-unique sysids
  */
 #define SDTOSYSID(sdp)	((gdp_t *)(sdp)->sd_queue->q_ptr)->sysid
-#define QPTOGP(qp)	((gdp_t *)((queue_t *)(qp))->q_ptr)
+#define QPTOGP(qp)	((gdp_t *)(qp)->q_ptr)
 extern int maxgdp;
 extern gdp_t *gdp;
 
@@ -99,7 +94,6 @@ extern int	gdp_get_circuit();
 extern void	gdp_put_circuit();
 extern int	gdp_init();
 extern void	gdp_discon();
-extern void	gdp_j_accuse();
 extern void	gdp_kill();
 
 #endif /* _KERNEL */

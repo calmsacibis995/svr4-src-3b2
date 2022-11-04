@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)klm:klm/klm.mk	1.4"
+#ident	"@(#)klm:klm/klm.mk	1.2"
 #
 #  		PROPRIETARY NOTICE (Combined)
 #  
@@ -34,7 +34,7 @@ MASTERD = ../master.d
 
 DASHG =
 DASHO = -O
-PFLAGS = $(DASHG) -D_KERNEL -DSYSV $(MORECPP)
+PFLAGS = $(DASHG) -D_KERNEL -DSYSV $(MORECPP) -DLOCKDEBUG
 CFLAGS = $(DASHO) $(PFLAGS)
 DEFLIST =
 FRC =
@@ -81,7 +81,7 @@ klm_kprot.o: klm_kprot.c \
 	$(INC)/rpc/auth_des.h \
 	$(INC)/rpc/svc.h \
 	$(INC)/rpc/svc_auth.h \
-	klm_prot.h \
+	$(INC)/rpcsvc/klm_prot.h \
 	$(FRC)
 
 klm_lkmgr.o: klm_lkmgr.c \
@@ -107,7 +107,7 @@ klm_lkmgr.o: klm_lkmgr.c \
 	$(INC)/rpc/auth.h \
 	$(INC)/rpc/clnt.h \
 	$(INC)/klm/lockmgr.h \
-	klm_prot.h \
+	$(INC)/rpcsvc/klm_prot.h \
 	$(INC)/net/if.h \
 	$(INC)/nfs/nfs.h \
 	$(INC)/nfs/nfs_clnt.h \

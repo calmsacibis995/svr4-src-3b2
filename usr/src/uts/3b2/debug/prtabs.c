@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)debug:debug/prtabs.c	1.26"
+#ident	"@(#)debug:debug/prtabs.c	1.21"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -31,7 +31,7 @@
 #include "vm/seg_vn.h"
 #include "vm/anon.h"
 
-char	prtabs_buf[300];
+char	prtabs_buf[200];
 
 char	*prproc_hdg =
 	" SLOT    ADDR    PID PPID STATUS   WCHAN  FLAGS              \tCMD\n\n";
@@ -89,59 +89,42 @@ char	*prproc_flgs[] = {
 			};
 int	prproc_flgs_sz = sizeof(prproc_flgs) / sizeof(char *);
  
-int
-procinval(paddr)
-	register proc_t *paddr;
-{
- 	register proc_t *p;
-
-        for (p = practive; ; p = p->p_next) {
-		if (p == NULL) {
-                        cmn_err(CE_CONT, "^%x is not a proc table address\n",
-                          paddr);
-                        return -1;
-		}
-                if (p == paddr)
-                        return 0;
-	}
-}
-
 printprocs()
 {
-	register proc_t	*pp;
+	register proc_t	**pp;
 	register int	lc;
-	int i;
 	register user_t	*up;
 	int		winaddr_save;
 	char		buf[20];
+	int		slot;
 
 	cmn_err(CE_CONT, "^%s", prproc_hdg);
 
-	for (i = 0; i < v.v_proc; i++) {
-		if ((pp = pid_entry(i)) == NULL)
+	for (slot = 0, pp = &nproc[0] ; pp < v.ve_proc ; slot++, pp++) {
+		if (*pp == NULL || (*pp)->p_stat == 0)
 			continue;
-		sprintf(prtabs_buf, " %3d   %.8x ", pp->p_slot, pp);
-		sprintf(buf, "%4d ", pp->p_pid);
+		sprintf(prtabs_buf, " %3d   %.8x ", slot, *pp);
+		sprintf(buf, "%4d ", (*pp)->p_pid);
 		strcat(prtabs_buf, buf);
-		sprintf(buf, "%4d ", pp->p_ppid);
+		sprintf(buf, "%4d ", (*pp)->p_ppid);
 		strcat(prtabs_buf, buf);
-		strcat(prtabs_buf, prproc_stat[pp->p_stat]);
+		strcat(prtabs_buf, prproc_stat[(*pp)->p_stat]);
 
-		sprintf(buf, "%.8x ", pp->p_wchan);
+		sprintf(buf, "%.8x ", (*pp)->p_wchan);
 		strcat(prtabs_buf, buf);
 
 		for (lc = 0  ;  lc < prproc_flgs_sz  ;  lc++) {
-			if (pp->p_flag & (1 << lc))
+			if ((*pp)->p_flag & (1 << lc))
 				strcat(prtabs_buf, prproc_flgs[lc]);
 		}
 
-		if (pp->p_stat == SZOMB  ||  pp->p_stat == SIDL) {
+		if ((*pp)->p_stat == SZOMB  ||  (*pp)->p_stat == SIDL) {
 			cmn_err(CE_CONT, "^%s\n", prtabs_buf);
 			continue;
 		}
 
-		if (pp->p_flag & SULOAD) {
-			up = (user_t *)KUSER(pp->p_segu);
+		if ((*pp)->p_flag & SULOAD) {
+			up = (user_t *)KUSER((*pp)->p_segu);
 			cmn_err(CE_CONT, "^%s\t%s\n", prtabs_buf, up->u_psargs);
 		} else
 			cmn_err(CE_CONT, "^%s\tSWAPPED\n", prtabs_buf);
@@ -345,7 +328,10 @@ register uint	adr;
 	sprintf(prtabs_buf, "pte at %#x: ", 
 		pt, *(int *)pt);
 	cmn_err(CE_CONT, "^%s", prtabs_buf);
-	cmn_err(CE_CONT, "^TAG %x ", pt->pgm.pg_tag);
+	if(pt->pgm.pg_lock)
+		cmn_err(CE_CONT, "^LK ");
+	if(pt->pgm.pg_ndref)
+		cmn_err(CE_CONT, "^NR ");
 	if(pt->pgm.pg_ref)
 		cmn_err(CE_CONT, "^R ");
 	if(pt->pgm.pg_w)
@@ -415,7 +401,7 @@ u_int pt;
 		/*
 		 * Must be a kernel page table.
 		 */
-		if ((pt >= (u_int)ksegmappt) && (pt < (u_int)eksegmappt)) {
+		if ((pt >= (u_int)ksegmappt) && (pt < (u_int)ksegupt)) {
 			secseg = (SCN1 << 14) |
 				((SEGNUM(kvsegmap) +
 				 (((pt - (u_int)ksegmappt) >> 9))) << 1);
@@ -440,7 +426,8 @@ u_int pt;
 			return;
 		}
 
-		ptd = (struct ptdat *)(pp->p_ptdats) + (((u_int)pt >> 9) & 3);
+		ptd = (pp->p_ptdats) + (((u_int)pt >> 9) & 3);
+		/* LINTED */
 		if (ptd->pt_addr == ((paddr_t)pt & ~255)) {
 			cmn_err(CE_CONT, "pte belongs to a free page table:  addr %x  pp %x\n",
 				ptd->pt_addr,
@@ -454,19 +441,20 @@ u_int pt;
 				((ptd->pt_secseg << 16) | (pagnum << PNUMSHFT)) );
 
 			dodmddelay();
-                        {
-                        register proc_t *p;
+			{
+			register proc_t	**pp;
+			int		slot;
 
-                        cmn_err(CE_CONT, "proc:");
-
-                        for (p = practive; p != NULL; p = p->p_next) {
-                                if (p->p_as != ptd->pt_as)
-                                        continue;
-                                cmn_err(CE_CONT, " %x", p);
-                        }
-                        cmn_err(CE_CONT, "\n");
-                        }
-
+			cmn_err(CE_CONT, "proc:");
+			slot = 0;
+			pp = &nproc[0] ;
+			for ( ; pp < v.ve_proc ; slot++, pp++) {
+				if (*pp == NULL || (*pp)->p_as != ptd->pt_as)
+					continue;
+				cmn_err(CE_CONT, " %x", *pp);
+			}
+			cmn_err(CE_CONT, "\n");
+			}
 		}
 	}
 	dodmddelay();
@@ -480,6 +468,7 @@ int arg;
 	extern proc_t *curproc;
 	proc_t  **argptr;
 	int 	argc;
+	int 	j, flag;
 
 	argc = argcount();	/* get num of args */
 	argptr = (proc_t **) &arg;		/* get ptr to first arg */
@@ -498,9 +487,25 @@ int arg;
 			argc = 1;
 		}
 
-		if (procinval(paddr))
-                        return;
-
+		/*
+			Validate the proc table address 
+		*/
+	
+		if ((proc_t **)paddr >= nproc && (proc_t **)paddr < v.ve_proc)
+			paddr = *((proc_t **)paddr);
+		else
+			if ((paddr != curproc) && (paddr != opaddr)) {
+				flag = 0;
+				for (j = 0; j < v.v_proc ; j++)
+					if (paddr == nproc[j]) {
+						++flag;
+						break;
+					}
+				if (flag == 0) {
+					cmn_err(CE_CONT, "^%x is not a nproc table address\n", paddr);
+					return;
+				}
+			}
 		opaddr = paddr;
 		if (paddr->p_as == (struct as *)NULL)
 			cmn_err(CE_CONT, "^process has no as\n");
@@ -725,6 +730,7 @@ int arg;
 	extern proc_t *curproc;
 	proc_t  **argptr;
 	int 	argc;
+	int 	j, flag;
 
 	argc = argcount();	/* get num of args */
 	argptr = (proc_t **) &arg;		/* get ptr to first arg */
@@ -741,9 +747,24 @@ int arg;
 			argc = 1;
 		}
 
-		if (procinval(paddr))
-			return;
-
+		/*
+			Validate the proc table address 
+		*/
+		if ((proc_t **)paddr >= nproc && (proc_t **)paddr < v.ve_proc)
+			paddr = *((proc_t **)paddr);
+		else
+			if ((paddr != curproc) && (paddr != opaddr)) {
+				flag = 0;
+				for (j = 0; j < v.v_proc ; j++)
+					if (paddr == nproc[j]) {
+						++flag;
+						break;
+					}
+				if (flag == 0) {
+					cmn_err(CE_CONT, "^%x is not a nproc table address\n", paddr);
+					return;
+				}
+			}
 		opaddr = paddr;
 		if (paddr->p_as == (struct as *)NULL)
 			cmn_err(CE_CONT, "^process has no as\n");
@@ -782,11 +803,14 @@ struct as *asp;
 
 ckall()
 {
- 	register proc_t *p;
+	register proc_t	**pp;
+	char		buf[20];
+	int		slot;
 
-        for (p = practive; p != NULL; p = p->p_next)
-		if (p->p_as != NULL)
-                        ckp(p);
+	for (slot=0, pp=&nproc[0] ; pp < v.ve_proc ; slot++, pp++) {
+		if (*pp != NULL && (*pp)->p_as != NULL)
+			ckp(*pp);
+	}
 }
 
 ckp(pp)

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kfree.c	1.4"
+#ident	"@(#)ktli:ktli/t_kfree.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kfree.c 1.1 88/12/12 SMI"
 #endif
@@ -35,8 +35,8 @@ static char sccsid[] = "@(#)t_kfree.c 1.1 88/12/12 SMI"
  *	Free the specified kernel tli data structure.
  *
  *	Returns:
- *		0 on success or
- *	        positive error code.
+ *		0 on success.
+ *	       -1 on failure and u.u_error
  */
 
 #include <sys/param.h>
@@ -56,21 +56,18 @@ static char sccsid[] = "@(#)t_kfree.c 1.1 88/12/12 SMI"
 /*ARGSUSED*/
 int
 t_kfree(tiptr, ptr, struct_type)
-	register TIUSER			*tiptr;
-	register char			*ptr;
-	register int			struct_type;
+register TIUSER *tiptr;
+register char *ptr;
+register int struct_type;
 {
 	union structptrs {
-		struct t_bind		*bind;
-		struct t_call		*call;
-		struct t_discon		*dis;
-		struct t_optmgmt	*opt;
-		struct t_kunitdata	*udata;
-		struct t_uderr		*uderr;
+		struct t_bind *bind;
+		struct t_call *call;
+		struct t_discon *dis;
+		struct t_optmgmt *opt;
+		struct t_kunitdata *udata;
+		struct t_uderr *uderr;
 	} p;
-	int				error;
-
-	error = 0;
 
 	/*
 	 * Free all the buffers associated with the appropriate
@@ -120,22 +117,26 @@ t_kfree(tiptr, ptr, struct_type)
 		p.udata = (struct t_kunitdata *)ptr;
 
 		if (p.udata->udata.udata_mp) {
-		KTLILOG(2, "t_kfree: freeing mblk_t %x, ",
-						p.udata->udata.udata_mp);
-		KTLILOG(2, "ref %d\n",
-				 p.udata->udata.udata_mp->b_datap->db_ref);
+#ifdef KTLIDEBUG
+printf("t_kfree: freeing mblk_t %x, ref %d\n", p.udata->udata.udata_mp, p.udata->udata.udata_mp->b_datap->db_ref);
+#endif
 			freemsg(p.udata->udata.udata_mp);
 		}
-		if (p.udata->opt.buf != NULL)
+		if (p.udata->opt.buf != NULL) {
+#ifdef KTLIDEBUG
+printf("t_kfree: freeing options\n");
+#endif
 			kmem_free(p.udata->opt.buf, (u_int)p.udata->opt.maxlen);
+		}
 		if (p.udata->addr.buf != NULL) {
-		KTLILOG(2, "t_kfree: freeing address %x, ",
-						p.udata->addr.buf);
-		KTLILOG(2, "len %d\n",
-						p.udata->addr.maxlen);
+#ifdef KTLIDEBUG
+printf("t_kfree: freeing address %x, %d\n", p.udata->addr.buf, p.udata->addr.maxlen);
+#endif
 			kmem_free(p.udata->addr.buf, (u_int)p.udata->addr.maxlen);
 		}
-		KTLILOG(2, "t_kfree: freeing t_kunitdata\n", 0);
+#ifdef KTLIDEBUG
+printf("t_kfree: freeing t_kunitdata\n");
+#endif
 		kmem_free(ptr, (u_int)sizeof(struct t_kunitdata));
 		break;
 
@@ -153,11 +154,11 @@ t_kfree(tiptr, ptr, struct_type)
 		break;
 
 	default:
-		error = EINVAL;
-		break;
+		u.u_error = EINVAL;
+		return(-1);
 	}
 	
-	return error;
+	return(0);
 }
 /******************************************************************************/
 

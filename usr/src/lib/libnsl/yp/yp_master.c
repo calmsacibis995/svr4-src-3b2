@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libyp:yp_master.c	1.3"
+#ident	"@(#)libyp:yp_master.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -102,7 +102,7 @@ yp_master (domain, map, master)
 }
 
 /*
- * This talks v2 to ypserv
+ * This talks v3 to ypserv
  */
 static int
 domaster (domain, map, pdomb, timeout, master)
@@ -118,7 +118,7 @@ domaster (domain, map, pdomb, timeout, master)
 
 	req.domain = domain;
 	req.map = map;
-	memset((char *) &resp, 0, sizeof(struct ypresp_master));
+	resp.master = NULL;
 
 	/*
 	 * Do the get_master request.  If the rpc call failed, return with

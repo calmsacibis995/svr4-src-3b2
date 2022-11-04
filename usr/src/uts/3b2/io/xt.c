@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/xt.c	1.15"
+#ident	"@(#)kernel:io/xt.c	1.12.3.1"
 
 /*
  * XT --   STREAMS Driver for AT&T windowing terminals (5620, 615, 620, 630)
@@ -3218,16 +3218,6 @@ mblk_t *bp;
 	/* Find how many bytes are available to send downstream.
 	*/
 	size = msgdsize(bp);
-
-    /* For some reason, emacs sends down type M_DATA message blocks
-     * with msgdsize of 0. Since size is 0 there is nothing to send,
-     * so just free the mesage and return.
-     */
-        if(size == 0) {
-                freemsg(bp);
-                return(1);
-        }
-
 
 	/*
 	** PATH 1: This is network xt and we are able to send the

@@ -5,12 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/uucp.h	1.5"
+#ident	"@(#)libnsl:dial/uucp.h	1.2"
 
 #ifndef _UUCP_H
 #define _UUCP_H
 
-#include <unistd.h>
+#include <osfcn.h>
 #include <stdlib.h>
 #include <string.h>
 #include "parms.h"

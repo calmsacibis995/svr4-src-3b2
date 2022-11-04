@@ -8,7 +8,7 @@
 #ifndef _FS_FIFONODE_H
 #define _FS_FIFONODE_H
 
-#ident	"@(#)head.sys:sys/fs/fifonode.h	1.15"
+#ident	"@(#)head.sys:sys/fs/fifonode.h	1.13"
 
 /*
  * Each FIFOFS object is identified by a struct fifonode/vnode pair.
@@ -20,7 +20,6 @@ struct fifonode {
 	ushort		fn_ino;		/* node id for pipes */
 	short		fn_wcnt;	/* number of writers */
 	short		fn_rcnt;	/* number of readers */
-	short		fn_open;	/* open count of node*/
 	struct vnode	*fn_unique;	/* new vnode created by CONNLD */
 	ushort		fn_flag;	/* flags as defined below */
 	time_t		fn_atime;	/* creation times for pipe */
@@ -41,9 +40,6 @@ struct fifonode {
 #define FIFOREAD       040	/* process is blocked waiting to read */
 #define FIFOPASS      0100	/* CONNLD passed a new vnode in fn_unique */
 
-/* #ifdef MERGE */
-extern int fifo_rdchk();
-/* #endif MERGE */
 
 /*
  * Macros to convert a vnode to a fifnode, and vice versa.

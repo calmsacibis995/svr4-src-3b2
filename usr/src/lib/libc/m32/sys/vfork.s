@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 # OS library -- vfork
-.ident	"@(#)libc-m32:sys/vfork.s	1.2"
+.ident	"@(#)libc-m32:sys/vfork.s	1.1"
 
 	.file	"vfork.s"
 	.globl	_cerror
@@ -25,17 +19,7 @@
 
 	.set	sys_vfork,119
 	.text
-_m4_ifdef_(`ABI',`
-	.globl	vfork
-_fgdef_(vfork):
-',`
-_m4_ifdef_(`DSHLIB',`
-	.globl	vfork
-_fgdef_(vfork):
-',`
 _fwdef_(`vfork'):
-')
-')
 	movw	-8(%sp),%r2		# remember old %pc in %r2
 	movaw	_sref_(.L0),-8(%sp)		# arrange for RET to return here
 	RET

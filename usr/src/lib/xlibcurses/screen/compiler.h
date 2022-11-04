@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/compiler.h	1.5"
+#ident	"@(#)curses:screen/compiler.h	1.3"
 /*********************************************************************
 *                         COPYRIGHT NOTICE                           *
 **********************************************************************
@@ -56,7 +56,6 @@ Initial revision
  */
 
 #include <stdio.h>
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
 
 #ifndef TRUE
 #define TRUE	1
@@ -151,7 +150,7 @@ struct name_table_entry	*find_entry();	/* look up entry in hash table */
 int	next_char();
 int	trans_string();
 
-#ifdef SIGSTOP	/* SVR4.0 and beyond */
+#ifdef __STDC__
 #define SRCDIR "/usr/share/lib/terminfo"
 #else
 #define SRCDIR "/usr/lib/terminfo"

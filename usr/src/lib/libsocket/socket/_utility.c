@@ -5,8 +5,33 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:_utility.c	1.17"
+#ident	"@(#)libsocket:_utility.c	1.12"
 
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 		PROPRIETARY NOTICE (Combined)
+ * 
+ * This source code is unpublished proprietary information
+ * constituting, or derived under license from AT&T's UNIX(r) System V.
+ * In addition, portions of such source code were derived from Berkeley
+ * 4.3 BSD under license from the Regents of the University of
+ * California.
+ * 
+ * 
+ * 
+ * 		Copyright Notice 
+ * 
+ * Notice of copyright on this source code product does not indicate 
+ * publication.
+ * 
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+ * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ * 	          All rights reserved.
+ *  
+ */
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mkdev.h>
@@ -16,18 +41,15 @@
 #include <sys/stream.h>
 #include <sys/sockmod.h>
 #include <sys/socketvar.h>
-#include <sys/sockio.h>
 #include <sys/socket.h>
 #include <sys/tiuser.h>
 #include <sys/tihdr.h>
 #include <sys/uio.h>
 #include <sys/signal.h>
 #include <sys/stat.h>
-#include <netinet/in.h>
-#include <sys/un.h>
 #include <poll.h>
 #include <fcntl.h>
-#include <syslog.h>
+#include <netinet/in.h>
 
 extern int		 errno;
 extern void		*calloc();
@@ -44,39 +66,32 @@ static int		 recvmsg();
 static int		 msgpeek();
 static int		 _s_alloc_bufs();
 
-/* Global, used to enable debugging.
- */
-int			_s_sockdebug;
-
 /* The following two string arrays map a number as specified
  * by a user of sockets, to the string as would be returned
  * by a call to getnetconfig().
  *
  * They are used by _s_match();
- *
- * proto_sw contains protocol entries for which there is a corresponding
- * /dev device. All others would presumably use raw IP and download the
- * desired protocol.
  */
 static char *proto_sw[] = {
-	"",
+	NULL,
 	"icmp",		/* 1 = ICMP */
-	"",
-	"",
-	"",
-	"",
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 	"tcp",		/* 6 = TCP */
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 	"udp",		/* 17 = UDP */
+	NULL
 };
 
 static char *family_sw[] = {
@@ -103,6 +118,7 @@ static char *family_sw[] = {
 	"x25",		/* 20 = AF_X25 */
 	"osinet",	/* 21 = AF_OSINET */
 	"gosip",	/* 22 = AF_GOSIP */
+	NULL
 };
 
 /*
@@ -113,6 +129,9 @@ _s_checkfd(s)
 	register int		s;
 {
 	struct _si_user		*siptr;
+#ifdef DEBUG
+fprintf(stdout, "_s_checkfd: s %d: Entered\n", s);
+#endif
 
 	if ((siptr = find_silink(s)) != NULL)
 		return siptr;
@@ -120,8 +139,9 @@ _s_checkfd(s)
 	/* maybe the descripter is valid, but we did an exec()
 	 * and lost the information. Try to re-constitute the info.
 	 */
-	SOCKDEBUG((struct _si_user *)NULL,
-		"_s_checkfd: s %d: Not found, trying to reconstitute\n", s);
+#ifdef DEBUG
+fprintf(stdout, "_s_checkfd: s %d: Not found, trying to reconstitute\n", s);
+#endif
 	if (_s_getudata(s, &siptr) < 0)
 		return NULL;
 	return	siptr;
@@ -138,7 +158,9 @@ _s_open(device, protocol)
 	int	 		retval;
 	struct   _si_user	*siptr;
 
-	SOCKDEBUG((struct _si_user *)NULL, "_s_open: %s\n", device);
+#ifdef DEBUG
+fprintf(stdout, "_s_open: %s\n", device);
+#endif
 	if ((s = open(device, O_RDWR)) < 0)
 		return NULL;
 
@@ -171,10 +193,8 @@ _s_open(device, protocol)
 	if (protocol) {
 		/* need to send down the protocol number.
 		 */
-		if (_setsockopt(siptr, SOL_SOCKET, SO_PROTOTYPE, 
-				(caddr_t)&protocol, sizeof(protocol)) < 0)
-			(void)syslog(LOG_ERR,
-				"_s_open: setsockopt: SO_PROTOTYPE failed");
+		(void)_setsockopt(siptr, SOL_SOCKET, SO_PROTOTYPE, 
+					(caddr_t)&protocol, sizeof(protocol));
 	}
 	siptr->family = -1;	/* No family (yet) */
 	return siptr;
@@ -192,24 +212,14 @@ _s_match(family, type, proto, nethandle)
 {
 	register struct netconfig	*net;
 	register struct netconfig	*maybe;
-	register char			*oproto;
-
-	if (family < 0 || family >= sizeof(family_sw)/sizeof(char *) ||
-				proto < 0 || proto >= IPPROTO_MAX)  {
-		errno = EPROTONOSUPPORT;
-		return NULL;
-	}
-	if (proto) {
-		if (proto >= sizeof(proto_sw)/sizeof(char *))
-			oproto = "";
-		else	oproto = proto_sw[proto];
-	}
-
-	/* Loop through each entry in netconfig
+	
+	/* loop through each entry in netconfig
 	 * until one matches or we reach the end.
 	 */
 	if ((*nethandle = setnetconfig()) == NULL) {
-		(void)syslog(LOG_ERR, "_s_match: setnetconfig failed");
+#ifdef DEBUG
+		nc_perror("_s_match: setnetconfig failed");
+#endif
 		return NULL;
 	}
 
@@ -218,9 +228,12 @@ _s_match(family, type, proto, nethandle)
 		if (net->nc_semantics == NC_TPI_COTS_ORD)
 			net->nc_semantics = NC_TPI_COTS;
 		if (proto) {
+#ifdef DEBUG
+fprintf(stdout, "_s_match: nc_protofmly %s, family %d; nc_semantics %d, type %d; nc_proto %s, proto %d\n", net->nc_protofmly, family, net->nc_semantics, type, net->nc_proto, proto);
+#endif
 			if (strcmp(net->nc_protofmly, family_sw[family]) == 0 &&
 				    net->nc_semantics == type &&
-				    strcmp(net->nc_proto, oproto) == 0)
+				    strcmp(net->nc_proto, proto_sw[proto]) == 0)
 				break;
 
 			if (strcmp(net->nc_protofmly, family_sw[family]) == 0 &&
@@ -233,6 +246,9 @@ _s_match(family, type, proto, nethandle)
 			continue;
 		}
 		else    {
+#ifdef DEBUG
+fprintf(stdout, "_s_match: nc_protofmly %s, family %d; nc_semantics %d, type %d\n", net->nc_protofmly, family, net->nc_semantics, type);
+#endif
 			if (strcmp(net->nc_protofmly, family_sw[family]) == 0 &&
 					net->nc_semantics == type) {
 				break;
@@ -260,7 +276,6 @@ register struct _si_user		**siptr;
 	struct si_udata			udata;
 	register struct _si_user	*nsiptr;
 	int				retlen;
-	int				pid;
 
 	sigsave = sigset(SIGPOLL, SIG_HOLD);
 	if (!_s_do_ioctl(s, (caddr_t)&udata, sizeof(struct si_udata),
@@ -287,26 +302,13 @@ register struct _si_user		**siptr;
 		if (_s_alloc_bufs(nsiptr, &udata) < 0)
 			return -1;
 		nsiptr->udata = udata;		/* structure copy */
-		nsiptr->family = -1;
-
 		*siptr = nsiptr;
-
-		/* Set up the (potentially new) process
-		 * to receive SIGPIPE properly from
-		 * sockmod.
-		 */
-		pid = getpid();
-		if (_ioctl(s, SIOCSPGRP, &pid) < 0) {
-			(void)syslog(LOG_ERR, 
-				"ioctl: SIOCSPGRP failed %d\n", errno);
-			errno = 0;
-		}
 		return 0;
 	}
 	else	(*siptr)->udata = udata;
-
-	SOCKDEBUG(*siptr, "_s_getudata: siptr: %x\n", *siptr);
-
+#ifdef DEBUG
+fprintf(stdout, "_s_getudata: siptr %x, servtype %d, addrsize %d, tidusize %d, state %x, options %x\n", *siptr, (*siptr)->udata.servtype, (*siptr)->udata.addrsize, (*siptr)->udata.tidusize, (*siptr)->udata.so_state, (*siptr)->udata.so_options);
+#endif
 	return 0;
 }
 
@@ -315,7 +317,7 @@ register struct _si_user		**siptr;
  * Only UNIX domain supported.
  *
  * Returns:
- *	>0	Number of bytes read on success
+ *	0	On success
  *     -1	If an error occurred.
  */
 static int
@@ -340,9 +342,15 @@ recvaccrights(siptr, msg)
 
 	/* First get the pipe channel.
 	 */
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: getting pipe channel\n");
+#endif
 	if (ioctl(siptr->fd, I_RECVFD, &pipe) < 0)
 		return -1;
 
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: pipe channel fd %d\n", pipe.fd);
+#endif
 	/* To ensure the following operations are atomic
 	 * as far as the user is concerned, we reset
 	 * O_NDELAY if it is on.
@@ -359,8 +367,9 @@ recvaccrights(siptr, msg)
 	/* We do the same whether the flags say MSG_PEEK or
 	 * not.
 	 */
-	SOCKDEBUG(siptr, "recvaccrights: getting access rights\n", 0);
-
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: getting access rights\n");
+#endif
 	/* Dispose of rights, copying them into the users
 	 * buffer if possible.
 	 */
@@ -372,10 +381,16 @@ recvaccrights(siptr, msg)
 		struct strrecvfd	stfd;
 
 		retval = 0;
-		if (ioctl(pipe.fd, I_RECVFD, &stfd) < 0)
+		if (ioctl(pipe.fd, I_RECVFD, &stfd) < 0) {
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: got errno %d\n", errno);
+#endif
 			break;
+		}
 		else	{
-			SOCKDEBUG(siptr, "recvaccrights: got fd %d\n", stfd.fd);
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: got fd %d\n", stfd.fd);
+#endif
 			if (i != nfd) {
 				fdarray[i] = stfd.fd;
 				msg->msg_accrightslen += sizeof(int);
@@ -394,6 +409,9 @@ recvaccrights(siptr, msg)
 		if (siptr->udata.servtype == T_CLTS) {
 			/* First get the source address.
 			 */
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: Getting source address\n");
+#endif
 			(void)memset((caddr_t)&addr, 0, sizeof(addr));
 			if (read(pipe.fd, (caddr_t)&addr, sizeof(addr))
 							 != sizeof(addr)) {
@@ -410,14 +428,26 @@ recvaccrights(siptr, msg)
 		}
 
 		for (i = 0; i < msg->msg_iovlen; i++) {
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: calling read\n");
+#endif
 			count = read(pipe.fd, msg->msg_iov[i].iov_base,
 				msg->msg_iov[i].iov_len);
-			SOCKDEBUG(siptr, "recvaccrights: got %d bytes\n",
-							count);
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: read returned %d bytes\n", count);
+#endif
+#ifdef DEBUG
+if (count < 0)
+fprintf(stdout, "recvaccrights: read errno %d\n", errno);
+#endif
 			if (count > 0)
 				retval += count;
 			if (count == 0) {
 				/* EOF */
+#ifdef DEBUG
+fprintf(stdout, "recvaccrights: Got EOF\n");
+#endif
+
 				errno = 0;
 				break;
 			}
@@ -472,6 +502,9 @@ msgpeek(s, ctlbuf, rcvbuf, fmode)
 		if (retval == 1) {
 			ctlbuf->len = strpeek.ctlbuf.len;
 			rcvbuf->len = strpeek.databuf.len;
+#ifdef DEBUG
+fprintf(stdout, "msgpeek: I_PEEK returned %d, rcvbuf->len %d, ctlbuf->len %d\n", retval, rcvbuf->len, ctlbuf->len);
+#endif
 			return 0;
 		}
 		else	
@@ -483,11 +516,17 @@ msgpeek(s, ctlbuf, rcvbuf, fmode)
 			fds[0].fd = s;
 			fds[0].events = POLLIN;
 			fds[0].revents = 0;
+#ifdef DEBUG
+fprintf(stdout, "msgpeek: Waiting in poll for input\n");
+#endif
 			for (;;) {
 				if (poll(fds, 1L, -1) < 0)
 					return -1;
 				if (fds[0].revents != 0)
 					break;
+#ifdef DEBUG
+fprintf(stdout, "msgpeek: poll - spurious wakeup\n");
+#endif
 			}
 		}
 		else	{
@@ -529,7 +568,7 @@ recvmsg(siptr, msg, flags)
 		return 0;
 
 	if (msg->msg_iovlen > 1) {
-		if ((rcvbuf.buf = calloc(1, len)) == NULL) {
+		if ((rcvbuf.buf = (char *)calloc(1, len)) == NULL) {
 			errno = ENOMEM;
 			return -1;
 		}
@@ -547,17 +586,24 @@ tryagain:
 	ctlbuf.buf = siptr->ctlbuf;
 
 	if (flags & MSG_OOB) {
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Getting OOB data\n");
+#endif
 		/* Handles the case when MSG_PEEK is set 
 		 * or not.
 		 */
 		if (! _s_do_ioctl(s, rcvbuf.buf, rcvbuf.maxlen, flags, 
 								&rcvbuf.len)) 
 			goto rcvout;
-		SOCKDEBUG(siptr, "recvmsg: Got %d bytes OOB data\n",
-						rcvbuf.len);
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Got %d bytes OOB data\n", rcvbuf.len);
+#endif
 	}
 	else
 	if (flags & MSG_PEEK) {
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Calling msgpeek()\n");
+#endif
 		if (msgpeek(s, &ctlbuf, &rcvbuf, fmode) < 0) {
 			if (errno == EBADMSG) {
 				errno = 0;
@@ -575,6 +621,9 @@ tryagain:
 		 * to cause a SIGURG.
 		 */
 		sigsave = sigset(SIGPOLL, SIG_IGN);
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Calling getmsg()\n");
+#endif
 		if (getmsg(s, &ctlbuf, &rcvbuf, &flg) < 0) {
 			(void)sigset(SIGPOLL, sigsave);
 			if (errno == EBADMSG) {
@@ -596,7 +645,13 @@ tryagain:
 		 * of urgent data in the data stream - the user
 		 * should not see this.
 		 */
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Got instream urgent mark message\n");
+#endif
 		if (flags & MSG_PEEK) {
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: MSG_PEEK - reading zero length message\n");
+#endif
 			/* better make sure it goes.
 			 */
 			flg = 0;
@@ -633,24 +688,34 @@ rcvout:
 				register struct T_unitdata_ind *udata_ind;
 	
 				udata_ind = (struct T_unitdata_ind *)ctlbuf.buf;
-				msg->msg_namelen = _s_cpaddr(siptr,
-					msg->msg_name,
-					msg->msg_namelen,
-					udata_ind->SRC_offset + ctlbuf.buf,
-					udata_ind->SRC_length);
-
+				addr = udata_ind->SRC_offset + ctlbuf.buf;
+				if (msg->msg_namelen > udata_ind->SRC_length)
+					msg->msg_namelen =
+						udata_ind->SRC_length;
+				(void)memcpy(msg->msg_name, addr,
+							msg->msg_namelen);
 			}
 		}
 		else	{
 			addrlen = msg->msg_namelen;
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: calling getpeername: buffer length %d\n", addrlen);
+#endif
 			if (_getpeername(siptr, msg->msg_name, &addrlen) < 0) {
 				errno = 0;
 				msg->msg_namelen = 0;
 			}
 			msg->msg_namelen = addrlen;
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: got %d bytes of address\n", addrlen);
+#endif
 		}
 	}
 
+
+#ifdef DEBUG
+fprintf(stdout, "recvmsg: Returning\n");
+#endif
 	if (msg->msg_iovlen > 1)
 		(void)free(rcvbuf.buf, rcvbuf.maxlen);
 	if (errno)
@@ -694,9 +759,18 @@ _s_soreceive(siptr, msg, flags)
 
 	retval = recvmsg(siptr, msg, flags);
 
-	if (errno)
+	if (errno) {
+#ifdef DEBUG
+fprintf(stdout, "_s_soreceive: Returning with errno %d\n", errno);
+#endif
 		return -1;
-	else	return retval;
+	}
+	else	{
+#ifdef DEBUG
+fprintf(stdout, "_s_soreceive: Returning with %d bytes\n", retval);
+#endif
+		return retval;
+	}
 }
 
 /* common send code.
@@ -714,6 +788,9 @@ _s_sosend(siptr, msg, flags)
 	struct strbuf		ctlbuf;
 	struct strbuf		databuf;
 
+#ifdef DEBUG
+fprintf(stdout, "_s_sosend: siptr %x: Entered: state %x\n", siptr, siptr->udata.so_state);
+#endif
 	errno = 0;
 	if (siptr->udata.so_state & SS_CANTSENDMORE) {
 		(void)kill(getpid(), SIGPIPE);
@@ -739,6 +816,9 @@ _s_sosend(siptr, msg, flags)
 	if ( !(siptr->udata.so_state & SS_ISBOUND)) {
 		/* need to bind it for TLI.
 		 */
+#ifdef DEBUG
+fprintf(stdout, "_s_sosend: siptr %x: Not bound - binding\n", siptr);
+#endif
 		if (_bind(siptr, NULL, 0, NULL, NULL) < 0)
 			return -1;
 	}
@@ -765,17 +845,9 @@ _s_sosend(siptr, msg, flags)
 	}
 
 	if (flags & MSG_OOB) {
-		/* If the socket is SOCK_DGRAM or
-		 * AF_UNIX which we know is not to support
-		 * MSG_OOB or the TP does not support the
-		 * notion of expedited data then we fail.
-		 *
-		 * Otherwise we hope that the TP knows
-		 * what to do.
-		 */
-		if (_s_getfamily(siptr) == AF_UNIX ||
-				siptr->udata.servtype == T_CLTS ||
-				siptr->udata.etsdusize == 0) {
+		if (_s_getfamily(siptr) != AF_INET ||
+			(siptr->udata.servtype != T_COTS &&
+			siptr->udata.servtype != T_COTS_ORD)) {
 			errno = EOPNOTSUPP;
 			goto sndout;
 		}
@@ -794,41 +866,12 @@ _s_sosend(siptr, msg, flags)
 			goto sndout;
 		}
 
-		if ((siptr->udata.so_state & SS_ISCONNECTED) == 0) {
-			switch (_s_getfamily(siptr)) {
-			case AF_INET:
-				if (msg->msg_namelen != 
-						sizeof(struct sockaddr_in))
-					errno = EINVAL;
-				break;
-
-			case AF_UNIX:
-				/* Checked below.
-				 */
-				break;
-
-			default:
-				if (msg->msg_namelen > siptr->udata.addrsize)
-					errno = EINVAL;
-				break;
-			}
-			if (errno)
-				goto sndout;
-		}
-
 		if (msg->msg_namelen > 0 && _s_getfamily(siptr) == AF_UNIX) {
 			struct stat		rstat;
+			int			unlen;
 			struct sockaddr_un 	*un;
 
 			un = (struct sockaddr_un *)msg->msg_name;
-
-			if (msg->msg_namelen > sizeof(*un) ||
-					(i = _s_uxpathlen(un)) ==
-						 sizeof(un->sun_path)) {
-				errno = EINVAL;
-				goto sndout;
-			}
-			un->sun_path[i] = 0;
 
 			/* Substitute the user supplied address with the
 			 * one that will have actually got bound to.
@@ -837,6 +880,13 @@ _s_sosend(siptr, msg, flags)
 				errno = EINVAL;
 				goto sndout;
 			}
+			if (msg->msg_namelen > sizeof(*un) ||
+					(unlen = _s_uxpathlen(un)) ==
+						sizeof(un->sun_path)) {
+				errno = EMSGSIZE;
+				goto sndout;
+			}
+			un->sun_path[unlen] = 0;	/* Null terminate */
 
 			/* stat the file.
 			 */
@@ -859,7 +909,7 @@ _s_sosend(siptr, msg, flags)
 		if (msg->msg_iovlen > 1) {
 			/* have to make one buffer
 			 */
-			if ((dbuf = calloc(1, len)) == NULL) {
+			if ((dbuf = (char *)calloc(1, len)) == NULL) {
 				errno = ENOMEM;
 				goto sndout;
 			}
@@ -881,8 +931,8 @@ _s_sosend(siptr, msg, flags)
 		tmpbuf = siptr->ctlbuf;
 		udata_req = (struct T_unitdata_req *)tmpbuf;
 		udata_req->PRIM_type = T_UNITDATA_REQ;
-		udata_req->DEST_length = _s_min(msg->msg_namelen,
-						 siptr->udata.addrsize);
+		udata_req->DEST_length =
+			_s_min(msg->msg_namelen, siptr->udata.addrsize);
 		udata_req->DEST_offset = 0;
 		tmpcnt = sizeof(*udata_req);
 	
@@ -894,11 +944,16 @@ _s_sosend(siptr, msg, flags)
 
 		ctlbuf.len = tmpcnt;
 		ctlbuf.buf = tmpbuf;
+#ifdef DEBUG
+fprintf(stdout, "_s_sosend: ctl buf len %d\n", ctlbuf.len);
+#endif
  
 		databuf.len = len == 0 ? -1 : len;
 		databuf.buf = dbuf;
 
-		SOCKDEBUG(siptr, "_s_sosend: sending %d bytes\n", databuf.len);
+#ifdef DEBUG
+fprintf(stdout, "_s_sosend: sending down CLTS message len %d\n", databuf.len);
+#endif
 		if (putmsg(s, &ctlbuf, &databuf, 0) < 0) {
 			if (errno == EAGAIN)
 				errno = ENOMEM;
@@ -915,7 +970,6 @@ _s_sosend(siptr, msg, flags)
 		register int			tmp;
 		register int			tmpcnt;
 		register int			firsttime;
-		register int			error;
 		char				*tmpbuf;
 
 		if (len == 0) {
@@ -929,6 +983,9 @@ _s_sosend(siptr, msg, flags)
 		}
 
 		data_req = (struct T_data_req *)siptr->ctlbuf;
+		if (flags & MSG_OOB)
+			data_req->PRIM_type = T_EXDATA_REQ;
+		else	data_req->PRIM_type = T_DATA_REQ;
 		 
 		ctlbuf.len = sizeof(*data_req);
 		ctlbuf.buf = siptr->ctlbuf;
@@ -937,32 +994,21 @@ _s_sosend(siptr, msg, flags)
 		firsttime = 0;
 		while (tmpcnt = get_msg_slice(msg, &tmpbuf,
 					 siptr->udata.tidusize, firsttime)) {
-			if (flags & MSG_OOB) {
-				data_req->PRIM_type = T_EXDATA_REQ;
-				if ((tmp - tmpcnt) != 0)
-					data_req->MORE_flag = 1;
-				else	data_req->MORE_flag = 0;
-			}
-			else	data_req->PRIM_type = T_DATA_REQ;
+			if ((tmp - tmpcnt) > 0) {
+				data_req->MORE_flag = 1;
+			} else	data_req->MORE_flag = 0;
+	
+			if (tmpcnt == 0 && firsttime == 0)
+				databuf.len = -1;
+			else databuf.len = tmpcnt;
 
-			if (data_req->PRIM_type == T_DATA_REQ) {
-				/* Performance Optimization, don't bother
-				 * with header.
-				 */
-				SOCKDEBUG(siptr,
-				   "_s_sosend: writing %d bytes\n", tmpcnt);
-				error = write(s, tmpbuf, tmpcnt);
-			}
-			else	{
-				/* Urgent data.
-				 */
-				databuf.len = tmpcnt;
-				databuf.buf = tmpbuf;
-				SOCKDEBUG(siptr,
-				   "_s_sosend: sending %d bytes\n", tmpcnt);
-				error = putmsg(s, &ctlbuf, &databuf, 0);
-			}
-			if (error < 0) {
+			firsttime = 1;
+
+			databuf.buf = tmpbuf;
+#ifdef DEBUG
+fprintf(stdout, "_s_sosend: sending down COTS message -size %d\n", databuf.len);
+#endif
+			if (putmsg(s, &ctlbuf, &databuf, 0) < 0) {
 				if (len == tmp) {
 					if (errno == EAGAIN)
 						errno = ENOMEM;
@@ -973,7 +1019,6 @@ _s_sosend(siptr, msg, flags)
 					goto sndout;
 				}
 			}
-			firsttime = 1;
 			tmp -= tmpcnt;
 		}
 		retval = len - tmp;
@@ -1029,8 +1074,9 @@ send_clts_rights(siptr, msg, data, datalen)
 
 	/* Send the fd's.
 	 */
-	SOCKDEBUG(siptr, "send_clts_rights: nmbr of fd's %d\n",
-					 msg->msg_accrightslen/sizeof(int));
+#ifdef DEBUG
+fprintf(stdout, "send_clts_rights: nmbr of fd's %d\n", msg->msg_accrightslen/sizeof(int));
+#endif
 	rights = (int *)msg->msg_accrights;
 	for (i = 0; i < msg->msg_accrightslen/sizeof(int); i++) {
 		if (ioctl(pipefd[0], I_SENDFD, rights[i]) < 0) {
@@ -1083,11 +1129,17 @@ send_cots_rights(siptr, msg)
 	int				retval;
 	int				i;
 
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Getting pipe\n");
+#endif
 	/* Get a pipe.
 	 */
 	if (pipe(pipefd) < 0)
 		return -1;
 
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Got pipe fds %d, %d\n", pipefd[0], pipefd[1]);
+#endif
 	/* Ensure nothing in progress.
 	 */
 	intransit = 0;
@@ -1095,9 +1147,15 @@ send_cots_rights(siptr, msg)
 		if (_s_do_ioctl(siptr->fd, (caddr_t)&intransit,
 			sizeof(intransit), SI_GETINTRANSIT, &i) == 0) {
 			retval = -1;
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: SI_GETINTRANSIT failed\n");
+#endif
 			goto send_cots_done;
 		}
 		if (i != sizeof(intransit)) {
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Got size %d\n", i);
+#endif
 			errno = EPROTO;
 			retval = -1;
 			goto send_cots_done;
@@ -1109,6 +1167,9 @@ send_cots_rights(siptr, msg)
 
 	/* Send pipe fd.
 	 */
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Sending pipe fd %d\n", pipefd[1]);
+#endif
 	if (ioctl(siptr->fd, I_SENDFD, pipefd[1]) < 0) {
 		retval = -1;
 		goto send_cots_done;
@@ -1116,8 +1177,14 @@ send_cots_rights(siptr, msg)
 
 	/* Send the fd's.
 	 */
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: nmbr of fd's %d\n", msg->msg_accrightslen/sizeof(int));
+#endif
 	fds = (int *)msg->msg_accrights;
 	for (i = 0; i < msg->msg_accrightslen/sizeof(int); i++) {
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Sending fd %d\n", fds[i]);
+#endif
 		if (ioctl(pipefd[0], I_SENDFD, fds[i]) < 0) {
 			retval = -1;
 			goto send_cots_done;
@@ -1128,6 +1195,9 @@ send_cots_rights(siptr, msg)
 	if (msg->msg_iovlen) {
 		retval = 0;
 		for (i = 0; i < msg->msg_iovlen; i++) {
+#ifdef DEBUG
+fprintf(stdout, "send_cots_rights: Sending %d bytes data\n", msg->msg_iov[i].iov_len);
+#endif
 			if (write(pipefd[0], msg->msg_iov[i].iov_base,
 				 	msg->msg_iov[i].iov_len) !=
 					msg->msg_iov[i].iov_len) {
@@ -1389,6 +1459,9 @@ _s_do_ioctl(s, buf, size, cmd, retlen)
 		if ((retval & 0xff) == TSYSERR)
 			errno = (retval >>  8) & 0xff;
 		else	{
+#ifdef DEBUG
+fprintf(stderr, "_s_do_ioctl: TLI error %d\n", retval & 0xff);
+#endif
 			errno = tlitosyserr(retval & 0xff);
 		}
 		return 0;
@@ -1411,7 +1484,7 @@ _s_alloc_bufs(siptr, udata)
 	size2 = sizeof(union T_primitives) + udata->addrsize + sizeof(long) +
 					     udata->optsize + sizeof(long);
 
-	if ((siptr->ctlbuf = calloc(1, size2)) == NULL) {
+	if ((siptr->ctlbuf = (char *)calloc(1, size2)) == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1579,7 +1652,9 @@ _s_getfamily(siptr)
 	 * until one matches.
 	 */
 	if ((nethandle = setnetconfig()) == NULL) {
-		syslog(LOG_ERR, "_s_getfamily: setnetconfig failed");
+#ifdef DEBUG
+		nc_perror("_s_getfamily: setnetconfig failed");
+#endif
 		return -1;
 	}
 	while ((net = getnetconfig(nethandle)) != NULL) {
@@ -1620,28 +1695,11 @@ _s_uxpathlen(un)
 	register int			i;
 
 	for (i = 0; i < sizeof(un->sun_path); i++)
-		if (un->sun_path[i] == NULL)
+		if (un->sun_path[i] == NULL) {
+#ifdef DEBUG
+fprintf(stdout, "_s_uxpathlen: Returning %d\n", i);
+#endif
 			return i;
+		}
 	return sizeof(un->sun_path);
 }
-
-int
-_s_cpaddr(siptr, to, tolen, from, fromlen)
-	register struct _si_user	*siptr;
-	register char			*to;
-	register int			tolen;
-	register char			*from;
-	register int			fromlen;
-
-{
-	(void)memset(to, 0, tolen);
-	if (_s_getfamily(siptr) == AF_INET) {
-		if (tolen > sizeof(struct sockaddr_in))
-			tolen = sizeof(struct sockaddr_in);
-	}
-	else	if (tolen > fromlen)
-			tolen = fromlen;
-	(void)memcpy(to, from, _s_min(fromlen , tolen));
-	return tolen;
-}
-

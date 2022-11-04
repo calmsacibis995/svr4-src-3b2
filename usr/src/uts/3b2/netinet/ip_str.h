@@ -8,7 +8,7 @@
 #ifndef _NETINET_IP_STR_H
 #define _NETINET_IP_STR_H
 
-#ident	"@(#)head.sys:sys/netinet/ip_str.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/ip_str.h	1.2"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -72,7 +72,7 @@ struct ip_pcb {
 #define IPOPEN	1		/* Minor device open when set */
 
 struct ip_provider {		/* The description of each link service */
-	char            name[IFNAMSIZ];	/* provider name (e.g., emd1) */
+	char            name[IFNAMSIZ];	/* provider name (e.g., en0) */
 	queue_t        *qbot;	/* lower write queue */
 	int             l_index;/* unique ID of lower stream */
 	int             if_flags;	/* up/down, broadcast, etc. */

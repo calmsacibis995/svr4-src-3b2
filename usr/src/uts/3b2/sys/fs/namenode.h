@@ -8,7 +8,7 @@
 #ifndef _FS_NAMENODE_H
 #define _FS_NAMENODE_H
 
-#ident	"@(#)head.sys:sys/fs/namenode.h	1.3"
+#ident	"@(#)head.sys:sys/fs/namenode.h	1.2"
 
 /*
  * This structure is used to pass a file descriptor from user
@@ -27,7 +27,6 @@ struct namenode {
 	ushort		nm_flag;	/* flags defined below */
 	struct vattr    nm_vattr;	/* attributes of mounted STREAM */
 	struct vnode	*nm_filevp;	/* file desc. prior to mounting */
-	struct file	*nm_filep;	/* file pointer of nm_filevp */
 	struct vnode	*nm_mountpt;	/* mount point prior to mounting */
 	struct namenode *nm_nextp;	/* next link in the linked list */
 	struct namenode *nm_backp;	/* back link in linked list */

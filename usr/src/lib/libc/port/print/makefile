@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libc-port:print/makefile	1.12.4.1"
+#ident	"@(#)libc-port:print/makefile	1.12.3.2"
 #
 # makefile for libc/port/print
 #
@@ -59,4 +59,4 @@ doprnt.o fprintf.o printf.o sprintf.o : $(INCLIBC)/shlib.h
 	$(PROF)@echo $*.c:
 	$(PROF)$(CC) $(DEFLIST) $(INCLIST) $(CFLAGS) -c -p $*.c && mv $(*F).o $*.p
 	$(PIC)@echo $*.c:
-	$(PIC)$(CC) $(DEFLIST) $(INCLIST) $(CFLAGS) -c -DDSHLIB -Kpic $*.c && mv $(*F).o $*.P
+	$(PIC)$(CC) $(DEFLIST) $(INCLIST) $(CFLAGS) -c -Kpic $*.c && mv $(*F).o $*.P

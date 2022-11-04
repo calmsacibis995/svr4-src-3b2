@@ -1,4 +1,4 @@
-#ident	"@(#)pkgcore:protos/intrfc	1.10"
+#ident	"@(#)pkgcore:protos/intrfc	1.4"
 
 !INTFBIN=/usr/sadm/sysadm/bin
 !MENU=/usr/sadm/sysadm/menu
@@ -12,16 +12,23 @@ d intrfc $MENU 555 bin bin
 d intrfc $PKGBIN 0755 bin bin
 x intrfc $PKGSCR 0555 bin bin
 x intrfc $INTFBIN 0755 bin bin
-d intrfc /etc/skel 0755 bin bin
+d intrfc /usr/sadm/skel 0755 bin bin
 d intrfc $MENU/applmgmt 0755 bin bin
 v intrfc $MENU/applmgmt/appl.menu 0644 bin bin
+d intrfc $MENU/applmgmt/HELP 0755 bin bin
+f intrfc $MENU/applmgmt/HELP/appl.help  0644 bin bin
 d intrfc $MENU/backup_service 0755 bin bin
 v intrfc $MENU/backup_service/backup.menu 0644 bin bin
+d intrfc $MENU/backup_service/HELP 0755 bin bin
+f intrfc $MENU/backup_service/HELP/bkup.help  0644 bin bin
 d intrfc $MENU/networks 0755 bin bin
 v intrfc $MENU/networks/networks.menu 0644 bin bin
+d intrfc $MENU/networks/HELP 0755 bin bin
+f intrfc $MENU/networks/HELP/networks.help  0644 bin bin
 d intrfc $MENU/restores 0755 bin bin
 v intrfc $MENU/restores/restore.menu 0644 bin bin
-f intrfc $MENU/applmgmt/Help 0644 bin bin
+d intrfc $MENU/restores/HELP 0755 bin bin
+f intrfc $MENU/restores/HELP/rest.help  0644 bin bin
 
 # prototype from source area cmd/oamintf/devices/copy/Prototype
 d intrfc $MENU/devices/copy 0755 bin bin
@@ -37,14 +44,10 @@ f intrfc $MENU/devices/copy/Help 0644 bin bin
 d intrfc $MENU/devices 0755 bin bin
 v intrfc $MENU/devices/devices.menu 0644 bin bin
 f intrfc $MENU/devices/Menu.drive 0644 bin bin
-f intrfc $MENU/devices/Menu.disk 0644 bin bin
-f intrfc $MENU/devices/Text.diskerr 0644 bin bin
 f intrfc $MENU/devices/Help 0644 bin bin
 f intrfc $INTFBIN/getdlst 0755 bin bin
-f intrfc $INTFBIN/getdisk 0755 bin bin
 f intrfc $INTFBIN/showgrp 0755 bin bin
 f intrfc $INTFBIN/valdrive 0755 bin bin
-f intrfc $INTFBIN/valdisk 0755 bin bin
 
 # prototype from source area cmd/oamintf/devices/display/Prototype
 f intrfc $INTFBIN/dispdisk 0755 bin bin
@@ -79,21 +82,14 @@ f intrfc $INTFBIN/part 0755 bin bin
 d intrfc $MENU/devices/partition 0755 bin bin
 v intrfc $MENU/devices/partition/part.menu 0644 bin bin
 f intrfc $MENU/devices/partition/Form.disk 0644 bin bin
-f intrfc $MENU/devices/partition/Form.part 0644 bin bin
-f intrfc $MENU/devices/partition/Text.part 0644 bin bin
 f intrfc $MENU/devices/partition/Text.parterr 0644 bin bin
-f intrfc $MENU/devices/partition/Text.partok 0644 bin bin
-f intrfc $MENU/devices/partition/Text.warn 0644 bin bin
 f intrfc $MENU/devices/partition/Help 0644 bin bin
 
 # prototype from source area cmd/oamintf/devices/remove/Prototype
-f intrfc $INTFBIN/rmdisk 0755 bin bin
 d intrfc $MENU/devices/remove 0755 bin bin
 v intrfc $MENU/devices/remove/remove.menu 0644 bin bin
 f intrfc $MENU/devices/remove/Form.disk 0644 bin bin
-f intrfc $MENU/devices/remove/Text.rmdisk 0644 bin bin
-f intrfc $MENU/devices/remove/Text.rmnok 0644 bin bin
-f intrfc $MENU/devices/remove/Text.rmok 0644 bin bin
+f intrfc $INTFBIN/rmdisk 0755 bin bin
 f intrfc $MENU/devices/remove/Help 0644 bin bin
 
 # prototype from source area cmd/oamintf/diagnostics/Prototype
@@ -107,6 +103,7 @@ d intrfc $MENU/diagnostics/report 0755 bin bin
 f intrfc $MENU/diagnostics/report/Form.report 0644 bin bin
 f intrfc $MENU/diagnostics/report/Text.report1 0644 bin bin
 f intrfc $MENU/diagnostics/report/Text.report2 0644 bin bin
+f intrfc $INTFBIN/firmode 0755 bin bin
 f intrfc $MENU/diagnostics/Help 0644 bin bin
 f intrfc $MENU/diagnostics/repair/Help 0644 bin bin
 f intrfc $MENU/diagnostics/report/Help 0644 bin bin
@@ -114,7 +111,7 @@ f intrfc $MENU/diagnostics/report/Help 0644 bin bin
 # prototype from source area cmd/oamintf/interface/Prototype
 f intrfc $INTFBIN/object_gen 0755 bin bin
 f intrfc $INTFBIN/itemhelp 0755 bin bin
-f intrfc $PKGBIN/ie_build 0755 bin bin
+f intrfc $INTFBIN/ie_build 0755 bin bin
 f intrfc /usr/sbin/sysadm 0755 bin bin
 l intrfc /usr/sbin/setup=/usr/sbin/sysadm 0644 bin bin
 l intrfc /usr/sbin/powerdown=/usr/sbin/sysadm 0644 bin bin
@@ -148,9 +145,12 @@ f intrfc $MENU/trept.msg 0644 bin bin
 f intrfc $MENU/frept.msg 0644 bin bin
 f intrfc $MENU/ssmenu.msg 0644 bin bin
 f intrfc $MENU/msmenu.msg 0644 bin bin
+d intrfc $MENU/HELP 0755 bin bin
+f intrfc $MENU/HELP/main.help  0644 bin bin
 
 # prototype from source area cmd/oamintf/intf_install/Prototype
 f intrfc $PKGBIN/intf_inst 0755 bin bin
+f intrfc $PKGBIN/mod_expr 0755 bin bin
 f intrfc $PKGBIN/mod_menus 0755 bin bin
 f intrfc $PKGSCR/i.OAMmif 0644 bin bin
 
@@ -390,4 +390,4 @@ f intrfc $INTFBIN/getngroups 0500 root sys
 f intrfc $INTFBIN/expdate 0500 root sys
 f intrfc $INTFBIN/finduid 0500 root sys
 f intrfc $INTFBIN/getval 0500 root sys
-f intrfc /etc/skel/.profile 0644 root other 
+f intrfc /usr/sadm/skel/.profile 0644 root other 

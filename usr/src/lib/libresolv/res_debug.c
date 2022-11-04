@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:res_debug.c	1.2"
+#ident	"@(#)libresolv:res_debug.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -38,7 +38,6 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <arpa/nameser.h>
-#include "res.h"
 
 extern char *p_cdname(), *p_rr(), *p_type(), *p_class();
 extern char *inet_ntoa();

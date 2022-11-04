@@ -1,10 +1,4 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-#ident	"@(#)libc-m32:abi_objects	1.9"
+#ident	"@(#)libc-m32:abi_objects	1.2"
 
 rtboot.o
 globals.o
@@ -21,6 +15,7 @@ rtabiaddr.o
 rtsetup.o
 rtsyscall.o
 rtmemcpy.o
+rtisastream.o
 
 access.A
 acct.A
@@ -52,22 +47,17 @@ fstatvfs.A
 fsync.A
 ftok.A
 getctxt.A
-getcwd.A
 getegid.A
 geteuid.A
 getgid.A
-getgrnam.A
 getgroups.A
 getmsg.A
 getpid.A
 getpmsg.A
 getppid.A
-getpwnam.A
 getrlimit.A
 getuid.A
 ioctl.A
-initgroups.A
-isastream.A
 kill.A
 lchown.A
 link.A
@@ -88,7 +78,6 @@ nice.A
 nuname.A
 open.A
 pathconf.A
-fpathconf.A
 pause.A
 pipe.A
 poll.A
@@ -148,16 +137,16 @@ writev.A
 xmknod.A
 xstat.A
 
-cat_init.A
-catclose.A
-catgets.A
-catopen.A
 closedir.A
+getut.A
+getpwbuf.A
+getgrbuf.A
 getlogin.A
 ttyname.A
 gettxt.A
 localeconv.A
 opendir.A
+putpwbuf.A
 readdir.A
 rewinddir.A
 setlocale.A

@@ -8,7 +8,7 @@
 #ifndef _NFS_NFS_CLNT_H
 #define _NFS_NFS_CLNT_H
 
-#ident	"@(#)head.sys:sys/nfs/nfs_clnt.h	1.8"
+#ident	"@(#)head.sys:sys/nfs/nfs_clnt.h	1.7"
 
 /*	  @(#)nfs_clnt.h 2.28 88/08/19 SMI	*/
 
@@ -54,12 +54,12 @@
 #define	ACMINMAX	3600	/* 1 hr is longest min timeout */
 #define	ACMAXMAX	36000	/* 10 hr is longest max timeout */
 
-#define	NFS_CALLTYPES	3	/* Lookups, Reads, Writes */
+#define NFS_CALLTYPES	3	/* Lookups, Reads, Writes */
 
 /*
  * Fake errno passed back from rfscall to indicate transfer size adjustment
  */
-#define	ENFS_TRYAGAIN	999
+#define ENFS_TRYAGAIN	999
 
 /*
  * NFS private data per mounted file system
@@ -67,17 +67,15 @@
 struct mntinfo {
 	struct knetconfig	*mi_knetconfig;		/* bound TLI fd */
 	struct netbuf	 mi_addr;	/* server's address */
-	struct netbuf	 mi_syncaddr;	/* AUTH_DES time sync addr */
 	struct vnode	*mi_rootvp;	/* root vnode */
-	u_int		 mi_hard:1;	/* hard or soft mount */
-	u_int		 mi_printed:1;	/* not responding message printed */
-	u_int		 mi_int:1;	/* interrupts allowed on hard mount */
-	u_int		 mi_down:1;	/* server is down */
-	u_int		 mi_noac:1;	/* don't cache attributes */
-	u_int		 mi_nocto:1;	/* no close-to-open consistency */
-	u_int		 mi_dynamic:1;	/* dynamic transfer size adjustment */
-	u_int		 mi_grpid:1;	/* System V group id inheritance */
-	u_int		 mi_rpctimesync:1;	/* RPC time sync */
+	u_int		 mi_hard : 1;	/* hard or soft mount */
+	u_int		 mi_printed : 1;/* not responding message printed */
+	u_int		 mi_int : 1;	/* interrupts allowed on hard mount */
+	u_int		 mi_down : 1;	/* server is down */
+	u_int		 mi_noac : 1;	/* don't cache attributes */
+	u_int		 mi_nocto : 1;	/* no close-to-open consistency */
+	u_int		 mi_dynamic : 1;/* dynamic transfer size adjustment */
+	u_int		 mi_grpid : 1;	/* System V group id inheritance */
 	int		 mi_refct;	/* active vnodes for this vfs */
 	long		 mi_tsize;	/* transfer size (bytes) */
 					/* really read size */
@@ -107,8 +105,7 @@ struct mntinfo {
 /*
  * Mark cached attributes as timed out
  */
-#define	PURGE_ATTRCACHE(vp)	{vtor(vp)->r_attrtime.tv_sec = hrestime.tv_sec; \
-				 vtor(vp)->r_attrtime.tv_usec = hrestime.tv_nsec / 1000;}
+#define	PURGE_ATTRCACHE(vp)	(vtor(vp)->r_attrtime.tv_sec = hrestime.tv_sec)
 
 /*
  * Mark cached attributes as uninitialized (must purge all caches first)
@@ -118,8 +115,8 @@ struct mntinfo {
 /*
  * If returned error is ESTALE flush all caches.
  */
-#define	PURGE_STALE_FH(errno, vp) \
-	if ((errno) == ESTALE) { pvn_vptrunc(vp, 0, 0); nfs_purge_caches(vp); }
+#define PURGE_STALE_FH(errno, vp) \
+	if ((errno) == ESTALE) {pvn_vptrunc(vp, 0, 0); nfs_purge_caches(vp);}
 
 /*
  * Is cache valid?
@@ -130,7 +127,7 @@ struct mntinfo {
 #define	CACHE_VALID(rp, mtime) \
 	((rtov(rp)->v_flag & VISSWAP) == VISSWAP || \
 	 (rp)->r_attrtime.tv_sec == 0 || \
-	 ((mtime).tv_sec  == (rp)->r_attr.va_mtime.tv_sec && \
-	  (mtime).tv_nsec == (rp)->r_attr.va_mtime.tv_nsec))
+	 ((mtime).tv_sec == (rp)->r_attr.va_mtime.tv_sec && \
+	 (mtime).tv_nsec == (rp)->r_attr.va_mtime.tv_nsec))
 
 #endif	/* _NFS_NFS_CLNT_H */

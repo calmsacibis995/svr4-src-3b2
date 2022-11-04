@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)cmd-inet:libtmp/rcmd.c	1.4"
+#ident	"@(#)cmd-inet:libtmp/rcmd.c	1.2"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -48,7 +48,7 @@
 
 #ifdef SYSV
 #define bcopy(s1, s2, len)	memcpy(s2, s1, len)
-#define bzero(s, len)		memset(s, 0, len)
+#define bzero(s, len)		memset(s, '\0', len)
 #define index(s, c)		strchr(s, c)
 char	*strchr();
 #else
@@ -72,7 +72,6 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 	int lport = IPPORT_RESERVED - 1;
 	struct hostent *hp;
 #ifdef SYSV
-	void	(*spipe)();
 	sigset_t oldmask;
 	sigset_t newmask;
 #else
@@ -88,7 +87,6 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 	}
 	*ahost = hp->h_name;
 #ifdef SYSV
-	spipe = sigset(SIGPIPE, SIG_IGN);
 	bzero((char *) &newmask, sizeof (newmask));
 	(void) sigaddset(&newmask, SIGURG);
 	(void) sigprocmask(SIG_BLOCK, &newmask, &oldmask);
@@ -103,7 +101,6 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 			else
 				perror("rcmd: socket");
 #ifdef SYSV
-			(void) sigset(SIGPIPE, spipe);
 			(void) sigprocmask(SIG_SETMASK, &oldmask, 
 					   (sigset_t *) 0);
 #else
@@ -143,7 +140,6 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 		}
 		perror(hp->h_name);
 #ifdef SYSV
-		(void) sigset(SIGPIPE, spipe);
 		(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *) 0);
 #else
 		sigsetmask(oldmask);
@@ -209,7 +205,6 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 		goto bad2;
 	}
 #ifdef SYSV
-	(void) sigset(SIGPIPE, spipe);
 	(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *) 0);
 #else
 	sigsetmask(oldmask);
@@ -221,7 +216,6 @@ bad2:
 bad:
 	(void) close(s);
 #ifdef SYSV
-	(void) sigset(SIGPIPE, spipe);
 	(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *) 0);
 #else
 	sigsetmask(oldmask);

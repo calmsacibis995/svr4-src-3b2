@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nsu:preremove	1.11.2.3"
+#ident	"@(#)pkg.nsu:preremove	1.11.1.2"
 #
 #	preremove script for nsu package
 #
@@ -53,13 +53,13 @@ done
 # remove listen-type port monitors and any symbolic links that might
 # be lying arount
 #
-sacadm -L -t listen 2>/dev/null | cut -f1 -d: >/tmp/listeners
+sacadm -L -t listen | cut -f1 -d: >/tmp/listeners
 for i in `cat /tmp/listeners`
 do
 	sacadm -r -p $i >/dev/null 2>&1
 done
 #
-# symlinks and links
+# symlinks
 #
 LHOME=$BASEDIR/usr/net/nls
 if [ -f $LHOME/listen ]
@@ -74,10 +74,6 @@ if [ -f $LHOME/nlps_server ]
 then
 	rm $LHOME/nlps_server
 fi
-if [ -f /usr/bin/nlsadmin ]
-then
-	rm /usr/bin/nlsadmin
-fi
 rm /tmp/listeners
 
 #
@@ -89,13 +85,6 @@ grep -v '[ 	]loopback[ 	][ 	]*-[ 	][ 	]*/dev/ticotsord[ 	]' /tmp/$$.1 2>/dev/nul
 grep -v '[ 	]loopback[ 	][ 	]*-[ 	][ 	]*/dev/ticots[ 	]' /tmp/$$.2 2>/dev/null >/etc/netconfig
 
 rm -f /rmp/$$.1 /tmp/$$.2
-
-#
-#	Remove entries from OAM scripts...
-#
-
-fgrep -v 'name_to_address^Machine and Service Address Management^name_to_addr/map.menu' /usr/sadm/sysadm/menu/netservices/netserve.menu 2>/dev/null >/tmp/$$.3
-mv /tmp/$$.3 /usr/sadm/sysadm/menu/netservices/netserve.menu
 
 #
 #

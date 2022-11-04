@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:rpcb_prot.c	1.4"
+#ident	"@(#)librpc:rpcb_prot.c	1.3"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -19,15 +18,15 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
-*/
+*/ 
 
 
 #if !defined(lint) && defined(SCCSIDS)
@@ -64,13 +63,10 @@ xdr_rpcb(xdrs, objp)
 	if (!xdr_string(xdrs, &objp->r_addr, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->r_owner, ~0)) {
-		return (FALSE);
-	}
 	return (TRUE);
 }
 
-/*
+/* 
  * What is going on with linked lists? (!)
  * First recall the link list declaration from rpc_prot.h:
  *
@@ -79,11 +75,11 @@ xdr_rpcb(xdrs, objp)
  *	struct rpcblist *rpcb_next
  * };
  *
- * Compare that declaration with a corresponding xdr declaration that
+ * Compare that declaration with a corresponding xdr declaration that 
  * is (a) pointer-less, and (b) recursive:
  *
  * typedef union switch (bool_t) {
- *
+ * 
  *	case TRUE: struct {
  *		struct rpcb;
  * 		rpcblist_t foo;
@@ -96,8 +92,8 @@ xdr_rpcb(xdrs, objp)
  * the C declaration has no bool_t variable.  The bool_t can be
  * interpreted as ``more data follows me''; if FALSE then nothing
  * follows this bool_t; if TRUE then the bool_t is followed by
- * an actual struct rpcb, and then (recursively) by the
- * xdr union, rpcblist_t.
+ * an actual struct rpcb, and then (recursively) by the 
+ * xdr union, rpcblist_t.  
  *
  * This could be implemented via the xdr_union primitive, though this
  * would cause a one recursive call per element in the list.  Rather than do
@@ -108,7 +104,7 @@ xdr_rpcb(xdrs, objp)
  * the net, yet is the data that the pointer points to which is interesting;
  * this sounds like a job for xdr_reference!
  */
-/*
+/* 
  * And this one encodes and decode the tli version of the mappings.
  */
 bool_t
@@ -137,9 +133,9 @@ xdr_rpcblist(xdrs, rp)
 		 * before we free the current object ...
 		 */
 		if (freeing)
-			next = &((*rp)->rpcb_next);
+			next = &((*rp)->rpcb_next); 
 		if (! xdr_reference(xdrs, (caddr_t *)rp,
-		    (u_int)sizeof (RPCBLIST), xdr_rpcb))
+		    (u_int)sizeof(RPCBLIST), xdr_rpcb))
 			return (FALSE);
 		rp = (freeing) ? next : &((*rp)->rpcb_next);
 	}

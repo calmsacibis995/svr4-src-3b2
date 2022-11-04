@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:utmpx.h	1.3"
+#ident	"@(#)head:utmpx.h	1.1"
 
 /*******************************************************************
 
@@ -36,26 +36,22 @@ publication.
 #include <sys/time.h>
 #include <utmp.h>
 
-#define	UTMPX_FILE	"/var/adm/utmpx"
-#define	WTMPX_FILE	"/var/adm/wtmpx"
+#define	UTMPX_FILE	"/etc/utmpx"
+#define	WTMPX_FILE	"/etc/wtmpx"
 
 #define	ut_name	ut_user
 #define ut_xtime ut_tv.tv_sec
 
 struct utmpx
   {
-	char	ut_user[32];		/* user login name */
-	char	ut_id[4]; 		/* inittab id */
-	char	ut_line[32];		/* device name (console, lnxx) */
-	pid_t	ut_pid;			/* process id */
-	short	ut_type; 		/* type of entry */
+	char ut_user[32] ;		/* user login name */
+	char ut_id[4] ; 		/* /etc/inittab id(usually line #) */
+	char ut_line[32] ;		/* device name (console, lnxx) */
+	pid_t ut_pid ;			/* process id */
+	short ut_type ; 		/* type of entry */
 	struct exit_status ut_exit;     /* process termination/exit status */
-	struct timeval ut_tv;		/* time entry was made */
-	long	ut_session;		/* session ID, used for windowing */
-	long	pad[5];			/* reserved for future use */
-	short	ut_syslen;		/* significant length of ut_host */
-					/*   including terminating null */
-	char	ut_host[257];		/* remote host name */
+	struct timeval ut_tv ;		/* time entry was made */
+	char ut_host[64];		/* remote host name */
   } ;
 
 /*	Definitions for ut_type						*/

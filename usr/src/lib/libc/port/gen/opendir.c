@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/opendir.c	1.13"
+#ident	"@(#)libc-port:gen/opendir.c	1.12"
 /*
 	opendir -- C library extension routine
 
@@ -18,7 +18,6 @@
 #include	"shlib.h"
 #include	<sys/types.h>
 #include	<dirent.h>
-#include   	<sys/fcntl.h>
 #include	<sys/stat.h>
 #include	<sys/errno.h>
 #include	<stdlib.h>
@@ -37,11 +36,6 @@ const char		*filename;	/* name of directory */
 	struct stat	sbuf;		/* result of fstat() */
 
 	if ( (fd = open( filename, 0 )) < 0 )
-		return NULL;
-	/* POSIX mandated behavior
-	 * close on exec if using file descriptor 
- 	 */
-	if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) 
 		return NULL;
 	if ( (fstat( fd, &sbuf ) < 0)
 	  || ((sbuf.st_mode & S_IFMT) != S_IFDIR)

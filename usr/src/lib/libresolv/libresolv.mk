@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libresolv:libresolv.mk	1.2"
+#ident	"@(#)libresolv:libresolv.mk	1.1"
 
 #
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -33,26 +33,32 @@ DASHO=		-O
 MORECPP=	-DDEBUG -DSYSV
 INC=		$(ROOT)/usr/include
 INCSYS=		$(ROOT)/usr/include/sys
+UCBINC=		$(ROOT)/usr/ucbinclude
 USRLIB=		$(ROOT)/usr/lib
 INSTALL=	install
-LORDER=		lorder
-TSORT=		tsort
 
-CFLAGS=		$(DASHO) $(MORECPP) -I$(INC)
+CFLAGS=		$(DASHO) $(MORECPP) -I$(UCBINC) -I$(INC)
 
 LIBNAME=	libresolv.a
 
-OBJS=		gthostnamadr.o res_comp.o res_debug.o res_init.o \
-		res_mkquery.o res_query.o res_send.o sethostent.o \
-		strcasecmp.o
+LIBOBJS= \
+		$(LIBNAME)(gthostnamadr.o) \
+		$(LIBNAME)(res_comp.o) \
+		$(LIBNAME)(res_debug.o) \
+		$(LIBNAME)(res_init.o) \
+		$(LIBNAME)(res_mkquery.o) \
+		$(LIBNAME)(res_query.o) \
+		$(LIBNAME)(res_send.o) \
+		$(LIBNAME)(sethostent.o) \
+		$(LIBNAME)(strcasecmp.o)
 
 all:		$(LIBNAME)
 
 install:	all
 		$(INSTALL) -f $(USRLIB) -m 0444 -u bin -g bin $(LIBNAME)
 
-$(LIBNAME):	$(OBJS)
-		$(AR) crv $(LIBNAME) `$(LORDER) $(OBJS) | $(TSORT)`
+$(LIBNAME):	$(LIBOBJS)
+
 
 clean:
 		rm -f *.o
@@ -61,92 +67,5 @@ clobber:	clean
 		rm -f $(LIBNAME)
 
 #
-# Header dependencies
+# to do -- Header dependencies
 #
-gthostnamadr.o:	gthostnamadr.c \
-		$(INC)/sys/param.h \
-		$(INC)/sys/socket.h \
-		$(INC)/netinet/in.h \
-		$(INC)/ctype.h \
-		$(INC)/netdb.h \
-		$(INC)/stdio.h \
-		$(INC)/errno.h \
-		$(INC)/arpa/inet.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-res_comp.o:	res_comp.c \
-		$(INC)/sys/types.h \
-		$(INC)/stdio.h \
-		$(INC)/arpa/nameser.h \
-		res.h \
-		$(FRC)
-
-res_debug.o:	res_debug.c \
-		$(INC)/sys/types.h \
-		$(INC)/netinet/in.h \
-		$(INC)/stdio.h \
-		$(INC)/arpa/nameser.h \
-		res.h \
-		$(FRC)
-
-res_init.o:	res_init.c \
-		$(INC)/sys/types.h \
-		$(INC)/sys/socket.h \
-		$(INC)/netinet/in.h \
-		$(INC)/stdio.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-res_mkquery.o:	res_mkquery.c \
-		$(INC)/stdio.h \
-		$(INC)/sys/types.h \
-		$(INC)/netinet/in.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-res_query.o:	res_query.c \
-		$(INC)/sys/param.h \
-		$(INC)/sys/socket.h \
-		$(INC)/netinet/in.h \
-		$(INC)/ctype.h \
-		$(INC)/netdb.h \
-		$(INC)/stdio.h \
-		$(INC)/errno.h \
-		$(INC)/string.h \
-		$(INC)/arpa/inet.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-res_send.o:	res_send.c \
-		$(INC)/sys/param.h \
-		$(INC)/sys/time.h \
-		$(INC)/sys/socket.h \
-		$(INC)/sys/uio.h \
-		$(INC)/netinet/in.h \
-		$(INC)/stdio.h \
-		$(INC)/errno.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-sethostent.o:	sethostent.c \
-		$(INC)/sys/types.h \
-		$(INC)/arpa/nameser.h \
-		$(INC)/netinet/in.h \
-		$(INC)/resolv.h \
-		res.h \
-		$(FRC)
-
-strcasecmp.o:	strcasecmp.c \
-		res.h \
-		$(FRC)

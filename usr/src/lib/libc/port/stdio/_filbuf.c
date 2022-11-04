@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/_filbuf.c	1.8"
+#ident	"@(#)libc-port:stdio/_filbuf.c	1.7"
 /*LINTLIBRARY*/
 
 #ifdef __STDC__
@@ -14,7 +14,6 @@
 #include "synonyms.h"
 #include "shlib.h"
 #include <stdio.h>
-#include <errno.h>
 #include "stdiom.h"
 
 extern int read();
@@ -31,10 +30,8 @@ _filbuf(iop)	/* fill buffer, return first character or EOF */
 	{
 		if (iop->_flag & _IORW)
 			iop->_flag |= _IOREAD; /* change direction to read - fseek */
-		else {
-			errno = EBADF;
+		else
 			return EOF;
-		}
 	}
 
 	if (iop->_base == 0)

@@ -5,8 +5,8 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)curses:screen/rmident.sh	1.5"
-H='curses.ext maketerm.ed compiler.h curses.form curshdr.h object.h otermcap.h print.h unctrl.h'
+#ident	"@(#)curses:screen/rmident.sh	1.4"
+H='curses.ext maketerm.ed compiler.h curses.form curshdr.h object.h otermcap.h print.h unctrl.h uparm.h'
 for i in $H
 do 
 	echo de-identing $i

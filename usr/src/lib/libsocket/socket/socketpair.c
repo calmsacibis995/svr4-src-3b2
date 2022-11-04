@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:socketpair.c	1.10"
+#ident	"@(#)libsocket:socketpair.c	1.9"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -29,7 +29,9 @@
  * 	          All rights reserved.
  *  
  */
-
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/time.h>

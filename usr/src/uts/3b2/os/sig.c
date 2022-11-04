@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/sig.c	1.52"
+#ident	"@(#)kernel:os/sig.c	1.49.2.1"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/psw.h"
@@ -158,7 +158,7 @@ isjobstop(sig)
 		if (sigismember(&p->p_sig, SIGCONT)) {
 			sigdelset(&p->p_sig, SIGCONT);
 			sigdelq(p, SIGCONT);
-		} else if (sig == SIGSTOP || p->p_detached == 0) {
+		} else if (sig == SIGSTOP || !(p->p_flag & SDETACHED)) {
 			if (stop(p, PR_JOBCONTROL, sig, 0))
 				swtch();
 			p->p_wcode = CLD_CONTINUED;
@@ -307,7 +307,7 @@ issig(why)
 
 /*
  * Put the specified process into the stopped state and notify
- * tracers via wakeprocs().  Returns 0 if process can't be stopped.
+ * tracers via wakeup().  Returns 0 if process can't be stopped.
  * Returns non-zero in the normal case.
  */
 int
@@ -344,7 +344,7 @@ stop(p, why, what, firststop)
 		if (p->p_flag & STRC) {		/* ptrace() */
 			p->p_wcode = CLD_TRAPPED;
 			p->p_wdata = what;
-			wakeprocs((caddr_t)p->p_parent, PRMPT);
+			wakeup((caddr_t)p->p_parent);
 			if (!firststop || !sigismember(&p->p_sigmask, what)) {
 				p->p_flag |= SPSTART;
 				break;
@@ -357,7 +357,7 @@ stop(p, why, what, firststop)
 			p->p_flag |= SXSTART;
 		p->p_flag &= ~SPRSTOP;
 		if (p->p_trace)			/* /proc */
-			wakeprocs((caddr_t)p->p_trace, PRMPT);
+			wakeup((caddr_t)p->p_trace);
 		break;
 	}
 
@@ -401,18 +401,6 @@ psig()
 		ASSERT(sig);
 		ASSERT(!sigismember(&p->p_ignore, sig));
 		if ((func = u.u_signal[sig-1]) != SIG_DFL) {
-			k_siginfo_t *sip;
-
-                        /*
-                         * save siginfo pointer here, in case the
-                         * the signal's reset bit is on
-                         */
-
-			if (p->p_curinfo && sigismember(&p->p_siginfo, sig))
-                                sip = &p->p_curinfo->sq_info;
-			else
-                                sip = NULL;
-
 			if (u.u_sigflag & SOMASK) 
 				u.u_sigflag &= ~SOMASK;
 			else 
@@ -422,7 +410,7 @@ psig()
 				sigaddset(&p->p_hold, sig);
 			if (sigismember(&u.u_sigresethand, sig))
 				setsigact(sig, SIG_DFL, 0, 0);
-			rc = sendsig(sig, sip, func);
+			rc = sendsig(sig, func);
 			p->p_cursig = 0;
 			if (p->p_curinfo) {
 				kmem_free((caddr_t)p->p_curinfo,
@@ -559,7 +547,7 @@ ptrace(uap, rvp)
 	else
 		rvp->r_val1 = ipc.ip_data;
 	ipc.ip_lock = 0;
-	wakeprocs((caddr_t)&ipc, PRMPT);
+	wakeup((caddr_t)&ipc);
 	return error;
 }
 
@@ -699,12 +687,12 @@ procxmt()
 				p->p_curinfo = NULL;
 			}
 		}
-		wakeprocs((caddr_t)&ipc, PRMPT);
+		wakeup((caddr_t)&ipc);
 		return 1;
 
 	case 8: /* force exit */
 
-		wakeprocs((caddr_t)&ipc, PRMPT);
+		wakeup((caddr_t)&ipc);
 		p->p_flag |= SPTRX;
 		return 1;
 
@@ -712,7 +700,7 @@ procxmt()
 	error:
 		ipc.ip_req = -1;
 	}
-	wakeprocs((caddr_t)&ipc, PRMPT);
+	wakeup((caddr_t)&ipc);
 	return 0;
 }
 
@@ -792,14 +780,12 @@ sigcld(cp)
 		case CLD_EXITED:
 		case CLD_DUMPED:
 		case CLD_KILLED:
-			wakeprocs((caddr_t)cp, PRMPT);
-			wakeprocs((caddr_t)pp, PRMPT);
+			wakeup((caddr_t)pp);
 			break;
 
 		case CLD_STOPPED:
 		case CLD_CONTINUED:
-			wakeprocs((caddr_t)cp, PRMPT);
-			wakeprocs((caddr_t)pp, PRMPT);
+			wakeup((caddr_t)pp);
 			if (pp->p_flag & SJCTL)
 				break;
 
@@ -934,6 +920,44 @@ postsig:
 	sigtoproc(p, sig, infop->si_code <= 0);
 }
 
+/*
+ * Duplicate siginfo_t structures.  Called from newproc().
+ */
+void
+sigdupq(cp, pp)
+	proc_t *cp;	/* child process */
+	proc_t *pp;	/* parent process */
+{
+	register sigqueue_t *sqp;
+	register sigqueue_t *nsqp;
+	register sigqueue_t **psqp = &cp->p_sigqueue;
+
+	/*
+	 * Duplicate the queue of pending siginfo_t's.
+	 */
+	for (sqp = pp->p_sigqueue; sqp; sqp = sqp->sq_next) {
+		nsqp = (sigqueue_t *)kmem_alloc(sizeof(sigqueue_t), KM_SLEEP);
+		bcopy((caddr_t)&sqp->sq_info, (caddr_t)&nsqp->sq_info,
+		  sizeof(k_siginfo_t));
+		*psqp = nsqp;
+		psqp = &nsqp->sq_next;
+	}
+	*psqp = NULL;
+
+	/*
+	 * Duplicate the current siginfo_t, if any.
+	 */
+	if ((sqp = pp->p_curinfo) == NULL)
+		cp->p_curinfo = NULL;
+	else {
+		nsqp = (sigqueue_t *)kmem_alloc(sizeof(sigqueue_t), KM_SLEEP);
+		bcopy((caddr_t)&sqp->sq_info, (caddr_t)&nsqp->sq_info,
+		  sizeof(k_siginfo_t));
+		nsqp->sq_next = NULL;
+		cp->p_curinfo = nsqp;
+	}
+}
+
 sigqueue_t	*
 sigappend(toks, toqueue, fromks, fromqueue)
 	register k_sigset_t	*toks;
@@ -965,14 +989,9 @@ sigprepend(toks, toqueue, fromks, fromqueue)
 	register k_sigset_t	*fromks;
 	register sigqueue_t	*fromqueue;
 {
-	register sigqueue_t	*endqueue;
-
 	sigorset(toks, fromks);
 	if (fromqueue != NULL) {
-		for (endqueue = fromqueue; endqueue->sq_next;
-		  endqueue = endqueue->sq_next)
-			;
-		endqueue->sq_next = toqueue;
+		fromqueue->sq_next = toqueue;
 		toqueue = fromqueue;
 	}
 	return toqueue;

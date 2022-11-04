@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-# ident	"@(#)libnet:saf/doconfig.c	1.5"
+# ident	"@(#)libnet:saf/doconfig.c	1.4"
 
 # include <stdio.h>
 # include <fcntl.h>
@@ -27,7 +27,7 @@
 extern	char	*strchr();
 extern	char	*getenv();
 extern	char	*malloc();
-extern	char	**_environ;
+extern	char	**environ;
 extern	int	errno;
 
 char	*eatwhite();
@@ -489,7 +489,7 @@ int waitflg;
 			/* stderr */
 			if (dup(0) != 2)
 				return(-1);
-			execle("/usr/bin/sh", "sh", "-c", p, 0, _environ);
+			execle("/usr/bin/sh", "sh", "-c", p, 0, environ);
 			/* if we get here, there is a problem - remember that
 			   this is the child */
 			exit(1);

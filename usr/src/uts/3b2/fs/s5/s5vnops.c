@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5vnops.c	1.8.1.47"
+#ident	"@(#)fs:fs/s5/s5vnops.c	1.8.1.30"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -37,7 +37,6 @@
 #include "sys/proc.h"
 #include "sys/disp.h"
 #include "sys/user.h"
-#include "sys/swap.h"
 
 #include "sys/fs/s5param.h"
 #include "sys/fs/s5dir.h"
@@ -67,7 +66,10 @@ STATIC int	s5mkdir(), s5rmdir(), s5readdir();
 STATIC int	s5symlink(), s5readlink(), s5fsync(), s5fid();
 STATIC int	s5seek(), s5frlock(), s5space();
 STATIC int	s5getpage(), s5putpage(), s5map(), s5addmap(), s5delmap();
+STATIC int	s5bloop(), s5writelbn();
+
 STATIC void	s5inactive(), s5rwlock(), s5rwunlock();
+extern int fs_setfl();
 
 struct vnodeops s5vnodeops = {
 	s5open,
@@ -106,32 +108,7 @@ struct vnodeops s5vnodeops = {
 	s5delmap,
 	fs_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -249,7 +226,6 @@ s5getattr(vp, vap, flags, cr)
 {
 	register struct inode *ip = VTOI(vp);
 	int error = 0;
-	u_long nlblocks;
 
 	/*
 	 * Return (almost) all the attributes.  This should be refined so
@@ -281,10 +257,9 @@ s5getattr(vp, vap, flags, cr)
 	else
 		vap->va_blksize = VBSIZE(vp);
 	vap->va_vcode = ip->i_vcode;
-	if (vap->va_mask & AT_NBLOCKS) {
-		if ((error = s5getsp(vp, &nlblocks)) == 0)
-			vap->va_nblocks = FsLTOP(S5VFS(vp->v_vfsp), nlblocks);
-	} else
+	if (vap->va_mask & AT_NBLOCKS)
+		error = s5getsp(vp, &vap->va_nblocks);
+	else
 		vap->va_nblocks = 0;
 	IUNLOCK(ip);
 	return error;
@@ -332,6 +307,8 @@ s5setattr(vp, vap, flags, cr)
 				ip->i_mode &= ~ISGID;
 		}
 		ip->i_flag |= ICHG;
+		if ((vp->v_flag & VTEXT) && ((ip->i_mode & ISVTX) == 0))
+			xrele(vp);
 		if (MANDLOCK(vp, vap->va_mode)) {
 			if (error = fs_vcode(vp, &ip->i_vcode))
 				goto out;
@@ -369,8 +346,7 @@ s5setattr(vp, vap, flags, cr)
 		ip->i_flag |= ICHG;
 	}
 	/*
-	 * Truncate file.  Must have write permission and file must not
-	 * be a directory.
+	 * Truncate file.  Must have write permission and not be a directory.
 	 */
 	if (mask & AT_SIZE) {
 		if (vap->va_size != 0) {
@@ -515,7 +491,7 @@ s5create(dvp, name, vap, excl, mode, vpp, cr)
 	 * nothing more we can do here because the resultant vnode may
 	 * be of a different file system type.
 	 */
-	if (ip != NULL && ITOV(ip)->v_vfsmountedhere) {
+	if (error == 0 && ITOV(ip)->v_vfsmountedhere) {
 		vnode_t *vp = ITOV(ip);
 
 		IUNLOCK(ip);
@@ -671,13 +647,6 @@ s5rename(sdvp, snm, tdvp, tnm, cr)
 		goto out;
 	}
 	/*
-	 * POSIX 1003.3 requires write permission on a directory in order
-	 * to rename it.
-	 */
-	if ((sip->i_mode & IFMT) == IFDIR
-	  && (error = iaccess(sip, IWRITE, cr)) != 0)
-		goto out;
-	/*
 	 * Link source to the target.
 	 */
 	if (error = direnter(tdp, tnm, DE_RENAME, sdp, sip,
@@ -689,7 +658,7 @@ s5rename(sdvp, snm, tdvp, tnm, cr)
 	 * If the entry has changed just forget about it.  Release
 	 * the source inode.
 	 */
-	if ((error = dirremove(sdp, snm, sip, NULLVP,
+	if ((error = dirremove(sdp, snm, sip, (struct vnode *) 0,
 	  DR_RENAME, cr)) == ENOENT)
 		error = 0;
 
@@ -1040,7 +1009,7 @@ s5frlock(vp, cmd, bfp, flag, offset, cr)
 	/*
 	 * If file is being mapped, disallow frlock.
 	 */
-	if (ip->i_mapcnt > 0 && MANDLOCK(vp, ip->i_mode))
+	if (ip->i_mapcnt > 0)
 		return EAGAIN;
 
 	return fs_frlock(vp, cmd, bfp, flag, offset, cr);
@@ -1064,49 +1033,6 @@ s5space(vp, cmd, bfp, flag, offset, cr)
 		error = s5freesp(vp, bfp, flag);
 	return error;
 }
-
-/*
- * Compute the total number of blocks allocated to the file, including
- * indirect blocks as well as data blocks, on the assumption that the
- * file contains no holes.  (It's too expensive to account for holes
- * since that requires a complete scan of all indirect blocks.)
- */
-
-#define	NDADDR	(NADDR - 3)
-
-STATIC int
-s5getsp(vp, totp)
-	struct vnode *vp;
-	u_long *totp;
-{
-	struct s5vfs *s5vfsp = S5VFS(vp->v_vfsp);
-	int bshift = s5vfsp->vfs_bshift;
-	int inshift, indir;
-	u_long blocks, tot;
-
-	blocks = tot = (VTOI(vp)->i_size + VBSIZE(vp) - 1) >> bshift;
-	if (blocks > NDADDR) {
-		inshift = s5vfsp->vfs_nshift;
-		indir = s5vfsp->vfs_nindir;
-		tot += ((blocks-NDADDR-1) >> inshift) + 1;
-		if (blocks > NDADDR + indir) {
-			tot += ((blocks-NDADDR-indir-1) >> (inshift*2)) + 1;
-			if (blocks > NDADDR + indir + indir*indir)
-				tot++;
-		}
-	}
-	*totp = tot;
-	return 0;
-}
-
-#if 0
-
-/*
- * This version of s5getsp() actually works, but it's too expensive to
- * use.
- */
-
-STATIC int s5getsp();
 
 /*
  * Count total number of blocks allocated to the file.  Call s5bloop()
@@ -1142,18 +1068,23 @@ s5getsp(vp, blkcntp)
 	for (i = NADDR - 1; i >= 0; i--) {
 		if ((bn = ip->i_addr[i]) == 0)
 			continue;
+
 		switch (i) {
+
 		default:
 			(*blkcntp)++;
 			break;
+
 		case NADDR-3:
 			if (error = s5bloop(vfsp, bn, 0, 0, blkcntp))
 				goto out;
 			break;
+
 		case NADDR-2:
 			if (error = s5bloop(vfsp, bn, 1, 0, blkcntp))
 				goto out;
 			break;
+
 		case NADDR-1:
 			if (error = s5bloop(vfsp, bn, 1, 1, blkcntp))
 				goto out;
@@ -1211,7 +1142,6 @@ s5bloop(vfsp, bn, f1, f2, blkcntp)
 	return error;
 }
 
-#endif
 
 /*
  * Page-handling operations: getpage() and putpage().
@@ -1292,24 +1222,24 @@ reread:
 	nio = 0; 
 
 	if (multi_io > 1) {
-		for (i = 0; i < multi_io; i += 2) {
-			if (ip->i_size <= curoff)
-				break;
+		for(i=0; i < multi_io; i=i+2) {
 			bnp2 = bnp + 1;
 			err = bmap(ip, lbn+i, bnp, bnp2, rw, 0);
 			if (err)
 				goto out;
-			if (ip->i_size > curoff+bsize && *bnp2 == S5_HOLE
-			  && (err = bmap(ip, lbn+i+1, bnp2, 0, rw, 0)))
-				goto out;
-			if (protp != NULL
-			  && (*bnp == S5_HOLE
-			    || (*bnp2 == S5_HOLE
-			      && curoff+bsize < ip->i_size)))
-				*protp &= ~PROT_WRITE;
+			if((ip->i_size > curoff + bsize) && (*bnp2 == S5_HOLE)) {
+					err = bmap(ip, lbn+i+1, bnp2, 0, rw, 0);
+					if (err)
+						goto out;
+			}
+			if (protp != NULL) {
+				if ((*bnp == S5_HOLE) || ((*bnp2 == S5_HOLE) &&
+			  	(curoff+bsize < ip->i_size)))
+					*protp &= ~PROT_WRITE;
+			}
 			if (*bnp != S5_HOLE)
 				nio++;
-			if (*bnp2 != S5_HOLE && curoff+bsize < ip->i_size)
+			if ((*bnp2 != S5_HOLE) && ((curoff + bsize) < ip->i_size))
 				nio++;
 			bnp = bnp + 2;
 			curoff = curoff + 2*bsize;
@@ -1320,11 +1250,12 @@ reread:
 		if (err)
 			goto out;
 		nio = 1;
-		if (s5_ra && ip->i_nextr == off && *bnp2 != S5_HOLE
-		  && lbnoff + bsize < ip->i_size)
+		if (s5_ra && ip->i_nextr == off && *bnp2 != S5_HOLE &&
+	  	    lbnoff + bsize < ip->i_size) {
 			do_ra = 1;
-		else
+		} else {
 			do_ra = 0;
+		}
 	}
 
 	bnp = bn;
@@ -1359,10 +1290,11 @@ reread:
 		 */
 		if (pl != NULL) {
 			pp = rm_allocpage(seg, addr, PAGESIZE, P_CANWAIT);
-			for (i = 0; i < multi_io; i++)
+			for (i=0; i<multi_io; i++)
 				pp->p_dblist[i] = bn[i];
 			if (page_enter(pp, vp, off))
-				cmn_err(CE_PANIC, "s5_getapage page_enter");
+				cmn_err(CE_PANIC,
+				  "s5_getapage page_enter");
 			pagezero(pp, 0, PAGESIZE);
 			page_unlock(pp);
 			pp->p_nio = nio;
@@ -1382,15 +1314,11 @@ reread:
 
 		ASSERT(pp != NULL);
 		pp2 = pp;
-		if (bsize < PAGESIZE) {
-			for (i = 0; i < multi_io; i++)
+		do {
+			for (i=0; i<multi_io; i++)
 				pp2->p_dblist[i] = bn[i];
-		} else {
-			do {
-				pp2->p_dblist[0] = bn[0];
-				pp2 = pp2->p_next;
-			} while (pp2 != pp);
-		}
+			pp2 = pp2->p_next;
+		} while (pp2 != pp);
 
 		if (pl != NULL) {
 			register int sz;
@@ -1435,6 +1363,12 @@ reread:
 		bp[0]->b_dev = cmpdev(dev);
 		bp[0]->b_blkno = LTOPBLK(*bnp, bsize) + 
 				   ((io_off - lbnoff) >> SCTRSHFT);
+#if 0 /* if smart driver */
+		bp[0]->b_un.b_addr = 0;
+#else
+		pgaddr = pfntokv(page_pptonum(pp));
+		bp[0]->b_un.b_addr = (caddr_t)pgaddr;
+#endif
 
 		/*
 		 * Zero part of page which we are not
@@ -1483,7 +1417,12 @@ reread:
 				(*bufp)->b_edev = dev;
 				(*bufp)->b_dev = cmpdev(dev);
 				(*bufp)->b_blkno = LTOPBLK(*bnp, bsize);
+#if 0 /* if smart driver */
 				(*bufp)->b_un.b_addr = (caddr_t)pgoff;
+#else
+				pgaddr = pfntokv(page_pptonum(pp2));
+				(*bufp)->b_un.b_addr = (caddr_t)(pgaddr + pgoff);
+#endif
 
 				/*
 			 	 * Zero part of page which we are not
@@ -1505,29 +1444,28 @@ reread:
 
 		lbnoff += bsize;
 		addr2 = addr + (lbnoff - off);
-		if (addr2 >= seg->s_base + seg->s_size)
+		if (addr2 >= seg->s_base + seg->s_size) {
 			pp2 = NULL;
-		else
+		} else {
 			pp2 = pvn_kluster(vp, lbnoff, seg, addr2, &io_off,
-			  &io_len, lbnoff, blksz, 1);
+				&io_len, lbnoff, blksz, 1);
+		}
 		pgoff = 0;
 
 		if (pp2 != NULL) {
 			pp = pp2;
-			do {
-				pp->p_dblist[0] = bn[1];
-				pp = pp->p_next;
-			} while (pp != pp2);
+			pp->p_dblist[0] = bn[1];
 
-			*bufp =
-			  pageio_setup(pp2, io_len, devvp, (B_ASYNC | B_READ));
+			*bufp = pageio_setup(pp2, io_len, devvp, (B_ASYNC | B_READ));
 			(*bufp)->b_edev = dev;
 			(*bufp)->b_dev = cmpdev(dev);
-			(*bufp)->b_blkno = LTOPBLK(*bnp, bsize) +
-			  ((io_off - lbnoff) >> SCTRSHFT);
+			(*bufp)->b_blkno = LTOPBLK(*bnp, bsize) + ((io_off - lbnoff) >> SCTRSHFT);
+			pgaddr = pfntokv(page_pptonum(pp2));
+			(*bufp)->b_un.b_addr = (caddr_t)pgaddr;
 			xlen = (io_len + pgoff) & PAGEOFFSET;
 			if (xlen != 0)
-				pagezero(pp2->p_prev, xlen, PAGESIZE - xlen);
+				pagezero(pp2->p_prev, xlen,
+					 PAGESIZE - xlen);
 			(*bdevsw[getmajor(dev)].d_strategy)(*bufp);
 			vminfo.v_pgin++;
 			vminfo.v_pgpgin += btopr(io_len);
@@ -1649,8 +1587,6 @@ s5getpage(vp, off, len, protp, pl, plsz, seg, addr, rw, cr)
 	return err;
 }
 
-STATIC int s5writelbn();
-
 /*
  * Flags are composed of {B_ASYNC, B_INVAL, B_FREE, B_DONTNEED, B_FORCE}
  * If len == 0, do from off to EOF.
@@ -1680,7 +1616,7 @@ s5putpage(vp, off, len, flags, cr)
 	int err = 0, werr;
 	struct s5vfs *s5vfsp = S5VFS(vp->v_vfsp);
 	int fs_bshift, fs_bmask;
-	int i, nio, curoff, do_bmap;
+	int i, nio, curoff;
 
 	if (vp->v_flag & VNOMAP)
 		return ENOSYS;
@@ -1756,25 +1692,33 @@ again:
 		ip->i_nextr = 0;
 
 		/*
+		 * If the modified time on the inode has not already been
+		 * set elsewhere (e.g. for write/setattr) and this is not
+		 * a call from msync (B_FORCE) we set the time now.
+		 * This gives us approximate modified times for mmap'ed files
+		 * which are modified via stores in the user address space.
+		 */
+		if ((ip->i_flag & IMODTIME) == 0 || (flags & B_FORCE)) {
+			ip->i_flag |= IUPD;
+			ITIMES(ip);
+		}
+		/*
 		 * This is an attempt to clean up loose ends left by
 		 * applications that store into mapped files.  It's
 		 * insufficient, strictly speaking, for ill-behaved
 		 * applications, but about the best we can do.
 		 */
-		if ((ip->i_flag & IMODTIME) == 0 || (flags & B_FORCE)) {
-			ip->i_flag |= IUPD;
-			ITIMES(ip);
-			if (vp->v_type == VREG) {
-				ILOCK(ip);
-				err = fs_vcode(vp, &ip->i_vcode);
-				IUNLOCK(ip);
-			}
+		if (vp->v_type == VREG) {
+			ILOCK(ip);
+			err = fs_vcode(vp, &ip->i_vcode);
+			IUNLOCK(ip);
 		}
 	}
 
 	/*
 	 * Handle all the dirty pages not yet dealt with.
 	 */
+	bnp = bn;
 	while (err == 0 && (pp = dirty) != NULL) {
 		/*
 		 * Pull off a contiguous chunk that fits in one lbn.
@@ -1782,51 +1726,11 @@ again:
 		curoff = io_off = pp->p_offset;
 		lbn = io_off >> s5vfsp->vfs_bshift;
 		nio = 0;
-		do_bmap = 0;
-		if (!IS_SWAPVP(vp)) {
-			for (i = 0, bnp = bn; i < multi_io; i++, bnp++) 
-				*bnp = S5_HOLE;
-			for (i = 0, bnp = bn; i < multi_io; i++, bnp++) {
-				if (ip->i_size <= curoff)
-					break;
-				*bnp = pp->p_dblist[i];
-				if (*bnp == S5_HOLE) {
-					do_bmap = 1;
-					break;
-				} else
-					nio++;
-				curoff = curoff + bsize;
-			}
-		} else 
-			do_bmap = 1;
-		
-		if (do_bmap) {
-			curoff = pp->p_offset;
-			nio = 0;
-			for (i = 0, bnp = bn; i < multi_io; i++, bnp++)
-				*bnp = S5_HOLE;
-			for (i = 0, bnp = bn; i < multi_io; i += 2) {
-				if (ip->i_size <= curoff)
-					break;
-				bnp2 = bnp + 1;
-				if (err = bmap(ip, lbn+i, bnp, bnp2,
-				  S_WRITE, 1))
-					break;
-				if (*bnp2 == S5_HOLE
-				  && ip->i_size > curoff + bsize
-			  	  && (err = bmap(ip, lbn+i+1, bnp2,
-				    0, S_WRITE, 1)))
-					break;
-				if (*bnp != S5_HOLE)
-					nio++;
-				if (multi_io > 1 && *bnp2 != S5_HOLE
-			  	   && curoff + bsize < ip->i_size)
-					nio++;
-				bnp = bnp + 2;
-				curoff = curoff + 2*bsize;
-			}
-			if (err)
-				break;
+
+		for (i = 0, bnp = bn; i < multi_io; i++, bnp++) {
+			*bnp = pp->p_dblist[i];
+			if (*bnp != S5_HOLE)
+				nio++;
 		}
 
 		page_sub(&dirty, pp);
@@ -1850,7 +1754,7 @@ again:
 		 * Check for page length rounding problems
 	  	 */
 		if (io_off + io_len > lbn_off + bsize) {
-			ASSERT((io_off+io_len) - (lbn_off+bsize) < PAGESIZE);
+			ASSERT((io_off + io_len) - (lbn_off + bsize) < PAGESIZE);
 			io_len = lbn_off + bsize - io_off;
 		}
 
@@ -1870,10 +1774,10 @@ again:
 				*bnp = LTOPBLK(*bnp, bsize);
 				if (multi_io == 1) 
 				 	werr = s5writelbn(ip, *bnp, io_list,
-					  io_len, 0, flags);
+						  io_len, 0, flags);
 				else
-					werr = s5writelbn(ip, *bnp, io_list,
-					  bsize, bsize*i, flags);
+					werr = s5writelbn(ip, *bnp, io_list, bsize,
+				  	   	  bsize*i, flags);
 				if (err == 0)
 					err = werr;
 			}
@@ -1934,7 +1838,11 @@ s5writelbn(ip, bn, pp, len, pgoff, flags)
 	bp->b_edev = ip->i_dev;
 	bp->b_dev = cmpdev(ip->i_dev);
 	bp->b_blkno = bn + ((pp->p_offset & (bsize - 1)) >> SCTRSHFT);
+#if 0
 	bp->b_un.b_addr = (caddr_t)pgoff;
+#else
+	bp->b_un.b_addr = (caddr_t)pfntokv(page_pptonum(pp)) + pgoff;
+#endif
 
 	(*bdevsw[getmajor(ip->i_dev)].d_strategy)(bp);
 
@@ -1966,7 +1874,7 @@ s5map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 {
 	struct segvn_crargs vn_a;
 	register int error = 0;
-	register struct inode *ip = VTOI(vp);
+	register struct inode *ip;
 
 	if (vp->v_flag & VNOMAP)
 		return ENOSYS;
@@ -1978,15 +1886,15 @@ s5map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 		return ENODEV;
 
 	/*
-	 * If file has active mandatory lock, disallow mmap.
+	 * If file is being locked, disallow mmap.
 	 */
-	if (vp->v_filocks != NULL && MANDLOCK(vp, ip->i_mode))
+	if (vp->v_filocks != NULL)
 		return EAGAIN;
 
 	/*
 	 * Don't allow a mapping beyond the last page in the file.
 	 */
-	if (off + len > ((ip->i_size + PAGEOFFSET) & PAGEMASK))
+	if (off + len > ((VTOI(vp)->i_size + PAGEOFFSET) & PAGEMASK))
 		return ENXIO;
 
 	if ((flags & MAP_FIXED) == 0) {
@@ -2006,6 +1914,7 @@ s5map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	 * since the only effect, if it failed for some reason (e.g.,
 	 * lack of memory), will be on performance.
 	 */
+	ip = VTOI(vp);
 	/* lock the inode to protect the blocklist during construction */
 	ILOCK(ip);
 	(void) s5allocmap(ip);
@@ -2024,11 +1933,11 @@ s5map(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 
 /* ARGSUSED */
 STATIC int
-s5addmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
+s5addmap(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	caddr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;
@@ -2042,11 +1951,11 @@ s5addmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
 
 /* ARGSUSED */
 STATIC int
-s5delmap(vp, off, as, addr, len, prot, maxprot, flags, cr)
+s5delmap(vp, off, as, addrp, len, prot, maxprot, flags, cr)
 	struct vnode *vp;
 	u_int off;
 	struct as *as;
-	addr_t addr;
+	caddr_t *addrp;
 	u_int len;
 	u_int prot, maxprot;
 	u_int flags;

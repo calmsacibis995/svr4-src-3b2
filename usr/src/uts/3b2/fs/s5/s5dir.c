@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5dir.c	1.15"
+#ident	"@(#)fs:fs/s5/s5dir.c	1.11"
 /*
  * Directory manipulation routines.
  * From outside this file, only dirlook(), direnter(), and dirremove()
@@ -84,8 +84,7 @@ dirlook(dp, namep, ipp, cr)
 		return 0;
 	}
 	ILOCK(dp);
-	if (((error = dirsearch(dp, namep, ipp, (off_t *) 0)) != 0)
-	  || dp != *ipp)
+	if (((error = dirsearch(dp, namep, ipp, (off_t *) 0)) != 0) || dp != *ipp)
 		IUNLOCK(dp);
 	if (error == 0) {
 		vp = ITOV(*ipp);
@@ -653,9 +652,7 @@ dirmakeinode(tdp, ipp, vap, op, cr)
 	if (op == DE_MKDIR)
 		error = dirmakedirect(ip, tdp);
 	if (error) {
-		/*
-		 * Throw away the inode we just allocated.
-		 */
+		/* Throw away inode we just allocated. */
 		ip->i_nlink = 0;
 		ip->i_flag |= ICHG;
 		iput(ip);
@@ -684,9 +681,7 @@ dirmakedirect(ip, dp)
 
 	if ((error = rdwri(UIO_WRITE, ip, (caddr_t) newdir, 2*SDSIZ,
 	  (off_t) 0, UIO_SYSSPACE, IO_SYNC, (int *) 0)) == 0) {
-		/*
-		 * Synchronously update link count of parent.
-		 */
+		/* Synchronously update link count of parent. */
 		dp->i_nlink++;
 		dp->i_flag |= ICHG|ISYN;
 		iupdat(dp);
@@ -711,10 +706,6 @@ dirremove(dp, namep, oip, cdir, op, cr)
 	int error, dotflag;
 	off_t offset;
 	struct direct dir;
-	static struct direct emptydirect[] = {
-		0, ".",
-		0, "..",
-	};
 
 	ip = NULL;
 	ILOCK(dp);
@@ -775,12 +766,21 @@ dirremove(dp, namep, oip, cdir, op, cr)
 			goto out;
 	} else if (op == DR_REMOVE) {
 		/*
-		 * unlink(2) requires a different check: allow only
-		 * the super-user to unlink a directory.
+		 * unlink(2) requires different checks:
+		 * (a) Allow only the super-user to unlink a directory.
+		 * (b) Don't allow a busy text file to be removed.
 		 */
-		if (ITOV(ip)->v_type == VDIR && !suser(cr)) {
+		struct vnode *vp = ITOV(ip);
+		if (vp->v_type == VDIR && !suser(cr)) {
 			error = EPERM;
 			goto out;
+		}
+		if (vp->v_flag & VTEXT) {
+			xrele(vp);
+			if ((vp->v_flag & VTEXT) && ip->i_nlink == 1) {
+				error = ETXTBSY;
+				goto out;
+			}
 		}
 	}
 	/*
@@ -807,16 +807,6 @@ dirremove(dp, namep, oip, cdir, op, cr)
 			dp->i_nlink--;
 			dnlc_remove(ITOV(ip), "..");
 		}
-		/*
-		 * If other references exist, zero the "." and "..
-		 * entries so they're inaccessible (POSIX requirement).
-		 * If the directory is going away we can avoid doing
-		 * this work.
-		 */
-		if (ITOV(ip)->v_count > 1 && ip->i_nlink <= 0)
-			(void) rdwri(UIO_WRITE, ip, (caddr_t) emptydirect,
-			  min(sizeof(emptydirect), ip->i_size),
-			  (off_t) 0, UIO_SYSSPACE, 0, (int *) 0);
 	} else
 		ip->i_nlink--;
 
@@ -952,7 +942,7 @@ out:
 	 * Unserialize.
 	 */
 	if (serialize_flag & RENAME_WAITING)
-		wakeprocs((caddr_t) &serialize_flag, PRMPT);
+		wakeup((caddr_t) &serialize_flag);
 	serialize_flag = 0;
 	return error;
 }

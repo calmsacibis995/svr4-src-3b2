@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/slp.c	1.31"
+#ident	"@(#)kernel:os/slp.c	1.29"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sbd.h"
@@ -61,7 +61,7 @@ struct sleepq {
 /*
  * This is used to hold the addr of each process being awaken up 
  * for that chan so they will be written to the buffer at the end 
- * of wakeprocs call.
+ * of wakeup call.
  */
 
 caddr_t	wpp[1024];
@@ -159,7 +159,7 @@ sleep(chan, disp)
 		ASSERT(pp->p_stat == SSLEEP);
 		if (runin != 0) {
 			runin = 0;
-			wakeprocs((caddr_t)&runin, PRMPT);
+			wakeup((caddr_t)&runin);
 		}
 		pp->p_flag &= ~SASLEEP;
 
@@ -304,7 +304,7 @@ wakeprocs(chan, preemptflg)
 			*plinkp = pp->p_link;
 			if (pp->p_stat == SSLEEP) {
 				pp->p_stat = SRUN;
-				if (preemptflg == NOPRMPT)
+				if (preemptflg == NOPREEMPT)
 					npwakecnt++;
 
 				/*
@@ -328,7 +328,7 @@ wakeprocs(chan, preemptflg)
 					if (runout > 0)
 						runsched = 1;
 				} else if (pp->p_pri > curpri &&
-				    preemptflg != NOPRMPT)
+				    preemptflg != NOPREEMPT)
 					runrun = 1;
 			}
 		} else {
@@ -339,7 +339,7 @@ wakeprocs(chan, preemptflg)
 	sqp->sq_last = rp;
 	if (runsched) {
 		runout = 0;
-		setrun(proc_sched);
+		setrun(nproc[0]);
 	}
 #ifdef KPERF
 	if (kpftraceflg && outbuf == 0) {
@@ -405,7 +405,7 @@ setrun(pp)
 			 */
 			if ((pp->p_flag & SPSTART)
 			  && pp->p_whystop == PR_SIGNALLED)
-				wakeprocs((caddr_t)pp->p_parent, PRMPT);
+				wakeup((caddr_t)pp->p_parent);
 			splx(s);
 			return;
 		}
@@ -433,7 +433,7 @@ setrun(pp)
 	if ((pp->p_flag & SLOAD) == 0) {
 		if (runout > 0) {
 			runout = 0;
-			setrun(proc_sched);
+			setrun(nproc[0]);
 		}
 	} else if (pp->p_pri > curpri)
 		runrun = 1;
@@ -442,9 +442,17 @@ setrun(pp)
 }
 
 
+/*
+ * The following is for binary compatibility only.  New code
+ * which calls wakeup() should be including the sysmacros.h
+ * header file which defines wakeup() and wakeupnp() macro
+ * interfaces to the wakeprocs() function.
+ */
+#undef wakeup
+
 void
 wakeup(chan)
 register caddr_t	chan;
 {
-	wakeprocs(chan, PRMPT);
+	wakeprocs(chan, PREEMPTOK);
 }

@@ -1,0 +1,7 @@
+#ident	"@(#)pkg.slnmap:prototype	1.1"
+
+# packaging files
+i pkginfo
+i depend
+i postinstall
+i preremove

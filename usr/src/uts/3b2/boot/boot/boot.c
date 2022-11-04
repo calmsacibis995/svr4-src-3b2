@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/boot/boot.c	1.14"
+#ident	"@(#)boot:boot/boot/boot.c	1.12"
 #include	"sys/types.h"
 #include	"sys/psw.h"
 #include	"sys/elog.h"
@@ -28,7 +28,6 @@
 #include	"sys/fsiboot.h"
 #include 	"sys/libfm.h"
 #include	"sys/id.h"
-#include	"sys/inline.h"
 
 char magic = FALSE;
 
@@ -66,10 +65,6 @@ main()
 
 	demand_config = FALSE;
 
-
-	if (P_CMDQ->b_type == UNIXBOOT)
-		strcpy(name, "unix");
-
 	/* Loop forever until the final program name to be loaded is found. */
 
 	for (;;)
@@ -90,6 +85,9 @@ main()
 		    (STRCMP(name, FILLEDT) == 0) ||
 		    (STRCMP(name, LBOOT) == 0))
 			check_config = FALSE;
+		else
+			if (P_CMDQ->b_type == UNIXBOOT)
+				strcpy(name, "unix");
 
 		if (P_CMDQ->b_type == AUTOBOOT){	
 			RNVRAM((char *)(UNX_NVR->bootname), oname, 15);

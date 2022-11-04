@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nsu:postinstall	1.20.3.2"
+#ident	"@(#)pkg.nsu:postinstall	1.20.1.4"
 #
 #	postinstall script for nsu package
 #
@@ -150,143 +150,12 @@ else
 fi
 
 #
-#	create the hosts and services files for the loopback drivers...
-#
-
-mkdir /etc/net /etc/net/ticots /etc/net/ticlts /etc/net/ticotsord >/dev/null 2>&1
-
-if grep '^rpcbind	rpc' /etc/net/ticots/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "rpcbind	rpc" >>/etc/net/ticots/services
-fi
-
-if grep '^keyserv	keyserv' /etc/net/ticots/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "keyserv	keyserv" >>/etc/net/ticots/services
-fi
-
-if grep '^listen	serve' /etc/net/ticots/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "listen	serve" >>/etc/net/ticots/services
-fi
-
-if grep '^statd	statd' /etc/net/ticots/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "statd	statd" >>/etc/net/ticots/services
-fi
-
-if grep '^lockd	lockd' /etc/net/ticots/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "lockd	lockd" >>/etc/net/ticots/services
-fi
-
-if grep '^rpcbind	rpc' /etc/net/ticotsord/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "rpcbind	rpc" >>/etc/net/ticotsord/services
-fi
-
-if grep '^keyserv	keyserv' /etc/net/ticotsord/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "keyserv	keyserv" >>/etc/net/ticotsord/services
-fi
-
-if grep '^listen	serve' /etc/net/ticotsord/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "listen	serve" >>/etc/net/ticotsord/services
-fi
-
-if grep '^statd	statd' /etc/net/ticotsord/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "statd	statd" >>/etc/net/ticotsord/services
-fi
-
-if grep '^lockd	lockd' /etc/net/ticotsord/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "lockd	lockd" >>/etc/net/ticotsord/services
-fi
-
-if grep '^rpcbind	rpc' /etc/net/ticlts/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "rpcbind	rpc" >>/etc/net/ticlts/services
-fi
-
-if grep '^keyserv	keyserv' /etc/net/ticlts/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "keyserv	keyserv" >>/etc/net/ticlts/services
-fi
-
-if grep '^listen	serve' /etc/net/ticlts/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "listen	serve" >>/etc/net/ticlts/services
-fi
-
-if grep '^statd	statd' /etc/net/ticlts/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "statd	statd" >>/etc/net/ticlts/services
-fi
-
-if grep '^lockd	lockd' /etc/net/ticlts/services >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "lockd	lockd" >>/etc/net/ticlts/services
-fi
-
-#
-#	update the hosts files for the loopback drivers...
-#
-
-UNAME=`/usr/bin/uname`
-echo "$UNAME	$UNAME" >/etc/net/ticots/hosts
-echo "$UNAME	$UNAME" >/etc/net/ticlts/hosts
-echo "$UNAME	$UNAME" >/etc/net/ticotsord/hosts
-
-#
-#	Modify the OAM menu to include name to address mapping...
-#
-
-if fgrep 'name_to_address^Machine and Service Address Management^name_to_addr/map.menu' /usr/sadm/sysadm/menu/netservices/netserve.menu >/dev/null 2>&1
-then
-	: Already there!
-else
-	echo "name_to_address^Machine and Service Address Management^name_to_addr/map.menu" >>/usr/sadm/sysadm/menu/netservices/netserve.menu
-fi
-
-#
 #	install listen id (if not there) and fix up files
 #
 /usr/bin/passmgmt -a -u 37 -g 4 -c "Network Admin" -h /usr/net/nls listen \
 	>/dev/null 2>&1
 STEM=$BASEDIR/etc/saf
-sacadm -L -t listen 2>/dev/null | cut -f1 -d: >/tmp/listeners
+sacadm -L -t listen | cut -f1 -d: >/tmp/listeners
 #
 #	convert the listener files that are already under SAF
 #	control
@@ -307,7 +176,7 @@ done
 #
 #	now convert any old style listeners into new format
 #
-sacadm -L 2>/dev/null | cut -f1 -d: >/tmp/pms
+sacadm -L | cut -f1 -d: >/tmp/pms
 LHOME=$BASEDIR/usr/net/nls
 for i in $LHOME/*
 do
@@ -366,26 +235,22 @@ done
 rm /tmp/listeners
 rm /tmp/pms
 #
-# leave symbolic (and hard) links around for compatibility
+# leave symbolic links around for compatibility
 #
-if [ -d $LHOME ]
+if [ -f $LHOME/listen ]
 then
-	if [ -f $LHOME/listen ]
-	then
-        	rm $LHOME/listen
-	fi
-	if [ -f $LHOME/dbfconv ]
-	then
-        	rm $LHOME/dbfconv
-	fi
-	if [ -f $LHOME/nlps_server ]
-	then
-        	rm $LHOME/nlps_server
-	fi
+        rm $LHOME/listen
         ln -s $BASEDIR/usr/lib/saf/listen $LHOME/listen
+fi
+if [ -f $LHOME/dbfconv ]
+then
+        rm $LHOME/dbfconv
         ln -s $BASEDIR/usr/lib/saf/dbfconv $LHOME/dbfconv
+fi
+if [ -f $LHOME/nlps_server ]
+then
+        rm $LHOME/nlps_server
         ln -s $BASEDIR/usr/lib/saf/nlps_server $LHOME/nlps_server
-	ln $BASEDIR/usr/sbin/nlsadmin $BASEDIR/usr/bin/nlsadmin
 fi
 #
 #	finished installing files: tell OAM

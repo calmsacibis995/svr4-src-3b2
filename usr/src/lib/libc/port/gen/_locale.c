@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/_locale.c	1.5"
+#ident	"@(#)libc-port:gen/_locale.c	1.4"
 #include "synonyms.h"
 #include <locale.h>
 #include "_locale.h"
@@ -45,8 +45,8 @@ char *
 _fullocale(loc, file)	/* "/usr/lib/locale/<loc>/<file>" */
 const char *loc, *file;
 {
-	static char ans[18 + 2 * LC_NAMELEN] = "/usr/lib/locale/";
-	register char *p = ans + 16;
+	static char ans[14 + 2 * LC_NAMELEN] = "/usr/lib/locale/";
+	register char *p = ans + 12;
 
 	(void)strcpy(p, loc);
 	p += strlen(loc);

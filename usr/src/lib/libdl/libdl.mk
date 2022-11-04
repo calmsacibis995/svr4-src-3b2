@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libdl:libdl.mk	1.5"
+#ident	"@(#)libdl:libdl.mk	1.4"
 #
 # makefile for libdl
 #
@@ -34,14 +34,7 @@ MAKE=make
 ENVPARMS=ROOT="$(ROOT)" SGS="$(SGS)" OWN="$(OWN)" GRP="$(GRP)" CC="$(CC)" CFLAGS="$(CFLAGS)" LDLIBS="$(LDLIBS)" LINT="$(LINT)" LINTFLAGS="$(LINTFLAGS)" INS="$(INS)"  STRIP="$(STRIP)" MAKE="$(MAKE)" LIB="$(LIB)" USRLIB="$(USRLIB)" SGSBASE="$(SGSBASE)"
 
 #
-all:
-	if u3b2 || u3b5 || u3b15; \
-	then \
-	$(MAKE) -f libdl.mk libdl.so MACH=m32; \
-	elif i386; \
-	then \
-	$(MAKE) -f libdl.mk libdl.so MACH=i386; \
-	fi
+all:	libdl.so
 
 libdl.so:	$(OBJECTS)
 	$(AR) -r libdl.so $(OBJECTS)

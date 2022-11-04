@@ -1,0 +1,42 @@
+#ident	"@(#)npack:cmd/npackinit	1.2"
+
+#	npack setup
+EMDDEV=`getmajor EMD`
+if [ $? -ne 0 ]
+then
+	exit 1	# network not configured
+fi
+case $1 in
+'start')
+	set `who -r`
+	if [ $9 = "S" -o $9 = "1" ]
+	then
+		ps -e | grep pckd >/dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			if [ ! -x /usr/bin/pckd ]
+			then
+				exit 1
+			fi
+			/usr/bin/pckd /dev/emd$EMDDEV
+			if [ $? -ne 0 ]
+			then
+				echo /etc/init.d/npackinit: /usr/bin/pckd failed
+				exit 1
+			fi
+		fi
+		#listener will be started by the SAC
+	fi
+	;;
+
+'stop')
+	nlsadmin -k npack
+	pid=`ps -e | grep pckd | sed -e 's/^  *//' -e 's/ .*//'`
+	if [ "${pid}" != "" ]
+	then
+		kill ${pid}
+	fi
+	;;
+*)
+	exit 1
+esac

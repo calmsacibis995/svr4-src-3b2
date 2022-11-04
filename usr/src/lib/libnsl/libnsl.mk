@@ -5,8 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libnsl:libnsl.mk	1.4"
-
+#ident	"@(#)libnsl:libnsl.mk	1.3"
 # 
 # Network services library
 #
@@ -15,8 +14,6 @@ ROOT=
 USRLIB=$(ROOT)/usr/lib
 SHLIB=$(ROOT)/shlib
 INC=$(ROOT)/usr/include
-CPPFLAGS=OmitYP
-#CPPFLAGS=-DYP
 
 INS = install
 
@@ -27,15 +24,6 @@ all:
 		case $$i in\
 		*.*)\
 			;;\
-		yp)\
-			if [ $(CPPFLAGS) = -DYP ] ; \
-			then \
-				cd  $$i;\
-				echo "===== $(MAKE) -f $$i.mk all";\
-				$(MAKE) -f $$i.mk ROOT=$(ROOT) INC=$(INC); \
-				cd .. ;\
-			fi;\
-		;;\
 		*)\
 		cd  $$i;\
 		echo "===== $(MAKE) -f $$i.mk all";\

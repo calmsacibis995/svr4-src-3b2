@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/putenv.c	1.11"
+#ident	"@(#)libc-port:gen/putenv.c	1.9.1.1"
 /*	LINTLIBRARY	*/
 /*	putenv - change environment variables
 
@@ -31,7 +31,7 @@ static int find(), match();
 
 int
 putenv(change)
-char *change;
+const char *change;
 {
 	char **newenv;		    /* points to new environment */
 	register int which;	    /* index of variable to replace */

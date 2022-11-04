@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libmalloc:libmalloc.mk	1.21.1.2"
+#ident	"@(#)libmalloc:libmalloc.mk	1.21.1.1"
 #
 # makefile for libmalloc
 #
@@ -40,7 +40,7 @@ noprof: $(OBJECTS)
 	$(RM) -rf objects
 	mkdir objects
 	$(CP) $(OBJECTS) objects
-	cd objects; $(AR) $(ARFLAGS) libmalloc.a *
+	cd objects; $(AR) $(ARFLAGS) libmalloc.a ../__Ext_Synonyms *
 
 prof: $(POBJECTS)
 	$(RM) -rf pobjects
@@ -49,7 +49,7 @@ prof: $(POBJECTS)
 	do\
 		$(CP) $$i pobjects/`basename $$i .p`.o;\
 	done
-	cd pobjects; $(AR) $(ARFLAGS) libmalloc.a *
+	cd pobjects; $(AR) $(ARFLAGS) libmalloc.a ../__Ext_Synonyms *
 
 malloc.o malloc.p: $(INC)/malloc.h mallint.h
 

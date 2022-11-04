@@ -1,9 +1,9 @@
-#ident	"@(#)pkg.nsu:pkginfo	1.3.1.2"
+#ident	"@(#)pkg.nsu:pkginfo	1.3"
 
-ARCH="3B2"
+ARCH="3b2"
 # BASEDIR=/
 CATEGORY="system"
-CLASSES="none pt build OAMadmin OAMmif"
+CLASSES="none pt build"
 # DESC=
 # EMAIL=
 # HOTLINE=

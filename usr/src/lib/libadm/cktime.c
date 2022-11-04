@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:cktime.c	1.5"
+#ident	"@(#)libadm:cktime.c	1.1"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -21,7 +21,7 @@ extern int	getinput(),
 		puttext();
 
 #define PROMPT	"Enter the time of day"
-#define ERRMSG	"Please enter the time of day. Format is"
+#define ERRMSG	"Please enter the time day. Format is <%s>."
 #define DEFAULT	"%H:%M"
 
 #define TLEN 3
@@ -34,16 +34,6 @@ extern int	getinput(),
 #define US 59
 #define DELIM1 ':'
 #define BLANK ' '
-#define TAB '	'
-
-static void
-setmsg(msg, fmt)
-char	*msg, *fmt;
-{
-	if(fmt == NULL)
-		fmt = DEFAULT;
-	(void) sprintf(msg, "%s <%s>.", ERRMSG, fmt);
-}
 
 static char *
 p_ndig(string, value)
@@ -121,9 +111,6 @@ char	*fmt, *input;
 {
 	char ltrl, dfl;
 	int valid = 1; 	/* time of day string is valid for format */
-
-	if((fmt != NULL) && (fmtcheck(fmt) == 1))
-		return(4);
 
 	if(fmt == NULL)
 		fmt = DEFAULT;
@@ -256,79 +243,27 @@ char	*fmt, *input;
 	if(!(*fmt) && (*input))
 		valid = 0;
 
-	return((valid == 0));
+	return(!valid);
 }
 
-int
+void
 cktime_err(fmt, error)
 char	*fmt, *error;
 {
 	char	defmesg[128];
 
-	if(fmtcheck(fmt) == 1)
-		return(4);
-	setmsg(defmesg, fmt);
+	(void) sprintf(defmesg, ERRMSG, fmt);
 	puterror(stdout, defmesg, error);
-	return(0);
 }
 
-int
+void
 cktime_hlp(fmt, help)
 char	*fmt, *help;
 {
 	char	defmesg[128];
 
-	if(fmtcheck(fmt) == 1)
-		return(4);
-	setmsg(defmesg, fmt);
+	(void) sprintf(defmesg, ERRMSG, fmt);
 	puthelp(stdout, defmesg, help);
-	return(0);
-}
-
-/*
-*	A little state machine that checks out the format to
-*	make sure it is acceptable.
-*		return value 1: NG
-*		return value 0: OK
-*/
-int
-fmtcheck(fmt)
-char	*fmt;
-{
-	int	percent = 0;
-
-	while(*fmt) {
-		switch(*fmt++) {
-		 	case '%': /* previous state must be start or letter */
-				if(percent == 0)
-					percent = 1;
-				else
-					return(1);
-				break;
-			case 'H': /* previous state must be "%"*/
-			case 'M':
-			case 'S':
-			case 'T':
-			case 'R':
-			case 'r':
-			case 'I':
-			case 'p':
-				if(percent == 1)
-					percent = 0;
-				else
-					return(1);
-				break;
-			case TAB: /* previous state must be start or letter */
-			case BLANK:
-			case DELIM1:
-				if(percent == 1)
-					return(1);
-				break;
-			default:
-				return(1);
-		}
-	}
-	return(percent);
 }
 
 int
@@ -341,12 +276,9 @@ char *defstr, *error, *help;
 	char	input[128],
 		defmesg[128];
 
-	if((fmt != NULL) && (fmtcheck(fmt) == 1))
-		return(4);
-
 	if(fmt == NULL)
 		fmt = DEFAULT;
-	setmsg(defmesg, fmt);
+	(void) sprintf(defmesg, ERRMSG, fmt);
 	if(!prompt)
 		prompt = "Enter a time of day";
 

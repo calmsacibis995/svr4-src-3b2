@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_input.c	1.10"
+#ident	"@(#)netinet:netinet/tcp_input.c	1.6.1.1"
+
+/*
+ * System V STREAMS TCP - Release 2.0 
+ *
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved. 
+ *
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code. 
+ *
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates. 
+ *
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies. 
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -27,26 +45,6 @@
  *  	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *  	          All rights reserved.
  */
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
 
 #define STRNET
 
@@ -88,14 +86,11 @@
 #include <netinet/insrem.h>
 #include <netinet/ip_str.h>
 #ifdef SYSV
-#ifdef SYSV
 #include <sys/cmn_err.h>
-#endif
 #endif SYSV
 
 #include <sys/signal.h>
 
-int		tcpdprintf = 0;
 int             tcpprintfs = 0;
 int             tcpcksum = 1;
 int		tcprexmtthresh = 3;
@@ -385,7 +380,7 @@ int urp;
 	ind = (struct T_exdata_ind *) bp2->b_rptr;
 	bp2->b_wptr += sizeof (struct T_exdata_ind);
 	ind->PRIM_type = T_EXDATA_IND;
-	ind->MORE_flag = 0;
+	ind->MORE_type = 0;
 	if ((bp2->b_cont = allocb(1, BPRI_HI)) == (mblk_t *) NULL) {
 		if (bp1)
 			freemsg(bp1);
@@ -446,11 +441,12 @@ headerize(bp)
 #ifdef SYSV
 		cmn_err(CE_WARN, "headerize: dupb failed");
 #else
-		printf( "headerize: dupb failed");
-#endif
+		printf ("headerize: dupb failed\n");
+#endif SYSV
 	return (bp0);
 }
 
+int tcpdprintf = 0;
 
 /*
  * TCP input routine, follows pages 65-76 of the protocol specification dated
@@ -478,11 +474,7 @@ tcp_linput(q, bp)
 	if (msgblen(bp) < sizeof(struct tcpiphdr)) {
 		if ((pullupmsg(bp, sizeof(struct tcpiphdr))) == 0) {
 			if (tcpdprintf)
-#ifdef SYSV
-				cmn_err(CE_NOTE, "tcp_linput: too short\n");
-#else
-				printf( "tcp_linput: too short\n");
-#endif
+				printf ("tcp_linput: too short\n");
 			tcpstat.tcps_rcvshort++;
 			freemsg(bp);
 			return;
@@ -504,11 +496,8 @@ tcp_linput(q, bp)
 		ti->ti_x1 = 0;
 		if (ti->ti_sum = in_cksum(bp, len)) {
 			if (tcpprintfs)
-#ifdef SYSV
-				cmn_err(CE_NOTE,"tcp sum: src %lx, sum %x", ntohl(ti->ti_src), ti->ti_sum);
-#else
-				printf("tcp sum: src %lx, sum %x", ntohl(ti->ti_src), ti->ti_sum);
-#endif
+				printf("tcp sum: src %x, sum %x\n", ti->ti_src,
+				       ti->ti_sum);
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
 		}
@@ -545,11 +534,7 @@ tcp_linput(q, bp)
 	}
         if (tp->t_state == TCPS_CLOSED) {
 		if (tcpprintfs)
-#ifdef SYSV
-			cmn_err(CE_NOTE, "tcp_linput: state == CLOSED\n");
-#else
-			printf( "tcp_linput: state == CLOSED\n");
-#endif
+			printf ("tcp_linput: state == CLOSED\n");
                 goto drop;
 	}
 	tcp_io(tp, TF_NEEDIN, bp);
@@ -562,11 +547,7 @@ dropwithreset:
 	 * broadcast. 
 	 */
 	if (tcpdprintf)
-#ifdef SYSV
-		cmn_err(CE_NOTE, "tcp_linput: drop with reset\n");
-#else
-		printf( "tcp_linput: drop with reset\n");
-#endif
+		printf ("tcp_linput: drop with reset\n");
         tiflags = ti->ti_flags;
 	if ((tiflags & TH_RST) || in_broadcast(ti->ti_dst))
 		goto drop;
@@ -584,22 +565,17 @@ dropwithreset:
 
 drop:
 	if (tcpdprintf)
-#ifdef SYSV
-		cmn_err(CE_NOTE, "tcp_linput: drop\n");
-#else
-		printf( "tcp_linput: drop\n");
-#endif
+		printf ("tcp_linput: drop\n");
 	freemsg(bp);
 	return;
 }
 
-struct tcpcb *
 tcp_uinput(tp0)
 	struct tcpcb *tp0;
 {
-	register struct tcpcb *tp = NULL;
+	register struct tcpcb *tp;
 	register struct tcpiphdr *ti;
-	struct inpcb    *inp;
+	struct inpcb    *inp = tp0->t_inpcb;
 	int		len;
 	int             off;
 	register mblk_t *bp;
@@ -614,24 +590,17 @@ tcp_uinput(tp0)
 	int		s;
 
 	if (tcpdprintf)
-#ifdef SYSV
-		cmn_err(CE_NOTE, "tcp_uinput\n");
-#else
-		printf( "tcp_uinput\n");
-#endif
+		printf ("tcp_uinput\n");
 moreinput:
-	tp = tp0 ? tp0 : tp;
-	tp0 = NULL;
-
+	tp = tp0;
 	s = splstr();
-	if (!tp || !(bp = tp->t_inq)) {
-		if (tp)
-			tp->t_flags &= ~TF_NEEDIN;
+	bp = tp->t_inq;
+	if (!bp) {
+		tp->t_flags &= ~TF_NEEDIN;
 		splx(s);
-		return(tp);
+		return;
 	}
 	tp->t_inq = bp->b_next;
-	inp = tp->t_inpcb;
 	splx(s);
 
 	optbp = (mblk_t *)NULL;
@@ -646,11 +615,7 @@ moreinput:
 	off = ti->ti_off << 2;
 	if (off < sizeof(struct tcphdr) || off > ti->ti_len) {
 		if (tcpprintfs)
-#ifdef SYSV
-			cmn_err(CE_NOTE,"tcp off: src %lx off %d", ntohl(ti->ti_src), off);
-#else
-			printf("tcp off: src %lx off %d", ntohl(ti->ti_src), off);
-#endif
+			printf("tcp off: src %x off %d\n", ti->ti_src, off);
 		tcpstat.tcps_rcvbadoff++;
 		goto drop;
 	}
@@ -660,11 +625,7 @@ moreinput:
 			if (pullupmsg(bp, (int) sizeof(struct ip) + off)
 			    == 0) {
 				if (tcpdprintf)
-#ifdef SYSV
-					cmn_err(CE_NOTE, "tcp_uinput: too short\n");
-#else
-					printf( "tcp_uinput: too short\n");
-#endif
+					printf ("tcp_uinput: too short\n");
 				tcpstat.tcps_rcvshort++;
 				goto drop;
 			}
@@ -673,11 +634,7 @@ moreinput:
 		optbp = allocb((int) (off - sizeof(struct tcphdr)), BPRI_HI);
 		if (optbp == 0) {
 			if (tcpdprintf)
-#ifdef SYSV
-				cmn_err(CE_NOTE, "tcp_uinput: can't allocb opt buf");
-#else
-				printf( "tcp_uinput: can't allocb opt buf");
-#endif
+				printf ("tcp_uinput: can't allocb opt buf");
 			goto drop;
 		}
 		optbp->b_wptr += off - sizeof(struct tcphdr);
@@ -721,8 +678,7 @@ moreinput:
 		dropsocket++;
 		inp->inp_laddr = ti->ti_dst;
 		inp->inp_lport = ti->ti_dport;
-		inp->inp_options = ip_srcroute(0);
-		tp0 = tp;
+		inp->inp_options = ip_srcroute();
 		tp = intotcpcb(inp);
 		tp->t_state = TCPS_LISTEN;
 	}
@@ -777,7 +733,7 @@ moreinput:
 		 */
 	case TCPS_LISTEN:{
 			mblk_t         *am;
-			register struct sockaddr_in *sin;
+			register struct taddr_in *sin;
 
 			if (tiflags & TH_RST)
 				goto drop;
@@ -787,11 +743,11 @@ moreinput:
 				goto drop;
 			if (in_broadcast(ti->ti_dst))
 				goto drop;
-			am = allocb(sizeof(struct sockaddr_in), BPRI_HI);
+			am = allocb(sizeof(struct taddr_in), BPRI_HI);
 			if (am == NULL)
 				goto drop;
-			am->b_wptr += sizeof(struct sockaddr_in);
-			sin = (struct sockaddr_in *) am->b_rptr;
+			am->b_wptr += sizeof(struct taddr_in);
+			sin = (struct taddr_in *) am->b_rptr;
 			sin->sin_family = AF_INET;
 			sin->sin_addr = ti->ti_src;
 			sin->sin_port = ti->ti_sport;
@@ -1242,13 +1198,11 @@ trimthenstep6:
 		 */
 		{
 		u_int incr = tp->t_maxseg;
-		register tmp;
 
 		if (tp->snd_cwnd > tp->snd_ssthresh)
 			incr = MAX(incr * incr / tp->snd_cwnd, 1);
 
-		tmp = (int)tp->snd_cwnd + incr;
-		tp->snd_cwnd = MIN(tmp, IP_MAXPACKET); /* XXX */
+		tp->snd_cwnd = MIN(tp->snd_cwnd + incr, IP_MAXPACKET); /* XXX */
 		}
 		ourfinisacked = (tp->t_flags & TF_SENTFIN)
 				&& (ti->ti_ack == tp->snd_max);
@@ -1260,14 +1214,14 @@ trimthenstep6:
 			if (usq)
 				tcp_qdrop(WR(usq), qsize);
 			STRLOG(TCPM_ID, 2, 9, SL_TRACE,
-			       "setting q size to 0");
+			       "setting q size to 0\n");
 		} else if (acked) {
 			tp->snd_wnd -= acked;
 			tp->t_qsize -= acked;
 			if (usq)
 				tcp_qdrop(WR(usq), acked);
 			STRLOG(TCPM_ID, 2, 9, SL_TRACE,
-			    "subtracting %d from q size, new value is %d",
+			    "subtracting %d from q size, new value is %d\n",
 			       acked, tp->t_qsize);
 			acked = 0;
 		}
@@ -1328,7 +1282,7 @@ trimthenstep6:
 			if (ourfinisacked) {
 				tcp_cancelinger(tp);
 				tp->t_state = TCPS_CLOSED;
-				tp = tcp_close(tp, 0);
+				tcp_close(tp, 0);
 				goto drop;
 			}
 			break;
@@ -1371,7 +1325,7 @@ step6:
 	/*
 	 * Process segments with URG.
 	 */
-	if ((tiflags & TH_URG) && ti->ti_urp &&
+	if ((ti->ti_flags & TH_URG) && ti->ti_urp &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		mblk_t *sigbp;
 
@@ -1394,6 +1348,18 @@ step6:
 		if (SEQ_GT(ti->ti_seq + ti->ti_urp, tp->rcv_up)) {
 			tp->rcv_up = ti->ti_seq + ti->ti_urp;
 			tp->t_oobflags &= ~(TCPOOB_HAVEDATA | TCPOOB_HADDATA);
+		}
+
+		/*
+		** now send an M_SIG to notify the stream head
+		*/
+
+		sigbp = allocb(1, BPRI_HI);
+		if (sigbp) {
+			struct inpcb   *ipp = tp->t_inpcb;
+			sigbp->b_datap->db_type = M_PCSIG;
+			*sigbp->b_wptr++ = SIGURG;
+			putnext(ipp->inp_q, sigbp);
 		}
 
 		ti->ti_urp--;		/* XXX - 4.2 BSD compatibility */
@@ -1542,11 +1508,7 @@ dropwithreset:
 
 drop:
 	if (tcpdprintf)
-#ifdef SYSV
-		cmn_err(CE_NOTE, "tcp_uinput: drop\n");
-#else
-		printf( "tcp_uinput: drop\n");
-#endif
+		printf ("tcp_uinput: drop\n");
 	if (optbp)
 		(void) freemsg(optbp);
 	/*
@@ -1645,8 +1607,6 @@ tcp_mss(tp)
 		}
 	}
 	mss = prov->if_maxtu - sizeof(struct tcpiphdr);
-	if (mss > 1024)
-		mss = (mss / 1024) * 1024;
 	if (in_localaddr(inp->inp_faddr))
 		return (mss);
 	mss = MIN(mss, TCP_MSS);

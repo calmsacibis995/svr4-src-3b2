@@ -8,7 +8,7 @@
 #ifndef _FS_RFS_RF_CANON_H
 #define _FS_RFS_RF_CANON_H
 
-#ident	"@(#)fs:fs/rfs/rf_canon.h	1.4"
+#ident	"@(#)fs:fs/rfs/rf_canon.h	1.2"
 
 /*
  * Macros describing the format of various structures.
@@ -30,46 +30,27 @@
 #define MKDENT_FMT	"llllllllllllllllllllllllllc0"
 
 /*
- * String, character array, scalar character, short, integer type expansion;
- * string is worst-case estimate.
+ * character, short, integer type expansion
  */
-#define STRXPAND	(2 * sizeof(long))
-#define CXPAND(len)	(sizeof(long) + ((len) % sizeof(long) ?	\
-			  sizeof(long) - (len) % sizeof(long) : 0))
-#define BXPAND		(sizeof(long) - 1)
+#define CXPAND		(2 * sizeof(long))
 #define SXPAND		(sizeof(long) - sizeof(short))
-#define IXPAND		(sizeof(long) - sizeof(int))
+#define IXPAND		(sizeof(int))
 
 /*
- * Macros for heterogeneity buffer expansion.  These are used to allocate
- * streams messages and for sanity checking on responses.
- *
- * NOTE to porters:  These are necessarily machine and compiler-specific,
- * and derived after considering structure layout and padding.
- *
- * TO DO:  do this with canonical structure representations and expressions
- * like sizeof(struct candirent) - sizeof(struct dirent).  Just make sure
- * that the canonical representation allows for aligning strings.  The
- * worst case is demonstrated by
- *
- *	--------------------------------------
- *	|             'a' | 'b' 'c' 'd' '\0' |
- *	--------------------------------------
- *
- * for the native representation, because the 'a' will require an additional
- * long in the canonical representation.
+ * Macros for heterogeneity buffer expansion.
  */
-#define DIRENT_XP	(SXPAND + STRXPAND)
-#define FLOCK_XP	(2 * SXPAND)
-#define OFLOCK_XP	(4 * SXPAND)
-#define STAT_XP		(6 * SXPAND)
-#define STATFS_XP	(2 * CXPAND(6))
-#define USTAT_XP	(SXPAND + 2 * CXPAND(6) - 2)
-#define ATTR_XP		0
-#define RFLKC_XP	0
-#define SYMLNK_XP	(CXPAND(256) + STRXPAND)
-#define STATVFS_XP	(CXPAND(16) + CXPAND(32))
-#define MKDENT_XP	STRXPAND
+#define MINXPAND	(2 * sizeof(long))		/* for misalignment */
+#define DIRENT_XP	(SXPAND + CXPAND)		/* struct dirent */
+#define FLOCK_XP	(MINXPAND + 2*SXPAND)		/* struct flock  */
+#define OFLOCK_XP	(MINXPAND + 4*SXPAND)		/* struct oflock  */
+#define STAT_XP		(MINXPAND + 7*SXPAND)		/* struct stat   */
+#define STATFS_XP	(MINXPAND + SXPAND + 2*CXPAND)	/* struct statfs */
+#define USTAT_XP	(MINXPAND + SXPAND + 2*CXPAND)	/* struct ustat */
+#define ATTR_XP		MINXPAND 			/* struct vattr */
+#define RFLKC_XP	MINXPAND 			/* rflkc_info_t */
+#define SYMLNK_XP	(MINXPAND + 2*CXPAND)		/* symlnkarg */
+#define STATVFS_XP	(MINXPAND + 2*CXPAND)		/* struct statvfs */
+#define MKDENT_XP	(MINXPAND + CXPAND)		/* struct mkdent */
 
 /*
  * Generic data canonization

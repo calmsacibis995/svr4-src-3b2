@@ -1,4 +1,56 @@
-#ident	"@(#)pkg.rpc:postinstall	1.5.1.3"
+#ident	"@(#)pkg.rpc:postinstall	1.5.1.1"
+
+#-----create system name entries in loopback administrative files
+
+NETDIR=/etc/net
+HOSTDIR="$NETDIR/ticots $NETDIR/ticotsord $NETDIR/ticlts"
+HOSTNAME=`uname`
+i=/etc/net/ticots
+
+for i in $HOSTDIR; do
+	if [ -d $i ] && [  -f $i/hosts ]; then
+		#Write hostname into hosts file
+		if grep "$HOSTNAME" $i/hosts >/dev/null 2>&1 ; then  :
+		else
+			echo "$HOSTNAME\t$HOSTNAME" >>$i/hosts 2>/dev/null
+		fi
+	else
+		echo "**WARNING** ${PKGNAME} cannot install loopback system administrative entries in /etc/net."
+		echo "They must be added later for RPC services to function."
+	fi
+done
+
+#-------update /etc/system
+
+ETCSYSTEM=/etc/system
+DES='INCLUDE:DES'
+IDES='INCLUDE:IDES'
+COMMENTOUT='*INCLUDE:IDES'
+
+if [ -f $ETCSYSTEM ]; then
+	if grep "$COMMENTOUT" $ETCSYSTEM >/dev/null 2>&1
+	then
+		ed $ETCSYSTEM <<-!  >/dev/null 2>&1
+			g/$COMMENTOUT/d
+			w
+			q
+		!
+		echo "$IDES" >>$ETCSYSTEM 2>/dev/null 
+	else
+		if grep "$IDES" $ETCSYSTEM >/dev/null 2>&1; then  :
+		else
+			if (grep "$DES" $ETCSYSTEM >/dev/null 2>&1)
+			then 
+				echo "$COMMENTOUT" >>$ETCSYSTEM 2>/dev/null
+			else
+				echo "$IDES" >>$ETCSYSTEM 2>/dev/null
+			fi
+    		fi
+	fi
+	else
+		echo "**WARNING** ${PKGNAME} cannot install IDES entry in /etc/system."
+		echo "The entry will have to be added manually at a later time."
+	fi
 
 #------install drivers
 
@@ -9,33 +61,5 @@ MASTER=/etc/master.d
 /etc/drvinstall -d $BOOT/KRPC -v 1.0 || exit $FAILURE
 /etc/drvinstall -d $BOOT/KTLI -v 1.0 || exit $FAILURE
 /etc/drvinstall -d $BOOT/IDES  -v 1.0 || exit $FAILURE
-
-#-------update /etc/system
-
-
-ETCSYSTEM=/etc/system
-DES='INCLUDE:DES'
-IDES='INCLUDE:IDES'
-COMMENTOUT='*INCLUDE:IDES'
-
-if [ -f $ETCSYSTEM ]; then
-	if grep "$DES" $ETCSYSTEM >/dev/null 2>&1
-	then
-		if grep "$IDES" $ETCSYSTEM >/dev/null 2>&1
-		then
-		ed $ETCSYSTEM <<-!  >/dev/null 2>&1
-			g/$IDES/d
-			w
-			q
-		!
-		echo "$COMMENTOUT" >>$ETCSYSTEM 2>/dev/null 
-    		fi
-	fi
-	else
-		echo "**WARNING** ${PKGNAME} cannot install IDES entry in /etc/system."
-		echo "The entry will have to be added manually at a later time."
-	fi
-
-
 
 exit 10			# indicates that the system should be rebooted

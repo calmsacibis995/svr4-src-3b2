@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_order.c	1.2"
+#ident	"@(#)libyp:yp_order.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -118,7 +117,7 @@ doorder (domain, map, pdomb, timeout, order)
 
 	req.domain = domain;
 	req.map = map;
-	memset((char *)&resp, 0, sizeof(struct ypresp_order));
+	resp.ordernum = 0;
 
 	/*
 	 * Do the get_order request.  If the rpc call failed, return with

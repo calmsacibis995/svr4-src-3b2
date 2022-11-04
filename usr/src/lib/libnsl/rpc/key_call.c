@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:key_call.c	1.4"
+#ident	"@(#)librpc:key_call.c	1.3"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -28,6 +27,11 @@
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */ 
+
+#if !defined(lint) && defined(SCCSIDS)
+static char sccsid[] = "@(#)key_call.c 1.14 89/05/02 Copyr 1986 Sun Micro";
+#endif 
+
 /*
  * key_call.c, Interface to keyserver
  *
@@ -42,7 +46,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <sys/wait.h>
-#include <netconfig.h>
 
 #define KEY_TIMEOUT	5	/* per-try timeout in seconds */
 #define KEY_NRETRY	12	/* number of retries */
@@ -123,7 +126,6 @@ key_gendes(key)
 	return (0);
 }
 
-/*returns  0 on failure 1 on success*/
 static
 key_call(proc, xdr_arg, arg, xdr_rslt, rslt)
 	u_long proc;
@@ -132,43 +134,75 @@ key_call(proc, xdr_arg, arg, xdr_rslt, rslt)
 	bool_t (*xdr_rslt)();
 	char *rslt;
 {
+	XDR xdrargs;
+	XDR xdrrslt;
+	FILE *fargs;
+	FILE *frslt;
+	void (*osigchild)();
+#ifdef WEXITSTATUS 
+	int status;
+#else
+	union wait status;
+#endif
+	pid_t wpid;
+	pid_t pid;
 	int success;
-	void *localhandle;
-   	struct netconfig *nconf;
-	CLIENT *clnt = NULL;
-	struct timeval wait_time;	
+	uid_t ruid;
+	uid_t euid;
 
-#define TOTAL_TIMEOUT   30      /* total timeout talking to keyserver */
-#define TOTAL_TRIES     5      /* Number of tries */
+	success = 1;
+	osigchild = signal(SIGCHLD, SIG_DFL);
+	/* This MUST not be SIG_IGN under SYSV */
 
+	/*
+	 * We are going to exec a set-uid program which makes our effective uid
+	 * zero, and authenticates us with our real uid. We need to make the
+	 * effective uid be the real uid for the setuid program, and
+	 * the real uid be the effective uid so that we can change things back.
+	 */
+	euid = geteuid();
+	ruid = getuid();
+	/*(void) setreuid(euid, ruid);*/
+	if (euid != ruid)
+		(void) setuid(euid); /*eff ->real*/ /*dubious if it works*/
+	pid = _rpc_openchild(MESSENGER, &fargs, &frslt);
+	if (euid != ruid)
+		(void) setuid(ruid); /*restore real*/
+	/*(void) setreuid(ruid, euid);*/
+	if (pid < 0) {
+		debug("open_streams");
+		return (0);
+	}
+	xdrstdio_create(&xdrargs, fargs, XDR_ENCODE);
+	xdrstdio_create(&xdrrslt, frslt, XDR_DECODE);
 
+	if (!xdr_u_long(&xdrargs, &proc) || !(*xdr_arg)(&xdrargs, arg)) {
+		debug("xdr args");
+		success = 0;
+	}
+	(void) fclose(fargs);
 
-       if (!(localhandle = setnetconfig()))
-                return (0);
-        while (nconf = getnetconfig(localhandle)) {
-                if (strcmp(nconf->nc_protofmly, NC_LOOPBACK) == 0) {
-			clnt = clnt_tp_create(_rpc_gethostname(),
-				 KEY_PROG, KEY_VERS, nconf);
-				if (clnt) break;
-                }
-        }
-        endnetconfig(localhandle);
+	if (success && !(*xdr_rslt)(&xdrrslt, rslt)) {
+#ifdef DEBUG
+		perror("xdr rslt");
+#endif
+		success = 0;
+	}
 
-	if (clnt == NULL) return (0);	
-
-	clnt->cl_auth = authsys_create("", geteuid(), 0, 0, NULL);
-        if (clnt->cl_auth == NULL) return (0);
-
-	wait_time.tv_sec = TOTAL_TIMEOUT/TOTAL_TRIES;
-        wait_time.tv_usec = 0;
-        (void) clnt_control(clnt, CLSET_RETRY_TIMEOUT, &wait_time);
-
-	wait_time.tv_sec = TOTAL_TIMEOUT;
-        wait_time.tv_usec = 0;
-
-
-	if (CLNT_CALL(clnt, proc, xdr_arg, arg, xdr_rslt, rslt, wait_time)
-		== RPC_SUCCESS) return (1);
-	else return (0);
+	(void) fclose(frslt);
+	while (((wpid = wait(&status)) != pid) && (wpid != -1));
+	if (wpid < 0 || 
+#ifdef WEXITSTATUS
+		WEXITSTATUS(status)) {
+#else
+		(status.w_retcode)) {
+#endif
+#ifdef DEBUG
+		fprintf(stderr, "wait: %d %d %x\n", wpid, pid, status);
+#endif
+		success = 0;
+	}
+	(void) signal(SIGCHLD, osigchild);
+	return (success);
 }
 

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/callers.c	1.5"
+#ident	"@(#)libnsl:dial/callers.c	1.2"
 
 #include "uucp.h"
 
@@ -46,7 +46,7 @@ EXTERN int	open801();
 #endif
 
 #ifdef DATAKIT
-EXTERN int	dkcall();
+int	dkcall();
 #endif /* DATAKIT */
 
 #ifdef V8
@@ -213,8 +213,6 @@ register char *flds[], *dev[];
 	char *phonecl;			/* clear phone string */
 	char phoneex[2*(MAXPH+2)];	/* expanded phone string */
 	EXTERN void ttygenbrk();
-	struct termio tty_orig;
-	int ret_orig = -1;
 
 	sdev = dev;
 	/*	set up default "break" routine	*/
@@ -319,9 +317,6 @@ register char *flds[], *dev[];
 		goto bad;
 	}
 
-	/* save initial state of line in case script fails */
-	ret_orig = ioctl(dcf, TCGETA, &tty_orig);
-
 	/* use sdev[] since dev[] is incremented for internal callers */
 	fixline(dcf, atoi(fdig(sdev[D_CLASS])), D_DIRECT);
 
@@ -369,9 +364,6 @@ register char *flds[], *dev[];
 	return(dcf);
 bad:
 	if ( dcf >= 0 ) {
-		/* reset line settings if we got them in the beginning */
-		if ( ret_orig == 0 )
-			(void) ioctl(dcf, TCSETAW, &tty_orig);
 		fd_rmlock(dcf);
 		(void)close(dcf);
 	}

@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_bind.c	1.3"
+#ident	"@(#)libyp:yp_bind.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -46,7 +45,7 @@ static  char sccsid[] = "@(#)yp_bind.c 1.36 88/07/16 Copyr 1985 Sun Micro";
 #include <rpcsvc/ypclnt.h>
 
 #define BFSIZE (YPMAXDOMAIN + 32) /* size of binding file */
-#define YPBINDPROTO "netpath"     /* use anything*/
+#define YPBINDPROTO "visible"     /* use anything*/
 
 /* This should match the one in ypbind.c */
 
@@ -132,8 +131,7 @@ struct dom_binding **binding;	/* if result == 0, ptr to dom_binding */
 		return (0);		/* We are bound */
 
 	while(1){
-		tb=clnt_create(_rpc_gethostname(),
-		    (u_long)YPBINDPROG,YPBINDVERS,YPBINDPROTO);
+		tb=clnt_create(_rpc_gethostname(),YPBINDPROG,YPBINDVERS,YPBINDPROTO);
 		if (tb==NULL) return(YPERR_YPBIND);
 
 		for(tries=0;tries<5;tries++){
@@ -342,20 +340,18 @@ int *err;
 
 	pdomb->dom_binding = ypbind_res->ypbind_resp_u.ypbind_bindinfo;
 	/*
-	 * Open up a path to the server, which will remain active globally.
-	 */
-	if ((pdomb->dom_client = clnt_tp_create(
-	    pdomb->dom_binding->ypbind_servername,
-	    (u_long) YPPROG, YPVERS, pdomb->dom_binding->ypbind_nconf))
+		 * Open up a path to the server, which will remain active globally.
+		 */
+	if ((pdomb->dom_client = clnt_tli_create(RPC_ANYFD,
+	    pdomb->dom_binding->ypbind_nconf,         
+	    pdomb->dom_binding->ypbind_svcaddr,
+	    YPPROG, YPVERS, RPCSMALLMSGSIZE, YPMSGSZ))
 	    == NULL) {
-		clnt_pcreateerror("yp_bind: clnt_tp_create");
+		clnt_pcreateerror("yp_bind:clnt_tli_create");
 		free((char *) pdomb);
 		*err = YPERR_RPC;
 		return (struct dom_binding *) (NULL);
 	}
-#ifdef DEBUG
-printf("ypbind: clnt_tp_create suceeded\n");
-#endif
 
 	pdomb->dom_pnext = bound_domains;	/* Link this to the list as */
 	pdomb->dom_domain=malloc(strlen(domain)+(unsigned)1);
@@ -369,6 +365,9 @@ printf("ypbind: clnt_tp_create suceeded\n");
 	bound_domains = pdomb;			/* ... the head entry */
 	return (pdomb);
 }
+
+
+
 
 int
 usingypmap(ddn, map)

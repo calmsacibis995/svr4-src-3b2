@@ -8,13 +8,14 @@
 #ifndef _SIGNAL_H
 #define _SIGNAL_H
 
-#ident	"@(#)head:signal.h	1.5.3.2"
+#ident	"@(#)head:signal.h	1.5.1.9"
 
 typedef int 	sig_atomic_t;
 
 extern char *_sys_siglist[];
 extern int _sys_nsig;
 
+#include <sys/types.h>
 #include <sys/signal.h>
 
 #if defined(__STDC__)
@@ -23,9 +24,8 @@ extern void (*signal(int, void (*)(int)))(int);
 extern int raise(int);
 
 #if __STDC__ == 0 || defined(_POSIX_SOURCE) || defined(_XOPEN_SOURCE)
-#include <sys/types.h>
 extern int kill(pid_t, int);
-extern int sigaction(int, const struct sigaction *, struct sigaction *);
+extern int sigaction(int, struct sigaction *, struct sigaction *);
 extern int sigaddset(sigset_t *, int);
 extern int sigdelset(sigset_t *, int);
 extern int sigemptyset(sigset_t *);

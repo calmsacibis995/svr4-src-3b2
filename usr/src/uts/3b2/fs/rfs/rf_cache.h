@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_cache.h	1.8"
+#ident	"@(#)fs:fs/rfs/rf_cache.h	1.7"
 /*
  * Interfaces supporting RFS reads and writes through the VM page cache
  */
@@ -51,11 +51,6 @@ typedef enum rfc_ctl {
  *		 condition is necessary because rfcl_esbwrmsg
  *		 ultimately gets to rf_getpage to map the pages
  *		 in.
- *	  bufp - defined iff kern.  non-NULL if I/O pages are covered
- *	       by a buffer header.  Guaranteed that b_bcount <= MAXBSIZE
- *	       and that pages are virtually addressable.
- *	       Assumes that cleanup at end of IO will be done at lower level,
- *	       e.g., by using an esballoc-ed steams message.
  *	  uio - defined only if cached, used for I/O into page cache.
  *	  iovec - defined only if cached, used for I/O into page cache.
  */
@@ -78,7 +73,6 @@ typedef struct rf_rwa {
 		struct {
 			int		ioflag;
 			int		kern;
-			buf_t		*bufp;
 			uio_t		uio;
 			iovec_t		iovec;
 		} wr;
@@ -96,7 +90,6 @@ typedef struct rf_rwa {
 #define rd_endnrb	rf_rwa_un.rd.endnrb
 #define wr_ioflag	rf_rwa_un.wr.ioflag
 #define wr_kern		rf_rwa_un.wr.kern
-#define wr_bufp		rf_rwa_un.wr.bufp
 #define cwruio		rf_rwa_un.wr.uio
 #define wr_iovec	rf_rwa_un.wr.iovec
 
@@ -120,7 +113,6 @@ typedef struct rf_rwa {
 
 extern void	rfc_pageunlock();
 extern int	rfc_pagelist();
-extern page_t	*rfc_page_lookup();
 extern void	rfc_plrele();
 extern int	rfc_readmove();
 extern int	rfc_plmove();

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/scalls.c	1.78"
+#ident	"@(#)kernel:os/scalls.c	1.74.3.1"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -53,7 +53,6 @@
 #include "sys/ulimit.h"
 #include "sys/todc.h"
 #include "sys/kmem.h"
-#include "sys/unistd.h"
 
 #include "vm/hat.h"
 #include "vm/as.h"
@@ -92,10 +91,10 @@ stime(uap, rvp)
 		wtodc();
 		(void)rf_stime(u.u_cred);	/* RFS */
 		return 0;
-	} else
+	} else {
 		return EPERM;
+	}
 }
-
 struct sysconfiga {
 	int which;
 };
@@ -110,8 +109,11 @@ sysconfig(uap, rvp)
 	default:
 		return EINVAL;
 
-	case _CONFIG_CLK_TCK:
-		rvp->r_val1 = HZ;	/* 3b2 clock frequency per second */
+	case _CONFIG_CHOWN_RST:
+		/*
+		 * 1 if chown(2) is restricted to super-user, 0 otherwise.
+		 */
+		rvp->r_val1 = rstchown;
 		break;
 
 	case _CONFIG_NGROUPS:
@@ -136,15 +138,11 @@ sysconfig(uap, rvp)
 		break;
 
 	case _CONFIG_POSIX_VER:
-		rvp->r_val1 = _POSIX_VERSION; /* current POSIX version */
+		rvp->r_val1 = _POSIX_VERSION;	/* defined in param.h */
 		break;
 
 	case _CONFIG_PAGESIZE:
 		rvp->r_val1 = PAGESIZE;
-		break;
-
-	case _CONFIG_XOPEN_VER:
-		rvp->r_val1 = _XOPEN_VERSION; /* current XOPEN version */
 		break;
 	}
 	
@@ -157,9 +155,9 @@ struct adjtimea {
 };
 
 int tickadj = MICROSEC/HZ;		/* "standard" clock skew,
-					 * msec per tick */
+				         * msec per tick */
 int tickdelta;				/* current clock skew,
-					 * msecs per tick */
+				         * msecs per tick */
 long timedelta;				/* unapplied time correction, msecs */
 long bigadj = MICROSEC ;		/* bigger skew */
 int doresettodr;			/* reset clock flag */
@@ -221,7 +219,7 @@ setuid(uap, rvp)
 	register uid_t uid;
 	int error = 0;
 
-	if ((uid = uap->uid) > MAXUID || uid < (uid_t) 0)
+	if ((uid = uap->uid) >= MAXUID)
 		return EINVAL;
 	if (u.u_cred->cr_uid
 	  && (uid == u.u_cred->cr_ruid || uid == u.u_cred->cr_suid)) {
@@ -236,10 +234,11 @@ setuid(uap, rvp)
 		u.u_cred->cr_uid = uid;
 		u.u_cred->cr_ruid = uid;
 		u.u_cred->cr_suid = uid;
-		if (uid < USHRT_MAX)
+		if ( uid < USHRT_MAX)
 			u.u_uid = (o_uid_t) uid;
 		else
 			u.u_uid = (o_uid_t) UID_NOBODY;
+
 		u.u_procp->p_uid = (o_uid_t) uid;		/* XXX */
 	} else
 		error = EPERM;
@@ -271,14 +270,14 @@ setgid(uap, rvp)
 	register gid_t gid;
 	int error = 0;
 
-	if ((gid = uap->gid) > MAXUID || gid < (gid_t) 0)
+	if ((gid = uap->gid) >= MAXUID)
 		return EINVAL;
 	if (u.u_cred->cr_uid
 	  && (gid == u.u_cred->cr_rgid || gid == u.u_cred->cr_sgid)) {
 		u.u_cred = crcopy(u.u_cred);
 		u.u_cred->cr_gid = gid;
-		if (gid < USHRT_MAX)
-			u.u_gid = (o_gid_t) gid;		/* XXX */
+		if ( gid < USHRT_MAX)
+			u.u_gid = (o_gid_t) gid;			/* XXX */
 		else
 			u.u_gid = (o_gid_t) UID_NOBODY;
 	} else if (suser(u.u_cred)) {
@@ -286,8 +285,8 @@ setgid(uap, rvp)
 		u.u_cred->cr_gid = gid;
 		u.u_cred->cr_rgid = gid;
 		u.u_cred->cr_sgid = gid;
-		if (gid < USHRT_MAX)
-			u.u_gid = (o_gid_t) gid;		/* XXX */
+		if ( gid < USHRT_MAX)
+			u.u_gid = (o_gid_t) gid;			/* XXX */
 		else
 			u.u_gid = (o_gid_t) UID_NOBODY;
 	} else
@@ -371,7 +370,7 @@ setegid(uap, rvp)
 		u.u_cred = crcopy(u.u_cred);
 		u.u_cred->cr_gid = gid;
 
-		if (gid < USHRT_MAX)
+		if ( gid < USHRT_MAX)
 			u.u_gid = (o_gid_t) gid;		/* XXX */
 		else
 			u.u_gid = (o_gid_t) UID_NOBODY;
@@ -426,7 +425,7 @@ setgroups(uap, rvp)
 }
 
 struct getgroupsa {
-	int	gidsetsize;
+	u_int	gidsetsize;
 	gid_t	*gidset;
 };
 
@@ -436,10 +435,10 @@ getgroups(uap, rvp)
 	rval_t *rvp;
 {
 	register struct cred *cr = u.u_cred;
-	register gid_t n = cr->cr_ngroups;
+	register u_short n = cr->cr_ngroups;
 
 	if (uap->gidsetsize != 0) {
-		if ((gid_t)uap->gidsetsize < n)
+		if (uap->gidsetsize < n)
 			return EINVAL;
 		if (copyout((caddr_t)cr->cr_groups, (caddr_t)uap->gidset, 
 		  n * sizeof(gid_t)))
@@ -467,28 +466,26 @@ setpgrp(uap, rvp)
 	switch (uap->flag) {
 
 	case 1: /* setpgrp() */
-		if (p->p_sessp->s_sidp != p->p_pidp && !pgmembers(p->p_pid))
-			sess_create();
+		if (p->p_sessp->s_sid != p->p_pid && !memberspg(p->p_pid))
+			newsession();
 		rvp->r_val1 = p->p_sessp->s_sid;
 		return 0;
 
 	case 3: /* setsid() */
-		if (p->p_pgidp == p->p_pidp || pgmembers(p->p_pid))
+		if (p->p_pgrp == p->p_pid || memberspg(p->p_pid))
 			return EPERM;
-		sess_create();
+		newsession();
 		rvp->r_val1 = p->p_sessp->s_sid;
 		return 0;
 
 	case 5: /* setpgid() */
 	{
-		register pid_t pgid;
-		register pid_t pid;
-
-		if ((pid = uap->pid) == 0)
-			pid = p->p_pid;
-		else if (pid < 0 || pid >= MAXPID)
+		register pid_t pgid = uap->pgid;
+		register pid_t pid = uap->pid;
+		if (pid < 0 || pgid < 0 
+		  || pid >= MAXPID || pgid >= MAXPID)
 			return EINVAL;
-		else if (pid != p->p_pid) {
+		if (pid != p->p_pid && pid != 0) {
 			for (p = p->p_child; ; p = p->p_sibling) {
 				if (p == NULL)
 					return ESRCH;
@@ -497,33 +494,19 @@ setpgrp(uap, rvp)
 			}
 			if (p->p_flag & SEXECED)
 				return EACCES;
-			if (p->p_sessp != u.u_procp->p_sessp)
-				return EPERM;
 		}
-
-		if (p->p_sessp->s_sid == pid)
-			return EPERM;
-
-		if ((pgid = uap->pgid) == 0)
+		if (pgid == 0)
 			pgid = p->p_pid;
-		else if (pgid < 0 || pgid >= MAXPID)
-			return EINVAL;
-
 		if (p->p_pgrp == pgid)
 			break;
-		else if (p->p_pid == pgid) {
-			pgexit(p);
-			pgcreate(p);
-		} else {
-			register proc_t *q;
-			if ((q = pgfind(pgid)) == NULL 
-			  || q->p_sessp != p->p_sessp)
-				return EPERM;
-			pgexit(p);
-			pgjoin(p, q->p_pgidp);
-		}
-
-		wakeprocs((caddr_t)p->p_parent, PRMPT);
+		if (p->p_sessp->s_sid == p->p_pid
+		  || (p->p_pgrp == p->p_pid && memberspg(p->p_pid))
+		  || p->p_sessp != u.u_procp->p_sessp
+		  || pgid != p->p_pid && !checkpg(p->p_sessp->s_sid, pgid))
+			return EPERM;
+		leavepg(p);
+		joinpg(p, pgid);
+		attachpg(p);
 		break;
 	}
 
@@ -550,8 +533,7 @@ setpgrp(uap, rvp)
 }
 
 /*
- * Indefinite wait.  No one should call wakeup() or wakeprocs()
- * with a chan of &u.
+ * Indefinite wait.  No one should wakeup(&u).
  */
 
 void
@@ -701,7 +683,7 @@ sigaltstack(uap, rvp)
 	 * save before copying out.
 	 */
 	if (uap->ss) {
-		if (u.u_sigaltstack.ss_flags & SS_ONSTACK)
+		if (u.u_altflags & SS_ONSTACK)
 			return EPERM;
 		if (copyin((caddr_t) uap->ss, (caddr_t) &ss, sizeof(ss)))
 			return EFAULT;
@@ -828,13 +810,14 @@ sigaction(uap, rvp)
 	if (sig <= 0 || sig >= NSIG || sigismember(&cantmask, sig))
 		return EINVAL;
 
-	/*
-	 * act and oact might be the same address, so copyin act first.
-	 */
-	if (uap->act && copyin((caddr_t)uap->act, (caddr_t)&act, sizeof(act)))
-		return EFAULT;
+	/* act and oact might be the same address, so copyin act first */
+	if (uap->act) {
+		if (copyin((caddr_t)uap->act, (caddr_t)&act, sizeof(act)))
+			return EFAULT;
+	}
 
 	if (uap->oact) {
+
 		struct sigaction oact;
 		register flags;
 		register void (*disp)();
@@ -899,7 +882,6 @@ kill(uap, rvp)
 {
 	register id_t id;
 	register idtype_t idtype;
-	procset_t set;
 
 	if (uap->sig < 0 || uap->sig >= NSIG)
 		return EINVAL;
@@ -918,8 +900,22 @@ kill(uap, rvp)
 		id = (id_t)(-uap->pid);
 	}
 
+	return sigsend(idtype, id, uap->sig);
+}
+
+/*
+ * Device driver interface to sigsend.
+ */
+int
+sigsend(idtype, id, sig)
+	register idtype_t idtype;
+	register id_t id;
+	register sig;
+{
+	procset_t set;
+
 	setprocset(&set, POP_AND, idtype, id, P_ALL, P_MYID);
-	return sigsendset(&set, uap->sig);
+	return sigsendset(&set, sig);
 }
 
 struct sigsenda {
@@ -1057,23 +1053,21 @@ ulimit(uap, rvp)
 	register struct ulimita *uap;
 	rval_t *rvp;
 {
+	register rlim_t lim;
+	register int error = 0;
+
 	switch (uap->cmd) {
 
-	case UL_GFILLIM: /* Return current file size limit. */
-		rvp->r_off = (u.u_rlimit[RLIMIT_FSIZE].rlim_cur >> SCTRSHFT);
-		break;
-
 	case UL_SFILLIM: /* Set new file size limit. */
-	{
-		register int error = 0;
-		register rlim_t lim;
-
 		lim = uap->arg << SCTRSHFT;
 		if (error = rlimit(RLIMIT_FSIZE, lim, lim))
 			return error;
-		rvp->r_off = uap->arg;
+		/* FALLTHROUGH */
+
+	case UL_GFILLIM: /* Return current file size limit. */
+		rvp->r_off = u.u_rlimit[RLIMIT_FSIZE].rlim_cur >> SCTRSHFT;
 		break;
-	}
+
 
 	case UL_GMEMLIM: /* Return maximum possible break value. */
 	{
@@ -1092,11 +1086,11 @@ ulimit(uap, rvp)
 		sseg = seg = as->a_segs;
 		if (seg != NULL) {
 			do {
-				if (seg->s_base >= brkend) {
-					nextseg = seg;
-					break;
-				}
-				seg = seg->s_next;
+                                if (seg->s_base >= brkend) {
+                                        nextseg = seg;
+                                        break;
+                                }
+                                seg = seg->s_next;
 			} while (seg != sseg);
 		}
 
@@ -1126,19 +1120,34 @@ ulimit(uap, rvp)
 		else
 			size = 0;
 		rvp->r_off = min(rvp->r_off, (off_t)(brkend + size));
-		break;
+
+		return 0;
 	}
 
 	case UL_GDESLIM: /* Return approximate number of open files */
 		rvp->r_off = u.u_rlimit[RLIMIT_NOFILE].rlim_cur;
 		break;
 
+	case UL_GTXTOFF: /* 64 - for XENIX compatibility */
+		/* Return number of bytes between the beginning of
+		 * user text and the text address given by 'arg'.
+		 * Only valid for 386 binaries.  286 XENIX binaries
+		 * will have this ulimit() call handled by the emulator.
+		 *
+		 * Just return the text offset the user sent as the argument,
+		 * since we're small model...
+		 */
+		rvp->r_off = uap->arg;
+		break;
+
 	default:
-		return EINVAL;
+		error = EINVAL;
+		break;
 
 	}
 
-	return 0;
+	return error;
+
 }
 
 struct rlimita {
@@ -1263,8 +1272,6 @@ utssys(uap, rvp)
 		register struct vfs *vfsp;
 		struct ustat ust;
 		struct statvfs stvfs;
-		char *cp, *cp2;
-		int i;
 		extern int rf_ustat();
 
 		/*
@@ -1293,26 +1300,9 @@ utssys(uap, rvp)
 
 		ust.f_tfree = (daddr_t) (stvfs.f_bfree * (stvfs.f_frsize/512));
 		ust.f_tinode = (o_ino_t) stvfs.f_ffree;
-
-		cp = stvfs.f_fstr;
-		cp2 = ust.f_fname;
-		i = 0;
-		while (i++ < sizeof(ust.f_fname))
-			if (*cp != '\0')
-				*cp2++ = *cp++;
-			else
-				*cp2++ = '\0';
-		while (*cp != '\0'
-		  && (i++ < sizeof(stvfs.f_fstr) - sizeof(ust.f_fpack)))
-			cp++;
-		cp++;
-		cp2 = ust.f_fpack;
-		i = 0;
-		while (i++ < sizeof(ust.f_fpack))
-			if (*cp != '\0')
-				*cp2++ = *cp++;
-			else
-				*cp2++ = '\0';
+		bcopy(&stvfs.f_fstr[0], ust.f_fpack, sizeof(ust.f_fpack));
+		bcopy(&stvfs.f_fstr[sizeof(ust.f_fpack)], ust.f_fname,
+		  sizeof(ust.f_fname));
 		if (copyout((caddr_t)&ust, uap->ub.cbuf, sizeof(ust)))
 			error = EFAULT;
 		break;
@@ -1349,13 +1339,13 @@ uts_fusers(path, flags, outbp, rvp)
 	char *outbp;
 	rval_t *rvp;
 {
-	vnode_t *fvp = NULL;
+        vnode_t *fvp = NULL;
 	int error;
 	extern int lookupname();
 
-	int dofusers();
+        int dofusers();
 
-	if ((error = lookupname(path, UIO_USERSPACE, FOLLOW, NULLVPP, &fvp))
+        if ((error = lookupname(path, UIO_USERSPACE, FOLLOW, NULLVPP, &fvp))
 	  != 0) {
 		return error;
 	}
@@ -1372,7 +1362,7 @@ dofusers(fvp, flags, outbp, rvp)
 	char *outbp;
 	rval_t *rvp;
 {
-	register proc_t *prp;
+	register proc_t **prpp;
 	register int pcnt = 0;		/* number of f_user_t's copied out */
 	int error = 0;
 	register int contained = (flags == F_CONTAINED);
@@ -1396,13 +1386,15 @@ dofusers(fvp, flags, outbp, rvp)
 	}
 	cvfsp = fvp->v_vfsp;
 	ASSERT(cvfsp);
-	for (prp = practive; prp != NULL; prp = prp->p_next) {
+	for (prpp = nproc; prpp < v.ve_proc; prpp++) {
 		register user_t *up;
+		register proc_t *procp;
 
-		if (prp->p_stat == SZOMB || prp->p_stat == SIDL)
+		if ((procp = *prpp) == NULL || procp->p_stat == 0 ||
+		  procp->p_stat == SZOMB || procp->p_stat == SIDL) {
 			continue;
-
-		up = (user_t *)KUSER(prp->p_segu);
+		}
+		up = (user_t *)KUSER(procp->p_segu);
 		if (up->u_cdir && (VN_CMP(fvp, up->u_cdir) || contained && 
 		  up->u_cdir->v_vfsp == cvfsp)) {
 			use_flag |= F_CDIR;
@@ -1411,17 +1403,17 @@ dofusers(fvp, flags, outbp, rvp)
 		  up->u_rdir->v_vfsp == cvfsp)) {
 			use_flag |= F_RDIR;
 		}
-		if (prp->p_exec && (VN_CMP(fvp, prp->p_exec) ||
-		  contained && prp->p_exec->v_vfsp == cvfsp)) {
+		if (up->u_exdata.vp && (VN_CMP(fvp, up->u_exdata.vp) ||
+		  contained && up->u_exdata.vp->v_vfsp == cvfsp)) {
 			use_flag |= F_TEXT;
 		}
-		if (prp->p_trace && (VN_CMP(fvp, prp->p_trace) ||
-		  contained && prp->p_trace->v_vfsp == cvfsp)) {
+		if (procp->p_trace && (VN_CMP(fvp, procp->p_trace) ||
+		  contained && procp->p_trace->v_vfsp == cvfsp)) {
 			use_flag |= F_TRACE;
 		}
-		if (prp->p_sessp && (VN_CMP(fvp,prp->p_sessp->s_vp) ||
-		  contained && prp->p_sessp->s_vp && 
-		  prp->p_sessp->s_vp->v_vfsp == cvfsp)) {
+		if (procp->p_sessp && (VN_CMP(fvp,procp->p_sessp->s_vp) ||
+		  contained && procp->p_sessp->s_vp && 
+		  procp->p_sessp->s_vp->v_vfsp == cvfsp)) {
 			use_flag |= F_TTY;
 		}
 		ufp = &(up->u_flist);
@@ -1441,9 +1433,9 @@ dofusers(fvp, flags, outbp, rvp)
 		 * mmap usage??
 		 */
 		if (use_flag) {
-			fuentry->fu_pid = prp->p_pid;
+			fuentry->fu_pid = procp->p_pid;
 			fuentry->fu_flags = use_flag;
-			fuentry->fu_uid = (uid_t) prp->p_uid;
+			fuentry->fu_uid = (uid_t) procp->p_uid;
 			fuentry++;
 			pcnt++;
 			use_flag = 0;
@@ -1470,65 +1462,34 @@ nuname(uap, rvp)
 	rval_t *rvp;
 {
 	register int error = 0;
-	register struct utsname *buf = uap->cbuf;
+        register struct utsname *buf = uap->cbuf;
 
-	if (copyout(utsname.sysname, buf->sysname, strlen(utsname.sysname)+1)) {
-		error = EFAULT;
-		return error;
-	}
-	if (copyout(utsname.nodename, buf->nodename,
-	  strlen(utsname.nodename)+1)) {
-		error = EFAULT;
-		return error;
-	}
-	if (copyout(utsname.release, buf->release, strlen(utsname.release)+1)) {
-		error = EFAULT;
-		return error;
-	}
-	if (copyout(utsname.version, buf->version, strlen(utsname.version)+1)) {
-		error = EFAULT;
-		return error;
-	}
-	if (copyout(utsname.machine, buf->machine, strlen(utsname.machine)+1)) {
-		error = EFAULT;
-		return error;
-	}
+        if (copyout(utsname.sysname, buf->sysname, strlen(utsname.sysname)+1))
+{
+                error = EFAULT;
+                return error;
+        }
+        if (copyout(utsname.nodename, buf->nodename, strlen(utsname.nodename)+1)) {
+                error = EFAULT;
+                return error;
+        }
+        if (copyout(utsname.release, buf->release, strlen(utsname.release)+1))
+{
+                error = EFAULT;
+                return error;
+        }
+        if (copyout(utsname.version, buf->version, strlen(utsname.version)+1))
+{
+                error = EFAULT;
+                return error;
+        }
+        if (copyout(utsname.machine, buf->machine, strlen(utsname.machine)+1))
+{
+                error = EFAULT;
+                return error;
+        }
 	rvp->r_val1 = 1;
 	return error;
-}
-
-#define UADMIN_SYNC 0
-#define UADMIN_UMOUNT 1
-
-STATIC void
-dis_vfs(op)
-	int op;
-{
- 	register struct vfs *pvfsp, *cvfsp, *ovfsp;
-
-        pvfsp = rootvfs;
-	cvfsp = pvfsp->vfs_next;
-
-        while (cvfsp != NULL) {
-		ovfsp = cvfsp;
-
-                switch (op) {
-		case UADMIN_SYNC:
-			(void)VFS_SYNC(cvfsp, SYNC_CLOSE, u.u_cred);
-			break;
-		case UADMIN_UMOUNT:
-			(void)dounmount(cvfsp, u.u_cred);
-			break;
-		default:
-			break;
-		}
-
-		cvfsp = pvfsp->vfs_next;
-		if (cvfsp == ovfsp) {
-			pvfsp = cvfsp;
-			cvfsp = cvfsp->vfs_next;
-		}
-	}
 }
 
 /*
@@ -1548,41 +1509,26 @@ uadmin(uap, rvp)
 	rval_t *rvp;
 {
 	static ualock;
+	register struct proc **p;
 	int error = 0;
 
 	if (ualock)
 		return 0;
-	if (uap->cmd != A_SWAPCTL && !suser(u.u_cred))
+	if ((uap->cmd != A_SWAPCTL) && !suser(u.u_cred))
 		return EPERM;
 	ualock = 1;
 	switch (uap->cmd) {
 
 	case A_SHUTDOWN:
 	{
-		register struct proc *p;
-
-		/* 
-		 * Hold all signals so we don't die.
-		 */
-		sigfillset(&u.u_procp->p_hold);	
-
-		psignal(proc_init, SIGKILL);
-		sleep((caddr_t)proc_init, PWAIT);
-checkagain:
-		for (p = practive; p != NULL; p = p->p_next) {
-			if (p->p_exec != NULL	/* kernel daemons */
-			  && p->p_stat != SZOMB
-			  && p != u.u_procp) {
-				psignal(p, SIGKILL);
-				(void) sleep((caddr_t)p, PWAIT);
-				goto checkagain;
-			}
+		p = &nproc[1];
+		for (; p < v.ve_proc; p++) {
+			if (*p == NULL || (*p)->p_stat == 0)
+				continue;
+			if ((*p) != u.u_procp)
+				psignal(*p, SIGKILL);
 		}
-		dis_vfs(UADMIN_SYNC);
-		dis_vfs(UADMIN_UMOUNT);
-/*
-		bdwait();
-*/
+		delay(HZ);	/* allow other procs to exit */
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_UNMOUNT);
 		/* FALLTHROUGH */
 	}
@@ -1647,16 +1593,14 @@ setcontext(uap, rvp)
 		return 0;
 
 	case SETCONTEXT:
-		if (uap->ucp == NULL)
-			exit(0, 0);
 		if (copyin((caddr_t)uap->ucp,(caddr_t)&uc,sizeof(ucontext_t)))
 			return EFAULT;
 		restorecontext(&uc);
-		/* 
-		 * On return from system calls, r0 and r1 are overwritten with 
-		 * r_val1 and r_val2 respectively, so set r_val1 and r_val2 to 
-		 * r0 and r1 here.
-		 */
+	/* 
+	 * On return from system calls, r0 and r1 are overwritten with 
+	 * r_val1 and r_val2 respectively, so set r_val1 and r_val2 to 
+	 * r0 and r1 here.
+	 */
 		rvp->r_val1 = u.u_pcb.regsave[K_R0];
 		rvp->r_val2 = u.u_pcb.regsave[K_R1];
 		return 0;
@@ -1688,9 +1632,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1701,9 +1646,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1714,9 +1660,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1727,9 +1674,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1740,9 +1688,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1767,9 +1716,10 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
@@ -1780,83 +1730,127 @@ systeminfo(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
-	case SI_SRPC_DOMAIN:
+	case SI_GET_INET_DOMAIN:
 		getcnt = ((strcnt = strlen(srpc_domain)) >= uap->count) ?
 		  uap->count : strcnt + 1;
 		if (copyout(srpc_domain, uap->buf, getcnt)) {
 			error = EFAULT;
 			break;
 		}
-		if (strcnt >= uap->count 
-		  && subyte(uap->buf+uap->count-1, 0) < 0)
+		if ((strcnt >= uap->count) 
+		  && subyte(uap->buf+uap->count-1, 0) < 0) {
 			error = EFAULT;
+		}
 		rvp->r_val1 = strcnt + 1;
 		break;
 
 	case SI_SET_HOSTNAME:
-	{
-		size_t		len;
-		char 		name[SYS_NMLN];
+		{
+			struct vnode	*vp;
+			int		len = 0;
+			int		limit;
+			char 		name[SYS_NMLN];
+			char *c = name;
 
-		if (!suser(u.u_cred)) {
-			error = EPERM;
-			break;
-		}
+			if (!suser(u.u_cred)) {
+				error = EPERM;
+				break;
+			}
 
-		if ((error = copyinstr(uap->buf, name, SYS_NMLN, &len)) != 0)
-			break;
+			do {
+				if (copyin(uap->buf++, c, 1)) {
+					error = EFAULT;
+					break;
+				}
+				len++;
+			} while ((len < SYS_NMLN) && *c++);
+			if (error)
+				break;
 
-		/* 
-		 * Must be non-NULL string and string
-		 * must be less than SYS_NMLN chars.
-		 */
-		if (len < 2 || (len == SYS_NMLN && name[SYS_NMLN-1] != '\0')) {
-			error = EINVAL;
+			/* 
+			 * must be non-NULL string and string
+			 * must be less than SYS_NMLN chars.
+			 */
+			if ((len < 2) || ((len == SYS_NMLN) && (*c != '\0'))) {
+				error = EINVAL;
+				break;
+			}
+					
+			/*
+			 * Copy name into file /etc/nodename.
+		 	 * NOTE:
+			 * The name of the system is stored in a file for use
+			 * when booting because the non-volatile RAM on the
+			 * porting base will not allow storage of the full
+			 * internet standard nodename.
+			 * If sufficient non-volatile RAM is available on
+			 * the hardware, however, storing the name there would
+			 * be preferable to storing it in a file.
+			 */
+			limit = u.u_rlimit[RLIMIT_FSIZE].rlim_cur >> SCTRSHFT;
+			if (vn_open("/etc/nodename", UIO_SYSSPACE, 
+		  	  FWRITE|FCREAT|FTRUNC, 0, &vp) != 0) {
+				error = EFAULT;
+				break;
+			} else if (vn_rdwr(UIO_WRITE, vp, (caddr_t)name, 
+	     	  	  len, 0, UIO_SYSSPACE, 0, limit, u.u_cred, 
+			  NULL) != 0) {
+				error = EFAULT;
+				break;
+			}
+			/*
+			 * Copy the name into the global utsname structure.
+			 */
+			strcpy(utsname.nodename, name);
+			rvp->r_val1 = len;
 			break;
-		}
-				
-		/*
-		 * Copy the name into the global utsname structure.
-		 */
-		strcpy(utsname.nodename, name);
-		rvp->r_val1 = len;
-		break;
-	}
+        	}
 			
-	case SI_SET_SRPC_DOMAIN:
-	{
-		char name[SYS_NMLN];
-		size_t len;
+	case SI_SET_INET_DOMAIN:
+		{
+			char name[SYS_NMLN];
+			char *c = name;
+			int len = 0;
 
-		if (!suser(u.u_cred)) {
-			error = EPERM;
+			if (!suser(u.u_cred)) {
+				error = EPERM;
+				break;
+			}
+			do {
+				if (copyin(uap->buf++, c, 1)) {
+					error = EFAULT;
+					break;
+				}
+				len++;
+			} while ((len < SYS_NMLN) && *c++);
+			if (error)
+				break;
+			/*
+			 * If string passed in is longer than length
+			 * allowed for domain name, fail.
+			 */
+			if ((len == SYS_NMLN) && (*c != '\0')) {
+				error = EINVAL;
+				break;
+			}
+			strcpy(srpc_domain, name);
+			rvp->r_val1 = len;
 			break;
 		}
-		if ((error = copyinstr(uap->buf, name, SYS_NMLN, &len)) != 0)
-			break;
-		/*
-		 * If string passed in is longer than length
-		 * allowed for domain name, fail.
-		 */
-		if (len == SYS_NMLN && name[SYS_NMLN-1] != '\0') {
-			error = EINVAL;
-			break;
-		}
-		strcpy(srpc_domain, name);
-		rvp->r_val1 = len;
-		break;
-	}
 
 	default:
 		error = EINVAL;
 		break;
 	}
 
+	if (error)
+		rvp->r_val1 = -1;
 	return error;
 }

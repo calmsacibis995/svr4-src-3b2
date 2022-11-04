@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libc-port:sys/makefile	1.5.6.1"
+#ident	"@(#)libc-port:sys/makefile	1.5.5.2"
 #
 # makefile for libc/port/sys
 #
@@ -33,7 +33,7 @@ msgsys.o      nfssys.o      semsys.o    shmsys.o
 POBJECTS=$(OBJECTS:.o=.p)
 
 PIC_OBJECTS=\
-execl.P       execle.P      execv.P     hrtsys.P   lockf.P    \
+execl.P       execle.P      execv.P     lockf.P    \
 msgsys.P      semsys.P      shmsys.P
 
 ABI_OBJECTS=$(PIC_OBJECTS:.P=.A)

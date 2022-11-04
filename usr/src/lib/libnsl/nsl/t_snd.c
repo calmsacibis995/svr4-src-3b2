@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:nsl/t_snd.c	1.3.1.2"
+#ident	"@(#)libnsl:nsl/t_snd.c	1.3.1.1"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/errno.h"
@@ -45,10 +45,7 @@ int flags;
 		t_errno = TNOTSUPPORT;
 		return(-1);
 	}
-	if (!(tiptr->ti_flags & SENDZERO) && nbytes == 0) {
-		t_errno = TBADDATA;
-		return(-1);
-	}
+
 
 	datareq = (struct T_data_req *)tiptr->ti_ctlbuf;
 	if (flags&T_EXPEDITED) {
@@ -66,7 +63,7 @@ int flags;
 	tmp = nbytes;
 	tmpbuf = buf;
 
-	do {
+	while (tmp) {
 		if ((tmpcnt = tmp) > tiptr->ti_maxpsz) {
 			datareq->MORE_flag = 1;
 			tmpcnt = tiptr->ti_maxpsz;
@@ -103,7 +100,7 @@ int flags;
 		}
 		tmp = tmp - tmpcnt;
 		tmpbuf = tmpbuf + tmpcnt;
-	} while (tmp);
+	}
 
 	tiptr->ti_state = TLI_NEXTSTATE(T_SND, tiptr->ti_state);
 	return(nbytes - tmp);

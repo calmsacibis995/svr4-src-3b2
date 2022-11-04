@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/loc_cons.c	1.3"
+#ident	"@(#)boot:boot/filledt/dcp/loc_cons.c	1.2"
 
 
 
@@ -30,7 +30,6 @@
 #include <sys/iobd.h>
 #include <sys/diagnostic.h>
 #include <sys/termio.h>
-#include <sys/inline.h>
 
 extern unsigned char Dirname[];
 extern unsigned char filename[];

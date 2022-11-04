@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/specfs/specsubr.c	1.40"
+#ident	"@(#)fs:fs/specfs/specsubr.c	1.30"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/systm.h"
@@ -46,11 +23,6 @@
 #include "sys/file.h"
 #include "sys/open.h"
 #include "sys/user.h"
-/* #ifdef MERGE */
-#include "sys/termios.h"
-#include "sys/stream.h"
-#include "sys/strsubr.h"
-/* #endif MERGE */
 
 STATIC int specfstype;
 STATIC dev_t specdev;
@@ -115,8 +87,9 @@ specvp(vp, dev, type, cr)
 			sp->s_mtime = va.va_mtime.tv_sec;
 			sp->s_ctime = va.va_ctime.tv_sec;
 			sp->s_fsid = va.va_fsid;
-		} else
+		} else {
 			sp->s_fsid = specdev;
+		}
 		sp->s_realvp = vp;
 		VN_HOLD(vp);
 		sp->s_dev = dev;
@@ -211,17 +184,19 @@ stillreferenced(dev, type)
 	dev_t dev;
 	vtype_t type;
 {
-	register struct snode *sp, *csp;
-	register struct vnode *vp;
+	register struct snode *sp;
+	register struct vnode *vp, *cvp;
 
 	if ((vp = specfind(dev, type)) == NULL)
 		return 0;
 	VN_RELE(vp);
 	sp = VTOS(vp);
-	csp = VTOS(sp->s_commonvp);
-	if (csp->s_count > 0)		/* another snode exists */
+	if (sp->s_count > 0)                    /* snode is still in use */
 		return 1;
-	if (csp->s_mapcnt > 0)		/* mappings to device exist */
+	cvp = sp->s_commonvp;
+	if (cvp->v_count > 1)                   /* another snode exists */
+		return 1;
+	if (VTOS(cvp)->s_mapcnt > 0)            /* mappings to device exist */
 		return 1;
 	return 0;
 }
@@ -262,8 +237,7 @@ common_specvp(vp)
 {
 	register struct snode *sp;
 
-	if ((vp->v_type != VBLK) && (vp->v_type != VCHR) || 
-	  vp->v_op != &spec_vnodeops)
+	if ((vp->v_type != VBLK) && (vp->v_type != VCHR))
 		return vp;
 	sp = VTOS(vp);
 	return sp->s_commonvp;
@@ -274,6 +248,7 @@ common_specvp(vp)
  * one which is "common" to all the snodes which represent the
  * same device.  For use ONLY by SPECFS.
  */
+extern int dksize();
 
 STATIC
 struct vnode *
@@ -459,7 +434,11 @@ device_close(vp, flag, cr)
 	case VCHR:
 		if (cdevsw[getmajor(dev)].d_str)
 			error = strclose(sp->s_commonvp, flag, cr);
-		else
+		else if (*cdevsw[getmajor(dev)].d_flag & D_OLD) {
+			(void)(*cdevsw[getmajor(dev)].d_close)
+			  (cmpdev(dev), flag, OTYP_CHR);
+			error = u.u_error;              /* XXX */
+		} else
 			error = (*cdevsw[getmajor(dev)].d_close)
 			  (dev, flag, OTYP_CHR, cr);
 		break;
@@ -474,8 +453,13 @@ device_close(vp, flag, cr)
 		  (struct cred *) 0);
 		bflush(dev);
 		binval(dev);
-		error = (*bdevsw[getmajor(dev)].d_close)
-		  (dev, flag, OTYP_BLK, cr);
+		if (*bdevsw[getmajor(dev)].d_flag & D_OLD) {
+			(void)(*bdevsw[getmajor(dev)].d_close)
+			  (cmpdev(dev), flag, OTYP_BLK);
+			error = u.u_error;              /* XXX */
+		} else
+			error = (*bdevsw[getmajor(dev)].d_close)
+			  (dev, flag, OTYP_BLK, cr);
 		break;
 	}
 
@@ -483,40 +467,15 @@ device_close(vp, flag, cr)
 }
 
 struct vnode *
-makectty(ovp)
-	register vnode_t *ovp;
+makectty(dev)
+	register dev_t dev;
 {
 	register vnode_t *vp;
 
-	if (vp = makespecvp(ovp->v_rdev, VCHR)) {
+	if (vp = makespecvp(dev, VCHR)) {
 		VTOS(vp)->s_count++;
 		VTOS(VTOS(vp)->s_commonvp)->s_count++;
 	}
 
 	return vp;
 }
-
-/* #ifdef MERGE */
-/*
- * XENIX rdchk() support.
- */
-int
-spec_rdchk(vp, cr, rvalp)
-	struct vnode *vp;
-	struct cred *cr;
-	int *rvalp;
-{
-	dev_t dev;
-	int error;
-
-	if (vp->v_type != VCHR || vp->v_op != &spec_vnodeops)
-		return ENOTTY;
-	dev = VTOS(vp)->s_dev;
-	if (cdevsw[getmajor(dev)].d_str)
-		error = strioctl(vp, FIORDCHK, 0, 0, K_TO_K, cr, rvalp);
-	else
-		error =
-		  (*cdevsw[getmajor(dev)].d_ioctl)(dev, FIORDCHK, 0, 0, cr, rvalp);
-	return error;
-}
-/* #endif MERGE */

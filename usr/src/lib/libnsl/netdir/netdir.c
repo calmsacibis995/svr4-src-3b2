@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnet:netdir/netdir.c	1.7"
+#ident	"@(#)libnet:netdir/netdir.c	1.5"
 
 /*
  *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -65,6 +65,7 @@ static struct translator {
 	struct translator	*next;
 };
 
+ extern char *sys_errlist[];
 
 static struct translator *xlate_list = NULL;
  
@@ -333,8 +334,8 @@ netdir_free(ptr, type)
 		nas = (struct nd_addrlist *) ptr;
 		for (na = nas->n_addrs, i = 0; i < nas->n_cnt; i++, na++) {
 			free(na->buf);
+			free((char *)na);
 		}
-		free((char *)nas->n_addrs);
 		free((char *)nas);
 		break;
 
@@ -349,11 +350,11 @@ netdir_free(ptr, type)
 		hss = (struct nd_hostservlist *) ptr;
 		for (hs = hss->h_hostservs, i = 0; i < hss->h_cnt; i++, hs++) {
 			free(hs->h_host);
+			free(hs->h_serv);
 		}
 		free((char *)hss->h_hostservs);
 		free((char *)hss);
 		break;	
-
 	default :
 		_nderror = ND_UKNWN;
 		break;
@@ -491,7 +492,7 @@ netdir_sperror()
  		(void) sprintf(str, "n2a: control operation failed");
  		break;
  	case ND_SYSTEM:
- 		(void) sprintf(str, "n2a: system error: %s", strerror(errno));
+ 		(void) sprintf(str, "n2a: system error: %s", sys_errlist[errno]);
 	default : 
 		(void) sprintf(str, "n2a: unknown error #%d", _nderror);
 		break;

@@ -5,34 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/dnlc.c	1.12"
+#ident	"@(#)fs:fs/dnlc.c	1.7"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/systm.h"
-#include "sys/vfs.h"
 #include "sys/vnode.h"
 #include "sys/cred.h"
 #include "sys/dnlc.h"
@@ -70,8 +46,7 @@
 #define	INS_HASH(ncp, nch)	nc_inshash(ncp, nch)
 #define	RM_HASH(ncp)		nc_rmhash(ncp)
 
-#define	INS_LRU(ncp1, ncp2)	nc_inslru((struct ncache *) ncp1, \
-				  (struct ncache *) ncp2)
+#define	INS_LRU(ncp1, ncp2)	nc_inslru((struct ncache *) ncp1, (struct ncache *) ncp2)
 #define	RM_LRU(ncp)		nc_rmlru((struct ncache *) ncp)
 
 #define	NULL_HASH(ncp)		(ncp)->hash_next = (ncp)->hash_prev = (ncp)
@@ -107,6 +82,7 @@ STATIC int doingcache = 1;
 
 STATIC void		dnlc_rm(struct ncache *);
 STATIC struct ncache	*dnlc_search(vnode_t *, char *, int, int, cred_t *);
+STATIC int		dnlc_has_vp(vnode_t *);
 
 STATIC void		nc_inshash(struct ncache *, struct ncache *);
 STATIC void		nc_rmhash(struct ncache *);
@@ -117,6 +93,7 @@ STATIC void		nc_rmlru(struct ncache *);
 
 STATIC void		dnlc_rm();
 STATIC struct ncache	*dnlc_search();
+STATIC int		dnlc_has_vp();
 
 STATIC void		nc_inshash();
 STATIC void		nc_rmhash();
@@ -137,7 +114,7 @@ dnlc_init()
 
 	if (ncsize <= 0
 	  || (ncache =
-	      (struct ncache *)kmem_zalloc(ncsize * sizeof(*ncache), KM_SLEEP))
+	      (struct ncache *)kmem_alloc(ncsize * sizeof(*ncache), KM_SLEEP))
 	    == NULL) {
 		doingcache = 0;
 		cmn_err(CE_NOTE, "No memory for name cache\n");
@@ -202,8 +179,6 @@ dnlc_enter(dp, name, vp, cred)
 		VN_RELE(ncp->dp);
 	if (ncp->vp != NULL)
 		VN_RELE(ncp->vp);
-	if (ncp->cred != NULL)
-		crfree(ncp->cred);
 	/*
 	 * Hold the vnodes we are entering and
 	 * fill in cache info.
@@ -339,41 +314,6 @@ dnlc_purge_vp(vp)
 }
 
 /*
- * Purge cache entries referencing a vfsp.  Caller supplies a count
- * of entries to purge; up to that many will be freed.  A count of
- * zero indicates that all such entries should be purged.  Returns
- * the number of entries that were purged.
- */
-int
-dnlc_purge_vfsp(vfsp, count)
-	register struct vfs *vfsp;
-	register int count;
-{
-	register int moretodo;
-	register struct ncache *ncp;
-	register int n = 0;
-
-	if (!doingcache)
-		return 0;
-	do {
-		moretodo = 0;
-		for (ncp = nc_lru.lru_next; ncp != (struct ncache *) &nc_lru;
-		  ncp = ncp->lru_next) {
-			if (ncp->dp->v_vfsp == vfsp
-			  || ncp->vp->v_vfsp == vfsp) {
-				n++;
-				dnlc_rm(ncp);
-				if (count == 0 || n < count)
-					moretodo = 1;
-				break;
-			}
-		}
-	} while (moretodo);
-
-	return n;
-}
-
-/*
  * Purge any cache entry.
  * Called by, e.g., iget() when inode freelist is empty.
  * Returns 1 if a cache entry was purged, 0 if the cache was
@@ -505,4 +445,35 @@ nc_rmlru(ncp)
 {
 	ncp->lru_prev->lru_next = ncp->lru_next;
 	ncp->lru_next->lru_prev = ncp->lru_prev;
+}
+
+/*
+ * Return 1 if cache has entries referencing a vnode.
+ */
+STATIC int
+dnlc_has_vp(vp)
+	register vnode_t *vp;
+{
+	register struct ncache *ncp;
+
+	if (!doingcache)
+		return 0;
+	ncp = nc_lru.lru_next;
+	for (; ncp != (struct ncache *) &nc_lru; ncp = ncp->lru_next) {
+		if (ncp->vp == vp)
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * XXX -- kludge to turn off VTEXT until ETXTBSY goes away.
+ */
+void
+xrele(vp)
+	register vnode_t *vp;
+{
+	ASSERT(vp->v_flag & VTEXT);
+	if (vp->v_count == 1 || (vp->v_count == 2 && dnlc_has_vp(vp)))
+		vp->v_flag &= ~VTEXT;
 }

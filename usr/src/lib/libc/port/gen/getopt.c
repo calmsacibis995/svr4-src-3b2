@@ -5,14 +5,14 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/getopt.c	1.23"
+#ident	"@(#)libc-port:gen/getopt.c	1.21"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 #ifdef __STDC__
 	#pragma weak getopt = _getopt
 #endif
 #include "synonyms.h"
-#include <unistd.h>
+#include <osfcn.h>
 #include <string.h>
 #define NULL	0
 #define EOF	(-1)
@@ -35,7 +35,7 @@ int _sp = 1;
 int
 getopt(argc, argv, opts)
 int	argc;
-char	*const *argv, *opts;
+char	**argv, *opts;
 {
 	register char c;
 	register char *cp;

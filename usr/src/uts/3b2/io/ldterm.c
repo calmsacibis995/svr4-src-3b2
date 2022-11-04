@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/ldterm.c	1.36"
+#ident	"@(#)kernel:io/ldterm.c	1.28"
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * 		PROPRIETARY NOTICE (Combined)
@@ -23,7 +23,7 @@
  * Notice of copyright on this source code product does not indicate 
  * publication.
  * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
  * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * 	          All rights reserved.
  *  
@@ -103,12 +103,12 @@ int ldterm_debug = 0;
  * matter how much bigger than the high water mark it is.
  */
 static struct module_info ldtermmiinfo = {
-	0x0bad,
+	0xABCD,
 	"ldterm",
 	0,
-	256,
 	512,
-	200
+	300,
+	100
 };
 
 static struct qinit ldtermrinit = {
@@ -121,12 +121,12 @@ static struct qinit ldtermrinit = {
 };
 
 static struct module_info ldtermmoinfo = {
-	0x0bad,
+	0xABCD,
 	"ldterm",
 	0,
-	INFPSZ,
-	1,
-	0
+	512,
+	300,
+	200
 };
 
 static struct qinit ldtermwinit = {
@@ -323,17 +323,11 @@ ldtermopen(q, devp, oflag, sflag, crp)
 		(void) splx(s);
 	}
 	strop = (struct stroptions *)bp->b_wptr;
-#ifdef SVR32
 	strop->so_flags =
 	    SO_READOPT|SO_HIWAT|SO_LOWAT|SO_NDELON|SO_ISTTY;
-#endif /* SVR32 */
-#ifdef SVR40
-	strop->so_flags =
-	    SO_READOPT|SO_HIWAT|SO_LOWAT|SO_NDELON|SO_ISTTY|SO_STRHOLD;
-#endif /* SVR40 */
 	strop->so_readopt = RMSGN;
-	strop->so_hiwat = 512;
-	strop->so_lowat = 128;
+	strop->so_hiwat = 300;
+	strop->so_lowat = 200;
 	bp->b_wptr += sizeof (struct stroptions);
 	bp->b_datap->db_type = M_SETOPTS;
 	putnext(q, bp);
@@ -476,7 +470,7 @@ ldtermrput(q, mp)
 		 */
 
 		if ((mp->b_wptr - mp->b_rptr) != sizeof (struct iocblk)) {
-			DEBUG3 (("Non standard M_CTL received by the ldterm module\n"));
+			cmn_err (CE_NOTE,"Non standard M_CTL received by the ldterm module\n");
 			/* May be for someone else; pass it on */
 			putnext (q, mp);
 			return;
@@ -489,7 +483,7 @@ ldtermrput(q, mp)
 
 			DEBUG3(("ldtermrput: M_CTL Query Reply\n"));
 			if (!mp->b_cont) {
-				DEBUG3 (("No information in Query Message\n"));
+				cmn_err (CE_NOTE,"No information in Query Message\n");
 				break;
 			}
 			if ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
@@ -543,7 +537,8 @@ ldtermrput(q, mp)
 		break;
 	}
 #ifdef SVR40
-	drv_setparm(SYSRAWC, msgdsize(mp));
+	if (mp->b_wptr - mp->b_rptr)
+		drv_setparm(SYSRAWC, (mp->b_wptr - mp->b_rptr));
 #endif /* SVR40 */
 
 	/*
@@ -636,7 +631,6 @@ ldtermrput(q, mp)
 					if (c == tp->t_modes.c_cc[VSTOP]
 					    || c == tp->t_modes.c_cc[VSTART])
 						continue;
-				}
 					/*
 					 * Check for "literal next" character
 					 * and "flush output" character.
@@ -663,6 +657,7 @@ ldtermrput(q, mp)
 							continue;
 						}
 					}
+				}
 
 				tp->t_modes.c_lflag &= ~FLUSHO;
 
@@ -825,18 +820,14 @@ ldtermrsrv(q)
 	while ((mp = getq(q)) != NULL) {
 		if (mp->b_datap->db_type <= QPCTL && !canput(q->q_next)) {
 		/* 
-		 * Stream head is flow controlled. If echo is turned on,
-		 * flush the read side or send a bell down the line
-		 * to stop input and process the current message.
-	 	 * Otherwise(putbq) the user will not see any response to
-		 * to the typed input. Typically happens if there is no
-		 * reader process. Note that you will loose the data
-		 * in this case if the data is coming too fast. There
-		 * is an assumption here that if ECHO is turned on its
-		 * some user typing the data on a terminal and its not network.
+		 * Stream head flow controlled
+		 * In non-canonical mode its ok to put it back on the
+		 * the queue but in canonical there will be no echo
+		 * if there is no reader, flush the read side and 
+		 * process the current message and ship it up
 		 */
 		 
-			if (tp->t_modes.c_lflag & ECHO) {
+			if (CANON_MODE) {
 				if (tp->t_modes.c_iflag & IMAXBEL) {
 					ldterm_outchar(CTRL('g'), WR(q), 4, tp);
 				}
@@ -982,6 +973,11 @@ ldtermrsrv(q)
 					 * implementation.  
 				         */
 
+#ifdef SVR40
+					if (bp->b_wptr - bp->b_rptr)
+						drv_setparm(SYSCANC,
+						  (bp->b_wptr - bp->b_rptr));
+#endif /* SVR40 */
 					while (bp->b_rptr < bp->b_wptr) {
 						c = *bp->b_rptr++;
 						if ((bpt = ldterm_docanon(c, bpt,
@@ -1353,9 +1349,8 @@ ldterm_trim(tp)
 	register mblk_t *bpt;
 	register mblk_t *bp;
 
-	ASSERT(tp->t_endmsg);
-	bpt = tp->t_endmsg;
-
+	if ((bpt = tp->t_endmsg) == NULL)
+		panic("ldterm_trim called with no message");
 	if (bpt->b_rptr == bpt->b_wptr) {
 		/*
 		 * This mblk is now empty.
@@ -1365,8 +1360,8 @@ ldterm_trim(tp)
 		bp = tp->t_message;
 		if (bp != bpt) {
 			while (bp->b_cont != bpt) {
-				ASSERT(bp->b_cont);
-				bp = bp->b_cont;
+				if ((bp = bp->b_cont) == NULL)
+					panic("ldterm_unget: current input line mislinked");
 			}
 			bp->b_cont = NULL;
 			freeb(bpt);
@@ -1918,14 +1913,13 @@ DEBUG4 (("Unsetting TS_RTO, msglen = %d\n", tp->t_msglen));
 
 	else if (V_TIME) {
 		DEBUG4 (("ldterm_dononcanon VTIME  set\n"));
-		if (!(tp->t_state & TS_TACT)) {
-			DEBUG4 (("ldterm_dononcanon ldterm_vmin_timeout called\n"));
+		if (!(tp->t_state & TS_TACT))
+		DEBUG4 (("ldterm_dononcanon VTIME  set\n"));
 			ldterm_vmin_timeout (q);
-		}
 	}
 
 	if (free_flag)
-		DEBUG4 (("CAUTION message block not freed\n"));
+		cmn_err (CE_NOTE, "CAUTION message block not freed\n");
 
 	return (newmsg(tp));
 }
@@ -1969,9 +1963,8 @@ ldterm_echo(c, q, ebsize, tp)
 		}
 		ldterm_outchar(c, q, ebsize, tp);
 		return (i + 1);
-		/* echo only special control character and the Bell */
 	} else if ((c > 037 && c != 0177) || c == '\t' || c == '\n' 
-		  || c == '\r' || c == '\b' || c == 007) {
+		  || c == '\r' || c == '\b') {
 		ldterm_outchar(c, q, ebsize, tp);
 		return (i + 1);
 	}
@@ -2087,7 +2080,7 @@ ldterm_msg_upstream(q, tp)
 
 #ifdef SVR40
 	if (CANON_MODE) {
-		drv_setparm(SYSCANC, msgdsize(bp));
+		drv_setparm(SYSCANC, (bp->b_wptr - bp->b_rptr));
 	}
 #endif /* SVR40 */
 	tp->t_message = NULL;
@@ -2202,7 +2195,8 @@ ldtermwput(q, mp)
 		}
 		/* Update sysinfo outch */
 #ifdef SVR40
-			drv_setparm(SYSOUTC, msgdsize(mp));
+		if (mp->b_wptr - mp->b_rptr)
+			drv_setparm(SYSOUTC, (mp->b_wptr - mp->b_rptr));
 #endif /* SVR40 */
 		putnext(q, mp);
 		break;
@@ -2232,9 +2226,6 @@ ldterm_output_msg(q, imp, omp, tp, bsize, echoing)
 	register unsigned char c;
 	register int count, ctype;
 	register int bytes_left;
-
-	mblk_t *bp;	/* block to stuff an M_DELAY message in */
-
 
 	/*
 	 * Allocate a new block into which to put bytes.
@@ -2537,9 +2528,9 @@ ldterm_output_msg(q, imp, omp, tp, bsize, echoing)
 								count = 0;
 							break;
 						}
+						*obp->b_wptr++ = c;
+						bytes_left--;
 					}
-					*obp->b_wptr++ = c;
-					bytes_left--;
 				}
 				break;
 
@@ -2601,24 +2592,14 @@ ldterm_output_msg(q, imp, omp, tp, bsize, echoing)
 						bytes_left--;
 					} while (--count != 0);
 				} else {
-					if ((tp->t_modes.c_lflag & FLUSHO)
+					if (!(tp->t_modes.c_lflag & FLUSHO)
 					    && (tp->t_modes.c_lflag & IEXTEN)) {
-						freemsg(omp);	/* drop on floor */
-					} else {
-					/* Update sysinfo outch */
-#ifdef SVR40
-				drv_setparm(SYSOUTC, msgdsize(omp));
-#endif /* SVR40 */
+						/** tk_nout += msgdsize(omp); **/
 						putnext(q, omp);
-						/*
-						 * Send M_DELAY downstream
-						 */
-						if (( bp = allocb( 1, BPRI_MED)) != NULL) {
-							bp->b_datap->db_type = M_DELAY;
-							*bp->b_wptr++ = count;
-							(*q->q_next->q_qinfo->qi_putp)( q->q_next, bp);
-						}
-					}
+						(void) putctl1(q->q_next,
+						    M_DELAY, count);
+					} else
+						freemsg(omp);	/* drop on floor */
 					bytes_left = 0;
 					/*
 					 * We have to start a new message;
@@ -2694,11 +2675,7 @@ ldterm_dosig(q, sig, c, mtype, mode)
 {
 	register ldtermstd_state_t *tp = (ldtermstd_state_t *)q->q_ptr;
 
-	/*
-	 * c == \0 is brk case; need to flush on BRKINT even
-         * if noflsh is set.
-         */
-	if ((!(tp->t_modes.c_lflag & NOFLSH)) || (c == '\0')) {
+	if (!(tp->t_modes.c_lflag & NOFLSH)) {
 		if (mode) {
 			/*
 			 * Flush read or write side
@@ -3268,25 +3245,17 @@ ldterm_vmin_timeout (q)
 	register ldtermstd_state_t *tp;
 	int s;
 
-	DEBUG4(("ldterm_vmin_timeout:\n"));
-	/* 
-	 * LDTERM  may be popped when a function is pending in callout table.
-	 * We could instead untimeout on the close but checking the q validity
-	 * is fullproof - just in case multiple timers are active.
-	 */
-	if (!q) {
-		DEBUG4( ("ldterm_vmin_timeout returning with a bad q pointer\n"));
-	 	return;
-	}
 
 	tp = (ldtermstd_state_t *)q->q_ptr;
 
+	DEBUG4(("ldterm_vmin_timeout:\n"));
 
 	if (!tp) {
 		DEBUG4( ("ldterm_vmin_timeout returning with a bad tp pointer\n"));
 	 	return;
 	}
 
+	tp->t_state &= ~TS_TACT;
 	if (CANON_MODE || (tp->t_state & TS_CLOSE)) {
 		DEBUG4 (("OOPS: CANON MODE or CLOSE interrupted\n"));
 		return;
@@ -3294,15 +3263,12 @@ ldterm_vmin_timeout (q)
 	/* if VMIN has any value, the timer is to be started after one
 	 * char has been received only (if need be). Hence t_msglen
 	 * should never be equal to zero here if VMIN > 0.
-	 * However, this can happens in some situations like flush
-	 * followed by input before the timer expires etc.
 	 */
 
 	if ((tp->t_msglen == 0) && V_MIN) {
 		DEBUG4 (("OOPS: Timer messed up\n"));
 		return;				
 	}
-	tp->t_state &= ~TS_TACT;
 	if (!(tp->t_state & TS_RTO )) {
 		tp->t_state |= TS_RTO | TS_TACT;
 		DEBUG4( ("calling timeout from ldterm_vmin_timeout\n"));

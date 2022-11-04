@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:s_ioctl.c	1.6"
+#ident	"@(#)libsocket:s_ioctl.c	1.5"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -29,26 +29,17 @@
  * 	          All rights reserved.
  *  
  */
-
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 #include <fcntl.h>
-#include <sys/param.h>
 #include <sys/sockio.h>
 #include <sys/filio.h>
-#include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stropts.h>
 #include <sys/signal.h>
 #include <sys/termios.h>
-#include <sys/socket.h>
-#include <sys/sockmod.h>
 #include <errno.h>
-#include <syslog.h>
-
-#ifndef NULL
-#define	NULL	0
-#endif /* NULL */
-
-#define		ISSOCK(A)	(ioctl((A), I_FIND, "sockmod"))
 
 int
 fcntl(des, cmd, arg)
@@ -58,52 +49,21 @@ fcntl(des, cmd, arg)
 
 {
 	int		res;
-	int		retval;
 
 	switch(cmd) {
 	case F_SETOWN:
-		SOCKDEBUG((struct _si_user *)NULL,
-					"fcntl: got fcntl-F_SETOWN\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "fcntl: got fcntl-F_SETOWN\n");
+#endif
 		return ioctl(des, FIOSETOWN, &arg);
 
 	case F_GETOWN:
-		SOCKDEBUG((struct _si_user *)NULL,
-					"fcntl: got fcntl-F_GETOWN\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "fcntl: doing fcntl-F_GETOWN\n");
+#endif
 		if (ioctl(des, FIOGETOWN, &res) < 0)
 			return -1;
 		return res;
-
-	case F_SETFL:
-		SOCKDEBUG((struct _si_user *)NULL,
-					"fcntl: got fcntl-F_SETFL\n", 0);
-		if (ISSOCK(des)) {
-			res = arg & FASYNC;
-			if (_s_dofioasync(des, &res) < 0)
-				return -1;
-		}
-		return _fcntl(des, cmd, arg);
-
-	case F_GETFL: {
-		register int flags;
-
-		SOCKDEBUG((struct _si_user *)NULL,
-					"fcntl: got fcntl-F_GETFL\n", 0);
-		if ((flags = _fcntl(des, cmd, arg)) < 0)
-			return -1;
-		if (ISSOCK(des)) {
-			/* See if SIGIO is in force.
-			 */
-			if (ioctl(des, I_GETSIG, &retval) < 0) {
-				if (errno != EINVAL)
-					return -1;
-				else	errno = 0;
-			}
-			else
-			if (retval & (S_RDNORM|S_WRNORM))
-				flags |= FASYNC;
-		}
-		return flags;
-	}
 
 	default:
 		return _fcntl(des, cmd, arg);
@@ -120,8 +80,9 @@ ioctl(des, request, arg)
 	pid_t		pid;
 	int		retval;
 
-	SOCKDEBUG((struct _si_user *)NULL,
-				"ioctl: got ioctl request %x\n", request);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: got ioctl request %x\n", request);
+#endif
 	switch(request) {
 	case FIOASYNC:
 	case FIOSETOWN:
@@ -129,11 +90,12 @@ ioctl(des, request, arg)
 	case SIOCSPGRP:
 	case SIOCGPGRP:
 	case SIOCATMARK:
-		if (ISSOCK(des) == 0) {
+		if(_ioctl(des, I_FIND, "sockmod") == 0) {
 			if (request == SIOCSPGRP || request == SIOCGPGRP ||
 						request == SIOCATMARK) {
-				SOCKDEBUG((struct _si_user *)NULL,
-						"ioctl: %d not socket\n", des);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: %d not socket\n", des);
+#endif
 				errno = ENOTSOCK;
 				return -1;
 			}
@@ -142,14 +104,48 @@ ioctl(des, request, arg)
 
 		switch(request) {
 		case FIOASYNC:
-			/* Facilitate SIGIO.
+			/*  Turn on or off async I/O.
 			 */
-			return _s_dofioasync(des, arg);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: got FIOASYNC\n");
+#endif
+			retval = 0;
+			if (*(int *)arg) {
+				if (_ioctl(des, I_GETSIG, &retval) < 0 &&
+							 errno != EINVAL)
+					return -1;
+
+				retval |= (S_RDNORM|S_WRNORM);
+				return _ioctl(des, I_SETSIG, retval);
+			}
+
+			/* Get current disposition.
+			 */
+			if (_ioctl(des, I_GETSIG, &retval) < 0) {
+				if (errno == EINVAL)
+					return 0;
+				else	return -1;
+			}
+			if ( !(retval & (S_RDNORM|S_WRNORM)))
+				/* Async not in effect.
+				 */
+				return 0;
+
+			/* Clear out the old.
+			 */
+			(void)_ioctl(des, I_SETSIG, 0) ;
+
+			/* Bring in the new.
+			 */
+			if (retval &= ~(S_RDNORM|S_WRNORM))
+				return _ioctl(des, I_SETSIG, retval);
+			return 0;
 	
 		case SIOCGPGRP:
 		case FIOGETOWN:
-			SOCKDEBUG((struct _si_user *)NULL,
-					"ioctl: got SIOCGPGRP/FIOGETOWN\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: got SIOCGPGRP/FIOGETOWN\n");
+#endif
 			retval = 0;
 			if (_ioctl(des, I_GETSIG, &retval) < 0) {
 				if (errno == EINVAL) {
@@ -172,8 +168,9 @@ ioctl(des, request, arg)
 			 * fail it if the process group
 			 * specified is not the callers.
 			 */
-			SOCKDEBUG((struct _si_user *)NULL,
-					"ioctl: got SIOCSPGRP/FIOSETOWN\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: got SIOCSPGRP/FIOSETOWN\n");
+#endif
 			pid = *(pid_t *)arg;
 			if (pid < 0) {
 				pid = -pid;
@@ -195,17 +192,29 @@ ioctl(des, request, arg)
 
 			retval |= (S_RDBAND|S_BANDURG);
 			if (_ioctl(des, I_SETSIG, retval) < 0) {
-				(void)syslog(LOG_ERR,
-					"ioctl: I_SETSIG failed %d\n", errno);
+#ifdef DEBUG
+perror("ioctl: I_SETSIG failed\n");
+#endif
+				return -1;
+			}
+			pid = getpid();
+			if (_ioctl(des, SIOCSPGRP, &pid) < 0) {
+#ifdef DEBUG
+perror("ioctl: SIOCSPGRP failed\n");
+#endif
 				return -1;
 			}
 			return 0;
 	
 		case SIOCATMARK:
-			SOCKDEBUG((struct _si_user *)NULL,
-						"ioctl: got SIOCATMARK\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: got SIOCATMARK\n");
+#endif
 			if ((retval = _ioctl(des, I_ATMARK, LASTMARK)) < 0)
 				return -1;
+#ifdef DEBUG
+fprintf(stdout, "ioctl: I_ATMARK returned %d\n", retval);
+#endif
 			*(int *)arg = retval;
 			return 0;
 		}
@@ -213,73 +222,12 @@ ioctl(des, request, arg)
 	default:
 		break;
 	}
-	SOCKDEBUG((struct _si_user *)NULL,
-			"ioctl: match failed, calling regular ioctl\n", 0);
+#ifdef DEBUG
+fprintf(stdout, "ioctl: match failed, calling regular ioctl\n");
+#endif
 	return _ioctl(des, request, arg);
 }
 
 
-/* Enable or disable asynchronous I/O
- */
-static int
-_s_dofioasync(des, arg)
-	register int	des;
-	register int	*arg;
-{
-	int	retval;
-
-	SOCKDEBUG((struct _si_user *)NULL, "_s_dofioasync: Entered, %d\n",
-						*arg);
-	/*  Turn on or off async I/O.
-	 */
-	retval = 0;
-	if (*arg) {
-		/* Turn ON SIGIO.
-		 */
-		if (_ioctl(des, I_GETSIG, &retval) < 0) {
-			if (errno != EINVAL)
-				return -1;
-			else	errno = 0;
-		}
-		else	{
-			/* Don't bother if already on.
-		 	*/
-			if ((retval & (S_RDNORM|S_WRNORM)) ==
-						 (S_RDNORM|S_WRNORM))
-				return 0;
-		}
-
-		SOCKDEBUG((struct _si_user *)NULL,
-			"_s_dofioasync: Setting SIGIO\n", 0);
-		retval |= (S_RDNORM|S_WRNORM);
-		return _ioctl(des, I_SETSIG, retval);
-	}
-
-	/* Turn OFF SIGIO.
-	 */
-	SOCKDEBUG((struct _si_user *)NULL,
-			"_s_dofioasync: Re-setting SIGIO\n", 0);
-	if (_ioctl(des, I_GETSIG, &retval) < 0) {
-		if (errno == EINVAL) {
-			errno = 0;
-			return 0;
-		}
-		else	return -1;
-	}
-	if ( !(retval & (S_RDNORM|S_WRNORM)))
-		/* Async not in effect.
-		 */
-		return 0;
-
-	/* Clear out the old.
-	 */
-	(void)_ioctl(des, I_SETSIG, 0) ;
-
-	/* Bring in the new.
-	 */
-	if (retval &= ~(S_RDNORM|S_WRNORM))
-		return _ioctl(des, I_SETSIG, retval);
-	return 0;
-}
 
 

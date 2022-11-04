@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/_set_tab.c	1.7"
+#ident	"@(#)libc-port:gen/_set_tab.c	1.6"
 /*
 * _set_tab - set _ctype[], _numeric[] to requested locale-based info.
 */
@@ -14,7 +14,7 @@
 #include "_locale.h"
 #include <string.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <osfcn.h>
 
 int
 _set_tab(loc, cat)

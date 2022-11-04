@@ -8,7 +8,7 @@
 #ifndef _SYS_SYSMACROS_H
 #define _SYS_SYSMACROS_H
 
-#ident	"@(#)head.sys:sys/sysmacros.h	11.12"
+#ident	"@(#)head.sys:sys/sysmacros.h	11.11"
 
 #include "sys/param.h"
 
@@ -145,15 +145,13 @@ extern char MINOR[256];
  *   eminor() allows kernel/driver code to print external minor numbers
  */
 
-#define emajor(x)	(int)(((unsigned long)(x)>>O_BITSMINOR) > O_MAXMAJ) ? \
-				NODEV : (((unsigned long)(x)>>O_BITSMINOR)&O_MAXMAJ)
+#define emajor(x)	(int)(((unsigned)(x)>>O_BITSMINOR)&O_MAXMAJ)
 #define eminor(x)	(int)((x)&O_MAXMIN)
 
 /* get external major and minor device 
 ** components from expanded device number
 */
-#define getemajor(x)	(int)(((unsigned long)(x)>>L_BITSMINOR) > L_MAXMAJ) ? \
-			NODEV : (((unsigned long)(x)>>L_BITSMINOR)&L_MAXMAJ)
+#define getemajor(x)	(int)(((unsigned)(x)>>L_BITSMINOR)&L_MAXMAJ)
 #define geteminor(x)	(int)((x)&L_MAXMIN)
 
 

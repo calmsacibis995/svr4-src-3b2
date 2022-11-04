@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_subr.c	1.13"
+#ident	"@(#)fs:fs/nfs/nfs_subr.c	1.10"
 
 /*	  @(#)nfs_subr.c 2.91 88/08/05 SMI	*/
 
@@ -82,18 +82,18 @@ extern int nrnode;		/* max rnodes to alloc, set in machdep.c */
  * client side statistics
  */
 struct {
-	uint	nclsleeps;		/* client handle waits */
-	uint	nclgets;		/* client handle gets */
-	uint	ncalls;			/* client requests */
-	uint	nbadcalls;		/* rpc failures */
-	uint	reqs[32];		/* count of each request */
+	int	nclsleeps;		/* client handle waits */
+	int	nclgets;		/* client handle gets */
+	int	ncalls;			/* client requests */
+	int	nbadcalls;		/* rpc failures */
+	int	reqs[32];		/* count of each request */
 } clstat;
 
 int cltoomany = 0;
 
 #define MAXCLIENTS	6
 struct chtab {
-	uint	ch_timesused;
+	int	ch_timesused;
 	bool_t	ch_inuse;
 	CLIENT	*ch_client;
 } chtable[MAXCLIENTS];
@@ -162,9 +162,7 @@ authget(mi, cr)
 		savecred = u.u_cred;
 		u.u_cred = cr;
 		auth = authdes_create(mi->mi_netname, authdes_win,
-					&mi->mi_syncaddr,
-					mi->mi_knetconfig->knc_rdev,
-					(des_block *)NULL, mi->mi_rpctimesync);
+			(struct sockaddr *)&mi->mi_addr, (des_block *)NULL);
 		u.u_cred = savecred;
 
 		if (auth == NULL) {
@@ -246,7 +244,7 @@ clget(mi, cred)
 	register struct chtab *ch;
 	int retrans;
 	CLIENT *client;
-	register int	error;
+	CLIENT *clnt_tli_kcreate();	/* XXX - should be in header file */
 
 	/*
 	 * If soft mount and server is down just try once.
@@ -266,19 +264,15 @@ clget(mi, cred)
 		if (!ch->ch_inuse) {
 			ch->ch_inuse = TRUE;
 			if (ch->ch_client == NULL) {
-				error =
-				    clnt_tli_kcreate(mi->mi_knetconfig,
-					 &mi->mi_addr, NFS_PROGRAM,
-					 NFS_VERSION, 0,
-					 retrans, cred, &ch->ch_client);
-				if (error != 0) {
-					cmn_err(CE_PANIC,
-			"clget: null client in chtable, ch=%x, error %d\n",
-						(u_long)ch, error);
+				ch->ch_client =
+				    clnt_tli_kcreate(mi->mi_knetconfig, &mi->mi_addr,
+				    NFS_PROGRAM, NFS_VERSION, 0, 0,
+				    retrans, cred);
+				if (ch->ch_client == NULL) {
+					cmn_err(CE_PANIC, "clget: null client in chtable, ch=%x", (u_long)ch);
 				}
 				auth_destroy(ch->ch_client->cl_auth); /* XXX */
 			} else {
-				clnt_clts_reopen(ch->ch_client, mi->mi_knetconfig);
 				clnt_clts_init(ch->ch_client,
 				    &mi->mi_addr, retrans, cred);
 			}
@@ -296,11 +290,10 @@ clget(mi, cred)
 	 * To avoid deadlock, don't wait, but just grab another
 	 */
 	cltoomany++;
-	error = clnt_tli_kcreate(mi->mi_knetconfig, &mi->mi_addr, NFS_PROGRAM,
-			NFS_VERSION, 0, retrans, cred, &client);
-	if (error != 0)
-		cmn_err(CE_WARN, "clget: clnt_tli_kcreate returned error %d\n",
-					error);
+	client = clnt_tli_kcreate(mi->mi_knetconfig, &mi->mi_addr, NFS_PROGRAM,
+				NFS_VERSION, 0, 0, retrans, cred);
+	if (client == NULL)
+		cmn_err(CE_PANIC, "clget: null auxiliary client, client=%x", (u_long)client);
 	auth_destroy(client->cl_auth);	 /* XXX */
 	client->cl_auth = authget(mi, cred);
 	if (client->cl_auth == NULL)
@@ -444,7 +437,6 @@ rfscall(mi, which, xdrargs, argsp, xdrres, resp, cred)
 	if (nfsdprintf) printf("rfscall: Entered op = %d\n", which);
 
 	rpcerr.re_errno = 0;
-	rpcerr.re_status = RPC_SUCCESS;
 	newcred = NULL;
 retry:
 	client = clget(mi, cred);	
@@ -480,29 +472,28 @@ retry:
 		case RPC_CANTENCODEARGS:
 		case RPC_CANTDECODERES:
 		case RPC_VERSMISMATCH:
-		case RPC_PROCUNAVAIL:
-		case RPC_PROGUNAVAIL:
 		case RPC_PROGVERSMISMATCH:
 		case RPC_CANTDECODEARGS:
 			break;
 
 		default:
-			if (status == RPC_INTR) {
-				tryagain = (bool_t)(mi->mi_hard && !mi->mi_int);
-				if (tryagain)
-					continue;
-				rpcerr.re_status = RPC_INTR;
-				rpcerr.re_errno = EINTR;
-			} else
-				tryagain = (bool_t)mi->mi_hard;
-
-			if (tryagain) {
-				timeo = backoff(timeo);
-				if (--count > 0 && timeo < HZ*15)
-					continue;
-				if (!mi->mi_printed) {
-					mi->mi_printed = 1;
+			if (mi->mi_hard) {
+				if (mi->mi_int && status == RPC_INTR) {
+					rpcerr.re_status = RPC_INTR;
+					rpcerr.re_errno = EINTR;
+					tryagain = FALSE;
+					break;
+				} else {
+					tryagain = TRUE;
+					if (status == RPC_INTR)
+						continue;
+					timeo = backoff(timeo);
+					if (--count > 0 && timeo < HZ*15)
+						continue;
+					if (!mi->mi_printed) {
+						mi->mi_printed = 1;
 	printf("NFS server %s not responding still trying\n", mi->mi_hostname);
+					}
 				}
 				if (timer_type[which] != 0) {
 					/*
@@ -512,7 +503,7 @@ retry:
 					clfree(client);
 					if (newcred)
 						crfree(newcred);
-					return (ENFS_TRYAGAIN);
+					return(ENFS_TRYAGAIN);
 				}
 			}
 		}
@@ -554,16 +545,6 @@ retry:
 	if (newcred) {
 		crfree(newcred);
 	}
-	/*
-	 *	This ``should never happen'', but if it ever does it's
-	 *	a disaster, since callers of rfscall rely only on re_errno
-	 *	to indicate failures.
-	 */
-	if (rpcerr.re_status != RPC_SUCCESS && rpcerr.re_errno == 0) {
-		cmn_err(CE_PANIC, "rfscall: re_status %d, re_errno 0\n",
-			rpcerr.re_status);
-	}
-
 #ifdef NFSDEBUG
 	printf("rfscall: returning %d\n", rpcerr.re_errno);
 #endif
@@ -937,19 +918,21 @@ newname()
 {
 	char *news;
 	register char *s1, *s2;
-	register uint id;
-	static uint newnum = 0;
-
-	if (newnum == 0)
-		newnum = hrestime.tv_sec & 0xffff;
+	int id;
+	static int newnum;
 
 	news = (char *)kmem_alloc((u_int)NFS_MAXNAMLEN, KM_SLEEP);
-	for (s1 = news, s2 = prefix; s2 < &prefix[PREFIXLEN]; )
+	for (s1 = news, s2 = prefix; s2 < &prefix[PREFIXLEN]; ) {
 		*s1++ = *s2++;
-	id = newnum++;
+	}
+	if (newnum == 0) {
+		id = hrestime.tv_sec & 0xffff;
+	}
+	else
+		id = newnum++;
 	while (id) {
 		*s1++ = "0123456789ABCDEF"[id & 0x0f];
-		id >>= 4;
+		id = id >> 4;
 	}
 	*s1 = '\0';
 	return (news);
@@ -974,3 +957,11 @@ runlockk(rp, file, line)
 {
 	RUNLOCK(rp);
 }
+
+/*
+int
+nfs_badop()
+{
+	cmn_err(CE_PANIC, "nfs_badop");
+}
+*/

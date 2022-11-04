@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/valloc.c	1.2"
+#ident	"@(#)libc-port:gen/valloc.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak valloc = _valloc
@@ -13,7 +13,10 @@
 
 #include "synonyms.h"
 #include <stdlib.h>
-#include <unistd.h>
+#include <malloc.h>
+
+extern	unsigned getpagesize();
+extern VOID * memalign();
 
 VOID *
 valloc(size)
@@ -21,6 +24,6 @@ valloc(size)
 {
 	static unsigned pagesize;
 	if (!pagesize)
-		pagesize = sysconf(_SC_PAGESIZE);
+		pagesize = getpagesize();
 	return memalign(pagesize, size);
 }

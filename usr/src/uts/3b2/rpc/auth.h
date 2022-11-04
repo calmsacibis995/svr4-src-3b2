@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/rpc/auth.h	1.4"
+#ident	"@(#)head.sys:sys/rpc/auth.h	1.3"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -23,7 +23,7 @@
 * Notice of copyright on this source code product does not indicate 
 *  publication.
 *
-*	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+*	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */ 

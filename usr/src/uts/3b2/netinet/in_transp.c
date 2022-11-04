@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/in_transp.c	1.2"
+#ident	"@(#)netinet:netinet/in_transp.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -75,8 +75,8 @@ inet_doname(q, bp)
 	mblk_t		*bp;
 {
 	struct inpcb *inp = qtoinp(q);
-	struct sockaddr_in localaddr;
-	struct sockaddr_in remoteaddr;
+	struct taddr_in localaddr;
+	struct taddr_in remoteaddr;
 
 	if (inp == (struct inpcb *) 0) {
 		/* strlog this */

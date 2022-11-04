@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/fork.c	1.63"
+#ident	"@(#)kernel:os/fork.c	1.56"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/sysmacros.h"
@@ -46,10 +46,12 @@
 #include "vm/seg_u.h"
 
 #if defined(__STDC__)
+STATIC pid_t pid_assign(int, proc_t **);
 STATIC int procdup(proc_t *, proc_t *, int);
 STATIC void setuctxt(proc_t *, user_t *);
 STATIC int fork1(char *, rval_t *, int);
 #else
+STATIC pid_t pid_assign();
 STATIC int procdup();
 STATIC void setuctxt();
 STATIC int fork1();
@@ -171,15 +173,15 @@ newproc(cond, pidp, perror)
 	cp->p_cred = pp->p_cred;
 	crhold(pp->p_cred);
 	cp->p_ignore = pp->p_ignore;
+	cp->p_sig = pp->p_sig;
+	cp->p_cursig = pp->p_cursig;
 	cp->p_hold = pp->p_hold;
-	cp->p_siginfo = pp->p_siginfo;
 	cp->p_stat = SIDL;
 	cp->p_clktim = 0;
-	cp->p_flag = SLOAD | (pp->p_flag & (SJCTL|SNOWAIT));
-	cp->p_sessp = pp->p_sessp;
-	SESS_HOLD(pp->p_sessp);
-	pgjoin(cp, pp->p_pgidp);
-	cp->p_exec = pp->p_exec;
+	cp->p_flag = SLOAD | (pp->p_flag & (SDETACHED|SJCTL|SNOWAIT));
+	forksession(cp, pp->p_sessp);
+	joinpg(cp, pp->p_pgrp);
+	cp->p_siginfo = pp->p_siginfo;
 
 	if (cond & NP_SYSPROC)
 		cp->p_flag |= (SSYS | SLOCK);
@@ -211,7 +213,7 @@ newproc(cond, pidp, perror)
 		cp->p_sigmask = pp->p_sigmask;
 		cp->p_fltmask = pp->p_fltmask;
 	} else {
-		sigemptyset(&cp->p_sigmask);
+		premptyset(&cp->p_sigmask);
 		premptyset(&cp->p_fltmask);
 		/*
 		 * Syscall tracing flags are in the u-block.
@@ -222,8 +224,13 @@ newproc(cond, pidp, perror)
 	cp->p_clfuncs = pp->p_clfuncs;
 	if (CL_FORK(pp, pp->p_clproc, cp, &cp->p_stat, &cp->p_pri,
 	  &cp->p_flag, &cp->p_cred, &cp->p_clproc)) {
+		cp->p_stat = 0;
+		cp->p_ppid = 0;
+		cp->p_oppid = 0;
 		crfree(cp->p_cred);
-		pid_exit(cp);	/* free the proc table entry */
+		leavepg(cp);
+		exitsession(cp);
+		pid_release(cp->p_pid);	/* free the proc table entry */
 		return -1;
 	}
 
@@ -241,11 +248,6 @@ newproc(cond, pidp, perror)
 	cp->p_sibling = pp->p_child;
 	cp->p_parent = pp;
 	pp->p_child = cp;
-
-	cp->p_nextorph = pp->p_orphan;
-	cp->p_nextofkin = pp;
-	pp->p_orphan = cp;
-
 	cp->p_sysid = pp->p_sysid;	/* RFS HOOK */
 
 	/*
@@ -255,6 +257,8 @@ newproc(cond, pidp, perror)
 		if (getf(n, &fp) == 0) 
 			fp->f_count++;
 	}
+
+	sigdupq(cp, pp);
 
 	VN_HOLD(u.u_cdir);
 	if (u.u_rdir)
@@ -283,10 +287,15 @@ newproc(cond, pidp, perror)
 		 * them here.
 		 */
 		pp->p_child = cp->p_sibling;
-		pp->p_orphan = cp->p_nextorph;
-
+		cp->p_parent = NULL;
+		cp->p_sibling = NULL;
+		cp->p_stat = 0;
+		cp->p_ppid = 0;
+		cp->p_oppid = 0;
 		crfree(cp->p_cred);
-		pid_exit(cp);		/* free the proc table entry */
+		leavepg(cp);
+		exitsession(cp);
+		pid_release(cp->p_pid);	/* free the proc table entry */
 		if (pidp)
 			*pidp = -1;
 		return -1;
@@ -351,8 +360,6 @@ Verify that %s class is properly configured.", initclass, initclass);
 	if (pidp)
 		*pidp = cp->p_pid;	/* parent returns pid of child */
 
-	if (cp->p_exec)
-		VN_HOLD(cp->p_exec);
 	return 0;
 }
 
@@ -509,7 +516,7 @@ relvm(p)
 	} else {
 		p->p_flag &= ~SVFORK;	/* no longer a vforked process */
 		p->p_as = NULL;		/* no longer using parent's adr space */
-		wakeprocs((caddr_t)p, PRMPT);	/* wake up parent */
+		wakeup((caddr_t)p);	/* wake up parent */
 		while ((p->p_flag & SVFDONE) == 0) {	/* wait for parent */
 			(void) sleep((caddr_t)p, PZERO - 1);
 		}
@@ -551,5 +558,171 @@ vfwait(pid)
 	 * Wake up child, send it on its way.
 	 */
 	cp->p_flag |= SVFDONE;
-	wakeprocs((caddr_t)cp, PRMPT);
+	wakeup((caddr_t)cp);
+}
+
+/*
+ * This function assigns a pid for use in a fork request.  It checks
+ * to see that there is an empty slot in the proc table, that the
+ * requesting user does not have too many processes already active,
+ * and that the last slot in the proc table is not being allocated to
+ * anyone who should not use it.
+ *
+ * After a proc slot is allocated, it will try to allocate a proc
+ * structure for the new process. 
+ *
+ * If all goes well, pid_assign() will return a new pid and set up the
+ * proc structure pointer for the child process.  Otherwise it will
+ * return -1.
+ */
+STATIC pid_t
+pid_assign(cond, pp)
+	int	cond;	/* allow assignment of last slot? */
+	proc_t	**pp;	/* child process proc structure pointer */
+{
+	register pincr_t	*cp;
+	register proc_t		**p; 
+	register proc_t		**endp = &nproc[v.v_proc];
+	register uid_t ruid = u.u_cred->cr_ruid;
+	int	uid_procs, slot;
+
+	/*
+	 * Assign a slot.
+	 */
+	if ((cp = pfreelisthead) == NULL) {	/* no free proc entry */
+		syserr.procovf++;
+		return -1;
+	}
+
+	if (cp->pi_link == NULL) {	/* last entry */
+		if (cond & NP_NOLAST)
+			return -1;
+		pfreelisttail = NULL;
+	}
+
+	pfreelisthead = cp->pi_link;
+
+	/*
+	 * If not super-user then make certain that the maximum
+	 * number of children don't already exist.
+	 */
+	if (u.u_cred->cr_uid && ruid) {
+		uid_procs = 0;
+
+		for (p = &nproc[0]; p < endp; ++p) {
+			if (*p && (*p)->p_cred->cr_ruid == ruid)
+				uid_procs++;
+		}
+
+		if (uid_procs >= v.v_maxup) {	/* make cp head of list again */
+			pfreelisthead = cp;
+			if (pfreelisttail == NULL)
+				pfreelisttail = cp;
+			return -1;
+		}
+	}
+
+	cp->pi_link = NULL;
+
+	/*
+	 * Allocate a proc structure.
+	 */
+
+	slot = GET_INDEX(cp->pi_pid);
+
+	*pp = (proc_t *)kmem_zalloc(sizeof(proc_t), KM_NOSLEEP);
+
+	if (*pp == NULL) {		/* out of memory now! */
+		pid_release(cp->pi_pid);	/* clean up */
+		return -1;
+	} else
+		nproc[slot] = *pp;
+
+	return cp->pi_pid;
+}
+
+/*
+ * This function deactivates a proc table entry and returns
+ * it to the free list.
+ */
+void
+pid_release(pid)
+	pid_t pid;
+{
+	register proc_t *p;
+	register pincr_t *pip;	/* slot to be returned */
+	int slot;	/* slot number for the given pid */
+
+	slot = GET_INDEX(pid);
+	pip = &pincr[slot];
+
+	if ((p = nproc[slot]) != NULL) {
+
+		/* Free the proc structure and proc slot. */
+
+		nproc[slot] = NULL;
+		kmem_free(p, sizeof(proc_t));
+
+		/*
+		 * Put this entry at the end of the free list so it is
+		 * reassigned last.  Bump the incarnation count.
+		 */
+
+		INC_INCAR(pip->pi_pid);
+		pip->pi_link = NULL;
+		if (pfreelisttail) {
+			pfreelisttail->pi_link = pip;
+			pfreelisttail = pip;
+		} else {
+			pfreelisthead = pip;
+			pfreelisttail = pip;
+		}
+	} else {
+
+		/*
+		 * This slot was never actually used; put it on the
+		 * head of the list so it will be reused first.
+		 */
+
+		if (pfreelisthead) {
+			pip->pi_link	= pfreelisthead;
+			pfreelisthead	= pip;
+		} else {
+			pip->pi_link	= NULL;
+			pfreelisthead	= pip;
+			pfreelisttail	= pip;
+		}
+	}
+}
+
+/*
+ * This routine is called from mlsetup() to initialize the process table
+ * pointers, pids and status fields before they are first used.
+ */
+
+void
+ptbl_init()
+{
+	register proc_t	**pp;
+	register pincr_t *pip;
+	ushort pid;
+	
+	pp = &nproc[0];
+	pip = &pincr[0];
+
+	for (pid = 0; pp < v.ve_proc; pp++, pip++) {
+		*pp = NULL;
+		pip->pi_pid = pid++;
+		pip->pi_link = pip + 1;
+	}
+
+	/*
+	 * Set up the pointers to process table entry 1
+	 * and the first and last free entry. 
+	 */
+
+	pfreelisthead = &pincr[1];
+	pip--;
+	pip->pi_link = NULL;
+	pfreelisttail = pip;
 }

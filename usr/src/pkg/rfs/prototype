@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.rfs:prototype	1.3.10.4"
+#ident	"@(#)pkg.rfs:prototype	1.3.9.2"
 #
 # information files
 #
@@ -86,6 +86,7 @@ f	none	/usr/sbin/rmntstat
 s	none	/usr/bin/rmntstat=/usr/sbin/rmntstat
 f	none	/usr/sbin/unadv
 s	none	/usr/bin/unadv=/usr/sbin/unadv
+f	none	/usr/lbin/rfsrunning 	755	root	sys
 f	none	/usr/lib/fs/rfs/dfmounts
 f	none	/usr/lib/fs/rfs/dfshares	4555	root bin
 f	none	/usr/lib/fs/rfs/share
@@ -112,17 +113,24 @@ e	build	/var/spool/cron/crontabs/root=/usr/src/pkg/rfs/crontab
 #
 !default	755	root	sys
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs
+d	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/bin
 d	none	/usr/sadm/sysadm/menu/netservices/remote_files/setup/rfs
 #
@@ -146,8 +154,6 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/bin/gid_m
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/bin/uid_map
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/bin/rfs_net
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/bin/set_tp
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin/getaddr
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin/call_addr
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin/find_trans
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin/get_tps
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/bin/line_num
@@ -173,18 +179,6 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/bin/remote_moun
 #	fmli scripts for rfs admin
 #
 !default	644	bin	bin
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/setup/rfs/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Help
-f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/Help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.list
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.modify
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.modify2
@@ -194,12 +188,45 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.share2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.unshar2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.unshar3
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Form.unshare
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/acc.sh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/acc.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/aut.lst.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/aut.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/auto.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/cli.sh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/cur.lst.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/cur.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/des.sh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/dir.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/dir.sh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/imm.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/ok.mod2.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/ok.mod3.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/ok.unsh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/res.sh.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/HELP/res.un.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Text.list
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/local/rfs/Text.shmsg
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/HELP/control.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/HELP/id_map.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/HELP/netwk.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/HELP/system.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/Menu.rfs
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Form.start
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Form.start2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Form.stop
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/add.st.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/check.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/con.loc.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/con.rem.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/conf.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/mstop.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/pass2.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/passctl.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/start.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/stop.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/tp.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/HELP/ver.st.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Menu.control
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Menu.passctl
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/control/Text.check
@@ -209,8 +236,19 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Form.set
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Form.set2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Form.set3
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Form.set4
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/disp.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/gid.dis.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/gid.map.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/gid.set.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/set.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/uid.dis.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/uid.map.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/HELP/uid.set.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Menu.idmap
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/id_map/Text.display
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/HELP/display.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/HELP/set.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/HELP/tr.set.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/Menu.netwk
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/Menu.set
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/net/Text.display
@@ -223,6 +261,23 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Form.rf_a
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Form.rf_rem
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Form.rf_rem2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Form.set
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/addm.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/addpass.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/address.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/adr.ad.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/con.add.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/display.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/domain.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/lsactiv.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/lshost.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/lsname.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/remm.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/remove.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/rempass.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/role.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/set.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/system.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/HELP/transp.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Menu.member
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Menu.system
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/other/rfs/system/Menu.transp
@@ -240,6 +295,28 @@ f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Form.mount
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Form.unmnt2
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Form.unmnt3
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Form.unmount
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/acc.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/acc.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/aut.lst.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/aut.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/aut.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/auto.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/cac.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/cac.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/cur.lst.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/cur.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/cur.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/imm.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/mnt.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/mnt.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/mode.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/ok.un.auto
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/ok.un.imm
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/res.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/res.mod.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/res.un.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/set.mnt.help
+f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/HELP/su.mod.help
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Text.list
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/remote/rfs/Text.mount
 f	none	/usr/sadm/sysadm/menu/netservices/remote_files/setup/rfs/Menu.setup

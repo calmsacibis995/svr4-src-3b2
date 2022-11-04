@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libns:rfs_up.c	1.1.5.1"
+#ident	"@(#)libns:rfs_up.c	1.1.4.1"
 #include <sys/types.h>
 #include <sys/nserve.h>
 #include <sys/list.h>
 #include <sys/rf_sys.h>
 #include <sys/vnode.h>
-#include <sys/rf_messg.h>
 #include <sys/rf_comm.h>
 #include <errno.h>
 #include <nserve.h>

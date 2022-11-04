@@ -1,0 +1,5 @@
+#ident	"@(#)libmalloc:__Ext_Synonyms	1.1"
+
+cfree		_cfree
+mallopt		_mallopt
+mallinfo	_mallinfo

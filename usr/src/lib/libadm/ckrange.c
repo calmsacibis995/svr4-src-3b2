@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckrange.c	1.3"
+#ident	"@(#)libadm:ckrange.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -31,7 +31,7 @@ char	*msg;
 long	lower, upper;
 int	base;
 {
-	if((base == 10) || (base == 0))
+	if(base == 10)
 		(void) sprintf(msg, MESG10, lower, upper);
 	else
 		(void) sprintf(msg, MESG, base, lower, upper);
@@ -58,7 +58,7 @@ char	*help;
 	char	defmesg[MSGSIZ];
 
 	setmsg(defmesg, lower, upper, base);
-	puthelp(stdout, defmesg, help);
+	puterror(stdout, defmesg, help);
 }
 
 int
@@ -71,9 +71,9 @@ char	*input;
 	long	value;
 
 	value = strtol(input, &ptr, base);
-	if((*ptr != '\0') || (value < lower) || (value > upper))
-		return(1);
-	return(0);
+	if(*ptr != '\0')
+		return(-1);
+	return((value < lower) || (value > upper));
 }
 
 int

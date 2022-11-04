@@ -1,0 +1,6 @@
+*#ident	"@(#)kernel:master.d/ptc	1.1"
+*
+* PTTY  - controlling half driver
+*
+*FLAG	#VEC	PREFIX	SOFT	#DEV	IPL	DEPENDENCIES/VARIABLES
+ocs	-	ptc	25	10	-

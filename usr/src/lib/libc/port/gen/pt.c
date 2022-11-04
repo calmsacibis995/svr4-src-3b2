@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/pt.c	1.4"
+#ident	"@(#)libc-port:gen/pt.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak ptsname = _ptsname
@@ -15,14 +15,8 @@
 
 #include "synonyms.h"
 #include "sys/types.h"
-#ifdef i386
-#include <sys/tss.h>
-#include <sys/immu.h>
-#include <sys/user.h>
-#else
-#include <sys/psw.h>
-#include <sys/pcb.h>
-#endif
+#include "sys/psw.h"
+#include "sys/pcb.h"
 #include "sys/param.h"
 #include "sys/mkdev.h"
 #include "sys/fs/s5dir.h"
@@ -34,8 +28,6 @@
 #include "sys/fcntl.h"
 #include "sys/stat.h"
 #include "sys/ptms.h"
-#include <string.h>
-#include <unistd.h>
 
 #define PTSNAME "/dev/pts/"		/* slave name */
 #define PTLEN   13			/* slave name length */

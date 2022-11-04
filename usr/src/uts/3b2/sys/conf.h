@@ -8,7 +8,7 @@
 #ifndef _SYS_CONF_H
 #define _SYS_CONF_H
 
-#ident	"@(#)head.sys:sys/conf.h	11.21"
+#ident	"@(#)head.sys:sys/conf.h	11.16"
 
 /*
  * Declaration of block device switch. Each entry (row) is
@@ -25,9 +25,7 @@ struct bdevsw {
 	int	(*d_xhalt)();
 	int	*d_flag;
 };
-
 extern struct bdevsw bdevsw[];
-extern struct bdevsw shadowbsw[];
 
 /*
  * Character device switch.
@@ -47,27 +45,18 @@ struct cdevsw {
 	struct streamtab *d_str;
 	int	*d_flag;
 };
-
 extern struct cdevsw cdevsw[];
-extern struct cdevsw shadowcsw[];
 
 /*
  * Device flags.
- *
- * Bit 0 to bit 15 are reserved for kernel.
- * Bit 16 to bit 31 are reserved for different machines.
  */
 #define D_NEW		0x00	/* new-style driver */
-#define	D_OLD		0x01	/* old-style driver */
+#define	D_OLD		0x01	/* Old-style driver */
 /*
  * Added for UFS.
  */
 #define D_SEEKNEG       0x04    /* Negative seek offsets are OK */
 #define D_TAPE          0x08    /* Magtape device (no bdwrite when cooked) */
-/*
- * Added for pre-4.0 drivers backward compatibility.
- */
-#define D_NOBRKUP	0x10	/* No breakup needed for new drivers */
 
 #define	FMNAMESZ	8
 

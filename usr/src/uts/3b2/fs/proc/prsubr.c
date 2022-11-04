@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/proc/prsubr.c	1.42"
+#ident	"@(#)fs:fs/proc/prsubr.c	1.40"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/cmn_err.h"
@@ -93,7 +93,7 @@ prexit(p)
 		ASSERT(pnp->pr_proc);
 		pnp->pr_proc = NULL;
 	}
-	wakeprocs((caddr_t)p->p_trace, PRMPT);
+	wakeup((caddr_t)p->p_trace);
 }
 
 /*
@@ -158,7 +158,7 @@ prinvalidate(up)
 		premptyset(&p->p_fltmask);		/* faults */
 		p->p_flag &= ~(SPRSTOP|SRUNLCL|SPROCTR|SPRFORK);
 		if (p->p_trace)
-			wakeprocs((caddr_t)p->p_trace, PRMPT);
+			wakeup((caddr_t)p->p_trace);
 	}
 }
 
@@ -272,7 +272,7 @@ prawake(p)
 {
 	if (p->p_flag & SPRWAKE) {
 		p->p_flag &= ~SPRWAKE;
-		wakeprocs((caddr_t)&p->p_trace, PRMPT);
+		wakeup((caddr_t)&p->p_trace);
 		runrun = 1;
 	}
 }
@@ -300,7 +300,7 @@ prunlock(pnp)
 	prpidlock = 0;
 	if (prpidwant) {
 		prpidwant = 0;
-		wakeprocs((caddr_t)&prpidlock, PRMPT);
+		wakeup((caddr_t)&prpidlock);
 	}
 	splx(s);
 }
@@ -382,7 +382,7 @@ prgetstatus(p, sp)
 	} else {
 		iov.iov_base = (caddr_t) &instr;
 		uio.uio_resid = iov.iov_len = sizeof(instr);
-		uio.uio_offset = prgetpc(sp->pr_reg);
+		uio.uio_offset = sp->pr_reg[R_PC];
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_segflg = UIO_SYSSPACE;

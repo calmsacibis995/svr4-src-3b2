@@ -8,7 +8,7 @@
 #ifndef	_T_KUSER_H
 #define	_T_KUSER_H
 
-#ident	"@(#)head.sys:sys/t_kuser.h	1.4"
+#ident	"@(#)head.sys:sys/t_kuser.h	1.1"
 
 /*	@(#)t_kuser.h 1.1 88/12/12 SMI	*/
 
@@ -56,33 +56,23 @@ struct t_kunitdata {
 	struct knetbuf udata;
 };
 
-#ifdef DEBUG
-extern int	ktli_log();
-extern int	ktlilog;
-
-#define		KTLILOG(A, B, C) ((void)((ktlilog) && ktli_log((A), (B), (C))))
-#else
-#define		KTLILOG(A, B, C)
-#endif
-
 /* flags
  */
 #define		TIME_UP		0x01
 
-extern int	t_kalloc();
-extern int	t_kbind();
-extern int	t_kclose();
-extern int	t_kconnect();
-extern int	t_kfree();
-extern int	t_kgetstate();
-extern int	t_kopen();
-extern int	t_krcvudata();
-extern int	t_ksndudata();
-extern int	t_kspoll();
-extern int	t_kunbind();
-extern int	tli_send();
-extern int	tli_recv();
-extern int	get_ok_ack();
+extern TIUSER *t_kopen();
+extern char *t_kalloc();
+extern int   t_kbind();
+extern int   t_kgetstate();
+extern int   t_kconnect();
+extern int   t_kfree();
+extern int   t_ksndudata();
+extern int   t_krcvudata();
+extern int   t_kclose();
+extern int   t_kspoll();
+extern int   tli_send();
+extern int   tli_recv();
+extern int   get_ok_ack();
 
 /* these make life a lot easier
  */

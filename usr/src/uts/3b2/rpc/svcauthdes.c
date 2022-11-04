@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/svcauthdes.c	1.9"
+#ident	"@(#)krpc:krpc/svcauthdes.c	1.8"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)svcauth_des.c 1.3 89/01/11 SMI"
 #endif
@@ -61,6 +61,7 @@ static char sccsid[] = "@(#)svcauth_des.c 1.3 89/01/11 SMI"
 #include <sys/t_kuser.h>
 #include <rpc/svc.h>
 #include <rpc/rpc_msg.h>
+#include <sys/cmn_err.h>
 
 #ifdef _KERNEL
 /*
@@ -69,6 +70,10 @@ static char sccsid[] = "@(#)svcauth_des.c 1.3 89/01/11 SMI"
 */
 #else
 #include <sys/syslog.h>
+#endif
+
+#ifndef DEBUG
+#define cmn_err(type, msg)
 #endif
 
 extern char *strcpy();
@@ -190,7 +195,7 @@ _svcauth_des(rqst, msg)
 		if (key_decryptsession(cred->adc_fullname.name, 
 				       sessionkey) < 0) {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: key_decryptsessionkey failed\n", 0);
+			cmn_err(CE_NOTE, "key_decryptsessionkey failed");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  key_decryptsessionkey failed");
 #endif
@@ -200,7 +205,7 @@ _svcauth_des(rqst, msg)
 		sid = cred->adc_nickname;
 		if (sid >= AUTHDES_CACHESZ) {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: bad nickname %d\n", sid);
+			cmn_err(CE_NOTE, "bad nickname");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  bad nickname");
 #endif
@@ -227,7 +232,7 @@ _svcauth_des(rqst, msg)
 	}
 	if (DES_FAILED(status)) {
 #ifdef	_KERNEL
-		RPCLOG(1, "_svcauth_des: decryption failure\n", 0);
+		cmn_err(CE_NOTE, "decryption failure");
 #else
 		(void) syslog(LOG_DEBUG, "_svcauth_des:  decryption failure");
 #endif
@@ -257,7 +262,7 @@ _svcauth_des(rqst, msg)
 			winverf = IXDR_GET_U_LONG(ixdr);
 			if (winverf != window - 1) {
 #ifdef	_KERNEL
-				RPCLOG(1, "_svcauth_des: window verifier mismatch %d\n", winverf);
+				cmn_err(CE_NOTE, "window verifier mismatch");
 #else
 				(void) syslog(LOG_DEBUG, "_svcauth_des:  window verifier mismatch");
 #endif
@@ -267,7 +272,7 @@ _svcauth_des(rqst, msg)
 			    &timestamp);
 			if (sid < 0) {
 #ifdef	_KERNEL
-				RPCLOG(1, "_svcauth_des: replayed credential sid %d\n", sid);
+				cmn_err(CE_NOTE, "replayed credential");
 #else
 				(void) syslog(LOG_DEBUG, "_svcauth_des:  replayed credential");
 #endif
@@ -281,7 +286,7 @@ _svcauth_des(rqst, msg)
 
 		if ((u_long)timestamp.tv_usec >= USEC_PER_SEC) {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: invalid usecs %d\n", timestamp.tv_usec);
+			cmn_err(CE_NOTE, "invalid usecs");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  invalid usecs");
 #endif
@@ -291,8 +296,7 @@ _svcauth_des(rqst, msg)
 		if (nick && BEFORE(&timestamp, 
 				   &authdes_cache[sid].laststamp)) {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: timestamp before last seen\n", 0);
-
+			cmn_err(CE_NOTE, "timestamp before last seen");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  timestamp before last seen");
 #endif
@@ -307,7 +311,7 @@ _svcauth_des(rqst, msg)
 		current.tv_sec -= window;	/* allow for expiration */
 		if (!BEFORE(&current, &timestamp)) {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: timestamp expired\n", 0);
+			cmn_err(CE_NOTE, "timestamp expired");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  timestamp expired");
 #endif
@@ -335,7 +339,7 @@ _svcauth_des(rqst, msg)
 	    sizeof(des_block), DES_ENCRYPT);
 	if (DES_FAILED(status)) {
 #ifdef	_KERNEL
-		RPCLOG(1, "_svcauth_des: encryption failure\n", 0);
+		cmn_err(CE_NOTE, "encryption failure");
 #else
 		(void) syslog(LOG_DEBUG, "_svcauth_des:  encryption failure");
 #endif
@@ -376,7 +380,7 @@ _svcauth_des(rqst, msg)
 			(void) strcpy(entry->rname, cred->adc_fullname.name);
 		} else {
 #ifdef	_KERNEL
-			RPCLOG(1, "_svcauth_des: out of memory\n", 0);
+			cmn_err(CE_NOTE, "out of memory");
 #else
 			(void) syslog(LOG_DEBUG, "_svcauth_des:  out of memory");
 #endif
@@ -531,7 +535,7 @@ authdes_getucred(adc, uid, gid, grouplen, groups)
 	sid = adc->adc_nickname;
 	if (sid >= AUTHDES_CACHESZ) {
 #ifdef	_KERNEL
-		RPCLOG(1, "authdes_getucred:  invalid nickname\n", 0);
+		cmn_err(CE_NOTE, "authdes_getucred:  invalid nickname");
 #else
 		(void) syslog(LOG_DEBUG, "authdes_getucred:  invalid nickname");
 #endif
@@ -552,7 +556,7 @@ authdes_getucred(adc, uid, gid, grouplen, groups)
 			&i_grouplen, groups))
 		{
 #ifdef	_KERNEL
-			RPCLOG(1, "authdes_getucred:  unknown netname\n", 0);
+			cmn_err(CE_NOTE, "authdes_getucred:  unknown netname");
 #else
 			(void) syslog(LOG_DEBUG, "authdes_getucred:  unknown netname");
 #endif
@@ -560,7 +564,7 @@ authdes_getucred(adc, uid, gid, grouplen, groups)
 			return (0);
 		}
 #ifdef	_KERNEL
-		RPCLOG(1, "authdes_getucred:  missed ucred cache\n", 0);
+		cmn_err(CE_NOTE, "authdes_getucred:  missed ucred cache");
 #else
 		(void) syslog(LOG_DEBUG, "authdes_getucred:  missed ucred cache");
 #endif

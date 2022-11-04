@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_vfsops.c	1.40"
+#ident	"@(#)fs:fs/ufs/ufs_vfsops.c	1.31"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,7 +23,6 @@
 #include <sys/file.h>
 #include <sys/uio.h>
 #include <sys/conf.h>
-#include <sys/fs/ufs_fsdir.h>
 #include <sys/fs/ufs_fs.h>
 #include <sys/fs/ufs_inode.h>
 #undef NFS
@@ -73,7 +49,7 @@ STATIC int ufs_sync();
 STATIC int ufs_vget();
 STATIC int ufs_mountroot();
 STATIC int ufs_swapvp();	/* XXX */
-void sbupdate();
+STATIC void sbupdate();
 
 struct vfsops ufs_vfsops = {
 	ufs_mount,
@@ -88,10 +64,6 @@ struct vfsops ufs_vfsops = {
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 };
 
 extern int ufsfstype;
@@ -101,7 +73,7 @@ extern int ufsfstype;
  * UNIX is running off the mini-root.  That probably wants to be done
  * differently.
  */
-struct vnode *rootvp;
+extern struct vnode *rootvp;
 
 STATIC int
 ufs_mount(vfsp, mvp, uap, cr)
@@ -236,6 +208,7 @@ ufs_mountroot(vfsp, why)
 		(void)ufs_iflush(vfsp);
 #endif
 		binval(vfsp->vfs_dev);
+		fbinval(vfsp);
 		fsp = getfs(vfsp);
 		if (fsp->fs_state == FSACTIVE)
 			return EINVAL;
@@ -264,10 +237,8 @@ ufs_mountroot(vfsp, why)
 	/* to mountfs (in S5 case too?) */
 	if (error) {
 		vfs_unlock(vfsp);
-		if (rootvp) {
-			VN_RELE(rootvp);
-			rootvp = (struct vnode *)0;
-		}
+		VN_RELE(rootvp);
+		rootvp = (struct vnode *)0;
 		return (error);
 	}
 	vfs_add((struct vnode *)0, vfsp,
@@ -426,10 +397,8 @@ modify_now:
 			bwrite(tp);
 			tp = 0;
 		} else {
-			if (why != ROOT_INIT) {	
-				error = ENOSPC;
-				goto out;
-			}					
+			error = ENOSPC;
+			goto out;
 		}
 	
 	}
@@ -521,8 +490,7 @@ unmount1(vfsp, forcibly, cr)
 	struct vnode *bvp, *rvp;
 	struct inode *rip;
 	struct buf *bp;
-	extern int updlock;
-	
+
 	if (!suser(cr))
 		return (EPERM);
 
@@ -554,9 +522,6 @@ unmount1(vfsp, forcibly, cr)
 	bvp = ufsvfsp->vfs_devvp;
 	kmem_free((caddr_t)fs->fs_csp[0], (u_int)fs->fs_cssize);
 	flag = !fs->fs_ronly;
-	while(updlock)
-		(void)sleep((caddr_t)&updlock, PINOD);
-	updlock++;		
 	if (!fs->fs_ronly) {
 		bflush(dev);
 		fs->fs_time = hrestime.tv_sec;
@@ -572,14 +537,14 @@ unmount1(vfsp, forcibly, cr)
 		bp->b_flags |= B_AGE;
 		brelse(bp);
 	}
-	updlock = 0;
-	wakeup((caddr_t)&updlock);
 	if (!stillopen) {
 		(void) VOP_PUTPAGE(bvp, 0, 0, B_INVAL, cr);
 		(void) VOP_CLOSE(bvp, flag, 1, 0, cr);
 		VN_RELE(bvp);
 		binval(dev);
+		fbinval(vfsp);
 		ufs_iput(rip);
+		remque(rip);
 		kmem_free((caddr_t)ufsvfsp, sizeof(struct ufsvfs));
 	}
 	return (0);
@@ -630,7 +595,7 @@ ufs_statvfs(vfsp, sp)
 	sp->f_fsid = vfsp->vfs_dev;
 	(char *) strcpy(sp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name);
 	sp->f_flag = vf_to_stf(vfsp->vfs_flag);
-	sp->f_namemax = MAXNAMLEN;
+	sp->f_namemax = MAXNAMELEN;
 	blk = fsp->fs_spc * fsp->fs_cpc / NSPF(fsp);
 	for (i = 0; i < blk; i += fsp->fs_frag)
 		/* void */;

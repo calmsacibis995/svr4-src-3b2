@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)netinet:netinet/ip.mk	1.8"
+#ident	"@(#)netinet:netinet/ip.mk	1.7"
 #
 #
 #  		PROPRIETARY NOTICE (Combined)
@@ -40,7 +40,7 @@ FRC =
 
 PRODUCTS = IP ICMP RAWIP
 OBJ = in.o in_cksum.o in_pcb.o in_switch.o in_transp.o ip_input.o \
-	ip_output.o ip_main.o netlib.o route.o ip_vers.o
+	ip_output.o ip_main.o netlib.o route.o
 ROBJ=	raw_ip_main.o raw_ip.o raw_ip_cb.o
 CLEAN = ip.o ip_icmp.o icmp.o $(OBJ) $(ROBJ)
 

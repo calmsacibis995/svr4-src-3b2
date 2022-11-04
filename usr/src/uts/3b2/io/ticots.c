@@ -5,16 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)kernel:io/ticots.c	1.7"
-
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
+#ident	"@(#)kernel:io/ticots.c	1.4.3.1"
 /*
  *	TPI loopback transport provider.
  *	Virtual-circuit mode.
@@ -981,6 +972,14 @@ tco_close(q)
 	ASSERT(q != NULL);
 	te = (tco_endpt_t *)q->q_ptr;
 	ASSERT(te != NULL);
+
+	/* If the queue was linked then
+	 * unlink it.
+	 */
+	if ((WR(q))->q_next != NULL) {
+		(WR(q))->q_next = NULL;
+	}
+
 	(void)tco_unconnect(te);
 	(void)tco_unblink(te);
 	(void)tco_unolink(te);
@@ -1261,7 +1260,7 @@ tco_wsrv(q)
 			if (tco_data(q,mp,TE_DATA_REQ) == TCO_FAIL) {
 				STRLOG(TCO_ID,tco_min(te),3,SL_TRACE,
 				    "tco_wsrv _%d_: tco_data() failure",__LINE__);
-				/*return(UNIX_FAIL);	/* or just break ?? */
+				return(UNIX_FAIL);	/* or just break ?? */
 			}
 			break;
 		    case M_PROTO:
@@ -1280,7 +1279,7 @@ tco_wsrv(q)
 				if (tco_data(q,mp,TE_DATA_REQ) == TCO_FAIL) {
 					STRLOG(TCO_ID,tco_min(te),3,SL_TRACE,
 					    "tco_wsrv _%d_: tco_data() failure",__LINE__);
-					/*return(UNIX_FAIL);	/* or just break ?? */
+					return(UNIX_FAIL);	/* or just break ?? */
 				}
 				break;
 			    case T_EXDATA_REQ:
@@ -1289,7 +1288,7 @@ tco_wsrv(q)
 				if (tco_data(q,mp,TE_EXDATA_REQ) == TCO_FAIL) {
 					STRLOG(TCO_ID,tco_min(te),3,SL_TRACE,
 					    "tco_wsrv _%d_: tco_data() failure",__LINE__);
-					/*return(UNIX_FAIL);	/* or just break ?? */
+					return(UNIX_FAIL);	/* or just break ?? */
 				}
 				break;
 #ifdef TICOTSORD
@@ -1299,7 +1298,7 @@ tco_wsrv(q)
 				if (tco_data(q,mp,TE_ORDREL_REQ) == TCO_FAIL) {
 					STRLOG(TCO_ID,tco_min(te),3,SL_TRACE,
 					    "tco_wsrv _%d_: tco_data() failure",__LINE__);
-					/*return(UNIX_FAIL);	/* or just break ?? */
+					return(UNIX_FAIL);	/* or just break ?? */
 				}
 				break;
 #endif
@@ -1799,6 +1798,7 @@ tco_bind(q,mp)
 	if (ta == NULL) {
 		STRLOG(TCO_ID,tco_min(te),2,SL_TRACE,
 		    "tco_bind _%d_ errack: tli_err=TSYSERR, unix_err=ENOMEM",__LINE__);
+		(void)freemsg(mp2);
 		te->te_state = NEXTSTATE(TE_ERROR_ACK,te->te_state);
 		ASSERT(te->te_state != NR);
 		(void)tco_errack(q,mp,TSYSERR,ENOMEM);
@@ -2652,6 +2652,12 @@ tco_cres(q,mp)
 	mp3->b_cont = mp->b_cont;
 	mp->b_cont = NULL;
 	(void)freeb(mp);
+
+	/* link queues so that I_SENDFD will work.
+	 */
+	WR(te1->te_rq)->q_next = te3->te_rq;
+	WR(te3->te_rq)->q_next = te1->te_rq;
+
 	/*
 	 *	send confirmation msg
 	 */
@@ -3181,7 +3187,8 @@ tco_data(q,mp,evtype)
 			ASSERT((int)&prim->exdata_req.PRIM_type - (int)&prim->exdata_req
 			    == (int)&prim->exdata_ind.PRIM_type - (int)&prim->exdata_ind);
 			ASSERT((int)&prim->exdata_req.MORE_flag - (int)&prim->exdata_req
-			    == (int)&prim->exdata_ind.MORE_flag - (int)&prim->exdata_ind);
+			    == (int)&prim->exdata_ind.MORE_type - (int)&prim->exdata_ind);
+			    /* MORE_type should be MORE_flag -- bug in tihdr.h */
 			prim->type = T_EXDATA_IND;
 			break;
 #ifdef TICOTSORD

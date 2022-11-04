@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fread.c	3.29"
+#ident	"@(#)libc-port:stdio/fread.c	3.28"
 /*LINTLIBRARY*/
 
 #include "synonyms.h"
@@ -15,7 +15,6 @@
 #include <stddef.h>
 #include <values.h>
 #include <memory.h>
-#include <errno.h>
 
 extern int read();
 
@@ -41,7 +40,6 @@ fread(ptr, size, count, iop)
 
 	if (!(iop->_flag & (_IOREAD | _IORW))) { /* is it a readable stream */
 		iop->_flag |= _IOERR;
-		errno = EBADF;
 		return 0;
 	}
 	if (iop->_base == 0)

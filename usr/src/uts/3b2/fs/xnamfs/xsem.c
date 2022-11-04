@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/xnamfs/xsem.c	1.8"
+#ident	"@(#)fs:fs/xnamfs/xsem.c	1.7"
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
@@ -259,7 +259,7 @@ sigsem(uap, rvp)
 	xp->x_sem->x_headw = fp->f_slnk;
 					/* signal 1st waiting process, if there is one */
 	if((xp->x_sem->x_scount)++ < 0)
-		wakeprocs((caddr_t)xp->x_sem->x_headw, PRMPT);
+		wakeup((caddr_t)xp->x_sem->x_headw);
 	xnammark(xp, XNAMACC);
 
 out:
@@ -371,7 +371,7 @@ closesem(fp, vp)
 				/* cause all processes waiting to error return */
 				for(tfp = tfp->f_slnk; tfp != NULL; tfp = tfp->f_slnk) {
 					xp->x_sem->x_scount++;
-					wakeprocs((caddr_t) tfp, PRMPT);
+					wakeup((caddr_t) tfp);
 				}
 				xnammark(xp, XNAMCHG);
 				xp->x_sem->x_headw = (struct file *)NULL;

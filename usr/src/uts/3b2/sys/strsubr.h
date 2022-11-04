@@ -8,7 +8,7 @@
 #ifndef _SYS_STRSUBR_H
 #define _SYS_STRSUBR_H
 
-#ident	"@(#)head.sys:sys/strsubr.h	1.15"
+#ident	"@(#)head.sys:sys/strsubr.h	1.12"
 
 /*
  * WARNING:
@@ -31,8 +31,8 @@ typedef struct stdata {
 	long sd_flag;			/* state/flags */
 	long sd_iocid;			/* ioctl id */
 	ushort sd_iocwait;		/* count of procs waiting to do ioctl */
-	struct pid *sd_sidp;		/* controlling session info */
-	struct pid *sd_pgidp;		/* controlling process group info */
+	pid_t sd_sid;			/* controlling session ID */
+	pid_t sd_pgrp;		/* foreground process group ID */
 	ushort sd_wroff;		/* write offset */
 	int sd_rerror;			/* read error to set u.u_error */
 	int sd_werror;			/* write error to set u.u_error */
@@ -45,6 +45,7 @@ typedef struct stdata {
 	struct msgb *sd_mark;		/* "marked" message on read queue */
 	int sd_closetime;		/* time to wait to drain q in close */
 	clock_t sd_rtime;		/* time to release held message */
+	struct proc *sd_procp;		/* for sending signals */
 } stdata_t;
 
 /*
@@ -75,10 +76,9 @@ typedef struct stdata {
 #define RDPROTDIS	0x00200000	/* discard M_[PC]PROTO blocks and */
 					/* retain data blocks */
 #define STRMOUNT	0x00400000	/* stream is mounted */
-#define STRPID		0x00800000	/* controlling process not group */
+#define STRCTTY		0x00800000	/* stream is a controlling terminal */
 #define STRDELIM	0x01000000	/* generate delimited messages */
 #define STWRERR		0x02000000	/* fatal write error from M_ERROR */
-#define STRHOLD		0x04000000	/* enable strwrite message coalescing */
 
 
 /*
@@ -205,69 +205,6 @@ struct shinfo {
 	struct shinfo	*sh_next;	/* next in list */
 	struct shinfo	*sh_prev;	/* previous in list */
 };
-
-/*
- * data block info
- */
-#ifdef DEBUG
-struct dbinfo {
-	dblk_t	d_dblock;	/* the data block itself */
-	struct dbinfo *d_next;	/* next data block */
-	struct dbinfo *d_prev;	/* previous */
-};
-
-/*
- * message block info
- */
-struct mbinfo {
-	mblk_t	m_mblock;	/* the message block itself */
-	struct mbinfo *m_next;	/* next message block */
-	struct mbinfo *m_prev;	/* previous message block */
-	void	(*m_func)();	/* address of allocation function */	
-};
-#else
-/*
- * data block info
- */
-struct dbinfo {
-	dblk_t	d_dblock;
-};
-/*
- * message block info
- */
-struct mbinfo {
-	mblk_t	m_mblock;
-	void	(*m_func)();
-};
-#endif
-
-
-
-/* convenient power of 2 */
-#define	FASTBUF	(128 - sizeof(struct mbinfo) - sizeof(struct dbinfo))
-
-/*
- * triplet
- */
-struct	mdbblock {
-	struct	mbinfo	msgblk;
-	struct	dbinfo	datblk;
-	char	databuf[FASTBUF];
-};
-
-
-#ifdef DEBUG
-#define _INSERT_MSG_INUSE(x)	insert_msg_inuse(x)
-#define _INSERT_MDB_INUSE(y)	insert_mdb_inuse(y)
-#define _DELETE_MSG_INUSE(x)	delete_msg_inuse(x)
-#define _DELETE_MDB_INUSE(y)	delete_mdb_inuse(y)
-#else
-#define _INSERT_MSG_INUSE(x)
-#define _INSERT_MDB_INUSE(y)
-#define _DELETE_MSG_INUSE(x)
-#define _DELETE_MDB_INUSE(y)
-#endif
-
 
 /*
  * Stream event info

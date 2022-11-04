@@ -1,11 +1,11 @@
-/*	Copyright (c) 1988 AT&T	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 /*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:fmtmsg.h	1.3"
+#ident	"@(#)head.usr:fmtmsg.h	1.1"
 
 /*
  * fmtmsg.h
@@ -34,7 +34,7 @@
  *	MM_MXACTLN	Maximum size of an action string
  */
 
-#define	MM_MXLABELLN	25
+#define	MM_MXLABELLN	20
 #define	MM_MXTAGLN	32
 #define MM_MXTXTLN	512
 #define MM_MXACTLN	512
@@ -157,12 +157,5 @@
 
 
 /* Function definition */
-
-#if defined(__STDC__)
-int	fmtmsg(long, const char *, int, const char *, const char *, const char *);
-int	addseverity(int, const char *);
-
-#else
 int	fmtmsg();
 int	addseverity();
-#endif

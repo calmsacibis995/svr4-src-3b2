@@ -8,7 +8,7 @@
 #ifndef _NFS_NFSSYS_H
 #define _NFS_NFSSYS_H
 
-#ident	"@(#)head.sys:nfs/nfssys.h	1.5"
+#ident	"@(#)head.sys:nfs/nfssys.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -34,7 +34,7 @@
  * this file.
  */
 
-enum nfssys_op	{ NFS_SVC, ASYNC_DAEMON, EXPORTFS, NFS_GETFH, NFS_CNVT };
+enum nfssys_op	{ NFS_SVC, ASYNC_DAEMON, EXPORTFS, NFS_GETFH };
 
 struct nfs_svc_args {
 	int	fd;
@@ -50,19 +50,12 @@ struct nfs_getfh_args {
 	fhandle_t	*fhp;
 };
 
-struct nfs_cnvt_args {
-	fhandle_t	*fh;
-	int		filemode;
-	int		*fd;
-};
-
 #ifdef _KERNEL
 union nfssysargs {
 						/* async_daemon args: none */
 	struct exportfs_args	*exportfs_args_u;	/* exportfs args */
 	struct nfs_getfh_args	*nfs_getfh_args_u;	/* nfs_getfh args */
 	struct nfs_svc_args	*nfs_svc_args_u;	/* nfs_svc args */
-	struct nfs_cnvt_args	*nfs_cnvt_args_u;	/* nfs_cnvt args */
 };
 
 struct nfssysa {
@@ -71,7 +64,6 @@ struct nfssysa {
 #define	nfssysarg_exportfs	arg.exportfs_args_u
 #define	nfssysarg_getfh		arg.nfs_getfh_args_u
 #define	nfssysarg_svc		arg.nfs_svc_args_u
-#define nfssysarg_cnvt		arg.nfs_cnvt_args_u
 };
 #endif
 #endif	/* !_NFS_NFSSYS_H */

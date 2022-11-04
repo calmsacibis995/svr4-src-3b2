@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:svc_dg.c	1.3"
+#ident	"@(#)librpc:svc_dg.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -27,6 +27,10 @@
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */ 
+#if !defined(lint) && defined(SCCSIDS)
+static char sccsid[] = "@(#)svc_dg.c 1.13 89/02/28 Copyr 1988 Sun Micro";
+#endif
+
 /*
  * svc_dg.c, Server side for connectionless RPC.
  *
@@ -53,10 +57,7 @@ extern int errno;
 /*
  * kept in xprt->xp_p2
  */
-#define MAX_OPT_WORDS	32
 struct svc_dg_data {
-	struct netbuf optbuf;
-	long	opts[MAX_OPT_WORDS];		/*options*/	
 	u_int   su_iosz;			/* size of send.recv buffer */
 	u_long	su_xid;				/* transaction id */
 	XDR	su_xdrs;			/* XDR handle */
@@ -147,53 +148,28 @@ svc_dg_recv(xprt, msg)
 	u_long replylen;
 	struct t_unitdata tu_data;
 	int moreflag;			/* Flag indicating more data */
-	int lookres;
-	extern int t_errno;
 
 	tu_data.addr = xprt->xp_rtaddr;
 	tu_data.udata.buf = (char *)rpc_buffer(xprt);
-	tu_data.opt.buf= (char *) su->opts;
+	tu_data.udata.maxlen = su->su_iosz;
+	tu_data.opt.maxlen = 0;
 	/*
 	 * If moreflag is set, drop that data packet. Something wrong
 	 */
     again:
 	tu_data.addr.len = 0;
-	tu_data.opt.len  = 0;
-	tu_data.udata.len  = 0;
-
-	tu_data.udata.maxlen = su->su_iosz;
-	tu_data.opt.maxlen = MAX_OPT_WORDS <<2;
-
 	moreflag = 0;
-
-	if (t_rcvudata(xprt->xp_fd, &tu_data, &moreflag) == -1) {
-/*fprintf(stderr,"rcvudata error=%d errno=%d\n",t_errno, errno);	*/
-		if (t_errno == TLOOK){
-			lookres = t_look(xprt->xp_fd);
-/*fprintf(stderr,"TLOOK %x\n",lookres);*/
-			if (lookres & T_UDERR){
-					if (t_rcvuderr(xprt->xp_fd, (struct t_uderr *) 0)<0){
-			syslog(LOG_ERR,"t_rcvuderr error=%d\n",t_errno);
-					}
-				}
-			if (lookres & T_DATA) goto again;
-		}
-		else if ((errno == EINTR) && (t_errno == TSYSERR))
-			goto again;
-		else
-			return (FALSE);
-	}
-		
-	if ((moreflag) || (tu_data.udata.len < 4 * sizeof(u_long))){
+	if ((t_rcvudata(xprt->xp_fd, &tu_data, &moreflag) == -1) 
+		&& (errno == EINTR))
+	/* XXX What is the equivalent t_errno here ? */
+		goto again;
+	if ((moreflag) || (tu_data.udata.len < 4 * sizeof(u_long)))
 		return (FALSE);
-		}
-	su->optbuf= tu_data.opt;
 	xprt->xp_rtaddr.len = tu_data.addr.len;
 	xdrs->x_op = XDR_DECODE;
 	XDR_SETPOS(xdrs, 0);
-	if (! xdr_callmsg(xdrs, msg)){
+	if (! xdr_callmsg(xdrs, msg))
 		return (FALSE);
-		}
 	su->su_xid = msg->rm_xid;
 	if (su->su_cache != NULL) {
 		if (cache_get(xprt, msg, &reply, &replylen)) {
@@ -233,8 +209,6 @@ svc_dg_reply(xprt, msg)
 			if (su->su_cache && slen >= 0) {
 				cache_set(xprt, (u_long) slen);
 			}
-		} else {
-fprintf(stderr,"t_sunudata error t_errno=%d errno=%d\n",t_errno,errno);
 		}
 	}
 	return (stat);

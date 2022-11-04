@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_subr.c	1.20"
+#ident	"@(#)fs:fs/ufs/ufs_subr.c	1.16"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,7 +36,6 @@
 #ifdef SUNOS_FBUF
 int syncprt = 0;
 #endif
-int updlock;
 void ufs_flushi();
 
 /*
@@ -74,12 +50,12 @@ ufs_update()
 	register struct vfs *vfsp;
 	extern struct vfsops ufs_vfsops;
 	struct fs *fs;
+	static int updlock;
 
-	while (updlock) {
-		(void) sleep((caddr_t)&updlock, PINOD);
-	}
+	if (updlock) 
+		return;
 	updlock++;
-	
+
 #ifdef SUNOS_FBUF
 	if (syncprt)
 		bufstats();
@@ -102,6 +78,7 @@ ufs_update()
 			fs->fs_time = hrestime.tv_sec;
 			sbupdate(vfsp);
 		}
+	updlock = 0;
 
 	ufs_flushi(0);
 
@@ -111,8 +88,6 @@ ufs_update()
 	 * information (e.g., cg and inode info) to be flushed back.
 	 */
 	bflush((dev_t)NODEV);
-	updlock = 0;
-	wakeup((caddr_t)&updlock);
 	return;
 }
 
@@ -180,12 +155,10 @@ ufs_syncip(ip, flags)
 		error = 0;
 	else
 		error = VOP_PUTPAGE(vp, 0, 0, flags, (struct cred *)0);
-	if (ip->i_flag & (IUPD |IACC | ICHG | IMOD)) {
-		if ((flags & B_ASYNC) != 0) {
-			IUPDAT(ip, 0);
-		} else {
-			IUPDAT(ip, 1);
-		}
+	if ((flags & B_ASYNC) != 0) {
+		IUPDAT(ip, 0);
+	} else {
+		IUPDAT(ip, 1);
 	}
 	return (error);
 }
@@ -305,7 +278,7 @@ fbzero(vp, off, len, fbpp)
 	(*fbpp)->fb_addr = addr;
 	(*fbpp)->fb_count = len;
 
-	segmap_pagecreate(segkmap, addr, len, 1);
+	segmap_pagecreate(segkmap, addr, len, 1, 0, 0);
 
 	/*
 	 * Now we zero all the memory in the mapping we are interested in.
@@ -583,4 +556,3 @@ locc(c, len, cp)
 #endif notdef
 
 #endif !defined(vax)
-

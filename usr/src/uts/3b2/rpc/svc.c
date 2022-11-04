@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/svc.c	1.9"
+#ident	"@(#)krpc:krpc/svc.c	1.7"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)svc.c 1.1 88/12/12 SMI"
 #endif
@@ -348,7 +348,7 @@ svc_getreq(xprt)
 			}
 			/* now match message with a registered service*/
 			prog_found = FALSE;
-			low_vers = (u_long)-1;
+			low_vers = -1UL;
 			high_vers = 0;
 			for (s = svc_head; s != NULL_SVC; s = s->sc_next) {
 				if (s->sc_prog == r.rq_prog) {
@@ -398,23 +398,19 @@ void
 svc_run(xprt)
 	SVCXPRT *xprt;
 {
-	int	error;
-	int	events;
-
 	/* CONSTCOND */
 	while (TRUE) {
-		RPCLOG(4, "svc_run: calling t_kspoll pid %d, ", u.u_procp->p_pid);
-		RPCLOG(4, "tiptr = %x\n", xprt->xp_tiptr);
-		events = 0;
-		while (events == 0 && (error = t_kspoll(xprt->xp_tiptr, 0,
-					 READWAIT, &events)) == 0) {
-			if ((error = t_kspoll(xprt->xp_tiptr, -1, READWAIT,
-						&events)) != 0)
+#ifdef RPCDEBUG
+printf("svc_run: pid %d calling t_kspoll tiptr = %x\n", u.u_procp->p_pid, xprt->xp_tiptr);
+#endif
+		while (t_kspoll(xprt->xp_tiptr, 0, READWAIT) == 0)
+			if (t_kspoll(xprt->xp_tiptr, -1, READWAIT) == -1)
 				break;
-		}
 
-		if (error) {
-			RPCLOG(1, "svc_run: Server going down due to errno: %d\n", error);
+		if (u.u_error) {
+#ifdef RPCDEBUG
+printf("svc_run: Server going down due to errno: %d\n", u.u_error);
+#endif
 			SVC_DESTROY(xprt);
 			/* sigclearall(u.u_procp); */	/* gone, so duplicate it's effects */
 			{
@@ -428,8 +424,9 @@ svc_run(xprt)
 			exit(CLD_EXITED, 0);
 		}
 
-		RPCLOG(4, "svc_run: calling svc_getreq pid %d, ", u.u_procp->p_pid); 
-		RPCLOG(4, "tiptr = %x\n", xprt->xp_tiptr);
+#ifdef RPCDEBUG
+printf("svc_run: pid %d, calling svc_getreq tiptr = %x\n", u.u_procp->p_pid, xprt->xp_tiptr); 
+#endif
 		svc_getreq(xprt);
 		Rpccnt++;
 	}

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/xnamfs/xnamvfsops.c	1.6"
+#ident	"@(#)fs:fs/xnamfs/xnamvfsops.c	1.5"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/buf.h"
@@ -29,10 +29,6 @@ struct vfsops xnam_vfsops = {
 	fs_nosys,	/* mountroot */
 	fs_nosys,	/* swapvp */
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,

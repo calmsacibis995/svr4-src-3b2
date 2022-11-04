@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/sys3b.c	1.35"
+#ident	"@(#)kernel:os/sys3b.c	1.33.1.10"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/psw.h"
@@ -666,7 +666,8 @@ sys3b(uap, rvp)
 			error = ESRCH;
 			break;
 		}
-		if (p->p_stat == SIDL || p->p_stat == SZOMB) {
+		if (p->p_stat == 0 || p->p_stat == SIDL
+		  || p->p_stat == SZOMB) {
 			error = EINVAL;
 			break;
 		}
@@ -796,7 +797,7 @@ sys3b(uap, rvp)
 		if (kpftraceflg == 1)  
 			if (takephase == putphase )  {
 				kpchildslp = 1;
-				wakeprocs((caddr_t) &kpchildslp, PRMPT);
+				wakeup((caddr_t) &kpchildslp);
 				sleep((caddr_t) &kpft[takephase*NUMRC],PPIPE);
 			}
 		 /* full buffer i.e. abnormal termination */
@@ -825,7 +826,7 @@ sys3b(uap, rvp)
 		kperf_write(KPT_END,Kpc,curproc);
 		pre_trace = 0;
 		kpftraceflg = 0;
-		wakeprocs((caddr_t) &kpft[takephase*NUMRC], PRMPT);
+		wakeup((caddr_t) &kpft[takephase*NUMRC]);
 		break;
 	}
 #endif	/* KPERF */
@@ -1040,7 +1041,7 @@ call_demon()
  * the file ml/gate.c.
  */
 
-#define	GATE_ENTRIES	155+16+1+194	/* # of second-level gate entries */
+#define	GATE_ENTRIES	138+16+1+211	/* # of second-level gate entries */
 
 extern struct gate_l2 gates[];
 extern struct kpcb *Xproc, *Ivect[], kpcb_pswtch;
@@ -1052,7 +1053,7 @@ cache_off()
 	register struct kpcb	*ptr;
 	register struct kpcb	**ptr2;
 	register struct gate_l2	*ptr1;
-	register proc_t			*pp;
+	register proc_t			**pp;
 	register user_t			*up;
 	sde_t				*sdeptr;
 	int				oprot;
@@ -1082,8 +1083,10 @@ cache_off()
 	sendsig_psw.CSH_D = sendsig_psw.CSH_F_D = 1;
 	p0init_psw.CSH_D  = p0init_psw.CSH_F_D  = 1;
 
-	for (pp = practive; pp != NULL; pp = pp->p_next) {
-		up = (user_t *)KUSER(pp->p_segu);
+	for (pp = nproc; pp < v.ve_proc; pp++) {
+		if (*pp == NULL || (*pp)->p_stat == 0)
+			continue;
+		up = (user_t *)KUSER((*pp)->p_segu);
 		ptr = (struct kpcb *)&up->u_ipcb;
 		ptr->psw.CSH_D = ptr->psw.CSH_F_D = 1;
 		ptr->ipcb.psw.CSH_D = ptr->ipcb.psw.CSH_F_D = 1;
@@ -1111,7 +1114,7 @@ cache_on()
 	register struct kpcb	*ptr;
 	register struct kpcb	**ptr2;
 	register struct gate_l2	*ptr1;
-	register proc_t			*pp;
+	register proc_t			**pp;
 	register user_t			*up;
 	sde_t				*sdeptr;
 	int				oprot;
@@ -1141,8 +1144,10 @@ cache_on()
 	sendsig_psw.CSH_D = sendsig_psw.CSH_F_D = 0;
 	p0init_psw.CSH_D  = p0init_psw.CSH_F_D  = 0;
 
-	for (pp = practive; pp != NULL; pp = pp->p_next) {
-		up = (user_t *)KUSER(pp->p_segu);
+	for (pp = nproc; pp < v.ve_proc; pp++) {
+		if (*pp == NULL || (*pp)->p_stat == 0)
+			continue;
+		up = (user_t *)KUSER((*pp)->p_segu);
 		ptr = (struct kpcb *)&up->u_ipcb;
 		ptr->psw.CSH_D = ptr->psw.CSH_F_D = 0;
 		ptr->ipcb.psw.CSH_D = ptr->ipcb.psw.CSH_F_D = 0;

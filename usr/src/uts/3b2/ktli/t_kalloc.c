@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kalloc.c	1.3"
+#ident	"@(#)ktli:ktli/t_kalloc.c	1.2"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kalloc.c 1.2 89/01/11 SMI"
 #endif
@@ -35,8 +35,8 @@ static char sccsid[] = "@(#)t_kalloc.c 1.2 89/01/11 SMI"
  *	Kernel TLI-like function to allocate memory for the
  *	various TLI primitives.
  *
- *	Returns 0 on success or a positive error value.
- *	On success, ptr is set the structure required.
+ *	Returns a pointer to the allocated structure or
+ *	NULL.
  */
 
 #include <sys/param.h>
@@ -55,13 +55,13 @@ static char sccsid[] = "@(#)t_kalloc.c 1.2 89/01/11 SMI"
 #include <sys/kmem.h>
 
 static void _alloc_buf();
+static unsigned int getsz();
 
-int
-t_kalloc(tiptr, struct_type, fields, ptr)
-	register TIUSER 	*tiptr;
-	register int 		struct_type;
-	register int 		fields;
-	char			**ptr;
+char *
+t_kalloc(tiptr, struct_type, fields)
+register TIUSER *tiptr;
+register int struct_type;
+register int fields;
 {
 	register union structptrs {
 		char	*caddr;
@@ -73,10 +73,7 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		struct t_uderr *uderr;
 		struct t_info *info;
 	} p;
-	register unsigned	dsize;
-
-	if (ptr == NULL)
-		return EINVAL;
+	register unsigned dsize;
 
 	/*
 	 * allocate appropriate structure and the specified
@@ -90,8 +87,7 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		if (fields & T_ADDR) {
 			_alloc_buf(&p.bind->addr, tiptr->tp_info.addr);
 		}
-		*ptr = ((char *)p.bind);
-		return 0;
+		return ((char *)p.bind);
 
 	case T_CALL:
 		p.call = (struct t_call *)
@@ -106,8 +102,7 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 			dsize = max(tiptr->tp_info.connect, tiptr->tp_info.discon);
 			_alloc_buf(&p.call->opt, dsize);
 		}
-		*ptr = ((char *)p.call);
-		return 0;
+		return((char *)p.call);
 
 	case T_OPTMGMT:
 		p.opt = (struct t_optmgmt *)
@@ -115,8 +110,7 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		if (fields & T_OPT){
 			_alloc_buf(&p.opt->opt, tiptr->tp_info.options);
 		}
-		*ptr = ((char *)p.opt);
-		return 0;
+		return((char *)p.opt);
 
 	case T_DIS:
 		p.dis = (struct t_discon *)
@@ -124,8 +118,7 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		if (fields & T_UDATA){
 			_alloc_buf(&p.dis->udata, tiptr->tp_info.discon);
 		}
-		*ptr = ((char *)p.dis);
-		return 0;
+		return((char *)p.dis);
 
 	case T_UNITDATA:
 		p.udata = (struct t_kunitdata *)
@@ -143,12 +136,11 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		if (fields & T_UDATA){
 			p.udata->udata.udata_mp = NULL;
 			p.udata->udata.buf = NULL;
-			p.udata->udata.maxlen = tiptr->tp_info.tsdu;
+			p.udata->udata.maxlen = getsz(tiptr->tp_info.tsdu);
 			p.udata->udata.len = 0;
 		}
 		else	p.udata->udata.maxlen = p.udata->udata.len = 0;
-		*ptr = (char *)p.udata;
-		return 0;
+		return (char *)p.udata;
 
 	case T_UDERROR:
 		p.uderr = (struct t_uderr *)
@@ -159,20 +151,34 @@ t_kalloc(tiptr, struct_type, fields, ptr)
 		if (fields & T_OPT){
 			_alloc_buf(&p.uderr->opt, tiptr->tp_info.options);
 		}
-		*ptr = (char *)p.uderr;
-		return 0;
+		return (char *)p.uderr;
 
 	case T_INFO:
 		p.info = (struct t_info *)
 			kmem_zalloc((u_int)sizeof(struct t_info), KM_SLEEP);
-		*ptr = (char *)p.info;
-		return 0;
+		return (char *)p.info;
 
 	default:
-		return EINVAL;
+		u.u_error= EINVAL;
+		return NULL;
 	}
 }
 
+static unsigned int
+getsz(n)
+register int n;
+
+{
+	switch (n) {
+		case -1:
+			return 1024;
+		case 0:
+		case -2:
+			return 0;
+		default:
+			return n;
+	}
+}
  
 static void
 _alloc_buf(buf, n)

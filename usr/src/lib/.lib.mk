@@ -1,26 +1,20 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 #ident	"@(#)lib:libmk.template	1.14.2.3"
 #	Template for Global Library Makefile
 #
 #
-CCSLIB=$(ROOT)/usr/ccs/lib
-LIB=$(ROOT)/lib
-USRLIB=$(ROOT)/usr/lib
-LIBP=$(ROOT)/usr/ccs/lib/libp
-OWN=bin
-GRP=bin
-CCSBIN=$(ROOT)/usr/ccs/bin
+CCSLIB=/langint/3b2sgs/5.0/b7/usr/ccs/lib
+LIB=/langint/3b2sgs/5.0/b7/lib
+USRLIB=/langint/3b2sgs/5.0/b7/usr/lib
+LIBP=/langint/3b2sgs/5.0/b7/usr/ccs/lib/libp
+OWN=langint
+GRP=lang
+CCSBIN=
 LIBLIST=*
 MACH=m32
 INC=$(ROOT)/usr/include
 INCSYS=$(ROOT)/usr/include
 MAKE=make
-SGS=
+SGS=m32
 MAC=BMAC
 CFLAGS=
 

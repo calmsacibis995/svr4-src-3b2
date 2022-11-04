@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/sigsetops.c	1.4"
+#ident	"@(#)libc-port:gen/sigsetops.c	1.3"
 
 /*
  * POSIX signal manipulation functions. 
@@ -44,7 +44,7 @@ sigvalid(sig)
 		sigsinit++;
 	}
 
-	return (sigs.sigbits[sigword(sig)] & bitmask(sig)) != 0;
+	return (sigs.word[sigword(sig)] & bitmask(sig)) != 0;
 }
 
 int
@@ -64,10 +64,10 @@ int
 sigemptyset(set)
 sigset_t *set;
 {
-	set->sigbits[0] = 0;
-	set->sigbits[1] = 0;
-	set->sigbits[2] = 0;
-	set->sigbits[3] = 0;
+	set->word[0] = 0;
+	set->word[1] = 0;
+	set->word[2] = 0;
+	set->word[3] = 0;
 	return 0;
 }
 
@@ -80,7 +80,7 @@ register int sig;
 		errno = EINVAL;
 		return -1;
 	}
-	set->sigbits[sigword(sig)] |= bitmask(sig);
+	set->word[sigword(sig)] |= bitmask(sig);
 	return 0;
 }
 
@@ -93,7 +93,7 @@ register int sig;
 		errno = EINVAL;
 		return -1;
 	}
-	set->sigbits[sigword(sig)] &= ~bitmask(sig);
+	set->word[sigword(sig)] &= ~bitmask(sig);
 	return(0);
 }
 
@@ -106,5 +106,5 @@ register int sig;
 		errno = EINVAL;
 		return -1;
 	}
-	return (set->sigbits[sigword(sig)] & bitmask(sig)) != 0;
+	return (set->word[sigword(sig)] & bitmask(sig)) != 0;
 }

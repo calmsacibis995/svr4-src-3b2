@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/namefs/namevno.c	1.27.1.2"
+#ident	"@(#)fs:fs/namefs/namevno.c	1.25"
 /*
  * This file defines the vnode operations for mounted file descriptors.
  * The routines in this file act as a layer between the NAMEFS file 
@@ -48,7 +48,7 @@ int	nm_open(),     nm_close(),   nm_read(),    nm_write();
 int	nm_ioctl(),    nm_getattr(), nm_setattr(), nm_access();
 int	nm_link(),     nm_fsync(),   nm_fid(),     nm_seek();
 int	nm_realvp(),   nm_poll();
-void	nm_inactive(), nm_rwlock(),  nm_rwunlock();
+void	nm_inactive(), nm_rwlock(),   nm_rwunlock();
 
 /*
  * Define external routines.
@@ -95,39 +95,14 @@ struct vnodeops nm_vnodeops = {
 	fs_nosys,	/* delmap */
 	nm_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
+	fs_nosys,	/* filler */
 };
  
 /*
@@ -531,7 +506,7 @@ nm_rwunlock(vp)
 	nodep->nm_flag &= ~NMLOCK;
 	if( nodep->nm_flag & NMWANT) {
 		nodep->nm_flag &= ~NMWANT;
-		wakeprocs((caddr_t) nodep, PRMPT);
+		wakeup((caddr_t) nodep);
 	}
 }
 

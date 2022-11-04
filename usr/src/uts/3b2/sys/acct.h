@@ -8,7 +8,7 @@
 #ifndef _SYS_ACCT_H
 #define _SYS_ACCT_H
 
-#ident	"@(#)head.sys:sys/acct.h	11.9"
+#ident	"@(#)head.sys:sys/acct.h	11.8"
 /*
  * Accounting structures
  */
@@ -58,13 +58,12 @@ struct	o_acct
 extern	struct	acct	acctbuf;
 extern	struct	vnode	*acctp;		/* vnode of accounting file */
 
-#if !defined(_KERNEL)
+
 #if defined(__STDC__)
-extern int acct(const char *);
+extern void acct(char);
 #else
-extern int acct();
+extern void acct();
 #endif
-#endif /* !defined(_KERNEL) */
 
 #define	AFORK	01		/* has executed fork, but no exec */
 #define	ASU	02		/* used super-user privileges */

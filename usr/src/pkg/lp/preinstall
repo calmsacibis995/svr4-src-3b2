@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nlp:lp/ifiles/preinstall	1.10"
+#ident	"@(#)pkg.nlp:lp/ifiles/preinstall	1.9"
 ##########
 #
 # Make sure that there is a group named "lp".  If this is
@@ -234,8 +234,8 @@ fi
 
 echo "\nVerifying that lp can use crontab\n"
 
-CRONALLOW=/etc/cron.d/cron.allow
-CRONDENY=/etc/cron.d/cron.deny
+CRONALLOW=/etc/cron/cron.allow
+CRONDENY=/etc/cron/cron.deny
 CRONDIR=/var/spool/cron/crontabs
 
 if [ -f "${CRONDENY}" ] && \

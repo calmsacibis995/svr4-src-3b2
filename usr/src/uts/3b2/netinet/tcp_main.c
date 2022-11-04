@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_main.c	1.4.3.7"
+#ident	"@(#)netinet:netinet/tcp_main.c	1.4.3.2"
+
+/*
+ * System V STREAMS TCP - Release 2.0 
+ *
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved. 
+ *
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code. 
+ *
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates. 
+ *
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies. 
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -28,33 +46,12 @@
  *  	          All rights reserved.
  */
 
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
 /*
  * This is the main stream interface module for the DoD Transmission Control
  * Protocol (TCP).  Here, we deal with the stream setup and tear-down.  The
  * TPI state machine processing is in tcp_state.c and the specific I/O packet
  * handling happens in tcp_input.c and tcp_output.c 
  */
-
 
 #define STRNET
 
@@ -72,9 +69,6 @@
 #ifdef SYSV
 #include <sys/cred.h>
 #include <sys/proc.h>
-#ifdef SYSV
-#include <sys/cmn_err.h>
-#endif
 #endif /* SYSV */
 #include <sys/user.h>
 #include <sys/stropts.h>
@@ -108,6 +102,7 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcpip.h>
+#include <netinet/tcp_debug.h>
 #include <sys/kmem.h>
 
 int             nodev(), tcpopen(), tcpclose(), tcp_deqdata(), tcpuwput(), tcpuwsrv();
@@ -139,6 +134,9 @@ int             tcp_index;
 extern int      tcpfastid, tcpslowid;
 
 extern int	tcpdprintf;
+extern int	ntcp;
+int             tcp_ndebug, tcp_debx = 0;
+
 static int      tcpinited;
 
 tcp_seq         tcp_iss;
@@ -149,6 +147,7 @@ mblk_t	       *tcp_dihdr;
 /* configurable parameters */
 extern unsigned char   tcp_dev[];	/* bit mask of minor devs */
 extern int		ntcp;
+extern int		tcpalldebug;
 
 
 #define PLINGER	PZERO+1
@@ -198,7 +197,6 @@ tcpopen(q, dev, flag, sflag)
 		setuerror(EINVAL);
 		return (OPENFAIL);
 	}
-
 	if (error = tcp_attach(q)) {
 		setuerror((unsigned short) error);
 		return (OPENFAIL);
@@ -235,8 +233,6 @@ tcpopen(q, dev, flag, sflag)
 	} else {
 		setuerror(0);	/* suser sets u_error, so clear */
 	}
-	if ((inp->inp_protoopt & SO_LINGER) && inp->inp_linger == 0)
-		inp->inp_linger = TCP_LINGERTIME;
 	STRLOG(TCPM_ID, 1, 5, SL_TRACE, "tcpopen succeeded wq %x tcb %x",
 	       WR(q), inp->inp_ppcb);
 	tcp_dev[i] |= 1 << j;
@@ -248,12 +244,9 @@ tcpclose(q)
 {
 	struct tcpcb   *tp;
 	struct inpcb   *inp;
-	short		saveminor;
 	short           i, j;
-	extern void     lingertimer();
-	int		ss;
+	extern void      lingertimer();
 
-	ss = splstr();
 	ASSERT(q != NULL);
 	inp = qtoinp(q);
 	STRLOG(TCPM_ID, 1, 5, SL_TRACE, "tcpclose: wq %x pcb %x",
@@ -262,7 +255,10 @@ tcpclose(q)
 	ASSERT(inp == qtoinp(WR(q)));
 	tp = (struct tcpcb *) inp->inp_ppcb;
 	ASSERT(tp->t_inpcb == inp);
-	saveminor = tp->t_inpcb->inp_minor;
+	i = tp->t_inpcb->inp_minor;
+	j = i % 8;
+	i = i / 8;
+	tcp_dev[i] &= ~(1 << j);
 	if (inp->inp_protoopt & SO_ACCEPTCONN) {
 		struct tcpcb   *ctp;
 
@@ -277,46 +273,43 @@ tcpclose(q)
 		}
 	}
 	inp->inp_state |= SS_NOFDREF | SS_CANTRCVMORE;
-	inp->inp_tstate = TS_UNBND;
 	if (tp->t_state > TCPS_LISTEN)
 		tp = tcp_disconnect(tp);
 	else
 		tp = tcp_close(tp, 0);
-	if (tp && tp->t_qsize) {
+	if (tp && tp->t_qsize)
 		if (inp->inp_protoopt & SO_LINGER && inp->inp_linger) {
-			lingerstart(tp);
+			int            *idp, s;
 
-			/*
-			 * In case sleep returns prematurely, which it can,
-			 * check that we're still doing the linger boogie.
-			 */
-
-			while (tp->t_linger) {
-				if (sleep((caddr_t) tp, PLINGER | PCATCH)) {
-					/*
-					 * Caught signal, so later.
-					 */
-					tp->t_linger = 0;
-					tp->t_timer[TCPT_LINGER] = 0;
-				 	tcpstat.tcps_lingerabort++;
-					tp->t_qsize = 0;
-					break;
-				}
+			if (!(idp = (int *) kmem_alloc(sizeof(int), KM_NOSLEEP))) {
+				tp->t_qsize = 0;
+				inp->inp_q = NULL;
+				q->q_ptr = NULL;
+				return;
 			}
+			s = splnet();
+			tp->t_ltidp = idp;
+			*idp = timeout(lingertimer, (caddr_t)tp, inp->inp_linger * HZ);
+			splx(s);
+			if (sleep((caddr_t) tp, PLINGER | PCATCH)) {
+				s = splnet();
+				if (*idp) {
+					untimeout(*idp);
+					tp->t_ltidp = NULL;
+					tp->t_qsize = 0;
+					splx(s);
+					u.u_error == EINTR;
+				} else
+					splx(s);
+			}
+			kmem_free(idp, sizeof(int));
 		} else {
 			tp->t_qsize = 0;
 		}
-	}
-	if (q->q_ptr == (caddr_t) inp) {
-		inp->inp_q = NULL;
-		q->q_ptr = NULL;
-	}
-	i = saveminor;
-	j = i % 8;
-	i = i / 8;
-	tcp_dev[i] &= ~(1 << j);
-	splx(ss);
+	inp->inp_q = NULL;
+	q->q_ptr = NULL;
 }
+
 
 /*
  * tcpuwput is the upper write put routine.  It takes messages from user
@@ -416,7 +409,7 @@ tcpioctl(q, bp)
 	mblk_t         *bp;
 {
 	struct iocblk  *iocbp;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	struct inpcb   *inp;
 
 	iocbp = (struct iocblk *) bp->b_rptr;
@@ -510,22 +503,22 @@ tcpioctl(q, bp)
 
 	case SIOCGETNAME:	/* obsolete - replaced by TI_GETMYNAME */
 		iocbp->ioc_count = 0;
-		if ((bp->b_cont = allocb(sizeof(struct sockaddr_in), BPRI_LO))
+		if ((bp->b_cont = allocb(sizeof(struct taddr_in), BPRI_LO))
 		    == NULL) {
 			bp->b_datap->db_type = M_IOCNAK;
 			iocbp->ioc_error = ENOSR;
 			qreply(q, bp);
 			return;
 		}
-		bp->b_cont->b_wptr += sizeof(struct sockaddr_in);
-		sin = (struct sockaddr_in *) bp->b_cont->b_rptr;
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+		bp->b_cont->b_wptr += sizeof(struct taddr_in);
+		sin = (struct taddr_in *) bp->b_cont->b_rptr;
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		inp = qtoinp(q);
 		sin->sin_family = AF_INET;
 		sin->sin_port = inp->inp_lport;
 		sin->sin_addr = inp->inp_laddr;
 		bp->b_datap->db_type = M_IOCACK;
-		iocbp->ioc_count = sizeof(struct sockaddr_in);
+		iocbp->ioc_count = sizeof(struct taddr_in);
 		qreply(q, bp);
 		return;
 
@@ -538,21 +531,21 @@ tcpioctl(q, bp)
 			qreply(q, bp);
 			return;
 		}
-		if ((bp->b_cont = allocb(sizeof(struct sockaddr_in), BPRI_LO))
+		if ((bp->b_cont = allocb(sizeof(struct taddr_in), BPRI_LO))
 		    == NULL) {
 			bp->b_datap->db_type = M_IOCNAK;
 			iocbp->ioc_error = ENOSR;
 			qreply(q, bp);
 			return;
 		}
-		bp->b_cont->b_wptr += sizeof(struct sockaddr_in);
-		sin = (struct sockaddr_in *) bp->b_cont->b_rptr;
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+		bp->b_cont->b_wptr += sizeof(struct taddr_in);
+		sin = (struct taddr_in *) bp->b_cont->b_rptr;
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_port = inp->inp_fport;
 		sin->sin_addr = inp->inp_faddr;
 		bp->b_datap->db_type = M_IOCACK;
-		iocbp->ioc_count = sizeof(struct sockaddr_in);
+		iocbp->ioc_count = sizeof(struct taddr_in);
 		qreply(q, bp);
 		return;
 
@@ -624,10 +617,27 @@ tcpioctl(q, bp)
 
 tcpinit()
 {
+#ifdef TCPDEBUG
+	extern int      net_tcpdebug;
+#endif TCPDEBUG
 	struct T_data_ind *di;
 
 	STRLOG(TCPM_ID, 0, 9, SL_TRACE, "tcpinit starting");
 
+#ifdef TCPDEBUG
+	tcp_ndebug = net_tcpdebug;
+
+	if (tcp_ndebug) {
+#ifdef LATER
+		tcp_debug = (struct tcp_debug *)
+			kmem_alloc((int) (tcp_ndebug * sizeof(struct tcp_debug)), KM_NOSLEEP);
+#endif
+		if (tcp_debug == NULL) {
+			setuerror(ENOSR);
+			return;
+		}
+	}
+#endif TCPDEBUG
 
 	/* allocate header for T_DATA_IND messages */
 	if (!(tcp_dihdr = allocb(sizeof(struct T_data_ind), BPRI_HI))) {
@@ -646,7 +656,6 @@ tcpinit()
 	tcp_slowtimo();
 	tcp_fasttimo();
 
-	ipinit();
 	ipregister();
 	tcpinited = 1;
 
@@ -702,11 +711,7 @@ tcplrput(q, bp)
 
 		case N_UNITDATA_IND:
 			if (tcpdprintf)
-#ifdef SYSV
-				cmn_err(CE_NOTE, "tcplrput: got N_UNITDATA_IND\n");
-#else
-				printf( "tcplrput: got N_UNITDATA_IND\n");
-#endif
+				printf ("tcplrput: got N_UNITDATA_IND\n");
 			head = bp;
 			bp = bp->b_cont;
 			freeb(head);
@@ -734,22 +739,14 @@ tcplrput(q, bp)
 			struct iocblk_in *iocbp = (struct iocblk_in *) bp->b_rptr;
 
 			if (tcpdprintf)
-#ifdef SYSV
-				cmn_err(CE_NOTE, "tcplrput: got M_IOCACK/NAK\n");
-#else
-				printf( "tcplrput: got M_IOCACK/NAK\n");
-#endif
+				printf ("tcplrput: got M_IOCACK/NAK\n");
 			putnext(iocbp->ioc_transport_client, bp);
 			break;
 		}
 
 	case M_CTL:
 		if (tcpdprintf)
-#ifdef SYSV
-			cmn_err(CE_NOTE, "tcplrput: got M_CTL\n");
-#else
-			printf( "tcplrput: got M_CTL\n");
-#endif
+			printf ("tcplrput: got M_CTL\n");
 		tcp_ctlinput(bp);
 		freemsg(bp);
 		break;

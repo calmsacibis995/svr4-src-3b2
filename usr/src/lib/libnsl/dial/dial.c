@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/dial.c	1.5"
+#ident	"@(#)libnsl:dial/dial.c	1.3"
 /*LINTLIBRARY*/
 /***************************************************************
  *      dial() returns an fd for an open tty-line connected to the
@@ -100,14 +100,6 @@
 #include "sysfiles.c"
 #include "ulockf.c"
 
-#ifdef DATAKIT
-#include "dkbreak.c"
-#include "dkerr.c"
-#include "dkdial.c"
-#include "dkminor.c"
-#include "dtnamer.c"
-#endif
-
 static int
         rlfd;                   /* fd for remote comm line */
 
@@ -148,6 +140,7 @@ CALL call;
 {
 char *alt[7];
 char speed[10];		/* character value of speed passed to dial */
+int systemname = 0;
 
 	/* set service so we know which Sysfiles entries to use, then	*/
 	/* be sure can access Devices file(s).  use "cu" entries ...	*/
@@ -159,26 +152,17 @@ char speed[10];		/* character value of speed passed to dial */
 		return(NO_Ldv);
 	}
 
-	if (call.attr != NULL) {
-		if ( call.attr->c_cflag & PARENB ) {
-			Evenflag = ((call.attr->c_cflag & PARODD) ? 0 : 1);
-			Oddflag = ((call.attr->c_cflag & PARODD) ? 1 : 0);
-		}
-		line_8bit = (call.attr->c_cflag & CS8 ? 1 : 0);
-	}
-
-	if (call.speed <= 0)
-		strcpy(speed,"Any");
-	else
-		sprintf(speed,"%d",call.speed);
-
-	/* Determine whether contents of "telno" is a system name. */
-	if ( (call.telno != NULL) &&
-	     (strlen(call.telno) != strspn(call.telno,"0123456789=-*#")) ) {
-		/* use conn() for system names */
+	if (call.speed <= 0) strcpy(speed,"Any");
+	else sprintf(speed,"%d",call.speed);
+/* Determine whether contents of telno is a phone number or a system name */
+	if(strlen(call.telno) != strspn(call.telno,"0123456789=-*#"))
+		systemname++;
+/* If dial() was given a system name use "conn()" */
+	if(systemname)
 		rlfd = conn(call.telno);
-	} else {
+	else {
 		alt[F_NAME] = "dummy";	/* to replace the Systems file fields */
+
 		alt[F_TIME] = "Any";    /* needed for getto(); [F_TYPE] and */
 		alt[F_TYPE] = "";	/* [F_PHONE] assignment below       */
 		alt[F_CLASS] = speed;
@@ -186,20 +170,25 @@ char speed[10];		/* character value of speed passed to dial */
 		alt[F_LOGIN] = "";
 		alt[6] = "";
 
-		if ( (call.telno != NULL) && (*call.telno != '\0') ) {
-			/* given a phone number, use an ACU */
-			alt[F_PHONE] = call.telno;
-			alt[F_TYPE] = "ACU";
-		} else {
-			/* otherwise, use a Direct connection */
-			alt[F_TYPE] = "Direct";
-			/* If device name starts with "/dev/", strip it off  */
-			/* since Devices file entries will also be stripped. */
-			if ( (call.line != NULL) &&
-				(strncmp(call.line, "/dev/", 5) == 0) )
+		/* If device specified: if is "/dev/device", strip off	*/
+		/* "/dev/" because must	exactly match entries in Devices*/
+		/* file, which usually omit the "/dev/".  if doesn't	*/
+		/* begin with "/dev/", leave it as it is.		*/
+		if(call.line != NULL) {
+			if ( strncmp(call.line, "/dev/", 5) == 0 )
 				Myline = (call.line + 5);
 			else
 				Myline = call.line;
+		}
+	
+		/* If telno specified */
+		if(call.telno != NULL) {
+			alt[F_PHONE] = call.telno;
+			alt[F_TYPE] = "ACU";
+		}
+		/* If telno is NULL, it is a direct line */
+		else {
+			alt[F_TYPE] = "Direct";
 		}
 	
 #ifdef forfutureuse

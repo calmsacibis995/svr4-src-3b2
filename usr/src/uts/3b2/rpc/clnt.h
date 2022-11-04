@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 
-#ident	"@(#)head.sys:sys/rpc/clnt.h	1.9"
+#ident	"@(#)head.sys:sys/rpc/clnt.h	1.7"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -24,7 +24,7 @@
 * Notice of copyright on this source code product does not indicate 
 *  publication.
 *
-*	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+*	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */
@@ -54,7 +54,6 @@ enum clnt_stat {
 	RPC_CANTRECV=4,			/* failure in receiving result */
 	RPC_TIMEDOUT=5,			/* call timed out */
 	RPC_INTR=18,			/* call interrupted */
-	RPC_UDERROR=23,			/* recv got uderr indication */
 	/*
 	 * remote errors
 	 */
@@ -133,7 +132,7 @@ typedef struct {
 		void		(*cl_geterr)();	/* get specific error code */
 		bool_t		(*cl_freeres)();/* frees results */
 		void		(*cl_destroy)();/* destroy this structure */
-		bool_t		(*cl_control)();/* the ioctl() of rpc */
+		bool_t          (*cl_control)();/* the ioctl() of rpc */
 	} *cl_ops;
 	caddr_t			cl_private;	/* private stuff */
 #ifndef _KERNEL
@@ -155,19 +154,26 @@ struct rpc_timers {
 /*
  * Feedback values used for possible congestion and rate control
  */
-#define	FEEDBACK_REXMIT1	1	/* first retransmit */
-#define	FEEDBACK_OK		2	/* no retransmits */
+#define FEEDBACK_REXMIT1	1	/* first retransmit */
+#define FEEDBACK_OK		2	/* no retransmits */
 
-#define	RPCSMALLMSGSIZE	400	/* a more reasonable packet size */
+#define RPCSMALLMSGSIZE	400	/* a more reasonable packet size */
 
-#define	KNC_STRSIZE	128	/* maximum length of knetconfig strings */
+#ifdef _KERNEL
+#define UDPMSGSIZE	8800	/* temporary */
 struct knetconfig {
-	unsigned long	knc_semantics;	/* token name */
-	char		*knc_protofmly;	/* protocol family */
-	char		*knc_proto;	/* protocol */
-	dev_t		knc_rdev;	/* device id */
-	unsigned long	knc_unused[8];
+	char 	     *nc_netid;
+	unsigned long nc_semantics;
+	unsigned long nc_flag;
+	unsigned long nc_protofmly;
+	unsigned long nc_proto;
+	char	     *nc_device;
+	unsigned long nc_nlookups;
+	char	    **nc_lookups;
+	dev_t	      nc_rdev;
+	unsigned long nc_unused[8];
 };
+#endif
 
 /*
  * client side rpc interface ops
@@ -202,8 +208,8 @@ struct knetconfig {
  * CLNT_GETERR(rh);
  * 	CLIENT *rh;
  */
-#define	CLNT_GETERR(rh, errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
-#define	clnt_geterr(rh, errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
+#define	CLNT_GETERR(rh,errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
+#define	clnt_geterr(rh,errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
 
 /*
  * bool_t
@@ -218,29 +224,29 @@ struct knetconfig {
 /*
  * bool_t
  * CLNT_CONTROL(cl, request, info)
- *	CLIENT *cl;
- *	u_int request;
- *	char *info;
+ *      CLIENT *cl;
+ *      u_int request;
+ *      char *info;
  */
-#define	CLNT_CONTROL(cl, rq, in) ((*(cl)->cl_ops->cl_control)(cl, rq, in))
-#define	clnt_control(cl, rq, in) ((*(cl)->cl_ops->cl_control)(cl, rq, in))
+#define	CLNT_CONTROL(cl,rq,in) ((*(cl)->cl_ops->cl_control)(cl,rq,in))
+#define	clnt_control(cl,rq,in) ((*(cl)->cl_ops->cl_control)(cl,rq,in))
 
 
 /*
  * control operations that apply to all transports
  */
-#define	CLSET_TIMEOUT		1	/* set timeout (timeval) */
-#define	CLGET_TIMEOUT		2	/* get timeout (timeval) */
-#define	CLGET_SERVER_ADDR	3	/* get server's address (sockaddr) */
-#define	CLGET_FD		6	/* get connections file descriptor */
-#define	CLGET_SVC_ADDR		7	/* get server's address (netbuf) */
-#define	CLSET_FD_CLOSE		8	/* close fd while clnt_destroy */
-#define	CLSET_FD_NCLOSE		9	/* Do not close fd while clnt_destroy */
+#define CLSET_TIMEOUT       1   /* set timeout (timeval) */
+#define CLGET_TIMEOUT       2   /* get timeout (timeval) */
+#define CLGET_SERVER_ADDR   3   /* get server's address (sockaddr) */
+#define CLGET_FD	    6	/* get connections file descriptor */
+#define CLGET_SVC_ADDR	    7   /* get server's address (netbuf) */
+#define CLSET_FD_CLOSE	    8	/* close fd while clnt_destroy */
+#define CLSET_FD_NCLOSE	    9	/* Do not close fd while clnt_destroy */
 /*
  * Connectionless only control operations
  */
-#define	CLSET_RETRY_TIMEOUT 4   /* set retry timeout (timeval) */
-#define	CLGET_RETRY_TIMEOUT 5   /* get retry timeout (timeval) */
+#define CLSET_RETRY_TIMEOUT 4   /* set retry timeout (timeval) */
+#define CLGET_RETRY_TIMEOUT 5   /* get retry timeout (timeval) */
 
 /*
  * void
@@ -257,20 +263,20 @@ struct knetconfig {
  * and network administration.
  */
 
-#define	RPCTEST_PROGRAM		((u_long)1)
-#define	RPCTEST_VERSION		((u_long)1)
-#define	RPCTEST_NULL_PROC	((u_long)2)
-#define	RPCTEST_NULL_BATCH_PROC	((u_long)3)
+#define RPCTEST_PROGRAM		((u_long)1)
+#define RPCTEST_VERSION		((u_long)1)
+#define RPCTEST_NULL_PROC	((u_long)2)
+#define RPCTEST_NULL_BATCH_PROC	((u_long)3)
 
 /*
  * By convention, procedure 0 takes null arguments and returns them
  */
 
-#define	NULLPROC ((u_long)0)
+#define NULLPROC ((u_long)0)
 
 /*
  * Below are the client handle creation routines for the various
- * implementations of client side rpc.  They can return NULL if a
+ * implementations of client side rpc.  They can return NULL if a 
  * creation failure occurs.
  */
 
@@ -314,7 +320,7 @@ clnt_tli_create(/*fd, netconf, svcaddr, prog, vers, sendsz, recvsz*/); /*
 */
 
 /*
- * Low level clnt create routine for connectionful transports, e.g. tcp.
+ * Low level clnt create routine for connectionful transports e,g. tcp.
  */
 extern CLIENT *
 clnt_vc_create(/*fd, svcaddr, prog, vers, sendsz, recvsz*/); /*
@@ -327,7 +333,7 @@ clnt_vc_create(/*fd, svcaddr, prog, vers, sendsz, recvsz*/); /*
 */
 
 /*
- * Low level clnt create routine for connectionless transports, e.g. udp.
+ * Low level clnt create routine for connectionless transports e,g. udp.
  */
 extern CLIENT *
 clnt_dg_create(/*fd, svcaddr, program, version, sendsz, recvsz*/); /*
@@ -357,7 +363,7 @@ char *clnt_spcreateerror(/* char *msg */);	/* string */
 
 /*
  * Like clnt_perror(), but is more verbose in its output
- */
+ */ 
 void clnt_perrno(/* enum clnt_stat num */);	/* stderr */
 
 /*
@@ -366,7 +372,7 @@ void clnt_perrno(/* enum clnt_stat num */);	/* stderr */
 void clnt_perror(/* CLIENT *clnt, char *msg */); 	/* stderr */
 char *clnt_sperror(/* CLIENT *clnt, char *msg */);	/* string */
 
-/*
+/* 
  * If a creation fails, the following allows the user to figure out why.
  */
 struct rpc_createerr {

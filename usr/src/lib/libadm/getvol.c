@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:getvol.c	1.2"
+#ident	"@(#)libadm:getvol.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -16,7 +16,6 @@
 extern int	ckquit;
 
 #define LABELSIZ	6
-#define BELL	"\007"
 
 #define FORMFS_MSG ",\\n\\ \\ or [f] to format %s and place a filesystem on it"
 #define FORMAT_MSG ",\\n\\ \\ or [f] to format the %s"
@@ -337,7 +336,6 @@ int options;
 	*pt = '\0';
 
 	pt = prmpt;
-	fprintf(stderr, BELL);
 	for(;;) {
 		if(n = ckkeywd(strval, keyword, NULL, NULL, NULL, pt))
 			return(n);

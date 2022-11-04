@@ -5,9 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_b.h	1.2"
-
+#ident	"@(#)libyp:yp_b.h	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -35,7 +33,33 @@
  */
 
 #include <rpc/types.h>
+
 #include "netconfig.h"
+
+struct netconfigx {
+	char *nc_netid;
+	u_long nc_semantics;
+	u_long nc_flag;
+	u_long nc_protofmly;
+	u_long nc_proto;
+	char *nc_device;
+	u_long nc_nlookups;
+	u_long nc_lookups;
+	u_long nc_unused[8];
+};
+typedef struct netconfigx netconfigx;
+bool_t xdr_netconfigx();
+
+struct netbufx {
+	u_int maxlen;
+	struct {
+		u_int buf_len;
+		char *buf_val;
+	} buf;
+};
+typedef struct netbufx netbufx;
+bool_t xdr_netbufx();
+
 #include <stdio.h>
 
 extern bool_t xdr_netconfig();
@@ -67,7 +91,7 @@ struct domain {
 
 enum ypbind_resptype {
 	YPBIND_SUCC_VAL = 1,
-	YPBIND_FAIL_VAL = 2
+	YPBIND_FAIL_VAL = 2,
 };
 typedef enum ypbind_resptype ypbind_resptype;
 bool_t xdr_ypbind_resptype();
@@ -85,7 +109,7 @@ bool_t xdr_ypbind_domain();
 
 struct ypbind_binding {
 	struct netconfig *ypbind_nconf;
-	struct netbuf *ypbind_svcaddr;
+	struct netbufx *ypbind_svcaddr;
 	char *ypbind_servername;
 	long ypbind_hi_vers;
 	long ypbind_lo_vers;

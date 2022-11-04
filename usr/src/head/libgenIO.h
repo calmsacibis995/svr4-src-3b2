@@ -5,7 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.usr:libgenIO.h	1.2"
+#ident	"@(#)head.usr:libgenIO.h	1.1"
+
+/*
+ * Code review updated version.
+ */
 
 /* device types */
 

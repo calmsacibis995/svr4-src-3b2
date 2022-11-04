@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/map.c	1.26"
+#ident	"@(#)rtld:common/map.c	1.23"
 
 #include "rtinc.h"
 
@@ -57,7 +57,7 @@ CONST char *pathname;
 	if (_read(fd, (char *)ehdr, hsize) != hsize) {
 		if ((_lseek(fd, 0, 0) == -1) ||
 	 	   (_read(fd, (char *)ehdr, sizeof(Elf32_Ehdr)) != sizeof(Elf32_Ehdr))) {
-			_rt_lasterr("%s: %s: can't read ELF header for file: %s",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: can't read ELF header for file: %s",_proc_name,name);
 			return 0;
 		}
 	}
@@ -69,34 +69,34 @@ CONST char *pathname;
 		ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
 		ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
 		ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-		_rt_lasterr("%s: %s: %s is not an ELF file",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: %s is not an ELF file",_proc_name,name);
 		return 0;
 	}
 
 	/* check class and encoding */
 	if (ehdr->e_ident[EI_CLASS] != M_CLASS ||
 		ehdr->e_ident[EI_DATA] != M_DATA) {
-		_rt_lasterr("%s: %s: %s has wrong class or data encoding",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: %s has wrong class or data encoding",_proc_name,name);
 		return 0;
 	}
 
 	/* check magic number */
 	if (is_main) {
 		if (ehdr->e_type != ET_EXEC) {
-			_rt_lasterr("%s: %s: %s not an executable file",(char*) _rt_name, _proc_name,name);
+			_rt_lasterr("ld.so: %s: %s not an executable file", _proc_name,name);
 			return 0;
 		}
 	}
 	else { /* shared object */
 		if (ehdr->e_type != ET_DYN) {
-			_rt_lasterr("%s: %s: %s not a shared object",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: %s not a shared object",_proc_name,name);
 			return 0;
 		}
 	}
 
 	/* check machine type */
 	if (ehdr->e_machine != M_MACH) {
-		_rt_lasterr("%s: %s: bad machine type for file: %s",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: bad machine type for file: %s",_proc_name,name);
 		return 0;
 	}
 
@@ -109,7 +109,7 @@ CONST char *pathname;
 	/* verify ELF version */
 	/* ??? is this too restrictive ??? */
 	if (ehdr->e_version > EV_CURRENT) {
-		_rt_lasterr("%s: %s: bad file version for file: %s",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: bad file version for file: %s",_proc_name,name);
 		return 0;
 	}
 
@@ -118,7 +118,7 @@ CONST char *pathname;
 		((ehdr->e_ehsize + (ehdr->e_phnum * ehdr->e_phentsize)) > hsize)) {
 		hsize = ehdr->e_phnum * ehdr->e_phentsize;
 		if (_lseek(fd, ehdr->e_phoff, 0) == -1) {
-			_rt_lasterr("%s: %s: cannot seek to program header for file: %s",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: cannot seek to program header for file: %s",_proc_name,name);
 			return 0;
 		}
 
@@ -126,7 +126,7 @@ CONST char *pathname;
 			return 0;
 
 		if (_read(fd, (char *)phdr, hsize) != hsize) {
-			_rt_lasterr("%s: %s: can't read program header for file: %s",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: can't read program header for file: %s",_proc_name,name);
 			return 0;
 		}
 	}
@@ -143,7 +143,7 @@ CONST char *pathname;
 				first = pptr;
 			}
 			else if (pptr->p_vaddr <= lastaddr) {
-				_rt_lasterr("%s: %s: invalid program header - segments out of order: %s",(char*) _rt_name,_proc_name,name);
+				_rt_lasterr("ld.so: %s: invalid program header - segments out of order: %s",_proc_name,name);
 				return 0;
 			}
 			lastaddr = pptr->p_vaddr;
@@ -156,14 +156,14 @@ CONST char *pathname;
 	
 	/* check that we have at least 1 loadable segment */
 	if (first == 0) {
-		_rt_lasterr("%s: %s: no loadable segments in %s",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: no loadable segments in %s",_proc_name,name);
 		return 0;
 	}
 
 	/* calculate beginning virtual addr == virtual address of
 	 * first segment truncated to previous page boundary
 	 */
-	faddr = STRUNC(first->p_vaddr);
+	faddr = PTRUNC(first->p_vaddr);
 
 	/* calculate total amount of memory to be mapped ==
 	 * virtual addr of last loadable segment plus
@@ -182,7 +182,7 @@ CONST char *pathname;
 			PROT_READ, MAP_PRIVATE,
 			_devzero_fd, 0)) == -1) {
 
-			_rt_lasterr("%s: %s: can't map enough space for file %s",(char*) _rt_name, _proc_name,name);
+			_rt_lasterr("ld.so: %s: can't map enough space for file %s", _proc_name,name);
 			return 0;
 		}
 	}
@@ -192,7 +192,7 @@ CONST char *pathname;
 			(MAP_PRIVATE|MAP_FIXED), _devzero_fd, 0) 
 			== (caddr_t)-1) {
 
-			_rt_lasterr("%s: %s: can't map enough space for %s",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: can't map enough space for %s",_proc_name,name);
 			return 0;
 		}
 	}
@@ -245,7 +245,7 @@ CONST char *pathname;
 		if (_mmap((caddr_t)addr, fsize, prot,
 			(MAP_FIXED|MAP_PRIVATE), fd, foff) == (caddr_t)-1) {
 
-			_rt_lasterr("%s: %s: can't map segment with size 0x%x at 0x%x for file %s",(char*) _rt_name,_proc_name,fsize,addr,name);
+			_rt_lasterr("ld.so: %s: can't map segment with size 0x%x at 0x%x for file %s",_proc_name,fsize,addr,name);
 			return 0;
 		}
 
@@ -256,7 +256,7 @@ CONST char *pathname;
 	if ((SROUND(addr + msize) > PROUND(addr + msize)) && pptr != last) {
 	 	if (_munmap((caddr_t)PROUND(addr + msize), 
 			(SROUND(addr + msize) - PROUND(addr + msize)))) {
-			_rt_lasterr("%s: %s: can't unmap space for %s",(char*) _rt_name,_proc_name,name);
+			_rt_lasterr("ld.so: %s: can't unmap space for %s",_proc_name,name);
 			return 0;
 		}
 	DPRINTF(MAP,(2,"rtld: unmapped 0x%x bytes from addr 0x%x\n",
@@ -277,7 +277,7 @@ CONST char *pathname;
 			else {
 				if (_mprotect((caddr_t)bmem,((addr+msize)-bmem),
 					prot) == -1) {
-					_rt_lasterr("%s: %s: can't set protections on segment of length 0x%x at 0x%x",(char*) _rt_name, _proc_name,(addr+msize)-bmem,bmem);
+					_rt_lasterr("ld.so: %s: can't set protections on segment of length 0x%x at 0x%x", _proc_name,(addr+msize)-bmem,bmem);
 				return(0);
 				}
 			}
@@ -296,7 +296,7 @@ CONST char *pathname;
 
 	/* close argument file descriptor */
 	if (_close(fd) == -1) {
-		_rt_lasterr("%s: %s: can't close %s",(char*) _rt_name,_proc_name,name);
+		_rt_lasterr("ld.so: %s: can't close %s",_proc_name,name);
 		return 0;
 	}
 	if (!is_main) { /* add base addr to dynamic and entry point */
@@ -470,7 +470,7 @@ int permission;
 				ADDR(lm) : 0;
 			msize = phdr->p_memsz + (addr - PTRUNC(addr));
 			if (_mprotect((caddr_t)PTRUNC(addr), msize, prot) == -1){
-				_rt_lasterr("%s: %s: can't set protections on segment of length 0x%x at 0x%x",(char*) _rt_name, _proc_name,msize, PTRUNC(addr));
+				_rt_lasterr("ld.so: %s: can't set protections on segment of length 0x%x at 0x%x", _proc_name,msize, PTRUNC(addr));
 				return(0);
 			}
 		}

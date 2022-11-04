@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/ttyname.c	1.23"
+#ident	"@(#)libc-port:gen/ttyname.c	1.22"
 
 /*LINTLIBRARY*/
 /*
@@ -69,7 +69,7 @@ static const struct entry *get_pri_dirs();
 
 #define MATCH_MM	1
 #define MATCH_FS	2
-#define MATCH_INO	4
+#define MATCH_INODE	4
 #define MATCH_ALL	7
 
 #define DEV	"/dev"
@@ -240,11 +240,11 @@ srch_dir(path, depth, skip_dirs, fsb)
 		else if ((tsb.st_mode & S_IFMT) == S_IFCHR) {
 			int flag = 0;
 			if (tsb.st_dev == fsb->st_dev)
-				flag |= MATCH_FS;
-			if (tsb.st_rdev == fsb->st_rdev)
 				flag |= MATCH_MM;
+			if (tsb.st_rdev == fsb->st_rdev)
+				flag |= MATCH_FS;
 			if (tsb.st_ino == fsb->st_ino)
-				flag |= MATCH_INO;
+				flag |= MATCH_INODE;
 
 			if ( (flag & file.flags) == file.flags ) {
 				strcpy(rbuf, file.name);
@@ -358,7 +358,7 @@ get_pri_dirs()
 					vec->flags |= MATCH_FS;
 					break;
 				case 'I':
-					vec->flags |= MATCH_INO;
+					vec->flags |= MATCH_INODE;
 					break;
 				case EOLN_CHAR:
 					state = CHECK_STATE;

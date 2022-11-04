@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/catclose.c	1.3"
+#ident	"@(#)libc-port:gen/catclose.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak catclose = _catclose
@@ -15,7 +15,6 @@
 #include <stdio.h>
 #include <nl_types.h>
 #include <locale.h>
-#include <string.h>
 
 extern char *setlocale();
 extern int _mmp_opened;
@@ -35,12 +34,7 @@ char old_locale[MAXNAMLEN];
     } else
     if (catd->type == MKMSGS) {
         munmap(catd->info.g.sets,catd->info.g.size);
-
-        /* sprintf(symb_path,"%s/%s",(const char *)XOPEN_DIRECTORY,catd->info.g.link); */
-	strcpy(symb_path, (const char *)XOPEN_DIRECTORY);
-	strcat(symb_path, "/");
-	strcat(symb_path, catd->info.g.link);
-
+        sprintf(symb_path,"%s/%s",XOPEN_DIRECTORY,catd->info.g.link);
         unlink(symb_path);
 	close(catd->info.g.fd);
         free (catd->info.g.link);

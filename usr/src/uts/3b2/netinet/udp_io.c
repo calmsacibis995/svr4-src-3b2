@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/udp_io.c	1.4"
+#ident	"@(#)netinet:netinet/udp_io.c	1.3"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -99,7 +99,7 @@ int             udpcksum = 0;	/* XXX */
 
 int udp_ttl = UDP_TTL;
 
-struct sockaddr_in udp_in = {AF_INET};
+struct taddr_in udp_in = {AF_INET};
 struct udpstat  udpstat;
 
 /*ARGSUSED*/
@@ -192,7 +192,7 @@ udp_input(q, bp0)
 	udp_in.sin_addr = ui->ui_src;
 	bp->b_rptr += sizeof(struct udpiphdr);
 	bp0 = allocb(sizeof(struct T_unitdata_ind) +
-		     sizeof(struct sockaddr_in), BPRI_MED);
+		     sizeof(struct taddr_in), BPRI_MED);
 	if (bp0 == NULL) {
 		goto bad;
 	}
@@ -200,15 +200,15 @@ udp_input(q, bp0)
 	bp = bp0;
 	bp->b_datap->db_type = M_PROTO;
 	bp->b_wptr += sizeof(struct T_unitdata_ind) +
-		sizeof(struct sockaddr_in);
+		sizeof(struct taddr_in);
 	ind = (struct T_unitdata_ind *) bp->b_rptr;
 	ind->PRIM_type = T_UNITDATA_IND;
-	ind->SRC_length = sizeof(struct sockaddr_in);
+	ind->SRC_length = sizeof(struct taddr_in);
 	ind->SRC_offset = sizeof(struct T_unitdata_ind);
 	ind->OPT_length = 0;
 	ind->OPT_offset = 0;
 	bcopy((caddr_t) & udp_in, (caddr_t) bp->b_rptr +
-	      sizeof(struct T_unitdata_ind), sizeof(struct sockaddr_in));
+	      sizeof(struct T_unitdata_ind), sizeof(struct taddr_in));
 	STRLOG(UDPM_ID, 2, 9, SL_TRACE, "put to inp_q->q_next %x", inp->inp_q->q_next);
 	putnext(inp->inp_q, bp);
 	return;
@@ -223,7 +223,7 @@ udp_ctlinput(bp)
 	struct ip_ctlmsg *ctl;
 	extern u_char   inetctlerrmap[];
 	int             in_rtchange();
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 	int udp_snduderr();
 
 	ctl = (struct ip_ctlmsg *) bp->b_rptr;

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/parms.h	1.2"
+#ident	"@(#)libnsl:dial/parms.h	1.1"
 
 /* go through this carefully, configuring for your site */
 
@@ -77,7 +77,9 @@
 
 /* definitions for the types of networks and dialers that are available */
 /* used to depend on STANDALONE, but now done at runtime via Sysfiles	*/
+#ifndef DIAL
 #define DATAKIT		/* define DATAKIT if datakit is available. */
+#endif
 /* #define UNET		/* define UNET if you have 3com ethernet software */
 /* #define TCP		/* TCP (bsd systems) */
 /* #define SYTEK	/* for sytek network */

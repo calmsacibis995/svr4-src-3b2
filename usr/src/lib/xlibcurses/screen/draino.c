@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/draino.c	1.7"
+#ident	"@(#)curses:screen/draino.c	1.6"
 
 #include	"curses_inc.h"
 
@@ -49,7 +49,7 @@ int	ms;
 	    return (OK);
 	napms(NAPINTERVAL);
     }
-#else	/* TIOCOUTQ */
+#endif	/* TIOCOUTQ */
 
 #ifdef	TCSETAW
 #define	_DRAINO
@@ -66,7 +66,6 @@ int	ms;
     else
 	return (ERR);
 #endif	/* TCSETAW */
-#endif	/* TIOCOUTQ */
 
 #ifndef	_DRAINO
     /*

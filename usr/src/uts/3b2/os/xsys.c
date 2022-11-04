@@ -11,7 +11,7 @@
 /*	This Module contains Proprietary Information of Microsoft  */
 /*	Corporation and should be treated as Confidential.	   */
 
-#ident	"@(#)kernel:os/xsys.c	1.13"
+#ident	"@(#)kernel:os/xsys.c	1.11"
 
 /* #ifdef MERGE */
 
@@ -38,7 +38,9 @@
 #include "sys/var.h"
 #include "sys/cmn_err.h"
 
+#undef	wakeup
 extern u_int	timer_resolution;
+extern void	wakeup();	/* reference the function, not the macro */
 
 /*
  *	Nap for the specified number of milliseconds.
@@ -142,28 +144,39 @@ proctl(uap, rvp)
 	struct proctla *uap;
 	rval_t *rvp;
 {
-	register struct proc *p;
+	register struct proc **p, *q;
 	register pid_t pid;
 	int found = 0;
+	register struct cred *pcred, *ucred;
 
+	
 	pid = uap->pid;
-
-	for (p = practive; p != NULL; p = p->p_next) {
-		if (pid > 0) {
-			if (p->p_pid != pid)
-				continue;
-		} else if (p == proc_init)
+	if (pid > 0)
+		p = &nproc[1];
+	else
+		p = &nproc[2];
+	q = u.u_procp;
+	if (pid == 0 && q->p_pgrp == 0)
+		return ESRCH;
+	for(; p < v.ve_proc; p++) {
+		if (*p == NULL || (*p)->p_stat == NULL)
 			continue;
-		if (pid == 0 && p->p_pgidp != u.u_procp->p_pgidp)
+		if (pid > 0 && (*p)->p_pid != pid)
 			continue;
-		if (pid < -1 && p->p_pgrp != -pid)
+		if (pid == 0 && (*p)->p_pgrp != q->p_pgrp)
 			continue;
-		if (!hasprocperm(p->p_cred, u.u_cred)) {
-			if (pid > 0)
+		if (pid < -1 && (*p)->p_pgrp != -pid)
+			continue;
+		ucred = u.u_cred;
+		pcred = (*p)->p_cred;
+			
+		if (ucred->cr_uid != 0 && ucred->cr_uid != pcred->cr_uid && ucred->cr_ruid != pcred->cr_uid
+			 && ucred->cr_uid != pcred->cr_suid && ucred->cr_ruid != pcred->cr_suid 
+			 && u.u_procp != *p)
+			if (pid > 0) {
 				return EPERM;
-			else
+			} else
 				continue;
-		}
 		found++;
 		switch(uap->cmd) {
 			case PRHUGEX:
@@ -181,7 +194,6 @@ proctl(uap, rvp)
 		if (pid > 0)
 			break;
 	}
-
 	if (found == 0)
 		return ESRCH;
 	return 0;

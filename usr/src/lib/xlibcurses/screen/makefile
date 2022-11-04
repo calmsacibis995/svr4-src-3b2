@@ -24,7 +24,7 @@ DESTLIB=	$(ROOT)/usr/lib
 DESTBIN=	$(ROOT)/usr/bin
 DESTDIR=	$(ROOT)
 
-AR=		TMPDIR=$(TMP) ar
+AR=		TMPDIR=$(TMP) /bin/ar
 CHMOD=		/bin/chmod
 CPIO=		/usr/bin/cpio
 ECHO= 		/bin/echo
@@ -37,8 +37,8 @@ RM=		/bin/rm
 SHELL=		/bin/sh
 UNIQ=		/usr/bin/uniq
 
-INC = $(ROOT)/usr/include
-INCLUDE = -I. -I $(INC)
+#INC = $(ROOT)/usr/include
+INCLUDE = -I. -I $(PWD) -I $(INC)
 
 
 CPPDEFS= 	-I.
@@ -54,7 +54,7 @@ CCSLIB=$(ROOT)/usr/ccs/lib
 
 .SUFFIXES: .p .d .t
 
-HEADERS=	curses.h unctrl.h curses_inc.h curshdr.h term.h
+HEADERS=	curses.h unctrl.h curses_inc.h curshdr.h term.h uparm.h
 
 #
 #	tic source and header files
@@ -194,13 +194,11 @@ $(OBJS2): $(HEADERS)
 	mv $*.o $*.t
 	-mv $*.O $*.o
 
-#obj1:	$(OBJS1)
+obj1:	$(OBJS1)
 
-#obj2:	$(OBJS2)
+obj2:	$(OBJS2)
 
-#$(LIBNAME): obj1 obj2
-
-$(LIBNAME): $(OBJS1) $(OBJS2)
+$(LIBNAME): obj1 obj2
 	@$(ECHO)
 	@$(ECHO) Building libcurses archive
 	@$(ECHO)
@@ -447,6 +445,8 @@ install:	all
 	install -f $(CCSBIN) -m 555 -u bin -g bin captoinfo
 	install -f $(CCSBIN) -m 555 -u bin -g bin infocmp
 	install -f $(CCSBIN) -m 555 -u bin -g bin tput
+	-mkdir $(ROOT)/etc
+	install -f $(ROOT)/etc -m 555 -u bin -g bin ../termcap
 
 cktmp:
 	@$(ECHO) 

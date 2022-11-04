@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:nsl/_conn_util.c	1.6.3.2"
+#ident	"@(#)libnsl:nsl/_conn_util.c	1.6.3.1"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/errno.h"
@@ -169,9 +169,8 @@ register struct t_call *call;
 		case T_CONN_CON:
 
 			if ((ctlbuf.len < sizeof(struct T_conn_con)) ||
-			    (pptr->conn_con.OPT_length != 0 &&
 			    (ctlbuf.len < (pptr->conn_con.OPT_length +
-			     pptr->conn_con.OPT_offset)))) {
+			     pptr->conn_con.OPT_offset))) {
 				t_errno = TSYSERR;
 				errno = EPROTO;
 				return(-1);

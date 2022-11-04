@@ -8,7 +8,7 @@
 #ifndef _SYS_BUF_H
 #define _SYS_BUF_H
 
-#ident	"@(#)head.sys:sys/buf.h	11.21"
+#ident	"@(#)head.sys:sys/buf.h	11.18"
 
 /*
  *	Each buffer in the pool is usually doubly linked into 2 lists:
@@ -49,7 +49,7 @@ typedef struct	buf {
 	clock_t	b_start;		/* request start time */
 	struct  proc  *b_proc;		/* process doing physical or swap I/O */
 	struct	page  *b_pages;		/* page list for PAGEIO */
-	clock_t b_reltime;		/* previous release time */
+	unsigned long	b_reltime;      /* previous release time */
 	/* Begin new stuff */
 #define b_actf	av_forw
 #define	b_actl	av_back
@@ -80,6 +80,7 @@ struct diskhd {
  	long    b_bcount;               /* active flag */
 };
 
+extern	struct	buf	buf[];		/* The buffer pool itself */
 extern	struct	buf	bfreelist;	/* head of available list */
 struct	pfree	{
 	int	b_flags;
@@ -224,7 +225,9 @@ int		biowait();
 int		get_error();
 struct buf	*pageio_setup();
 void		pageio_done();
+void		dkstrategy();
 void		biodone();
+int		dksize();
 void		buf_breakup();
 
 #if defined(__STDC__)

@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckitem.c	1.3"
+#ident	"@(#)libadm:ckitem.c	1.1"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -102,26 +102,6 @@ int	attr;
 	return(pt);
 }
 
-void
-ckitem_err(menup, error)
-CKMENU	*menup;
-char	*error;
-{
-	deferr = setmsg(menup, 1);
-	puterror(stdout, deferr, error);
-	free(deferr);
-}
-
-void
-ckitem_hlp(menup, help)
-CKMENU	*menup;
-char	*help;
-{
-	defhlp = setmsg(menup, 0);
-	puthelp(stdout, defhlp, help);
-	free(defhlp);
-}
-
 ckitem(menup, item, max, defstr, error, help, prompt)
 CKMENU	*menup;
 char	*item[];
@@ -145,7 +125,6 @@ char	*defstr, *error, *help, *prompt;
 				item[0] = menup->choice->token;
 			else if(menup->invis)
 				item[0] = menup->invis[0];
-			item[1] = NULL;
 			return(0);
 		}
 	}
@@ -182,7 +161,6 @@ start:
 		for(i=0; (i < max); i++)
 			item[i] = list[i];
 		free((char *)list);
-		item[i] = NULL;
 	}
 	free(defhlp);
 	free(deferr);

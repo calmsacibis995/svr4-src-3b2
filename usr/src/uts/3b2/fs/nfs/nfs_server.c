@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_server.c	1.21"
+#ident	"@(#)fs:fs/nfs/nfs_server.c	1.12"
 
 /*	@(#)nfs_server.c 2.87 88/04/12 SMI	*/
 
@@ -101,39 +101,20 @@ STATIC	void	rfsput();
 #define	VERSIONMAX	2
 
 /*
- *	Returns true iff exported filesystem is read-only to the given host.
- *	This can happen in two ways:  first, if the default export mode is
- *	read only, and the host's address isn't in the rw list;  second,
- *	if the default export mode is read-write but the host's address
- *	is in the ro list.  The optimization (checking for EX_EXCEPTIONS)
- *	is to allow us to skip the calls to hostinlist if no host exception
- *	lists were loaded.
- *
- *	Note:  this macro should be as fast as possible since it's called
- *	on each NFS modification request.
+ * Returns true iff exported filesystem is read-only
  */
-#define	rdonly(exi, req)						\
-	(								\
-	  (								\
-	    ((exi)->exi_export.ex_flags & EX_RDONLY)			\
-	    &&								\
-	    (								\
-	      (((exi)->exi_export.ex_flags & EX_EXCEPTIONS) == 0) ||	\
-	      !hostinlist(svc_getrpccaller((req)->rq_xprt), 		\
-	 	  &(exi)->exi_export.ex_rwaddrs)			\
-	    )								\
-	  )								\
-	  ||								\
-	  (								\
-	    ((exi)->exi_export.ex_flags & EX_RDWR)			\
-	    &&								\
-	    (								\
-	      ((exi)->exi_export.ex_flags & EX_EXCEPTIONS) &&		\
-	      hostinlist(svc_getrpccaller((req)->rq_xprt),		\
-	 	 &(exi)->exi_export.ex_roaddrs)				\
-	    )								\
-	  )								\
-	)
+#ifdef SYSV
+#define rdonly(exi, req) (((exi)->exi_export.ex_flags & EX_RDONLY) || \
+			  (((exi)->exi_export.ex_flags & EX_RDMOSTLY) && \
+			   !hostinlist(svc_getcaller((req)->rq_xprt), \
+					&(exi)->exi_export.ex_writeaddrs)))
+#else
+#define rdonly(exi, req) (((exi)->exi_export.ex_flags & EX_RDONLY) || \
+			  (((exi)->exi_export.ex_flags & EX_RDMOSTLY) && \
+			   !hostinlist((struct sockaddr *)\
+					svc_getcaller((req)->rq_xprt), \
+					&(exi)->exi_export.ex_writeaddrs)))
+#endif
 
 struct vnode	*fhtovp();
 struct file	*getsock();
@@ -150,6 +131,8 @@ struct {
 	int	reqs[32];	/* count for each request */
 } svstat;
 
+/* STATIC int nfs_chars = 50000; */
+
 struct nfs_svc_args {
 	int fd;
 };
@@ -158,7 +141,7 @@ STATIC int nfs_server_count = 0;
 /*
  * NFS Server system call.
  * Does all of the work of running a NFS server.
- * uap->fd is the fd of an open transport provider
+ * sock is the fd of an open UDP socket.
  */
 nfs_svc(uap)
 	struct nfs_svc_args *uap;
@@ -166,7 +149,10 @@ nfs_svc(uap)
 	struct file *fp;
 	SVCXPRT *xprt;
 	u_long vers;
-	register int	error;
+	/* int error; */
+
+	/* disassociate this process from the terminal */
+	newsession();
 
 	if (getf(uap->fd, &fp)) {
 		return EBADF;
@@ -175,11 +161,10 @@ nfs_svc(uap)
 	/* Now, release client memory; we never return back to user */
 	relvm(u.u_procp);
 
-	/* Create a transport handle. */
-	if ((error = svc_tli_kcreate(fp, 0, &xprt)) != 0) {
+	if ((xprt = svc_tli_kcreate(fp, 0, 0)) == (SVCXPRT *)NULL) {
 		if (nfsdprintf)
-			printf("nfs_svc: svc_tli_kcreate failed %d, exiting\n",
-				error);
+			printf("nfs_svc: svc_tli_kcreate failed %d, exiting\n", u.u_error);
+		/* return (u.u_error); */
 		exit(CLD_EXITED, 0);
 	}
 
@@ -195,12 +180,12 @@ nfs_svc(uap)
 		}
 		SVC_DESTROY(xprt);
 		u.u_error = EINTR;	/* not needed; may help debugging */
+		/* sigclearall(u.u_procp); */	/* gone, so duplicate it's effects */
 		{
 			struct proc *p = u.u_procp;
 			p->p_cursig = 0;
 			if (p->p_curinfo) {
-				kmem_free((caddr_t)p->p_curinfo,
-					sizeof(*p->p_curinfo));
+				kmem_free((caddr_t)p->p_curinfo, sizeof(*p->p_curinfo));
 				p->p_curinfo = NULL;
 			}
 		}
@@ -215,7 +200,7 @@ nfs_svc(uap)
 
 /*
  * These are the interface routines for the server side of the
- * Network File System.  See the NFS protocol specification
+ * Networked File System.  See the NFS protocol specification
  * for a description of this interface.
  */
 
@@ -282,13 +267,13 @@ rfs_setattr(args, ns, exi, req)
 		ns->ns_status = NFSERR_STALE;
 		return;
 	}
-	if (rdonly(exi, req) || (vp->v_vfsp->vfs_flag & VFS_RDONLY)) {
+	if (rdonly(exi, req)) {
 		error = EROFS;
 	} else {
 		sattr_to_vattr(&args->saa_sa, &va);
 
 		/*
-		 * Allow System V-compatible option to set access and
+		 * Allow SysV-compatible option to set access and
 		 * modified times if root, owner, or write access.
 		 *
 		 * XXX - Until an NFS Protocol Revision, this may be
@@ -300,14 +285,15 @@ rfs_setattr(args, ns, exi, req)
 		 *       right thing, but will not be disastrous on
 		 *       unmodified servers.
 		 * XXX - 1,000,000 is actually a valid tv_nsec value,
-		 *	 so we must look in the pre-converted nfssaargs
-		 *	 field instead.
+		 *       but we can't change it because that's what NFS uses.
+		 *       So a valid number will produce incorrect results.
 		 * XXX - For now, va_mtime.tv_nsec == -1 flags this in
-		 *	 VOP_SETATTR(), but not all file system setattrs
-		 *	 respect this convention (for example, s5setattr).
+		 *	 VOP_SETATTR().
+		 * XXX - No it doesn't. At least s5setattr() just uses what's
+		 *       in vap->va_mtime|vap->va_atime.
 		 */
-		if ((va.va_mtime.tv_sec != (u_long)-1) &&
-		    (args->saa_sa.sa_mtime.tv_usec == 1000000)) {
+		if ((va.va_mtime.tv_sec != -1UL) &&
+		    (va.va_mtime.tv_nsec == 1000000)) {
 			va.va_mtime.tv_sec = hrestime.tv_sec;
 			va.va_mtime.tv_nsec = hrestime.tv_nsec;
 			va.va_atime.tv_sec = va.va_mtime.tv_sec;
@@ -365,14 +351,6 @@ rfs_lookup(da, dr, exi)
 	    da->da_name, da->da_fhandle.fh_fsid.val[0],
 	    da->da_fhandle.fh_fsid.val[1], da->da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((da->da_name == (char *) NULL) || (*da->da_name == '\0')) {
-		dr->dr_status = NFSERR_ACCES;
-		return;
-	}
-
 	dvp = fhtovp(&da->da_fhandle, exi);
 	if (dvp == NULL) {
 		dr->dr_status = NFSERR_STALE;
@@ -496,16 +474,13 @@ rfs_read(ra, rr, exi)
 	struct exportinfo *exi;
 {
 	register struct vnode *vp;
-	register int error, closerr;
+	register int error;
 	struct vattr va;
 	struct iovec iov;
 	struct uio uio;
 	int offset;
 	char *savedatap;
-	int opened;
-	struct vnode *avp;	/* addressable */
 
-	opened = 0;
 #ifdef NFSDEBUG
 	printf("rfs_read %d from fh %x %x %d\n",
 	    ra->ra_count, ra->ra_fhandle.fh_fsid.val[0],
@@ -523,8 +498,7 @@ rfs_read(ra, rr, exi)
 		error = EISDIR;
 	} else {
 		VOP_RWLOCK(vp);
-		/* everything but AT_NBLOCKS */
-		va.va_mask = AT_STAT|AT_TYPE|AT_BLKSIZE;
+		va.va_mask = AT_STAT|AT_TYPE|AT_BLKSIZE; /* everything but AT_NBLOCKS */
 		error = VOP_GETATTR(vp, &va, 0, u.u_cred);
 	}
 	if (error) {
@@ -550,14 +524,6 @@ rfs_read(ra, rr, exi)
 		}
 	}
 
-	avp = vp;
-	error = VOP_OPEN(&avp, FREAD, u.u_cred);
-	vp = avp;
-	if (error) {
-		goto bad;
-	}
-	opened = 1;
-
 	if (ra->ra_offset >= va.va_size) {
 		rr->rr_count = 0;
 		vattr_to_nattr(&va, &rr->rr_attr);
@@ -569,13 +535,17 @@ rfs_read(ra, rr, exi)
 	 * which would save the copy through the uio.
 	 */
 	offset = ra->ra_offset & MAXBOFFSET;
+#ifdef	SYSV
 #ifdef	VNOCACHE
 	if (nfsreadmap && (offset + ra->ra_count <= MAXBSIZE) &&
-	    (vp->v_flag & VNOCACHE) == 0)
+	    (vp->v_flag & VNOCACHE) == 0) {
 #else
-	if (nfsreadmap && (offset + ra->ra_count <= MAXBSIZE))
+	if (nfsreadmap && (offset + ra->ra_count <= MAXBSIZE)) {
 #endif
-	{
+#else	/* SYSV */
+	if (nfsreadmap && (offset + ra->ra_count <= MAXBSIZE) &&
+	    (vp->v_flag & (VNOCACHE | VNOMAP)) == 0) {
+#endif	/* SYSV */
 		faultcode_t fault_error;
 
 		rr->rr_map = segmap_getmap(segkmap, vp,
@@ -627,15 +597,6 @@ rfs_read(ra, rr, exi)
 	error = VOP_READ(vp, &uio, IO_SYNC, u.u_cred);
 	if (error) {
 		goto bad;
-	} else {
-		/*
-		 * Get attributes again so we can send the latest access
-		 * time to the client side for his cache.
-		 */
-		va.va_mask = AT_ALL;
-		error = VOP_GETATTR(vp, &va, 0, u.u_cred);
-		if (error)
-			goto bad;
 	}
 	vattr_to_nattr(&va, &rr->rr_attr);
 	rr->rr_count = ra->ra_count - uio.uio_resid;
@@ -656,12 +617,6 @@ bad:
 		rr->rr_count = 0;
 	}
 done:
-	if (opened)
-		closerr = VOP_CLOSE(vp, FREAD, 1, 0, u.u_cred);
-	else
-		closerr = 0;
-	if (!error)
-		error = closerr;
 	rr->rr_status = puterrno(error);
 	if (vp->v_type == VREG)
 		VOP_RWUNLOCK(vp);
@@ -696,15 +651,12 @@ rfs_write(wa, ns, exi, req)
 	register struct exportinfo *exi;
 	struct svc_req *req;
 {
-	register int error, closerr;
+	register int error;
 	register struct vnode *vp;
 	struct vattr va;
 	struct iovec iov;
 	struct uio uio;
-	int opened;
-	struct vnode *avp;	/* addressable */
 
-	opened = 0;
 #ifdef NFSDEBUG
 	printf("rfs_write: %d bytes fh %x %x %d\n",
 	    wa->wa_count, wa->wa_fhandle.fh_fsid.val[0],
@@ -722,6 +674,7 @@ rfs_write(wa, ns, exi, req)
 		error = EISDIR;
 	} else {
 		VOP_RWLOCK(vp);
+		/* va.va_mask = AT_ALL;	/* we want everything */
 		va.va_mask = AT_UID;	/* all we need is the uid */
 		error = VOP_GETATTR(vp, &va, 0, u.u_cred);
 	}
@@ -735,12 +688,6 @@ rfs_write(wa, ns, exi, req)
 			error = VOP_ACCESS(vp, VWRITE, 0, u.u_cred);
 		}
 		if (!error) {
-			avp = vp;
-			error = VOP_OPEN(&avp, FWRITE, u.u_cred);
-			vp = avp;
-		}
-		if (!error) {
-			opened = 1;
 			if (wa->wa_data) {
 				iov.iov_base = wa->wa_data;
 				iov.iov_len = wa->wa_count;
@@ -765,27 +712,63 @@ rfs_write(wa, ns, exi, req)
 				error = VOP_WRITE(vp, &uio, IO_SYNC, u.u_cred);
 			} else { 	/* mbuf hack */
 if (nfsdprintf) printf("rfs_write: hit mbuf hack...\n");
+/*
+ *				register struct mbuf *m;
+ *				register struct iovec *iovp;
+ *				register int iovcnt;
+ *				static caddr_t *base10, *base40;
+ *
+ *				iovcnt = 0;
+ *				for (m = (struct mbuf *)wa->wa_mbuf; m;
+ *					m = m->m_next) {
+ *					iovcnt++;
+ *				}
+ *				if (iovcnt < 10) {
+ *					iovp = (struct iovec *)kmem_fast_alloc(
+ *					    (caddr_t *)&base10,
+ *					    sizeof (struct iovec) * 10, 10, KM_SLEEP);
+ *				} else if (iovcnt < 40) {
+ *					iovp = (struct iovec *)kmem_fast_alloc(
+ *					    (caddr_t *)&base40,
+ *					    sizeof (struct iovec) * 40, 10, KM_SLEEP);
+ *				} else {
+ *					iovp = (struct iovec *)kmem_alloc(
+ *					    (u_int)(sizeof (struct iovec) *
+ *					    iovcnt), KM_SLEEP);
+ *				}
+ *				mbuf_to_iov((struct mbuf *)wa->wa_mbuf, iovp);
+ *				uio.uio_iov = iovp;
+ *				uio.uio_iovcnt = iovcnt;
+ *				uio.uio_segflg = UIO_SYSSPACE;
+ *				uio.uio_offset = wa->wa_offset;
+ *				uio.uio_resid = wa->wa_count;
+ */
 				/*
 				 * for now we assume no append mode
 				 */
+/*
+ *				error = VOP_WRITE(vp, &uio, IO_SYNC, u.u_cred);
+ *				if (iovcnt < 10) {
+ *					kmem_fast_free((caddr_t *)&base10,
+ *					    (caddr_t)iovp);
+ *				} else if (iovcnt < 40) {
+ *					kmem_fast_free((caddr_t *)&base40,
+ *					    (caddr_t)iovp);
+ *				} else {
+ *					kmem_free((caddr_t)iovp,
+ *					    (u_int)(sizeof (struct iovec) *
+ *					    iovcnt));
+ *				}
+ */
 			}
 		}
 	}
-
-	if (opened)
-		closerr = VOP_CLOSE(vp, FWRITE, 1, 0, u.u_cred);
-	else
-		closerr = 0;
-
-	if (!error)
-		error = closerr;
-
 	if (!error) {
 		/*
 		 * Get attributes again so we send the latest mod
 		 * time to the client side for his cache.
 		 */
-		va.va_mask = AT_ALL;	/* now we want everything */
+		/* va.va_mask = AT_ALL;	/* now we want everything */
 		error = VOP_GETATTR(vp, &va, 0, u.u_cred);
 	}
 	ns->ns_status = puterrno(error);
@@ -799,6 +782,22 @@ if (nfsdprintf) printf("rfs_write: hit mbuf hack...\n");
 	printf("rfs_write: returning %d\n", error);
 #endif
 }
+
+/*
+static
+mbuf_to_iov(m, iov)
+	register struct mbuf *m;
+	register struct iovec *iov;
+{
+
+	while (m) {
+		iov->iov_base = mtod(m, caddr_t);
+		iov->iov_len = m->m_len;
+		iov++;
+		m = m->m_next;
+	}
+}
+*/
 
 /*
  * Create a file.
@@ -816,21 +815,12 @@ rfs_create(args, dr, exi, req)
 	struct vattr va;
 	struct vnode *vp;
 	register struct vnode *dvp;
-	register char *name = args->ca_da.da_name;
 
 #ifdef NFSDEBUG
 	printf("rfs_create: %s dfh %x %x %d\n",
-	    name, args->ca_da.da_fhandle.fh_fsid.val[0],
+	    args->ca_da.da_name, args->ca_da.da_fhandle.fh_fsid.val[0],
 	    args->ca_da.da_fhandle.fh_fsid.val[1], args->ca_da.da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if (name == (char *) NULL || (*name == '\0')) {
-		dr->dr_status = NFSERR_ACCES;
-		return;
-	}
-
 	sattr_to_vattr(&args->ca_sa, &va);
 	/*
 	 * This is a completely gross hack to make mknod
@@ -843,14 +833,16 @@ rfs_create(args, dr, exi, req)
 	if ((va.va_mode & IFMT) == IFCHR) {
 		va.va_type = VCHR;
 		if (va.va_size == (u_long)NFS_FIFO_DEV)
-			va.va_type = VFIFO;	/* xtra kludge for named pipe */
+			va.va_type = VFIFO;	/* xtra kludge for namedpipe */
 		else
 			va.va_rdev = (dev_t)va.va_size;
 		va.va_size = 0;
+		va.va_mode &= ~IFMT;
 	} else if ((va.va_mode & IFMT) == IFBLK) {
 		va.va_type = VBLK;
 		va.va_rdev = (dev_t)va.va_size;
 		va.va_size = 0;
+		va.va_mode &= ~IFMT;
 #ifndef	SYSV
 	/*
 	 *	System V doesn't believe in other file systems with other
@@ -863,7 +855,6 @@ rfs_create(args, dr, exi, req)
 	} else {
 		va.va_type = VREG;
 	}
-	va.va_mode &= ~IFMT;
 
 	/*
 	 * XXX - Should get exclusive flag and use it.
@@ -886,7 +877,7 @@ rfs_create(args, dr, exi, req)
 		 * The server should always do exclusive create.
 		 */
 		if (va.va_size == 0 && svc_clts_kdup(req)) {
-			error = VOP_LOOKUP(dvp, name, &vp,
+			error = VOP_LOOKUP(dvp, args->ca_da.da_name, &vp,
 					(struct pathname *) NULL, 0,
 					(struct vnode *) 0, /* XXX - unused? */
 					u.u_cred);
@@ -904,10 +895,10 @@ rfs_create(args, dr, exi, req)
 			if (va.va_mtime.tv_sec != -1)
 				va.va_mask |= AT_MTIME;
 
-			error = VOP_CREATE(dvp, name,
+			error = VOP_CREATE(dvp, args->ca_da.da_name,
 			    &va, NONEXCL, VWRITE, &vp, u.u_cred);
 			if (error && svc_clts_kdup(req)) {
-				error = VOP_LOOKUP(dvp, name,
+				error = VOP_LOOKUP(dvp, args->ca_da.da_name,
 				    &vp, (struct pathname *) NULL, 0,
 				    (struct vnode *) 0,	/* XXX - unused? */
 				    u.u_cred);
@@ -951,14 +942,6 @@ rfs_remove(da, status, exi, req)
 	    da->da_name, da->da_fhandle.fh_fsid.val[0],
 	    da->da_fhandle.fh_fsid.val[1], da->da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((da->da_name == (char *) NULL) || (*da->da_name == '\0')) {
-		*status = NFSERR_ACCES;
-		return;
-	}
-
 	vp = fhtovp(&da->da_fhandle, exi);
 	if (vp == NULL) {
 		*status = NFSERR_STALE;
@@ -1013,17 +996,6 @@ rfs_rename(args, status, exi, req)
 	    args->rna_to.da_fhandle.fh_fsid.val[1],
 	    args->rna_to.da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((args->rna_from.da_name == (char *) NULL) ||
-	    (*args->rna_from.da_name == '\0') ||
-	    (args->rna_to.da_name == (char *) NULL) ||
-	    (*args->rna_to.da_name == '\0')) {
-		*status = NFSERR_ACCES;
-		return;
-	}
-
 	fromvp = fhtovp(&args->rna_from.da_fhandle, exi);
 	if (fromvp == NULL) {
 		*status = NFSERR_STALE;
@@ -1078,15 +1050,6 @@ rfs_link(args, status, exi, req)
 	    args->la_to.da_fhandle.fh_fsid.val[1],
 	    args->la_to.da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((args->la_to.da_name == (char *) NULL) ||
-	    (*args->la_to.da_name == '\0')) {
-		*status = NFSERR_ACCES;
-		return;
-	}
-
 	fromvp = fhtovp(&args->la_from, exi);
 	if (fromvp == NULL) {
 		*status = NFSERR_STALE;
@@ -1145,15 +1108,6 @@ rfs_symlink(args, status, exi, req)
 	    args->sla_from.da_fhandle.fh_len,
 	    args->sla_tnm);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((args->sla_from.da_name == (char *) NULL) ||
-	    (*args->sla_from.da_name == '\0')) {
-		*status = NFSERR_ACCES;
-		return;
-	}
-
 	sattr_to_vattr(&args->sla_sa, &va);
 	va.va_type = VLNK;
 	vp = fhtovp(&args->sla_from.da_fhandle, exi);
@@ -1200,21 +1154,12 @@ rfs_mkdir(args, dr, exi, req)
 	struct vattr va;
 	struct vnode *dvp;
 	register struct vnode *vp;
-	register char *name = args->ca_da.da_name;
 
 #ifdef NFSDEBUG
 	printf("rfs_mkdir %s fh %x %x %d\n",
-	    name, args->ca_da.da_fhandle.fh_fsid.val[0],
+	    args->ca_da.da_name, args->ca_da.da_fhandle.fh_fsid.val[0],
 	    args->ca_da.da_fhandle.fh_fsid.val[1], args->ca_da.da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((name == (char *) NULL) || (*name == '\0')) {
-		dr->dr_status = NFSERR_ACCES;
-		return;
-	}
-
 	sattr_to_vattr(&args->ca_sa, &va);
 	va.va_type = VDIR;
 	/*
@@ -1228,26 +1173,13 @@ rfs_mkdir(args, dr, exi, req)
 	if (rdonly(exi, req)) {
 		error = EROFS;
 	} else {
-		/* set vattr mask bits before mkdir */
-		va.va_mask = AT_TYPE|AT_MODE;
-		if (va.va_size != -1)
-			va.va_mask |= AT_SIZE;
-		if (va.va_uid != -1)
-			va.va_mask |= AT_UID;
-		if (va.va_gid != -1)
-			va.va_mask |= AT_GID;
-		if (va.va_atime.tv_sec != -1)
-			va.va_mask |= AT_ATIME;
-		if (va.va_mtime.tv_sec != -1)
-			va.va_mask |= AT_MTIME;
-
-		error = VOP_MKDIR(vp, name, &va, &dvp, u.u_cred);
+		error = VOP_MKDIR(vp, args->ca_da.da_name, &va, &dvp, u.u_cred);
 		if (error == EEXIST) {
 			/*
 			 * check for dup request
 			 */
 			if (svc_clts_kdup(req)) {
-				error = VOP_LOOKUP(vp, name,
+				error = VOP_LOOKUP(vp, args->ca_da.da_name,
 					  &dvp,
 					  (struct pathname *) NULL, 0,
 					  (struct vnode *) 0,	/* XXX - unused? */
@@ -1293,14 +1225,6 @@ rfs_rmdir(da, status, exi, req)
 	    da->da_name, da->da_fhandle.fh_fsid.val[0],
 	    da->da_fhandle.fh_fsid.val[1], da->da_fhandle.fh_len);
 #endif
-	/*
-	 *	Disallow NULL paths
-	 */
-	if ((da->da_name == (char *) NULL) || (*da->da_name == '\0')) {
-		*status = NFSERR_ACCES;
-		return;
-	}
-
 	vp = fhtovp(&da->da_fhandle, exi);
 	if (vp == NULL) {
 		*status = NFSERR_STALE;
@@ -1329,7 +1253,7 @@ rfs_rmdir(da, status, exi, req)
 		} else if (!error) {
 			svc_clts_kdupsave(req);
 		} else if (error == NFSERR_EXIST) {	
-			/* kludge for incompatible errnos */
+			/*kludge for incompatible errnos */
 			error = NFSERR_NOTEMPTY;
 		}
 	}
@@ -1348,15 +1272,11 @@ rfs_readdir(rda, rd, exi, req)
 	struct exportinfo *exi;
 	struct svc_req *req;
 {
-	int error, closerr;
-	int iseof;
+	int error;
 	struct iovec iov;
 	struct uio uio;
 	register struct vnode *vp;
-	int opened;
-	struct vnode *avp;	/* addressable */
 
-	opened = 0;
 #ifdef NFSDEBUG
 	printf("rfs_readdir fh %x %x %d count %d\n",
 	    rda->rda_fh.fh_fsid.val[0], rda->rda_fh.fh_fsid.val[1],
@@ -1368,13 +1288,6 @@ rfs_readdir(rda, rd, exi, req)
 		return;
 	}
 	VOP_RWLOCK(vp);
-	if (vp->v_type != VDIR) {
-#		ifdef NFSDEBUG
-		printf("rfs_readdir: attempt to read non-directory\n");
-#		endif
-		error = ENOTDIR;
-		goto bad;
-	}
 	/*
 	 * check read access of dir.  we have to do this here because
 	 * the opendir doesn't go over the wire.
@@ -1383,14 +1296,6 @@ rfs_readdir(rda, rd, exi, req)
 	if (error) {
 		goto bad;
 	}
-
-	avp = vp;
-	error = VOP_OPEN(&avp, FREAD, u.u_cred);
-	vp = avp;
-	if (error) {
-		goto bad;
-	}
-	opened = 1;
 
 	if (rda->rda_count == 0) {
 		rd->rd_size = 0;
@@ -1422,7 +1327,7 @@ rfs_readdir(rda, rd, exi, req)
 	/*
 	 * read directory
 	 */
-	error = VOP_READDIR(vp, &uio, u.u_cred, &iseof);
+	error = VOP_READDIR(vp, &uio, u.u_cred, (int *)NULL);
 
 	/*
 	 * Clean up
@@ -1440,19 +1345,10 @@ rfs_readdir(rda, rd, exi, req)
 		rd->rd_eof = TRUE;
 	} else {
 		rd->rd_size = rda->rda_count - uio.uio_resid;
-		if (iseof)
-			rd->rd_eof = TRUE;
-		else
-			rd->rd_eof = FALSE;
+		rd->rd_eof = FALSE;
 	}
 
 bad:
-	if (opened)
-		closerr = VOP_CLOSE(vp, FREAD, 1, 0, u.u_cred);
-	else
-		closerr = 0;
-	if (!error)
-		error = closerr;
 	rd->rd_status = puterrno(error);
 	VOP_RWUNLOCK(vp);
 	VN_RELE(vp);
@@ -1659,17 +1555,13 @@ rfsput(rs)
 	rfsfreesp = rs;
 }
 
+
 /*
- *	If nfs_portmon is set, then clients are required to use privileged
- *	ports (ports < IPPORT_RESERVED) in order to get NFS services.
- *
- *	N.B.:  this attempt to carry forward the already ill-conceived
- *	notion of privileged ports for TCP/UDP is really quite ineffectual.
- *	Not only is it transport-dependent, it's laughably easy to spoof.
- *	If you're really interested in security, you must start with secure
- *	RPC instead.
+ * If nfs_portmon is set, then clients are required to use
+ * privileged ports (ports < IPPORT_RESERVED) in order to get NFS services.
  */
 int nfs_portmon = 0;
+
 
 void
 rfs_dispatch(req, xprt)
@@ -1680,7 +1572,7 @@ rfs_dispatch(req, xprt)
 	int vers;
 	caddr_t	args = NULL;
 	caddr_t	res = NULL;
-	register struct rfsdisp *disp = (struct rfsdisp *) NULL;
+	register struct rfsdisp *disp;
 	struct cred *tmpcr;
 	struct cred *newcr = NULL;
 	int error;
@@ -1781,14 +1673,12 @@ rfs_dispatch(req, xprt)
 	(*disp->dis_proc)(args, res, exi, req);
 
 done:
-	if (disp) {
-		/*
-		 * Free arguments struct
-		 */
-		if (!SVC_FREEARGS(xprt, disp->dis_xdrargs, args) ) {
-			printf("nfs_server: bad freeargs\n");
-			error++;
-		}
+	/*
+	 * Free arguments struct
+	 */
+	if (!SVC_FREEARGS(xprt, disp->dis_xdrargs, args) ) {
+		printf("nfs_server: bad freeargs\n");
+		error++;
 	}
 	if (args != NULL) {
 		/* LINTED pointer alignment */
@@ -1875,41 +1765,48 @@ fhtovp(fh, exi)
 }
 
 /*
- *	Determine whether two addresses are equal.
- *
- *	This is not as easy as it seems, since netbufs are opaque addresses
- *	and we're really concerned whether the host parts of the addresses
- *	are equal.  The solution is to check the supplied mask, whose address
- *	bits are 1 if we should compare the corresponding bits in addr1 and
- *	addr2, and 0 otherwise.
+ * Determine if two addresses are equal
+ * Only AF_INET supported for now
  */
-eqaddr(addr1, addr2, mask)
+eqaddr(addr1, addr2)
+#ifdef	SYSV
 	struct netbuf *addr1;
 	struct netbuf *addr2;
-	struct netbuf *mask;
+#else
+	struct sockaddr *addr1;
+	struct sockaddr *addr2;
+#endif
 {
-	register char *a1, *a2, *m, *mend;
-
-	if ((addr1->len != addr2->len) || (addr1->len != mask->len))
+#ifdef	SYSV
+	return((addr1->len == addr2->len) && !bcmp(addr1->buf, addr2->buf, addr1->len));
+#else
+	if (addr1->sa_family != addr2->sa_family) {
 		return (0);
-
-	for (a1 = addr1->buf,
-	     a2 = addr2->buf,
-	     m = mask->buf,
-	     mend = mask->buf + mask->len; m < mend; a1++, a2++, m++)
-		if (((*a1) & (*m)) != ((*a2) & (*m)))
-			return (0);
-	return (1);
+	}
+	switch (addr1->sa_family) {
+	case AF_INET:
+		return (((struct taddr_in *) addr1)->sin_addr.s_addr ==
+			((struct taddr_in *) addr2)->sin_addr.s_addr);
+	case AF_NS:
+		/* coming soon? */
+		break;
+	}
+	return (0);
+#endif
 }
 
-hostinlist(na, addrs)
-	struct netbuf *na;
+hostinlist(sa, addrs)
+#ifdef	SYSV
+	struct netbuf *sa;
+#else
+	struct sockaddr *sa;
+#endif
 	struct exaddrlist *addrs;
 {
 	int i;
 
 	for (i = 0; i < addrs->naddrs; i++) {
-		if (eqaddr(na, &addrs->addrvec[i], &addrs->addrmask[i])) {
+		if (eqaddr(sa, &addrs->addrvec[i])) {
 			return (1);
 		}
 	}
@@ -1946,6 +1843,7 @@ checkauth(exi, req, cred)
 	int flavor;
 	short grouplen;
 
+#ifdef	SYSV
 	/*
 	 *      Check for privileged port number
 	 *      N.B.:  this assumes that we know the format of a netbuf.
@@ -1960,6 +1858,16 @@ checkauth(exi, req, cred)
 			return (0);
 		}
 	}
+#else
+	/*
+	 * Check for privileged port number
+	 */
+	if (nfs_portmon &&
+	    ntohs(req->rq_xprt->xp_raddr.sin_port) >= IPPORT_RESERVED) {
+		printf("NFS request from unprivileged port.\n");
+		return (0);
+	}
+#endif
 
 	/*
 	 * Set uid, gid, and gids to auth params
@@ -1977,6 +1885,7 @@ checkauth(exi, req, cred)
 	case AUTH_UNIX:
 		/* LINTED pointer alignment */
 		aup = (struct authunix_parms *)req->rq_clntcred;
+#ifdef	SYSV
 		if (aup->aup_uid == 0 &&
 		    !hostinlist(svc_getrpccaller(req->rq_xprt), &exi->exi_export.ex_unix.rootaddrs)) {
 			cred->cr_uid = exi->exi_export.ex_anon;
@@ -1989,6 +1898,21 @@ checkauth(exi, req, cred)
 			    aup->aup_len * sizeof (cred->cr_groups[0]));
 			cred->cr_ngroups = aup->aup_len;
 		}
+#else
+		if (aup->aup_uid == 0 &&
+		    !hostinlist((struct sockaddr *)svc_getcaller(req->rq_xprt),
+				&exi->exi_export.ex_unix.rootaddrs)) {
+			cred->cr_uid = exi->exi_export.ex_anon;
+			cred->cr_gid = exi->exi_export.ex_anon;
+			cred->cr_ngroups = 0;
+		} else {
+			cred->cr_uid = aup->aup_uid;
+			cred->cr_gid = aup->aup_gid;
+			bcopy((caddr_t)aup->aup_gids, (caddr_t)cred->cr_groups,
+			    aup->aup_len * sizeof (cred->cr_groups[0]));
+			cred->cr_ngroups = aup->aup_len;
+		}
+#endif
 		break;
 
 
@@ -2007,11 +1931,6 @@ checkauth(exi, req, cred)
 				cred->cr_uid = exi->exi_export.ex_anon;
 			}
 			cred->cr_gid = exi->exi_export.ex_anon;
-			grouplen = 0;
-		}
-		if ((cred->cr_uid == 0) && !rootname(&exi->exi_export,
-		    adc->adc_fullname.name)) {
-			cred->cr_uid = cred->cr_gid = exi->exi_export.ex_anon;
 			grouplen = 0;
 		}
 		cred->cr_ngroups = grouplen;

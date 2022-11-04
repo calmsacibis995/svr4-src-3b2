@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)krpc:krpc/krpc.mk	1.8"
+#ident	"@(#)krpc:krpc/krpc.mk	1.6"
 #
 #	@(#)rpc.mk 1.4 89/01/03 SMI
 #
@@ -41,12 +41,12 @@ CFLAGS = $(DASHO) $(PFLAGS) -DSYSV
 DEFLIST =
 FRC =
 
-KRPCOBJ = clnt_clts.o clnt_gen.o svc_gen.o svc_clts.o \
+KRPCOBJ = cpjsleep.o clnt_clts.o clnt_gen.o svc_gen.o svc_clts.o \
 	  xdr_mblk.o xdr_mem.o svc.o  auth_kern.o rpc_prot.o \
 	  rpc_calmsg.o xdr.o svc_auth.o authu_prot.o \
 	  svcauthdes.o svc_authu.o xdr_array.o key_call.o \
-	  key_prot.o clnt_perr.o \
-	  auth_des.o authdesprt.o authdesubr.o rpc_subr.o
+	  key_prot.o pmap_kport.o pmap_prot.o clnt_perr.o \
+	  auth_des.o authdesprt.o authdesubr.o rpcb_prot.o
 
 all:	KRPC
 
@@ -80,8 +80,7 @@ auth_des.o: auth_des.c \
 	$(INC)/rpc/xdr.h \
 	$(INC)/netinet/in.h \
 	$(INC)/sys/cmn_err.h \
-	$(INC)/sys/debug.h \
-	$(FRC)
+	$(INC)/sys/debug.h
 
 auth_kern.o: auth_kern.c \
 	$(INC)/sys/param.h \
@@ -97,15 +96,13 @@ auth_kern.o: auth_kern.c \
 	$(INC)/sys/utsname.h \
 	$(INC)/sys/cred.h \
 	$(INC)/sys/kmem.h \
-	$(INC)/sys/sysmacros.h \
-	$(FRC)
+	$(INC)/sys/sysmacros.h
 
 authdesprt.o: authdesprt.c \
 	$(INC)/rpc/types.h \
 	$(INC)/rpc/xdr.h \
 	$(INC)/rpc/auth.h \
-	$(INC)/rpc/auth_des.h \
-	$(FRC)
+	$(INC)/rpc/auth_des.h
 
 authdesubr.o: authdesubr.c \
 	$(INC)/sys/param.h \
@@ -125,8 +122,7 @@ authdesubr.o: authdesubr.c \
 	$(INC)/sys/utsname.h \
 	$(INC)/sys/vnode.h \
 	$(INC)/sys/uio.h \
-	$(INC)/sys/systeminfo.h \
-	$(FRC)
+	$(INC)/sys/systeminfo.h
 
 authu_prot.o: authu_prot.c \
 	$(INC)/rpc/types.h \
@@ -138,8 +134,7 @@ authu_prot.o: authu_prot.c \
 	$(INC)/rpc/xdr.h \
 	$(INC)/rpc/auth.h \
 	$(INC)/rpc/auth_unix.h \
-	$(INC)/sys/utsname.h \
-	$(FRC)
+	$(INC)/sys/utsname.h
 
 clnt_clts.o: clnt_clts.c \
 	$(INC)/sys/param.h \
@@ -162,8 +157,7 @@ clnt_clts.o: clnt_clts.c \
 	$(INC)/sys/t_kuser.h \
 	$(INC)/sys/fcntl.h \
 	$(INC)/sys/errno.h \
-	$(INC)/sys/kmem.h \
-	$(FRC)
+	$(INC)/sys/kmem.h
 
 clnt_gen.o: clnt_gen.c \
 	$(INC)/sys/param.h \
@@ -186,15 +180,13 @@ clnt_gen.o: clnt_gen.c \
 	$(INC)/sys/socket.h \
 	$(INC)/sys/sysmacros.h \
 	$(INC)/sys/errno.h \
-	$(INC)/sys/cred.h \
-	$(FRC)
+	$(INC)/sys/cred.h
 
 clnt_perr.o: clnt_perr.c \
 	$(INC)/sys/types.h \
 	$(INC)/rpc/types.h \
 	$(INC)/rpc/auth.h \
-	$(INC)/rpc/clnt.h \
-	$(FRC)
+	$(INC)/rpc/clnt.h
 
 key_call.o: key_call.c \
 	$(INC)/sys/param.h \
@@ -208,14 +200,34 @@ key_call.o: key_call.c \
 	$(INC)/sys/sysmacros.h \
 	$(INC)/sys/vnode.h \
 	$(INC)/sys/uio.h \
-	$(INC)/sys/debug.h \
-	$(FRC)
+	$(INC)/sys/debug.h
 
 key_prot.o: key_prot.c \
 	$(INC)/sys/types.h \
 	$(INC)/rpc/rpc.h \
-	$(INC)/rpc/key_prot.h \
-	$(FRC)
+	$(INC)/rpc/key_prot.h
+
+pmap_kport.o: pmap_kport.c \
+	$(INC)/rpc/types.h \
+	$(INC)/netinet/in.h \
+	$(INC)/rpc/xdr.h \
+	$(INC)/rpc/auth.h \
+	$(INC)/rpc/clnt.h \
+	$(INC)/rpc/rpc.h \
+	$(INC)/rpc/pmap_prot.h \
+	$(INC)/rpc/rpcb_clnt.h \
+	$(INC)/sys/time.h \
+	$(INC)/sys/socket.h \
+	$(INC)/sys/cred.h \
+	$(INC)/sys/param.h \
+	$(INC)/sys/user.h \
+	$(INC)/sys/proc.h
+
+pmap_prot.o: pmap_prot.c \
+	$(INC)/sys/types.h \
+	$(INC)/rpc/types.h \
+	$(INC)/rpc/xdr.h \
+	$(INC)/rpc/pmap_prot.h
 
 rpc_calmsg.o: rpc_calmsg.c \
 	$(INC)/sys/param.h \
@@ -225,8 +237,7 @@ rpc_calmsg.o: rpc_calmsg.c \
 	$(INC)/rpc/auth.h \
 	$(INC)/rpc/clnt.h \
 	$(INC)/rpc/rpc_msg.h \
-	$(INC)/netinet/in.h \
-	$(FRC)
+	$(INC)/netinet/in.h
 
 rpc_prot.o: rpc_prot.c \
 	$(INC)/sys/param.h \
@@ -236,8 +247,7 @@ rpc_prot.o: rpc_prot.c \
 	$(INC)/rpc/auth.h \
 	$(INC)/rpc/clnt.h \
 	$(INC)/rpc/rpc_msg.h \
-	$(INC)/netinet/in.h \
-	$(FRC)
+	$(INC)/netinet/in.h
 
 svc.o: svc.c \
 	$(INC)/sys/param.h \
@@ -261,8 +271,7 @@ svc.o: svc.c \
 	$(INC)/sys/stream.h \
 	$(INC)/sys/strsubr.h \
 	$(INC)/sys/tihdr.h \
-	$(INC)/sys/debug.h \
-	$(FRC)
+	$(INC)/sys/debug.h
 
 svc_auth.o: svc_auth.c \
 	$(INC)/sys/param.h \
@@ -277,8 +286,7 @@ svc_auth.o: svc_auth.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/t_kuser.h \
 	$(INC)/rpc/svc.h \
-	$(INC)/rpc/svc_auth.h \
-	$(FRC)
+	$(INC)/rpc/svc_auth.h
 
 svc_authu.o: svc_authu.c \
 	$(INC)/sys/param.h \
@@ -295,8 +303,7 @@ svc_authu.o: svc_authu.c \
 	$(INC)/sys/t_kuser.h \
 	$(INC)/rpc/svc.h \
 	$(INC)/rpc/auth_unix.h \
-	$(INC)/rpc/svc_auth.h \
-	$(FRC)
+	$(INC)/rpc/svc_auth.h
 
 svc_clts.o: svc_clts.c \
 	$(INC)/sys/param.h \
@@ -318,8 +325,7 @@ svc_clts.o: svc_clts.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/fcntl.h \
 	$(INC)/sys/errno.h \
-	$(INC)/sys/kmem.h \
-	$(FRC)
+	$(INC)/sys/kmem.h
 
 svc_gen.o: svc_gen.c \
 	$(INC)/sys/param.h \
@@ -336,8 +342,7 @@ svc_gen.o: svc_gen.c \
 	$(INC)/sys/stream.h \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/fcntl.h \
-	$(INC)/sys/errno.h \
-	$(FRC)
+	$(INC)/sys/errno.h
 
 svcauthdes.o: svcauthdes.c \
 	$(INC)/rpc/des_crypt.h \
@@ -354,22 +359,19 @@ svcauthdes.o: svcauthdes.c \
 	$(INC)/sys/tihdr.h \
 	$(INC)/sys/t_kuser.h \
 	$(INC)/rpc/svc.h \
-	$(INC)/rpc/rpc_msg.h \
-	$(FRC)
+	$(INC)/rpc/rpc_msg.h
 
 xdr.o: xdr.c \
 	$(INC)/sys/param.h \
 	$(INC)/sys/types.h \
 	$(INC)/rpc/types.h \
-	$(INC)/rpc/xdr.h \
-	$(FRC)
+	$(INC)/rpc/xdr.h
 
 xdr_array.o: xdr_array.c \
 	$(INC)/sys/param.h \
 	$(INC)/sys/types.h \
 	$(INC)/rpc/types.h \
-	$(INC)/rpc/xdr.h \
-	$(FRC)
+	$(INC)/rpc/xdr.h
 
 xdr_mblk.o: xdr_mblk.c \
 	$(INC)/sys/param.h \
@@ -377,18 +379,18 @@ xdr_mblk.o: xdr_mblk.c \
 	$(INC)/rpc/types.h \
 	$(INC)/sys/stream.h \
 	$(INC)/rpc/xdr.h \
-	$(INC)/netinet/in.h \
-	$(FRC)
+	$(INC)/netinet/in.h
 
 xdr_mem.o: xdr_mem.c \
 	$(INC)/sys/param.h \
 	$(INC)/sys/types.h \
 	$(INC)/netinet/in.h \
 	$(INC)/rpc/types.h \
-	$(INC)/rpc/xdr.h \
-	$(FRC)
+	$(INC)/rpc/xdr.h
 
-rpc_subr.o: rpc_subr.c \
+rpcb_prot.o: rpcb_prot.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/param.h \
-	$(FRC)
+	$(INC)/rpc/types.h \
+	$(INC)/rpc/xdr.h \
+	$(INC)/rpc/rpcb_prot.h

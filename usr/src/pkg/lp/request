@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nlp:lp/ifiles/request	1.9"
+#ident	"@(#)pkg.nlp:lp/ifiles/request	1.8"
 trap "exit 3" 1 2 3 15
 
 ALLOW=`ckyorn -d n \
@@ -17,20 +17,6 @@ ALLOW=`ckyorn -d n \
 	-p "Should the disable and enable commands be available to ALL users?"
 ` || exit $?
 
-POST=`ckyorn -d n \
-	-h 'If you answer "y" the programs necessary for using
-	PostScript printers will be installed.
-	\\n\\nIf you answer "n" these programs will not be installed.
-	This will prevent the use of a PostScript printer, but will
-	conserve space on the hard disk.' \
-	-p "Will you be attaching a PostScript printer to this system?"
-` || exit $?
-
 echo ALLOW=$ALLOW > $1
-
-if [ $POST = 'y' ]
-then
-    echo "CLASSES=$CLASSES post" >> $1
-fi
 
 exit $?

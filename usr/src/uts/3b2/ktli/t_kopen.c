@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_kopen.c	1.6"
+#ident	"@(#)ktli:ktli/t_kopen.c	1.5"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_kopen.c 1.2 89/03/19 SMI"
 #endif
@@ -37,8 +37,9 @@ static char sccsid[] = "@(#)t_kopen.c 1.2 89/03/19 SMI"
  *	endpoint using the protocol specified.
  *
  *	Returns:
- *		0 on success and "tiptr" is set to a valid transport pointer,
- *		else a positive error code.
+ *		A valid file pointer on success or -1 on failure.
+ *		On success, if info is non-NULL it will be filled with
+ *		transport provider values.
  *
  */
 
@@ -58,40 +59,39 @@ static char sccsid[] = "@(#)t_kopen.c 1.2 89/03/19 SMI"
 #include <sys/tiuser.h>
 #include <sys/t_kuser.h>
 #include <sys/kmem.h>
-#include <sys/cmn_err.h>
 
 static _t_setsize();
 
-int
-t_kopen(fp, rdev, flags, tiptr)
-	struct file		*fp;
-	register int		flags;
-	register dev_t		rdev;
-	TIUSER			**tiptr;
+TIUSER *
+t_kopen(fp, rdev, flags, info)
+struct file *fp;
+register int flags;
+register dev_t rdev;
+register struct	t_info *info;
 
 {
-	extern struct vnode	*makespecvp();
+	extern	 struct vnode *makespecvp();
 
-	register int		madefp = 0;
-	struct T_info_ack	inforeq;
-	int			retval;
-	struct vnode		*vp;
-	struct strioctl		strioc;
-	int			error;
-	TIUSER			*ntiptr;
+	register TIUSER *tiptr;
+	register int madefp = 0;
+	struct   T_info_ack inforeq;
+	int	 retval;
+	struct   vnode *vp;
+	struct	 strioctl strioc;
 
-	KTLILOG(2, "t_kopen: fp %x, ", fp);
-	KTLILOG(2, "rdev %x, ", rdev);
-	KTLILOG(2, "flags %x\n", flags);
+#ifdef KTLIDEBUG
+printf("t_kopen: fp %x, rdev %x, flags %x, info %x\n", fp, rdev, flags, info);
+#endif
 
-	error = 0;
+	u.u_error = 0;
 	retval = 0;
 	if (fp == NULL) {
 		int fd;
 
 		if (rdev == 0) {
-			KTLILOG(1, "t_kopen: null device\n", 0);
-			return EINVAL;
+			u.u_error = EINVAL;
+			printf("t_kopen: null device\n");
+			return NULL;
 		}
 		/* make a vnode.
 		 */
@@ -100,16 +100,17 @@ t_kopen(fp, rdev, flags, tiptr)
 		/* this will call the streams open
 		 * for us.
 		 */
-		if ((error = VOP_OPEN(&vp, flags, u.u_cred)) != 0) {
-			KTLILOG(1, "t_kopen: VOP_OPEN: %d\n", error);
-			return error;
+		if (u.u_error = VOP_OPEN(&vp, flags, u.u_cred)) {
+			printf("t_kopen: VOP_OPEN: %d\n", u.u_error);
+			return NULL;
 		}
 		/* allocate a file pointer, but
 		 * no file descripter.
 		 */
-		while ((error = falloc(vp, flags, &fp, &fd)) != 0) {
-			KTLILOG(1, "t_kopen: falloc: %d\n", error);
-			(void)delay(HZ);
+		if ((u.u_error = falloc(vp, flags, &fp, &fd)) != 0) {
+			(void)VOP_CLOSE(vp, flags, 0, (off_t)0, u.u_cred);
+			printf("t_kopen: falloc: %d\n", u.u_error);
+			return NULL;
 		}
 		setf(fd, NULLFP);
 
@@ -119,47 +120,35 @@ t_kopen(fp, rdev, flags, tiptr)
 
 	/* allocate a new transport structure
 	 */
-	ntiptr = (TIUSER *)kmem_alloc((u_int)TIUSERSZ, KM_SLEEP);
-	ntiptr->fp = fp;
+	tiptr = (TIUSER *)kmem_alloc((u_int)TIUSERSZ, KM_SLEEP);
+	tiptr->fp = fp;
 
-	KTLILOG(2, "t_kopen: vp %x, ", vp);
-	KTLILOG(2, "stp %x\n", vp->v_stream);
+#ifdef KTLIDEBUG
+printf("t_kopen: fp %x, vp %x, stp %x\n", fp, vp, vp->v_stream);
+#endif
 
 	/* see if TIMOD is already pushed
 	 */
-	error = strioctl(vp, I_FIND, "timod", 0, K_TO_K, u.u_cred, &retval);
-	if (error) {
-		kmem_free((caddr_t)ntiptr, (u_int)TIUSERSZ);
+	u.u_error = strioctl(vp, I_FIND, "timod", 0, K_TO_K, u.u_cred, &retval);
+	if (u.u_error) {
+		kmem_free((caddr_t)tiptr, (u_int)TIUSERSZ);
 		if (madefp)
 			closef(fp);
-		KTLILOG(1, "t_kopen: strioctl(I_FIND, timod): %d\n", error);
-		return error;
+		printf("t_kopen: strioctl(I_FIND, timod): %d\n", u.u_error);
+		return NULL;
 	}
 
 	if (retval == 0) {
-tryagain:
-		error = strioctl(vp, I_PUSH, "timod", 0, K_TO_K, u.u_cred,
+		u.u_error = strioctl(vp, I_PUSH, "timod", 0, K_TO_K, u.u_cred,
 								 &retval);
-		if (error) {
-			switch(error) {
-			case ENOSPC:
-			case EAGAIN:
-			case ENOSR:
-				/* This probably means the master file
-				 * should be tuned.
-				 */
-				cmn_err(CE_WARN, "t_kopen: I_PUSH of timod failed, error %d\n", error);
-				(void)delay(HZ);
-				error = 0;
-				goto tryagain;
-
-			default:
-				kmem_free((caddr_t)ntiptr, (u_int)TIUSERSZ);
-				if (madefp)
-					closef(fp);
-				KTLILOG(1, "t_kopen: I_PUSH (timod): %d", error);
-				return error;
-			}
+		if (u.u_error) {
+			kmem_free((caddr_t)tiptr, (u_int)TIUSERSZ);
+			if (madefp)
+				closef(fp);
+			printf("t_kopen: I_PUSH (timod): %d", u.u_error);
+			u.u_error = TSYSERR;
+			printf(", vp %x, fp %x, stp %x\n", vp, fp, vp->v_stream);
+			return NULL;
 		}
 	}
 
@@ -169,46 +158,55 @@ tryagain:
 	strioc.ic_dp = (char *)&inforeq;
 	strioc.ic_len = sizeof(struct T_info_req);
 
-	error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
+	u.u_error = strdoioctl(vp->v_stream, &strioc, NULL, K_TO_K,
 					 (char *)NULL, u.u_cred, &retval);
-	if (error) {
-		kmem_free((caddr_t)ntiptr, (u_int)TIUSERSZ);
+	if (u.u_error) {
+		kmem_free((caddr_t)tiptr, (u_int)TIUSERSZ);
 		if (madefp)
 			closef(fp);
-		KTLILOG(1, "t_kopen: strdoioctl(T_INFO_REQ): %d\n", error);
-		return error;
+		printf("t_kopen: strdoioctl(T_INFO_REQ): %d\n", u.u_error);
+		return NULL;
 	}
 
 	if (retval) {
 		if ((retval & 0xff) == TSYSERR)
-			error = (retval >> 8) & 0xff;
-		else    error = t_tlitosyserr(retval & 0xff);
-		kmem_free((caddr_t)ntiptr, (u_int)TIUSERSZ);
+			u.u_error = (retval >> 8) & 0xff;
+		else    u.u_error = tlitosyserr(retval & 0xff);
+		kmem_free((caddr_t)tiptr, (u_int)TIUSERSZ);
 		if (madefp)
 			closef(fp);
-		KTLILOG(1, "t_kopen: strdoioctl(T_INFO_REQ): retval: 0x%x\n", retval);
-		return error;
+		printf("t_kopen: strdoioctl(T_INFO_REQ): retval: 0x%x, %d\n", retval, u.u_error);
+		return NULL;
 	}
 
 	if (strioc.ic_len != sizeof(struct T_info_ack)) {
-		kmem_free((caddr_t)ntiptr, (u_int)TIUSERSZ);
+		kmem_free((caddr_t)tiptr, (u_int)TIUSERSZ);
 		if (madefp)
 			closef(fp);
-		KTLILOG(1, "t_kopen: strioc.ic_len != sizeof (struct T_info_ack): %d\n", strioc.ic_len);
-		return EPROTO;
+		u.u_error = EPROTO;
+		printf("t_kopen: strioc.ic_len != sizeof (struct T_info_ack): %d\n", u.u_error);
+		return NULL;
 	}
 
-	ntiptr->tp_info.addr = _t_setsize(inforeq.ADDR_size);
-	ntiptr->tp_info.options = _t_setsize(inforeq.OPT_size);
-	ntiptr->tp_info.tsdu = _t_setsize(inforeq.TSDU_size);
-	ntiptr->tp_info.etsdu = _t_setsize(inforeq.ETSDU_size);
-	ntiptr->tp_info.connect = _t_setsize(inforeq.CDATA_size);
-	ntiptr->tp_info.discon = _t_setsize(inforeq.DDATA_size);
-	ntiptr->tp_info.servtype = inforeq.SERV_type;
+	if (info != NULL) {
+		info->addr = _t_setsize(inforeq.ADDR_size);
+		info->options = _t_setsize(inforeq.OPT_size);
+		info->tsdu = _t_setsize(inforeq.TSDU_size);
+		info->etsdu = _t_setsize(inforeq.ETSDU_size);
+		info->connect = _t_setsize(inforeq.CDATA_size);
+		info->discon = _t_setsize(inforeq.DDATA_size);
+		info->servtype = inforeq.SERV_type;
+	}
 
-	*tiptr = ntiptr;
+	tiptr->tp_info.addr = inforeq.ADDR_size;
+	tiptr->tp_info.options = inforeq.OPT_size;
+	tiptr->tp_info.tsdu = inforeq.TSDU_size;
+	tiptr->tp_info.etsdu = inforeq.ETSDU_size;
+	tiptr->tp_info.connect = inforeq.CDATA_size;
+	tiptr->tp_info.discon = inforeq.DDATA_size;
+	tiptr->tp_info.servtype = inforeq.SERV_type;
 
-	return (0);
+	return (tiptr);
 }
 
 #define	DEFSIZE	128

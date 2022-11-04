@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)userdefs.h:userdefs.h	1.7.1.1"
+#ident	"@(#)userdefs.h:userdefs.h	1.7"
 
 /* User/group default values */
 #define	DEFGID		99	/* max reserved group id */
@@ -13,7 +13,7 @@
 #define	DEFGROUP	1
 #define	DEFGNAME	"other"
 #define	DEFPARENT	"/home"
-#define	DEFSKL		"/etc/skel"
+#define	DEFSKL		"/usr/sadm/skel"
 #define	DEFSHL		"/sbin/sh"
 #define	DEFINACT	0
 #define	DEFEXPIRE	""

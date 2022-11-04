@@ -8,7 +8,7 @@
 #ifndef _SYS_PROC_H
 #define _SYS_PROC_H
 
-#ident	"@(#)head.sys:sys/proc.h	11.65"
+#ident	"@(#)head.sys:sys/proc.h	11.59"
 
 #include "sys/immu.h"
 
@@ -25,7 +25,7 @@ typedef struct	proc {
 	u_char	p_swlocks;		/* number of swap vnode locks held */
 	u_int	p_flag;			/* flags defined below */
 	o_uid_t	p_uid;			/* for binary compatibility - real user id */
-	o_pid_t	p_oppid;		/* process id of parent*/
+	struct	cred	*p_cred;	/* process credentials */
 
 	/* the following pid fields declared o_pid_t are for
 	** binary compatibility only. They will be removed in
@@ -34,7 +34,7 @@ typedef struct	proc {
 
 	o_pid_t	p_opgrp;		/* name of process group leader */
 	o_pid_t	p_opid;			/* unique process id*/
-	struct	cred	*p_cred;	/* process credentials */
+	o_pid_t	p_oppid;		/* process id of parent*/
 	struct sess	*p_sessp;	/* session information */
 	int	p_pri;			/* scheduling priority */
 
@@ -49,7 +49,7 @@ typedef struct	proc {
 
 	caddr_t	p_brkbase;		/* base address of heap */
 	u_int	p_brksize;		/* heap size in bytes */
-	caddr_t p_stkbase;		/* base address of stack */
+	int * 	p_stkbase;		/* base address of stack */
 	int	p_stksize;		/* stack size in words */
 
 	u_int	p_swrss;		/* resident set size before last swap */
@@ -106,48 +106,101 @@ typedef struct	proc {
 	caddr_t *p_segacct;		/* segment accounting info */
 	struct seguser *p_segu;		/* u segment */
 	struct	vnode *p_exec;		/* pointer to a.out vnode */
+	pid_t	p_pgrp;			/* name of process group leader */
+	pid_t	p_pid;			/* unique process id*/
 	pid_t	p_ppid;			/* process id of parent*/
-	struct pid *p_pidp;		/* process ID info */
-	struct pid *p_pgidp;		/* process group ID info */
+/* #ifdef MERGE */
 	struct sd *p_sdp;		/* pointer to XENIX shared data */
-	struct proc *p_next;		/* active chain link */
-	struct proc *p_nextofkin;	/* gets accounting info at exit */
-	struct proc *p_orphan;
-	struct proc *p_nextorph;
+/* #endif MERGE */
 } proc_t;
 
-/* active process chain */
+/*
+ * The incarnation structure: one-to-one correspondence with
+ * the proc table.
+ */
+typedef struct pincr {
+	struct pincr *pi_link;
+	pid_t pi_pid;
+} pincr_t;
 
-extern proc_t *practive;
+typedef struct nproc_dummy { 		/* for demon use only */
+	int	dummy_demon;	/* to make demon work for nproc[n] */
+} nproc_t;
 
-/* Well known processes */
+extern proc_t *nproc[];	/* the proc table itself */
+extern pincr_t pincr[];		/* the incarnation table */
+extern pincr_t *pfreelisthead;	/* the first free pincr table entry pointer */
+extern pincr_t *pfreelisttail;	/* the last free pincr table entry pointer */
 
-extern proc_t *proc_sched;		/* memory scheduler */
-extern proc_t *proc_init;		/* init */
-extern proc_t *proc_pageout;		/* pageout daemon */
-extern proc_t *proc_bdflush;		/* block cache flush daemon */
+#if defined(_KERNEL)
 
-/* process ID info */
+#if defined(__STDC__)
 
-struct pid {
-	unsigned int pid_prinactive :1;
-	unsigned int pid_pgorphaned :1;
-	unsigned int pid_ref :6;
-	unsigned int pid_prslot :24;
-	pid_t pid_id;
-	struct proc *pid_pglink;
-	struct pid *pid_link;
-};
+/* process management functions */
+extern caddr_t findvaddr(proc_t *);
+extern paddr_t vtop(caddr_t, proc_t *);
+extern void pexit(void);
+extern int newproc(int, pid_t *, int *);
+extern void pid_release(pid_t);
+extern void vfwait(pid_t);
+extern void freeproc(proc_t *);
+extern proc_t *prfind(pid_t);
+extern void sigcld(proc_t *);
+extern void psig(void);
+extern int stop(proc_t *, int, int, int);
+extern int issig(int);
+extern void psignal(proc_t *, int);
+extern void sigtoproc(proc_t *, int, int);
+extern void setrun(proc_t *);
+extern void unsleep(proc_t *);
+extern void exit(int, int);
+extern void relvm(proc_t *);
 
-extern struct pid pid0;
+/* process group management functions (defined in os/pgrp.c) */
+extern void signal(pid_t, int);
+extern void detachcld(proc_t *);
+extern void joinpg(proc_t *, pid_t);
+extern void attachpg(proc_t *);
+extern void leavepg(proc_t *);
+extern int checkpg(pid_t, pid_t);
+extern int memberspg(pid_t);
+extern int detachedpg(pid_t);
 
-#define p_pgrp p_pgidp->pid_id
-#define p_pid  p_pidp->pid_id
-#define p_slot p_pidp->pid_prslot
-#define p_detached p_pidp->pid_pgorphaned
+#else 
 
-#define PID_HOLD(pidp)	(++(pidp)->pid_ref)
-#define PID_RELE(pidp)	((pidp)->pid_ref>1 ? --(pidp)->pid_ref : pid_rele(pidp))
+/* process management functions */
+extern caddr_t findvaddr();
+extern paddr_t vtop();
+extern void pexit();
+extern int newproc();
+extern void pid_release();
+extern void vfwait();
+extern void freeproc();
+extern proc_t *prfind();
+extern void sigcld();
+extern void psig();
+extern int stop();
+extern int issig();
+extern void psignal();
+extern void sigtoproc();
+extern void setrun();
+extern void unsleep();
+extern void exit();
+extern void relvm();
+
+/* process group management functions (defined in os/pgrp.c) */
+extern void signal();
+extern void detachcld();
+extern void joinpg();
+extern void attachpg();
+extern void leavepg();
+extern int  checkpg();
+extern int  memberspg();
+extern int  detachedpg();
+
+#endif /* __STDC__ */
+
+#endif /* _KERNEL */
 
 /* stat codes */
 
@@ -182,13 +235,16 @@ extern struct pid pid0;
 #define	SUSWAP	0x00040000	/* u-block is being swapped in or out */
 #define	SUWANT	0x00080000	/* waiting for u-block swap to complete */
 #define SEXECED 0x00100000	/* this process has execed */
-#define SSWLOCKS 0x00200000 	/* process has swap locks */
-#define SXSTART 0x00400000 	/* setrun() by SIGCONT or ptrace() */
-#define SPSTART 0x00800000 	/* setrun() by /proc */
+#define SDETACHED 0x00200000	/* this process detached from ctty */
+/* unused 	0x00400000 */
+/* unused 	0x00800000 */
 #define SJCTL	0x01000000	/* SIGCLD sent when children stop/continue */
 #define SNOWAIT 0x02000000	/* children never become zombies */
 #define SVFORK	0x04000000	/* process resulted from vfork */
 #define SVFDONE 0x08000000	/* vfork child releasing parent as */
+#define SSWLOCKS 0x10000000	/* process has swap locks */
+#define	SXSTART	0x20000000	/* setrun() by SIGCONT or ptrace() */
+#define	SPSTART	0x40000000	/* setrun() by /proc */
 
 /* pollflags */
 
@@ -225,89 +281,17 @@ extern struct pid pid0;
 #define	FORREAL		0	/* Usual side-effects */
 #define	JUSTLOOKING	1	/* Don't stop the process */
 
-#ifdef _KERNEL
+/* Macros for pid manipulation */
 
-#ifdef __STDC__
+#define	PIDSHIFT		12		/* 2^PIDSHIFT >= NPROC */
+#define	PIDINDEXMAX		0x0fff		/* = 2^PIDSHIFT-1 */
+#define	PIDINCARMAX		0x7000		/* 3 bits for incarnation number as of 08/15/88 */
 
-/* process management functions */
-extern caddr_t findvaddr(proc_t *);
-extern paddr_t vtop(caddr_t, proc_t *);
-extern void pexit(void);
-extern int newproc(int, pid_t *, int *);
-extern void vfwait(pid_t);
-extern void freeproc(proc_t *);
-extern void setrun(proc_t *);
-extern void unsleep(proc_t *);
-extern void exit(int, int);
-extern void relvm(proc_t *);
-
-extern void sigcld(proc_t *);
-extern void psig(void);
-extern int stop(proc_t *, int, int, int);
-extern int issig(int);
-extern void psignal(proc_t *, int);
-extern void sigtoproc(proc_t *, int, int);
-
-void pid_setmin(void);
-pid_t pid_assign(int, proc_t **);
-int pid_rele(struct pid *);
-void pid_exit(proc_t *);
-proc_t *prfind(pid_t);
-proc_t *pgfind(pid_t);
-void pid_init(void);
-proc_t *pid_entry(int);
-int pid_slot(proc_t *);
-void signal(pid_t, int);
-void prsignal(struct pid *, int);
-
-void pgsignal(struct pid *, int);
-void pgjoin(proc_t *, struct pid *);
-void pgcreate(proc_t *);
-void pgexit(proc_t *);
-void pgdetach(proc_t *);
-int pgmembers(pid_t);
-
-#else
-
-extern caddr_t findvaddr();
-extern paddr_t vtop();
-extern void pexit();
-extern int newproc();
-extern void vfwait();
-extern void freeproc();
-extern void setrun();
-extern void unsleep();
-extern void exit();
-extern void relvm();
-
-extern void sigcld();
-extern void psig();
-extern int stop();
-extern int issig();
-extern void psignal();
-extern void sigtoproc();
-
-void pid_setmin();
-pid_t pid_assign();
-int pid_rele();
-void pid_exit();
-proc_t *prfind();
-proc_t *pgfind();
-void pid_init();
-proc_t *pid_entry();
-int pid_slot();
-void signal();
-void prsignal();
-
-void pgsignal();
-void pgjoin();
-void pgcreate();
-void pgexit();
-void pgdetach();
-int pgmembers();
-
-#endif	/* __STDC__ */
-
-#endif	/* _KERNEL */
+#define	GET_INDEX(PI_PID)	((PI_PID)&(PIDINDEXMAX))
+#define	GET_INCAR(PI_PID)	(((unsigned)((PI_PID)&(PIDINCARMAX))) >> (PIDSHIFT))
+#define	INC_INCAR(PI_PID)	((PI_PID) = (((unsigned)(PI_PID) + ((0x1)<<(PIDSHIFT)))&((PIDINDEXMAX)|(PIDINCARMAX))))
+#define INC_INDEX(PI_PID)	PUT_INDEX(PI_PID,(GET_INDEX(PI_PID)+1)%NPROC)
+#define	PUT_INCAR(PI_PID,INCAR)	((PI_PID) = (((PI_PID)&(PIDINDEXMAX)) | (((INCAR)<<(PIDSHIFT))&(PIDINCARMAX))))
+#define PUT_INDEX(PI_PID,INDEX)	((PI_PID) = (((PI_PID)&(PIDINCARMAX)) | ((INDEX)&(PIDINDEXMAX))))
 
 #endif	/* _SYS_PROC_H */

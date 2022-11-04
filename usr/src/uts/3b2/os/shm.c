@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)kernel:os/shm.c	1.37"
+#ident	"@(#)kernel:os/shm.c	1.33"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/cred.h"
@@ -200,9 +177,9 @@ shmat(uap, rvp)
 	crargs.offset = 0;
 	crargs.type = MAP_SHARED;
 	crargs.amp = sp->shm_amp;
+	crargs.maxprot = PROT_ALL;
 	crargs.prot = (uap->flag & SHM_RDONLY) ?
 	    (PROT_ALL & ~PROT_WRITE) : PROT_ALL;
-	crargs.maxprot = crargs.prot;
 
 	error = as_map(pp->p_as, addr, size, segvn_create, (caddr_t)&crargs);
 	if (error)
@@ -289,10 +266,6 @@ shmctl(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if (ods.shm_perm.uid > MAXUID || ods.shm_perm.gid > MAXUID){
-			error = EINVAL;
-			break;
-		}
 		sp->shm_perm.uid = ods.shm_perm.uid;
 		sp->shm_perm.gid = ods.shm_perm.gid;
 		sp->shm_perm.mode =
@@ -309,11 +282,6 @@ shmctl(uap, rvp)
 		}
 		if (copyin((caddr_t)uap->arg, (caddr_t)&ds, sizeof(ds))) {
 			error = EFAULT;
-			break;
-		}
-		if (ds.shm_perm.uid < (uid_t)0 || ds.shm_perm.uid > MAXUID ||
-			ds.shm_perm.gid < (gid_t)0 || ds.shm_perm.gid > MAXUID){
-			error = EINVAL;
 			break;
 		}
 		sp->shm_perm.uid = ds.shm_perm.uid;

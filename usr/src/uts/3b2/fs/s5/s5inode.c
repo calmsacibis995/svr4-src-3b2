@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5inode.c	1.41"
+#ident	"@(#)fs:fs/s5/s5inode.c	1.36"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -69,14 +69,12 @@ extern struct vfsops s5vfsops;
 /*
  * Allocate and initialize inodes.
  */
-void
 inoinit()
 {
 	register struct inode *ip;
 	register int i;
 
-	if ((inode = (inode_t *)kmem_zalloc(ninode*sizeof(inode_t), KM_SLEEP))
-	  == NULL)
+	if ((inode = (inode_t *)kmem_zalloc(ninode*sizeof(inode_t), KM_SLEEP)) == NULL)
 		cmn_err(CE_PANIC, "inoinit: no memory for inodes");
 	ifreelist.av_forw = ifreelist.av_back = (inode_t *) &ifreelist;
 	for (i = 0; i < NHINO; i++)
@@ -88,6 +86,7 @@ inoinit()
 		ifreelist.av_forw = ip;
 		ip->av_back = (struct inode *) &ifreelist;
 	}
+	return 0;
 }
 
 /*
@@ -151,7 +150,7 @@ loop:
 	ILOCK(ip);
 #else
 	ip->i_flag = ILOCKED;
-	ip->i_owner = curproc->p_slot; 		/* XXX -- recursive ilocks */
+	ip->i_owner = GET_INDEX(curproc->p_pid); /*XXX -- recursive ilocks */
 	ip->i_nilocks = 1;			/* XXX -- recursive ilocks */
 #endif
 
@@ -165,8 +164,7 @@ loop:
 	 * the inode in the meantime; if so we put it back on the
 	 * free list and loop around to find another free inode.
 	 */
-	if (((vp)->v_vfsp && syncip(ip, B_INVAL) != 0)
-	  || (ip->i_flag & IWANT)) {
+	if (((vp)->v_vfsp && syncip(ip, B_INVAL) != 0) || (ip->i_flag&IWANT)) {
 		ipfree(ip);
 		IUNLOCK(ip);
 		goto loop;
@@ -223,7 +221,7 @@ loop:
 
 found:
 	if ((ip->i_flag & (IRWLOCKED|ILOCKED))
-	  && ip->i_owner != curproc->p_slot) {	/* XXX */
+	  && ip->i_owner != GET_INDEX(curproc->p_pid)) {	/* XXX */
 		ip->i_flag |= IWANT;
 		sleep((caddr_t) ip, PINOD);
 		goto loop;
@@ -239,7 +237,7 @@ found:
 		ip->av_forw->av_back = ip->av_back;
 	}
 	VN_HOLD(vp);
-	ip->i_owner = curproc->p_slot;	/* XXX */
+	ip->i_owner = GET_INDEX(curproc->p_pid);	/* XXX */
 	ip->i_nilocks++;				/* XXX */
 	ip->i_flag |= ILOCKED;
 	*ipp = ip;
@@ -369,6 +367,7 @@ iflush(vfsp, force)
 				}
 				IUNLOCK(ip);
 				iunhash(ip);
+					vp->v_vfsp = 0;
 			} else if (force == 0)
 				return -1;
 		}
@@ -429,7 +428,9 @@ iread(ip, ino)
 	s5vfsp = S5VFS(vfsp);
 	i = vfsp->vfs_bsize;
 	bp = bread(vfsp->vfs_dev, FsITOD(s5vfsp, ino), i);
-	if (error = geterror(bp)) {
+	if (bp->b_flags & B_ERROR) {
+		if ((error = bp->b_error) == 0 && (error = bp->b_oerror) == 0)
+			error = EIO;
 		brelse(bp);
 		return error;
 	}
@@ -457,10 +458,15 @@ iread(ip, ino)
 	}
 
 	if (ip->i_mode & IFBLK || ip->i_mode == IFCHR) {
+		/* is dev stored in new format */
+
 		if (ip->i_bcflag & NDEVFORMAT)
-			ip->i_rdev = makedevice(ip->i_major, ip->i_minor);
-		else
+			ip->i_rdev = makedevice(ip->i_major,ip->i_minor);
+		else {
+			/* get dev from old location */
+
 			ip->i_rdev = expdev(ip->i_oldrdev);
+		}
 	} else if (ip->i_mode & IFNAM)
 		ip->i_rdev = ip->i_oldrdev;
 
@@ -676,14 +682,15 @@ iunlock(ip)
 
 int s5fstype;
 
-void
 s5init(vswp, fstype)
 	struct vfssw *vswp;
 	int fstype;
 {
 	inoinit();
+
 	vswp->vsw_vfsops = &s5vfsops;
 	s5fstype = fstype;
+	return 0;
 }
 
 /*
@@ -701,8 +708,15 @@ iaccess(ip, mode, cr)
 {
 	register struct vnode *vp = ITOV(ip);
 
-	if ((mode & IWRITE) && (vp->v_vfsp->vfs_flag & VFS_RDONLY))
-		return EROFS;
+	if (mode & IWRITE) {
+		if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+			return EROFS;
+		if (vp->v_flag & VTEXT) {
+			xrele(vp);
+			if (vp->v_flag & VTEXT)
+				return ETXTBSY;	
+		}
+	}
 	if (cr->cr_uid == 0)
 		return 0;
 	if (cr->cr_uid != ip->i_uid) {
@@ -739,24 +753,3 @@ syncip(ip, flags)
 	return error;
 }
 
-int
-inull(vfsp)
-	register struct vfs *vfsp;
-{
-	register struct inode *ip;
-	register struct vnode *vp, *rvp = S5VFS(vfsp)->vfs_root;
-	register int i;
-	dev_t dev = vfsp->vfs_dev;
-
-	ASSERT(rvp != NULL);
-
-	for (i = 0, ip = inode; i < ninode; i++, ip++)
-		if (ip->i_dev == dev) {
-			vp = ITOV(ip);
-			if (vp == rvp)
-				continue;
-			vp->v_vfsp = 0;
-		}
-
-	return 0;
-}

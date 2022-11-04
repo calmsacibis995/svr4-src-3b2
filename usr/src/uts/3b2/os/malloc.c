@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/malloc.c	1.12"
+#ident	"@(#)kernel:os/malloc.c	1.10"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/systm.h"
@@ -30,13 +30,10 @@
  * (also see mfree/rmfree below)
  */
 
-unsigned long
-malloc(mp, size)
-register struct map *mp;
-register size_t size;
-{
-	return(rmalloc(mp, size));
-}
+asm("	.text"); 		/* ensure symbol refers to text section */
+asm("	.align 4");		/* functions aligned on word boundaries */
+asm("	.globl malloc");	/* make symbol tab storage class extern */
+asm("malloc:	");		/* define label. will be same as rmalloc */
 
 unsigned long
 rmalloc(mp, size)
@@ -75,14 +72,10 @@ register size_t size;
  *
  */
 
-void
-mfree(mp, size, a)
-register struct map *mp;
-register size_t size;
-register unsigned long a;
-{
-	rmfree(mp, size, a);
-}
+asm("	.text");
+asm("	.align 4");
+asm("	.globl mfree");
+asm("mfree:	");
 
 void
 rmfree(mp, size, a)
@@ -143,7 +136,7 @@ register unsigned long a;
 	}
 	if (mapwant(mp)) {
 		mapwant(mp) = 0;
-		wakeprocs((caddr_t)mp, PRMPT);
+		wakeup((caddr_t)mp);
 	}
 }
 

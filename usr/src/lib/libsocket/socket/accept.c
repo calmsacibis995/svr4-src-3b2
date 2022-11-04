@@ -5,8 +5,30 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:accept.c	1.11"
+#ident	"@(#)libsocket:accept.c	1.9"
 
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 		PROPRIETARY NOTICE (Combined)
+ * 
+ * This source code is unpublished proprietary information
+ * constituting, or derived under license from AT&T's UNIX(r) System V.
+ * In addition, portions of such source code were derived from Berkeley
+ * 4.3 BSD under license from the Regents of the University of
+ * California.
+ * 
+ * 
+ * 
+ * 		Copyright Notice 
+ * 
+ * Notice of copyright on this source code product does not indicate 
+ * publication.
+ * 
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+ * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ * 	          All rights reserved.
+ *  
+ */
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mkdev.h>
@@ -22,9 +44,10 @@
 #include <sys/tiuser.h>
 #include <sys/signal.h>
 #include <sys/stat.h>
-#include <sys/sockio.h>
-#include <fcntl.h>
-#include <syslog.h>
+#ifdef DEBUG
+#include <stdio.h>
+#endif
+
 
 extern int	errno;
 
@@ -91,14 +114,11 @@ _accept(siptr, addr, addrlen)
 	/* we don't expect any data, so no data
 	 * buffer is needed.
 	 */
-	sigsave = sigset(SIGPOLL, SIG_HOLD);
         if ((retval = getmsg(s, &ctlbuf, NULL, &flg)) < 0) {
-		(void)sigset(SIGPOLL, sigsave);
                 if (errno == EAGAIN)
                         errno = EWOULDBLOCK;
                 return -1;
         }
-	(void)sigset(SIGPOLL, sigsave);
         /*
          * did I get entire message?
          */
@@ -124,9 +144,9 @@ _accept(siptr, addr, addrlen)
                                 return -1;
                         }
 			if (addr && addrlen) {
-				*addrlen = _s_cpaddr(siptr, addr, *addrlen,
-					ctlbuf.buf + pptr->conn_ind.SRC_offset,
-					pptr->conn_ind.SRC_length);
+				if (*addrlen > pptr->conn_ind.SRC_length)
+					*addrlen = pptr->conn_ind.SRC_length;
+				(void)memcpy(addr, ctlbuf.buf+pptr->conn_ind.SRC_offset, *addrlen);
 			}
 			break;
  
@@ -145,7 +165,9 @@ _accept(siptr, addr, addrlen)
 	 * until one matches.
 	 */
 	if ((nethandle = setnetconfig()) == NULL) {
-		(void)syslog(LOG_ERR, "_accept: setnetconfig failed");
+#ifdef DEBUG
+		nc_perror("_accept: setnetconfig failed");
+#endif
 		return -1;
 	}
 	while ((net = getnetconfig(nethandle)) != NULL) {
@@ -163,7 +185,7 @@ _accept(siptr, addr, addrlen)
 		return -1;
 	}
 
-	/* Open a new instance to do the accept on
+	/* open a new instance to do the accept on
 	 *
 	 * Note that we have lost the protocol number(if one was
 	 * specified) with the listening endpoint, so we assume the
@@ -214,39 +236,10 @@ _accept(siptr, addr, addrlen)
 
 	sigset(SIGPOLL, sigsave);
 
-	/* New socket must have attributes of the
-	 * accepting socket.
-	 */
 	nsiptr->udata.so_state |= SS_ISCONNECTED;
-	nsiptr->udata.so_options = siptr->udata.so_options & ~SO_ACCEPTCONN;
-
-	/* Make the ownership of the new socket the
-	 * same as the original.
-	 */
-	retval = 0;
-	if (ioctl(s, SIOCGPGRP, &retval) == 0) {
-		if (retval != 0) {
-			(void)ioctl(nsiptr->fd, SIOCSPGRP, &retval);
-		}
-	}
-	else	{
-		(void)syslog(LOG_ERR,
-			"accept: SIOCGPGRP failed errno %d\n", errno);
-		errno = 0;
-	}
-
-	/* The accepted socket inherits the non-blocking and SIGIO
-	 * attributes of the accepting socket.
-	 */
-	if ((flg = fcntl(s, F_GETFL, 0)) < 0) {
-		(void)syslog(LOG_ERR,
-			"accept: fcntl: F_GETFL failed %d\n", errno);
-		errno = 0;
-	}
-	else	{
-		flg &= (FREAD|FWRITE|FASYNC|FNDELAY);
-		(void)fcntl(nsiptr->fd, F_SETFL, flg);
-	}
 
 	return s2;
 }
+
+
+

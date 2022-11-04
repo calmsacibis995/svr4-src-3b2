@@ -5,15 +5,14 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/termerr.c	1.6"
+#ident	"@(#)curses:screen/termerr.c	1.4"
 
 #include 	"curses_inc.h"
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
 
 char	*term_err_strings[] =
 {
     "",
-#ifdef SIGSTOP	/* SVR4.0 and beyond */
+#ifdef __STDC__
     "/usr/share/lib/terminfo is unaccessible",
 #else
     "/usr/lib/terminfo is unaccessible",

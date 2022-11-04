@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/crypt.c	1.11"
+#ident	"@(#)libc-port:gen/crypt.c	1.10"
 /*LINTLIBRARY*/
 /*
  * This program implements a data encryption algorithm to encrypt passwords.
@@ -16,7 +16,6 @@
 	#pragma weak setkey = _setkey
 #endif
 #include "synonyms.h"
-#include <errno.h>
 
 static const char IP[] = {
 	58,50,42,34,26,18,10, 2,
@@ -187,10 +186,6 @@ int	fake;
 	register int t, j, k;
 	char *R = &L[32];
 
-	if (fake != 0) {
-		errno = ENOSYS;
-		return;
-	}
 	for(j=0; j < 64; j++)
 		L[j] = block[IP[j]-1];
 	for(i=0; i < 16; i++) {

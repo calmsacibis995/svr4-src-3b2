@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/tsearch.c	2.11"
+#ident	"@(#)libc-port:gen/tsearch.c	2.11.1.1"
 /*LINTLIBRARY*/
 /*
  * Tree search algorithm, generalized from Knuth (6.2.2) Algorithm T.
@@ -21,6 +21,7 @@
 	#pragma weak twalk = _twalk
 #endif
 #include "synonyms.h"
+#include "shlib.h"
 #include <search.h>
 #include <stdlib.h>
 typedef char *POINTER;

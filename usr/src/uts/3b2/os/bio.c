@@ -5,14 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)kernel:os/bio.c	1.42"
+#ident	"@(#)kernel:os/bio.c	1.38.1.6"
 #include "sys/types.h"
 #include "sys/sysmacros.h"
 #include "sys/sbd.h"
@@ -42,18 +35,15 @@
 #include "sys/kmem.h"
 #include "vm/page.h"
 
-/*
- * Convert logical block number to a physical number
- * given block number and block size of the file system.
- * Assumes 512 byte blocks (see param.h).
- */
+/* Convert logical block number to a physical number */
+/* given block number and block size of the file system */
+/* Assumes 512 byte blocks (see param.h). */
 #define LTOPBLK(blkno, bsize)	(blkno * ((bsize>>SCTRSHFT)))
 
 /* count and flag for outstanding async writes */
 int basyncnt, basynwait;
 
 struct buf bhdrlist;	/* free buf header list */
-int nbuf;		/* number of buffer headers allocated */
 
 void	printbuf();
 
@@ -99,7 +89,7 @@ bread(dev, blkno, bsize)
 	u.u_ior++;
 	sysinfo.bread++;
 	(void) biowait(bp);
-	return bp;
+	return(bp);
 }
 
 /*
@@ -211,10 +201,10 @@ brelse(bp)
 	register s;
 
 	if (bp->b_flags & B_WANTED)
-		wakeprocs((caddr_t)bp, PRMPT);
+		wakeup((caddr_t)bp);
 	if (bfreelist.b_flags & B_WANTED) {
 		bfreelist.b_flags &= ~B_WANTED;
-		wakeprocs((caddr_t)&bfreelist, PRMPT);
+		wakeup((caddr_t)&bfreelist);
 	}
 	if (bp->b_flags & B_ERROR) {
 		bp->b_flags |= B_STALE|B_AGE;
@@ -300,26 +290,38 @@ loop:
 		}
 		else {
 			bremhash(bp);
-			if (savebp == NULL && bp->b_bufsize == bsize)
+			if (savebp == NULL && bp->b_bufsize == bsize) {
 				savebp = bp;
+			}
+			/*
+			 * If size doesn't match, free it.
+			 */
 			else {
-				/*
-				 * If size doesn't match, free it.
-				 */
 				kmem_free(bp->b_un.b_addr, bp->b_bufsize);
 				bfreelist.b_bufsize += bp->b_bufsize;
 				struct_zero(bp, sizeof(struct buf));
 				bp->b_flags |= B_KERNBUF;
 				bp->av_forw = bhdrlist.av_forw;
 				bhdrlist.av_forw = bp;
+				/*
+				 * notavail() decremented b_bcount already.
+				 *
+				 * bfreelist.b_bcount--;
+				 */
+				if (bhdrlist.b_flags&B_WANTED) {
+					bhdrlist.b_flags &= ~B_WANTED;
+					wakeup((caddr_t)&bhdrlist);
+				}
+
 			}
 		}
 		(void)splx(s);
 		goto loop;
 	}
 	(void)splx(s);
-	if (savebp != NULL)
-		return savebp;
+	if (savebp != NULL) {
+		return (savebp);
+	}
 	/*
 	 * If not enough memory for this buffer, sleep.  When we
 	 * return from sleep(), we must return to the caller to
@@ -333,28 +335,14 @@ loop:
 	}
 	/*
 	 * Allocate a new buffer.  Get a buffer header first.
-	 * If no free buffer header, allocate a chunk of
-	 * buffer headers.
+	 * If no free buffer header, sleep.  When we return from
+	 * sleep(), we must return to the caller to check the
+	 * hash queue again.
 	 */	
 	if (bhdrlist.av_forw == NULL) {
-		struct buf *dp;
-		int i;
-
-		dp = (struct buf *)kmem_zalloc(sizeof(struct buf) * v.v_buf,
-				KM_SLEEP);
-		ASSERT(dp != NULL);
-		bhdrlist.av_forw = dp;
-		nbuf += v.v_buf;
-
-		for (i = 0; i < v.v_buf-1; i++,dp++) {
-			dp->b_dev = (o_dev_t)NODEV;
-			dp->b_edev = (dev_t)NODEV;
-			dp->b_un.b_addr = NULL;
-			dp->av_forw = dp + 1;
-			dp->b_flags = B_KERNBUF;
-			dp->b_bcount = 0;
-		}
-
+		bhdrlist.b_flags |= B_WANTED;
+		sleep((caddr_t)&bhdrlist, PRIBIO + 1);
+		return NULL;
 	}
 	bp = bhdrlist.av_forw;
 	bhdrlist.av_forw = bp->av_forw;
@@ -378,14 +366,13 @@ getblk(dev, blkno, bsize)
 {
 	register struct buf *bp;
 	register struct buf *dp; 
-	register int s;
 
 	if (getmajor(dev) >= bdevcnt)
 		cmn_err(CE_PANIC,"blkdev");
 
 	blkno = LTOPBLK(blkno, bsize);
 loop:
-	s = spl0();
+	spl0();
 	if ((dp = bhash(dev, blkno)) == NULL)
 		cmn_err(CE_PANIC,"devtab");
 	for (bp = dp->b_forw; bp != dp; bp = bp->b_forw) {
@@ -400,13 +387,12 @@ loop:
 			syswait.iowait--;
 			goto loop;
 		}
-		splx(s);
+		spl0();
 		bp->b_flags &= ~B_AGE;
 		notavail(bp);
 		return bp;
 	}
 
-	splx(s);
 	bp = getfreeblk(bsize);
 	if (bp == NULL)
 		goto loop;
@@ -437,7 +423,8 @@ ngeteblk(bsize)
 loop:
 	dp = &bfreelist;
 
-	if ((bp = getfreeblk(bsize)) == NULL)
+	bp = getfreeblk(bsize);
+	if (bp == NULL)
 		goto loop;
 
 found:
@@ -461,6 +448,7 @@ geteblk()
 {
 	return ngeteblk((long)1024);
 }
+
 
 /*
  * Wait for I/O completion on the buffer; return errors
@@ -602,6 +590,7 @@ void
 binit()
 {
 	register struct buf *bp;
+	register struct buf *dp;
 	register unsigned i;
 		
 	/*
@@ -610,10 +599,19 @@ binit()
 	 */
 	bfreelist.b_bufsize = v.v_bufhwm * 1024;
 
-	bp = &bfreelist;
-	bp->b_forw = bp->b_back = bp->av_forw = bp->av_back = bp;
-	bhdrlist.av_forw = NULL;
+	dp = &bfreelist;
+	dp->b_forw = dp->b_back = dp->av_forw = dp->av_back = dp;
+	bhdrlist.av_forw = bp = buf;
 
+	for (i = 0; i < v.v_buf-1; i++,bp++) {
+		bp->b_dev = (o_dev_t)NODEV;
+		bp->b_edev = (dev_t)NODEV;
+		bp->b_un.b_addr = NULL;
+		bp->av_forw = bp + 1;
+		bp->b_flags = B_KERNBUF;
+		bp->b_bcount = 0;
+	}
+	bp->av_forw = NULL;
 	pfreecnt = v.v_pbuf;
 	pfreelist.av_forw = bp = pbuf;
 	for (; bp < &pbuf[v.v_pbuf-1]; bp++)
@@ -636,21 +634,22 @@ biowait(bp)
 
 	syswait.iowait++;
 	s = spl6();
-	curproc->p_swlocks++;
-	curproc->p_flag |= SSWLOCKS;
 	while ((bp->b_flags & B_DONE) == 0) {
+		curproc->p_swlocks++;
+		curproc->p_flag |= SSWLOCKS;
 		bp->b_flags |= B_WANTED;
 		(void) sleep((caddr_t)bp, PRIBIO);
 	}
-	if (--curproc->p_swlocks == 0)
+	if(--curproc->p_swlocks == 0)
 		curproc->p_flag &= ~SSWLOCKS;
 	(void) splx(s);
 	syswait.iowait--;
 	error = geterror(bp);
 
 	if ((bp->b_flags & B_ASYNC) == 0) {
-		if (bp->b_flags & B_PAGEIO)
+		if (bp->b_flags & B_PAGEIO) {
 			pvn_done(bp);
+		}
 		else if (bp->b_flags & B_REMAPPED)
 			bp_mapout(bp);
 	}
@@ -676,7 +675,7 @@ biodone(bp)
 			basyncnt--;
 		if (basyncnt == 0 && basynwait) {
 			basynwait = 0;
-			wakeprocs((caddr_t)&basyncnt, PRMPT);
+			wakeup((caddr_t)&basyncnt);
 		}
 		if (bp->b_flags & (B_PAGEIO|B_REMAPPED))
 			swdone(bp);
@@ -684,8 +683,9 @@ biodone(bp)
 			brelse(bp);		/* release bp to 1k freelist */
 	} else {
 		bp->b_flags &= ~B_WANTED;
-		wakeprocs((caddr_t)bp, PRMPT);
+		wakeup((caddr_t)bp);
 	}
+	return;
 }
 
 /*
@@ -701,14 +701,9 @@ geterror(bp)
 {
 	int error = 0;
 
-	if (bp->b_flags & B_ERROR) {
-		if (bp->b_flags & B_KERNBUF)
-			error = bp->b_error;
-		if (!error)
-			error = bp->b_oerror;
-		if (!error)
-			error = EIO;
-	}
+	if ((bp->b_flags & B_ERROR)
+	  && (error = bp->b_error) == 0 && (error = bp->b_oerror) == 0)
+		error = EIO;
 	return error;
 }
 
@@ -729,7 +724,7 @@ STATIC struct bufhd pageio_out = {
 	(struct buf *)&pageio_out,
 };
 
-#define	NOMEMWAIT() (u.u_procp == proc_pageout)
+#define	NOMEMWAIT() (u.u_procp == nproc[2])
 
 /*
  * Allocate and initialize a buf struct for use with pageio.
@@ -857,8 +852,9 @@ buf_breakup(strat, obp)
 			sleep((caddr_t)bp, PRIBIO);
 		}
 		(void) splx(s);
-		if (bp->b_flags & B_ERROR)
+		if (bp->b_flags & B_ERROR) {
 			goto out;
+		}
 		bp->b_blkno += btod(cc);
 		bp->b_un.b_addr += cc;
 		iocount -= cc;
@@ -878,6 +874,7 @@ out:
 	s = spl6();
 	biodone(obp);
 	splx(s);
+	return;
 }
 
 /* 
@@ -901,6 +898,13 @@ printbuf()
 	printf("%x\n", bp);
 	printf("bhdrlist	%x\n", bp->av_forw);
 
+	for (i = 0, bp = buf; i < v.v_buf; i++, bp++) {
+		printf("%x	%x	%x	%x	%x	%x	%d\n",
+		  bp, 
+		  bp->av_forw, bp->av_back, bp->b_forw, bp->b_back,
+		  bp->b_flags,
+		  bp->b_bufsize);
+	}
 }
 
 #endif

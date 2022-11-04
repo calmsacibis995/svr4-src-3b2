@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/mem.c	1.16"
+#ident	"@(#)kernel:io/mem.c	1.14"
 #include "sys/types.h"
 #include "sys/sbd.h"
 #include "sys/param.h"
@@ -48,7 +48,7 @@ STATIC int mmrw();
 #define	M_NULL		2	/* /dev/null - EOF & Rathole */
 #define	M_ZERO		3	/* /dev/zero - source of private memory */
 
-int mmdevflag = 0;
+int mmdevflag = 2;
 
 /*
  * Avoid addressing invalid kernel page.  This can happen, for example,
@@ -79,8 +79,8 @@ mmclose(dev, flag, cr)
 
 /* ARGSUSED */
 int
-mmioctl(dev, cmd, arg, flag, cr, rvalp)
-	dev_t dev;
+mmioctl(vp, cmd, arg, flag, cr, rvalp)
+	register struct vnode *vp;
 	int cmd;
 	int arg;
 	int flag;

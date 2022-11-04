@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/fbio.c	1.10"
+#ident	"@(#)kernel:os/fbio.c	1.8"
 
 #include "sys/types.h"
 #include "sys/buf.h"
@@ -99,7 +99,7 @@ fbzero(vp, off, len, fbpp)
 	(*fbpp)->fb_addr = addr;
 	(*fbpp)->fb_count = len;
 
-	segmap_pagecreate(segkmap, addr, len, 1);
+	segmap_pagecreate(segkmap, addr, len, 1, 0, 0);
 
 	/*
 	 * Now we zero all the memory in the mapping we are interested in.
@@ -235,4 +235,11 @@ fbiwrite(fbp, devvp, bn, bsize)
 	kmem_fast_free((caddr_t *)&fb_free, (caddr_t)fbp);
 
 	return error;
+}
+
+void
+fbinval(vfsp)
+	struct vfs *vfsp;
+{
+	segmap_inval(segkmap, vfsp);
 }

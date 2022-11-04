@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libinet:bindresvport.c	1.2"
+#ident	"@(#)libinet:bindresvport.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -36,7 +36,7 @@
 #include <netinet/in.h>
 
 #ifdef SYSV
-#define bzero(s, len)	memset(s, 0, len)
+#define bzero(s, len)	memset(s, '\0', len)
 #endif SYSV
 
 

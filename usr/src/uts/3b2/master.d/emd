@@ -1,4 +1,4 @@
-*#ident	"@(#)emd:master.d/emd	1.5"
+*#ident	"@(#)emd:master.d/emd	1.3"
 *
 * EMD  3b2 streams driver
 *
@@ -6,9 +6,6 @@
 fa 	1	emd	-	10	12
 						emd_nbds (%i) = {#C}
 						emd_maxdev (%i) = {#D}
-						inetstats (%i) = {INETSTATS}
 						emd_emd[#D] (%l%l%l%s%s%s%s)
-						emd_bd[#C] (%0x388)
+						emd_bd[#C] (%0x254)
 $$$
-*  provide stats for internet 'netstat' cmd if INETSTATS is set
-INETSTATS = 0

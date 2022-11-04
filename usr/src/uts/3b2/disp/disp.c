@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:disp/disp.c	1.30"
+#ident	"@(#)kernel:disp/disp.c	1.28"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/psw.h"
@@ -48,7 +48,6 @@ int		npwakecnt;	/* count of npwakeups since last pswtch() */
 proc_t		*curproc;	/* currently running process */
 int		curpri;		/* priority of current process */
 int		maxrunpri;	/* priority of highest priority active queue */
-int		idleswtch;	/* flag set while idle in pswtch() */
 
 STATIC ulong	*dqactmap;	/* bitmap to keep track of active disp queues */
 STATIC dispq_t	*dispq;		/* ptr to array of disp queues indexed by pri */
@@ -159,17 +158,15 @@ pswtch()
 			continue; /* might have made someone runnable */
 		}
 		curpri = 0;
-		curproc = proc_sched;
+		curproc = nproc[0];
 #ifdef KPERF
 		if (kpftraceflg) {
 			asm(" MOVAW 0(%pc),Kpc ");
 			kperf_write(KPT_IDLE, Kpc, curproc);
 		}
 #endif	/* KPERF */
-		idleswtch++;
 		idle();
 		splhi();
-		idleswtch = 0;
 		runrun = kprunrun = npwakecnt = 0;
 	}
 	dq = &dispq[maxrunpri];
@@ -216,7 +213,7 @@ pswtch()
 	curpri = pp->p_pri;
 	curproc = pp;
 #ifdef DEBUG
-	if (pp != proc_bdflush)		/* skip bdflush */
+	if (pp != nproc[3])		/* skip bdflush */
 		idlecntdown = 60;
 #endif
 	
@@ -634,10 +631,12 @@ register proc_t		*targpp;
 	register int	error;
 	id_t		reqpcid;
 	register cred_t	*reqpcredp;
+	id_t		targpcid;
 	register cred_t	*targpcredp;
 
 	reqpcid = reqpp->p_cid;
 	reqpcredp = reqpp->p_cred;
+	targpcid = targpp->p_cid;
 	targpcredp = targpp->p_cred;
 
 	error = CL_PARMSOUT(&class[parmsp->pc_cid], parmsp->pc_clparms,

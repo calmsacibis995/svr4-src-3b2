@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_update.c	1.3"
+#ident	"@(#)libyp:yp_update.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -19,21 +18,21 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
-*/
+*/ 
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)yp_update.c 1.10 88/03/22 Copyr 1986 Sun Micro";
 #endif
 
 /*
- * YP updater interface
+ * Yellow Pages updater interface
  */
 #include <stdio.h>
 #include <rpc/rpc.h>
@@ -41,16 +40,15 @@ static char sccsid[] = "@(#)yp_update.c 1.10 88/03/22 Copyr 1986 Sun Micro";
 #include <rpcsvc/ypclnt.h>
 #include <rpcsvc/ypupd.h>
 
-#define	WINDOW (60*60)
-#define	TOTAL_TIMEOUT	300
+#define WINDOW (60*60)
+#define TOTAL_TIMEOUT	300	
 
-#ifdef DEBUG
-#define	debugging 1
-#define	debug(msg)  fprintf(stderr, "%s\n", msg);
-#else
-#define	debugging 0
-#define	debug(msg)
-#endif
+/*
+ * Turn off debugging 
+ */
+#define debugging 0
+#define debug(msg)
+
 extern AUTH *authdes_seccreate();
 
 yp_update(domain, map, op, key, keylen, data, datalen)
@@ -63,8 +61,9 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 	int datalen;
 {
 	struct ypupdate_args args;
-	u_int rslt;
+	u_int rslt;	
 	struct timeval total;
+	struct netbuf server;
 	CLIENT *client;
 	char *ypmaster;
 	char ypmastername[MAXNETNAMELEN+1];
@@ -74,22 +73,22 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 	switch (op) {
 	case YPOP_DELETE:
 		proc = YPU_DELETE;
-		break;
+		break;	
 	case YPOP_INSERT:
 		proc = YPU_INSERT;
-		break;
+		break;	
 	case YPOP_CHANGE:
 		proc = YPU_CHANGE;
-		break;
+		break;	
 	case YPOP_STORE:
 		proc = YPU_STORE;
-		break;
+		break;	
 	default:
-		return (YPERR_BADARGS);
+		return(YPERR_BADARGS);
 	}
 	if (yp_master(domain, map, &ypmaster) != 0) {
 		debug("no master found");
-		return (YPERR_BADDB);
+		return (YPERR_BADDB);	
 	}
 
 	client = clnt_create(ypmaster, YPU_PROG, YPU_VERS, "circuit_n");
@@ -102,36 +101,33 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 	}
 
 	if (! host2netname(ypmastername, ypmaster, domain)) {
-		clnt_destroy(client);
 		free(ypmaster);
 		return (YPERR_BADARGS);
 	}
-	client->cl_auth = authdes_seccreate(ypmastername, WINDOW,
-				ypmaster, NULL);
+	client->cl_auth = authdes_seccreate(ypmastername, WINDOW, 
+						 ypmaster, NULL);
 	free(ypmaster);
 	if (client->cl_auth == NULL) {
 		debug("auth create failed");
 		clnt_destroy(client);
-		return (YPERR_RPC);
+		return (YPERR_RPC);	
 	}
 
-	args.mapname = map;
+	args.mapname = map;	
 	args.key.yp_buf_len = keylen;
 	args.key.yp_buf_val = key;
 	args.datum.yp_buf_len = datalen;
 	args.datum.yp_buf_val = data;
 
-	total.tv_sec = TOTAL_TIMEOUT;
-	total.tv_usec = 0;
+	total.tv_sec = TOTAL_TIMEOUT; total.tv_usec = 0;
 	clnt_control(client, CLSET_TIMEOUT, &total);
 	stat = clnt_call(client, proc,
 		xdr_ypupdate_args, &args,
 		xdr_u_int, &rslt, total);
 
 	if (stat != RPC_SUCCESS) {
-		debug("ypupdate RPC call failed");
-		if (debugging)
-			clnt_perror(client, "ypupdate call failed");
+		debug("ypu call failed");
+		if (debugging) clnt_perror(client, "ypu call failed");
 		rslt = YPERR_RPC;
 	}
 	auth_destroy(client->cl_auth);

@@ -8,7 +8,7 @@
 #ifndef _FS_SNODE_H
 #define _FS_SNODE_H
 
-#ident	"@(#)head.sys:sys/fs/snode.h	1.21"
+#ident	"@(#)head.sys:sys/fs/snode.h	1.19"
 /*
  * The snode represents a special file in any filesystem.  There is
  * one snode for each active special file.  Filesystems that support
@@ -84,7 +84,7 @@ extern struct proc *curproc;		/* XXX vm debugging */
 			curproc->p_flag &= ~SSWLOCKS; \
 	if ((sp)->s_flag & SWANT) { \
 		(sp)->s_flag &= ~SWANT; \
-		wakeprocs((caddr_t)(sp), PRMPT); \
+		wakeup((caddr_t)(sp)); \
 	} \
 	(sp)->s_powns = NULL; \
 }
@@ -117,10 +117,6 @@ extern int openwait();
 extern int openprivwait();
 extern int setprivwait();
 extern void privsig();
-
-/* #ifdef MERGE */
-extern int spec_rdchk();
-/* #endif MERGE */
 
 /*
  * If driver does not have a size routine (e.g. old drivers), the size of the

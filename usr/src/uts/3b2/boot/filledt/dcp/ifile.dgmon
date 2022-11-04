@@ -1,15 +1,17 @@
-/* #ident	"@(#)boot:boot/filledt/dcp/ifile.dgmon	1.2"	*/
+/* #ident	"@(#)boot:boot/filledt/dcp/ifile.dgmon	1.1"	*/
 MEMORY	{
 	CONTROL:	origin	=	0x2004480,	length	=	0x7B80
-	BUFFERS:	origin	=	0x2304000,	length	=	0x100000
 
 }
 
 SECTIONS	{
-	.text:		{ } > CONTROL
-	.data:		{ } > CONTROL
-	.bss:		{ } > CONTROL
-
-	.buffers:	{ } > BUFFERS
+	.text:		       { } > CONTROL
+	.data:	               {
+				*(.data)
+				*(.data1)
+				*(.rodata)
+				*(.rodata1)
+				 } > CONTROL
+	.bss:   	       { } > CONTROL
 
 }

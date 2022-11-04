@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:ml/gate.c	1.27"
+#ident	"@(#)kernel:ml/gate.c	1.21"
 
 #include	"sys/types.h"
 #include	"sys/psw.h"
@@ -314,7 +314,18 @@ struct kpcb *Ivect[256] = {
 
 extern int Xsyscall();
 
-struct gate_l2 gates[142] ={ { GPSW, Xsyscall },
+struct gate_l2 gates[153] ={ { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
+			    { GPSW, Xsyscall },
 			    { GPSW, Xsyscall },
 			    { GPSW, Xsyscall },
 			    { GPSW, Xsyscall },
@@ -500,18 +511,7 @@ struct gate_l2 gaten ={ GPSW, nrmx_YY };
  *	The structure is static, since no one else needs to
  *	know it is here.
  */
-struct gate_l2 gatefiller[207] = { {GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
-					{GPSW, nrmx_YY},
+struct gate_l2 gatefiller[196] = { {GPSW, nrmx_YY},
 					{GPSW, nrmx_YY},
 					{GPSW, nrmx_YY},
 					{GPSW, nrmx_YY},

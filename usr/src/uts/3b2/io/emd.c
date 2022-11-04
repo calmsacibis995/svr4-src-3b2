@@ -5,12 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)emd:io/emd.c	1.16"
+#ident	"@(#)emd:io/emd.c	1.9"
 
 typedef long CAPP;
 typedef long RAPP;
-#define RQSIZE 10
-#define CQSIZE 25
+#define RQSIZE 8
+#define CQSIZE 8
 #define NUM_QUEUES 3
 
 #include "sys/cmn_err.h"
@@ -31,6 +31,7 @@ typedef long RAPP;
 #include "sys/firmware.h"
 #include "sys/sbd.h"
 #include "sys/debug.h"
+#include "sys/inline.h"
 #include "sys/systm.h"
 #include "sys/cred.h"
 #include "sys/dlpi.h"
@@ -38,23 +39,13 @@ typedef long RAPP;
 #include "sys/emduser.h"
 #include "sys/emd.h"
 
-/* just need sockaddr for inet statistics */
-struct sockaddr {
-	u_short	sa_family;		 
-	char	sa_data[14];		 
-};
-
-#include "sys/kmem.h"
-#include "net/if.h"
-
-
 /*
  * Streams interface information.
  */
 STATIC int emdopen(), emdclose(), emdwput(), emdwsrv();
 
 STATIC struct module_info emdm_info = {
-	EMD_MID, EMD_NAME, 0, EMDMAXPSZ-EHEADSIZE, EMD_HIWAT, EMD_LOWAT
+	EMD_MID, EMD_NAME, 1, EMDMAXPSZ-EHEADSIZE, EMD_HIWAT, EMD_LOWAT
 };
 
 STATIC struct qinit emdrinit = {
@@ -92,10 +83,6 @@ int emddevflag = 0;		/* we support a new-style (SVR4) interface */
 int emdlog = 0;
 #endif
 
-extern int		inetstats;	/* from /etc/master.d/emd */
-extern struct ifstats	*ifstats;	/* per-interface statistics for inet */
-struct ifstats		*emdstats;	/* statistics for emd interface */
-
 /*
  * Routines defined in this file.
  */
@@ -116,7 +103,10 @@ STATIC void emdnonfatal();
 STATIC void emdfatal();
 STATIC void emd_domajors();
 STATIC int getboard();
+
+#ifdef UNUSED
 STATIC void emd_time();
+#endif
 
 /*
  * Initialize the EMD data structures.  Called from
@@ -136,27 +126,13 @@ emdinit()
 			emd_emd[offset].emd_rdq = NULL;
 			emd_emd[offset].emd_head = NULL;
 			emd_emd[offset].emd_tail = NULL;
-			emd_emd[offset].emd_state = DL_UNBOUND;
+			emd_emd[offset].emd_state = 0;
 			emd_emd[offset].emd_seq = 0;
 			emd_emd[offset].emd_bid = board;
 			emd_emd[offset].emd_sap = 0;
 		}
 		emd_binit(board);
 	}
-	if (inetstats) {
-		if ((emdstats = (struct ifstats *)kmem_zalloc(
-			(sizeof(struct ifstats) * emd_nbds), KM_NOSLEEP)) 
-		    != (struct ifstats *)0) {
-			for (board = 0; board < emd_nbds; board++) {
-				emdstats[board].ifs_name = "emd";
-				emdstats[board].ifs_unit = board+1;
-				emdstats[board].ifs_mtu = EMDMAXPSZ-EHEADSIZE;
-				emdstats[board].ifs_next = ifstats;
-				ifstats = &emdstats[board];
-			}
-		}
-	}
-	return;
 }
 
 /*
@@ -181,10 +157,9 @@ emd_binit(bid)
 	for (index = 0; index < RQSIZE+RQSIZE; index++)
 		emd_bd[bid].eb_ind[index] = NULL;
 	emd_bd[bid].eb_state = EB_DOWN;
-	if (emd_bd[bid].eb_timeid) {	/* reset the firmware timer */
+	if (emd_bd[bid].eb_timeid)	/* reset the firmware timer */
 		untimeout(emd_bd[bid].eb_timeid);
-		emd_bd[bid].eb_timeid = 0;
-	}
+	emd_bd[bid].eb_timeid = 0;
 	return;
 }
 
@@ -278,19 +253,8 @@ emdclose(q, flag, credp)
 		if (emd_bd[ep->emd_bid].eb_state & EB_INIT)
 			emd_bd[ep->emd_bid].eb_state = EB_DOWN;
 		emd_bd[ep->emd_bid].eb_initep = NULL;
-		if (emd_bd[ep->emd_bid].eb_timeid) {
-			untimeout(emd_bd[ep->emd_bid].eb_timeid);
-			emd_bd[ep->emd_bid].eb_timeid = 0;
-		}
 	}
 	splx(s);
-	if (inetstats && emdstats) {
-		emdstats[ep->emd_bid].ifs_active = 0;
-		emdstats[ep->emd_bid].ifs_ipackets = 0;
-		emdstats[ep->emd_bid].ifs_ierrors = 0;
-		emdstats[ep->emd_bid].ifs_opackets = 0;
-		emdstats[ep->emd_bid].ifs_oerrors = 0;
-	}
 	EMDLOG(EMD_MID, ep - emd_emd, 0, SL_TRACE, "EMD - close", 0);
 	return(0);
 }
@@ -381,15 +345,15 @@ emdwproc(ep, mp)
 	register union DL_primitives *p;
 	queue_t *rq;		/* read queue */
 	struct iocblk *iocp;
-	unchar vector;
-	int i, j;
+	u_char vector;
+	int i;
 	int len;
 	paddr_t temp;
 	ushort sap, type;
 	struct ehead *hp;
 	struct emd *nep;
 	struct emd_board *bdp;
-	ulong id;
+	u_long id;
 	int idx;
 	int nacknum = 0;
 	
@@ -514,7 +478,7 @@ emdwproc(ep, mp)
 			s = splemd();
 			BUMPSEQ(ep);
 			id = emdmkid(ep-emd_emd, ep->emd_seq);
-			if (emdfw_job(id,_EIDLM,temp,ip->size,((ulong)(ip->address))>>8,ep->emd_bid,GE_QUE) != PASS) {
+			if (emdfw_job(id,_EIDLM,temp,ip->size,((u_long)(ip->address))>>8,ep->emd_bid,GE_QUE) != PASS) {
 				splx(s);
 				goto iocfail;
 			}
@@ -527,7 +491,7 @@ emdwproc(ep, mp)
 			if (bdp->eb_state != EB_LOAD)
 				goto iocfail;
 			s = splemd();
-			/* BUMPSEQ(ep); - probably a bug in the firmware */
+			/* BUMPSEQ(ep); probably a bug in pupware [sar] */
 			id = emdmkid(ep-emd_emd, ep->emd_seq);
 			if (emdfw_job(id,_EIFCF,*((long *)mp->b_cont->b_rptr),0,CS_STATUS,ep->emd_bid,GE_QUE) != PASS) {
 				splx(s);
@@ -638,14 +602,12 @@ iocfail:
 			}
 			reqp = (dl_bind_req_t *)mp->b_rptr;
 			sap = reqp->dl_sap;
-			for (j = 0; j < emd_maxdev; j++) {
-				i = (ep->emd_bid * emd_maxdev) + j;
+			for (i = 0; i < (emd_maxdev * emd_nbds); i++) 
 				if ((emd_emd[i].emd_state == DL_IDLE) &&
 				    (sap == emd_emd[i].emd_sap)) {
 					emdnonfatal(rq, mp, DL_BIND_REQ, DL_BADSAP, 0);
 					return(1);
 				}
-			}
 
 			/* bind o.k., return dl_bind_ack_t */
 			if (!REUSEABLE(mp, sizeof(*ackp)+PHYAD_SIZE)) {
@@ -679,8 +641,6 @@ iocfail:
 			ep->emd_state = DL_IDLE;
 			ep->emd_sap = sap;
 			putnext(rq, mp);
-			if (inetstats && emdstats)
-				emdstats[ep->emd_bid].ifs_active = 1;
 			return(1);
 		    }
 
@@ -719,8 +679,6 @@ iocfail:
 			ep->emd_state = DL_UNBOUND;
 			ep->emd_sap = 0;
 			putnext(rq, mp);
-			if (inetstats && emdstats)
-				emdstats[ep->emd_bid].ifs_active = 0;
 			return(1);
 		    }
 
@@ -748,29 +706,24 @@ iocfail:
 			mp->b_datap->db_type = M_PCPROTO;
 			ackp = (dl_info_ack_t *)mp->b_wptr;
 			ackp->dl_primitive = DL_INFO_ACK;
-			ackp->dl_max_sdu = EMDMAXPSZ-EHEADSIZE;
+			ackp->dl_max_sdu = EMDMAXPSZ-EMDMINPSZ;
 			ackp->dl_min_sdu = 1;
 			ackp->dl_addr_length = PHYAD_SIZE;
 			ackp->dl_mac_type = DL_ETHER;
 			ackp->dl_reserved = 0;
 			ackp->dl_current_state = ep->emd_state;
-			ackp->dl_max_idu = EMDMAXPSZ-EHEADSIZE;
+			ackp->dl_max_idu = EMDMAXPSZ-EMDMINPSZ;
 			ackp->dl_service_mode = DL_CLDLS;
 			ackp->dl_qos_length = 0;
 			ackp->dl_qos_offset = 0;
 			ackp->dl_qos_range_length = 0;
 			ackp->dl_qos_range_offset = 0;
 			ackp->dl_provider_style = DL_STYLE1;
+			ackp->dl_addr_offset = sizeof(dl_info_ack_t);
 			ackp->dl_growth = 0;
-			if (ep->emd_state == DL_IDLE) {
-				ackp->dl_addr_offset = sizeof(dl_info_ack_t);
-				mp->b_wptr += sizeof(dl_info_ack_t);
-				eiacpy(bdp->eb_addr, mp->b_wptr);
-				mp->b_wptr += PHYAD_SIZE;
-			} else {
-				ackp->dl_addr_offset = 0;
-				mp->b_wptr += sizeof(dl_info_ack_t);
-			}
+			mp->b_wptr += sizeof(dl_info_ack_t);
+			eiacpy(bdp->eb_addr, mp->b_wptr);
+			mp->b_wptr += PHYAD_SIZE;
 			putnext(rq, mp);
 			return(1);
 		    }
@@ -779,6 +732,7 @@ iocfail:
 		    {
 			dl_unitdata_req_t *dp;
 			unchar *ap;
+			int fillsz;
 			struct ehead hdr;
 
 			EMDLOG(EMD_MID, ep-emd_emd, 0, SL_TRACE, "EMD - datareq", 0);
@@ -817,14 +771,29 @@ iocfail:
 			mp->b_wptr = mp->b_rptr + EHEADSIZE;
 
 			/*
-			 * Firmware pads packets.
+			 * Pad packet if necessary.
 			 */
-			len = EHEADSIZE;
-			for (tmp = mp->b_cont; tmp; tmp = tmp->b_cont)
+			len = 0;
+			for (tmp = mp; tmp; tmp = tmp->b_cont)
 				len += tmp->b_wptr - tmp->b_rptr;
-			if ((len > EMDMAXPSZ) || (len == EHEADSIZE)) {
+			if (len > EMDMAXPSZ) {
 				nacknum = EMD_PACK_SIZE;
 				goto nackdata;
+			} else if (len < EMDMINPSZ) {
+				fillsz = EMDMINPSZ - len;
+				for (tmp = mp->b_cont; tmp->b_cont; tmp = tmp->b_cont)
+					;
+				if ((tmp->b_datap->db_lim - tmp->b_wptr) >= fillsz) {
+					tmp->b_wptr += fillsz;
+				} else {
+					tmp->b_cont = allocb(fillsz, BPRI_MED);
+					if (!tmp->b_cont) {
+						nacknum = EMD_NOMEM;
+						goto nackdata;
+					}
+					tmp->b_cont->b_wptr += fillsz;
+				}
+				len += fillsz;
 			}
 
 			/*
@@ -897,10 +866,7 @@ sendit:
 			EMDLOG(EMD_MID, ep-emd_emd, 0, SL_TRACE, "EMD - gsend", 0);
 			mp->b_prev = (mblk_t *)ep->emd_seq;
 			emd_add(ep, mp);
-			emdtimeout(ep->emd_bid);
 			splx(s);
-			if (inetstats && emdstats)
-				emdstats[ep->emd_bid].ifs_opackets++;
 			return(1);
 		    }
 
@@ -944,8 +910,6 @@ nackdata:
 		mp->b_datap->db_type = M_PCPROTO;
 		putnext(rq, mp);
 		EMDLOG(EMD_MID, ep-emd_emd, 0, SL_TRACE, "EMD - nacking data, num = %x", nacknum);
-		if (inetstats && emdstats)
-			emdstats[ep->emd_bid].ifs_oerrors++;
 		return(1);
 	}
 }
@@ -977,7 +941,7 @@ getcqe:
 	if (emdfw_attention(&c_entry, bid) != PASS)
 		return(0);
 
-	if ((id = (ulong)c_entry.appl) == 0xffffffff) {
+	if ((id = (u_long)c_entry.appl) == 0xffffffff) {
 		/*
 		 * This is an unsolicited queue entry - it
 		 * usually reports a transient problem such as
@@ -1113,10 +1077,6 @@ emdcproc(bid, eidx, seqid)
 	}
 
 	emd_rmv(ep, mp);
-	if (emd_bd[bid].eb_timeid) {
-		untimeout(emd_bd[bid].eb_timeid);
-		emd_bd[bid].eb_timeid = 0;
-	}
 	mp->b_prev = (mblk_t *)NULL;
 
 	switch (mp->b_datap->db_type) {
@@ -1164,7 +1124,7 @@ emdrproc(bid, index, mp)
 	register mblk_t *bp;
 	register ushort sap;
 	struct ehead hdr;
-	unchar *sp, *dp;
+	u_char *sp, *dp;
 
 	dp = mp->b_rptr;
 	mp->b_rptr += PHYAD_SIZE;
@@ -1180,8 +1140,6 @@ emdrproc(bid, index, mp)
 	if (!canput(ep->emd_rdq->q_next)) {
 		EMDLOG(EMD_MID, ep-emd_emd, 0, (SL_TRACE|SL_ERROR),
 		    "EMD: upstream queue full, dropping packet on floor", 0);
-		if (inetstats && emdstats)
-			emdstats[ep->emd_bid].ifs_ierrors++;
 free:
 		freemsg(mp);
 		return;
@@ -1197,8 +1155,6 @@ free:
 	bp->b_cont = mp;
 	EMDLOG(EMD_MID, ep-emd_emd, 0, SL_TRACE, "EMD - received message %x\n", mp);
 	putnext(ep->emd_rdq, bp);
-	if (inetstats && emdstats)
-		emdstats[ep->emd_bid].ifs_ipackets++;
 }
 
 /*
@@ -1227,10 +1183,6 @@ emdterm(bid)
 	/* reset the EMD board */
 	s = splemd();
 	EMD_RESET(bid);
-	if (emd_bd[bid].eb_timeid) {
-		untimeout(emd_bd[bid].eb_timeid);
-		emd_bd[bid].eb_timeid = 0;
-	}
 	splx(s);
 	emd_bd[bid].eb_state = EB_DOWN;
 
@@ -1255,6 +1207,7 @@ emdterm(bid)
 	}
 }
 
+#ifdef UNUSED
 /*
  * This function gets called when a timer that was set timed out.
  * The timeout occured because the EMD hardware gave no response
@@ -1280,20 +1233,21 @@ emd_time(board)
 	emd_bd[board].eb_timeid = 0;	/* reset the board timer */
 	EMD_RESET(board);	/* reset the emd board */
 	emd_bd[board].eb_state = EB_DOWN;
-	cmn_err(CE_NOTE, "EMD: board slot %d timed out\n",
-	    emd_bd[board].eb_major);
 	return;
 }
+#endif
 
 STATIC void
 emdtimeout(bid)
 	int bid;
 {
+#ifdef UNUSED
 	if (emd_bd[bid].eb_timeid)
 		untimeout(emd_bd[bid].eb_timeid); /*reset the timer */
 	/* start the timer again */
-	emd_bd[bid].eb_timeid = timeout(emd_time, (caddr_t)bid, EMDTIME);
+	emd_bd[bid].eb_timeid = timeout(emd_time, bid, EMDTIME);
 	return;
+#endif
 }
 
 /*
@@ -1302,10 +1256,10 @@ emdtimeout(bid)
  */
 STATIC short
 emdfw_job(id, opcode, addr, size, subdev, bid, q)
-	ulong id;
+	u_long id;
 	char opcode;		/* firmware job opcode */
-	ulong addr;	/* address for the firmware */
-	ulong size;	/* size field for the firmware */
+	u_long addr;	/* address for the firmware */
+	u_long size;	/* size field for the firmware */
 	long subdev;		/* sub-device number */
 	long bid;		/* EMD board number */
 	long q;			/* EMD firmware que */
@@ -1334,7 +1288,7 @@ emdfw_job(id, opcode, addr, size, subdev, bid, q)
  */
 STATIC short
 emdfw_init(vect, bid)
-	unchar vect;
+	u_char vect;
 	register long bid;	/* EMD board number */
 {
 	register paddr_t temp;

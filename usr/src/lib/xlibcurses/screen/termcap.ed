@@ -1,8 +1,8 @@
-!#ident	"@(#)curses:screen/termcap.ed	1.19"
+!#ident	"@(#)curses:screen/termcap.ed	1.18"
 H
 !rm -f termcap.c
 0a
-#ident	"@(#)curses:screen/termcap.ed	1.19"
+#ident	"@(#)curses:screen/termcap.ed	1.18"
 /*
  * Simulation of termcap using terminfo.
  * This file is created from termcap.ed. DO NOT EDIT ME!
@@ -165,7 +165,7 @@ register	char	*tcstr, **area;
     if (offset == -1)
 	return (0);
     rv = str_array[offset];
-    if (area && *area && rv)
+    if (area && *area)
     {
 	(void) strcpy(*area, rv);
 	*area += strlen(rv) + 1;

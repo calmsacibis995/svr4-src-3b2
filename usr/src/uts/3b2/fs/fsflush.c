@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/fsflush.c	1.11"
+#ident	"@(#)fs:fs/fsflush.c	1.7"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -30,8 +30,8 @@
 #include "vm/page.h"
 #include "vm/pvn.h"
 
-int doiflush = 1;	/* non-zero to turn inode flushing on */
-int dopageflush = 1;	/* non-zero to turn page flushing on */
+int dopageflush = 1;	/* must be non-zero to turn page flushing on */
+extern struct buf bhdrlist;
 
 /*
  * As part of file system hardening, this daemon is waken
@@ -44,14 +44,12 @@ fsflush()
 	register struct buf *bp;
 	register autoup;
 	register struct page *pp = pages;
-	unsigned int i, s, nscan, pcount, icount, count = 0;
+	int i, s, nscan, pcount, count = 0;
 
 
-	ASSERT(v.v_autoup > 0);
-	ASSERT(tune.t_fsflushr > 0);
 	autoup = v.v_autoup * HZ;
-	nscan = ((epages-pages) * (tune.t_fsflushr))/v.v_autoup;
-	icount = v.v_autoup / tune.t_fsflushr;
+	ASSERT(v.v_autoup > 0);
+	nscan = (epages-pages)/v.v_autoup;
 loop:
 	s = spl6();
 	for (bp = bfreelist.av_forw; bp != &bfreelist; bp = bp->av_forw) {
@@ -64,8 +62,49 @@ loop:
 		}
 	}
 
+	/*
+	 * To prevent getfreeblk from hanging for a long
+	 * period of time (up to autoup seconds), free one
+	 * buffer from the buffer cache when someone is
+	 * waiting for a free buffer header.
+	 */
+	if (bhdrlist.b_flags & B_WANTED) {
+		for (bp = bfreelist.av_forw;bp != &bfreelist;bp = bp->av_forw) {
+			if ((bp->b_flags & B_DELWRI) == 0) {
+				notavail(bp);			
+				bp->av_forw = bp->av_back = NULL;
+				bremhash(bp);
+				kmem_free(bp->b_un.b_addr, (int)bp->b_bufsize);
+				bfreelist.b_bufsize += bp->b_bufsize;
+				struct_zero((caddr_t)bp, sizeof(struct buf));
+				bp->b_flags |= B_KERNBUF;
+				bp->av_forw = bhdrlist.av_forw;
+				bhdrlist.av_forw = bp;
+				bhdrlist.b_flags &= ~B_WANTED;
+				wakeup((caddr_t)&bhdrlist);
+				break;
+			}
+
+		}
+	}
+
+	/*
+	 * Every autoup times through the loop, flush cached attribute
+	 * information (e.g. inodes).
+	 */
+	if (count++ >= v.v_autoup) {
+		count = 0;
+
+		/*
+		 * Sync back cached data.
+		 */
+		for (i = 1; i < nfstype; i++)
+			(void)(*vfssw[i].vsw_vfsops->vfs_sync)(NULL,
+				SYNC_ATTR, u.u_cred);
+	}
+
 	if (!dopageflush)
-		goto iflush_out;
+		goto out;
 
 	/*
 	 * Flush dirty pages.
@@ -75,9 +114,11 @@ loop:
 		/*
 		 * Reject pages that don't make sense to free.
 		 */
-		if (!pp->p_vnode || pp->p_free || pp->p_lock || pp->p_intrans
-		  || pp->p_lckcnt > 0 || pp->p_cowcnt > 0 || pp->p_keepcnt > 0
-		  || IS_SWAPVP(pp->p_vnode) || pp->p_vnode->v_type == VCHR) {
+		if (pp->p_lock || pp->p_free || pp->p_intrans || 
+		    pp->p_lckcnt > 0 || pp->p_cowcnt > 0 ||
+		    pp->p_keepcnt > 0 || !pp->p_vnode ||
+		    IS_SWAPVP(pp->p_vnode) ||
+		    pp->p_vnode->v_type == VCHR) {
 			if (++pp >= epages)
 				pp = pages;
 			continue;
@@ -95,24 +136,6 @@ loop:
 
 		if (++pp >= epages)
 			pp = pages;
-	}
-
-iflush_out:
-	if (!doiflush)
-		goto out;
-
-	/*
-	 * Flush cached attribute information (e.g. inodes).
-	 */
-	if (count++ >= icount) {
-		count = 0;
-
-		/*
-		 * Sync back cached data.
-		 */
-		for (i = 1; i < nfstype; i++)
-			(void)(*vfssw[i].vsw_vfsops->vfs_sync)(NULL,
-				SYNC_ATTR, u.u_cred);
 	}
 
 out:

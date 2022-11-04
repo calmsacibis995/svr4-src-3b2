@@ -5,13 +5,14 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)boot:boot/mboot/mboot.mk	11.7"
+#ident	"@(#)boot:boot/mboot/mboot.mk	11.4"
 
 ROOT =
-INC = $(ROOT)/usr/include
+LIB = $(ROOT)/lib
+INCSYS = $(ROOT)/usr/include
 INCLOC = ..
 DASHO = -O
-CFLAGS = $(DASHO) -I$(INCLOC) -I$(INC)
+CFLAGS = $(DASHO) -I$(INCLOC) -I$(INCSYS)
 SIZE = size
 DIS = dis
 NM = nm
@@ -20,7 +21,7 @@ CONV = conv
 INS = install
 SYMLINK = :
 
-LDFLAGS =
+LDFLAG =
 FRC =
 
 all: mboot
@@ -37,9 +38,9 @@ mboot: mboot.map\
 	$(FRC)
 	if [ x$(CCSTYPE) = xCOFF ] ; \
 	then \
-		$(LD) $(LDFLAGS) mbld mboot.o -o mboot ; \
+		$(LD) $(LDFLAG) mbld mboot.o -o mboot -L$(LIB) -lc ; \
 	else \
-		$(LD) $(LDFLAGS) -Mmboot.map mboot.o -o mboot -dn ; \
+		$(LD) $(LDFLAG) -Mmboot.map mboot.o -o mboot -L$(CCSLIB) -dn -lc ; \
 	fi
 
 clean:
@@ -61,9 +62,9 @@ FRC:
 #
 
 mboot.o: mboot.c \
-	$(INC)/sys/boot.h \
-	$(INC)/sys/firmware.h \
+	$(INCSYS)/sys/boot.h \
+	$(INCSYS)/sys/firmware.h \
 	$(INCLOC)/sys/param.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/vtoc.h \
+	$(INCSYS)/sys/types.h \
+	$(INCSYS)/sys/vtoc.h \
 	$(FRC)

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/getutx.c	1.5"
+#ident	"@(#)libc-port:gen/getutx.c	1.1"
 
 /*******************************************************************
 
@@ -35,8 +35,6 @@ publication.
 	#pragma weak getutxent = _getutxent
 	#pragma weak getutxid = _getutxid
 	#pragma weak getutxline = _getutxline
-	#pragma weak makeutx = _makeutx
-	#pragma weak modutx = _modutx
 	#pragma weak pututxline = _pututxline
 	#pragma weak setutxent = _setutxent
 	#pragma weak endutxent = _endutxent
@@ -54,32 +52,8 @@ publication.
 #include	<errno.h>
 #include	<fcntl.h>
 #include	<string.h>
-#include	<unistd.h>
 
-#define IDLEN	4	/* length of id field in utmp */
-#define SC_WILDC	0xff	/* wild char for utmp ids */
 #define	MAXFILE	79	/* Maximum pathname length for "utmpx" file */
-
-# define MAXVAL 255	/* max value for an id `character' */
-# define IPIPE	"/etc/initpipe"	/* FIFO to send pids to init */
-
-
-/*
- * format of message sent to init
- */
-
-struct	pidrec {
-	int	pd_type;	/* command type */
-	pid_t	pd_pid;		/* pid */
-};
-
-/*
- * pd_type's
- */
-
-# define ADDPID 1	/* add a pid to "godchild" list */
-# define REMPID 2	/* remove a pid to "godchild" list */
-
 
 #ifdef	DEBUG
 #undef	UTMPX_FILE
@@ -89,11 +63,8 @@ struct	pidrec {
 #endif
 
 extern void	_setutxent();
-extern void	unlockutx();
-extern void	sendpid();
 
 static int fd = -1;	/* File descriptor for the utmpx file. */
-static int fd_u = -1;	/* File descriptor for the utmp file. */
 static char utmpxfile[MAXFILE+1] = UTMPX_FILE;	/* Name of the current */
 static char utmpfile[MAXFILE+1] = UTMP_FILE;	/* "utmpx" and "utmp"  */
 						/* like file.          */
@@ -390,25 +361,19 @@ const char *newfile;
 int updutmp(entry)
 struct utmpx *entry;
 {
-	int fc, type;
+	int fd_u, fc, type;
 	struct stat stbuf;
 	struct utmp ubuf, *uptr = NULL;
-	extern int fd_u;
 
-	if (fd_u < 0) {
-		if ((fd_u = open(utmpfile, O_RDWR|O_CREAT, 0644)) < 0) {
+	if ((fd_u = open(utmpfile, O_RDWR|O_CREAT, 0644)) < 0) {
 #ifdef ERRDEBUG
 		gxdebug("Could not open utmpfile\n");
 #endif
-			return(1);
-		}
-	}
-
-	if ((fc = fcntl(fd_u, F_GETFL, NULL)) == -1) {
-		close(fd_u);
-		fd_u = -1;
 		return(1);
 	}
+
+	if ((fc = fcntl(fd_u, F_GETFL, NULL)) == -1)
+		return(1);
 
 	while (read(fd_u, &ubuf, sizeof(ubuf)) == sizeof(ubuf)) {
 		if (ubuf.ut_type != EMPTY) {
@@ -451,15 +416,12 @@ done:
 	getutmp(entry, &ubuf);
 	
 	if (write(fd_u, &ubuf, sizeof(ubuf)) != sizeof(ubuf)) {
-		close(fd_u);
-		fd_u = -1;
 		return(1);
 	}
 	
 	fcntl(fd_u, F_SETFL, fc);
 
 	close(fd_u);
-	fd_u = -1;
 
 	return(0);
 }
@@ -484,21 +446,15 @@ updwtmpx(filex, utx)
 	fdx = open(filex, O_WRONLY | O_APPEND);
 
 	if (fd < 0) {
-		if (fdx < 0)
+		if ((fdx < 0) || ((fd = open(file, O_WRONLY|O_CREAT)) < 0))
 			return;
-		if ((fd = open(file, O_WRONLY|O_CREAT)) < 0) {
-			close(fdx);
-			return;
-		}
-	} else if ((fdx < 0) && ((fdx = open(filex, O_WRONLY|O_CREAT)) < 0)) {
-		close(fd);
+	} else if ((fdx < 0) && ((fdx = open(filex, O_WRONLY|O_CREAT)) < 0))
 		return;
-	}
 
 
 	/* Both files exist, synch them */
 	if (synchutmp(file, filex))
-		goto done;
+		return;
 
 	/* seek to end of file, in case synchutmp has appended to */
 	/* the files. 					 	  */
@@ -508,306 +464,10 @@ updwtmpx(filex, utx)
 	write(fd, &ut, sizeof(struct utmp));
 	write(fdx, utx, sizeof(struct utmpx));
 
-done:
 	close(fd);
 	close(fdx);
 }
 
-
-/*
- * makeutx - create a utmpx entry, recycling an id if a wild card is *	specified.  Also notify init about the new pid
- *
- *	args:	utmpx - point to utmpx structure to be created
- */
-
-
-struct utmpx *makeutx(utmp)
-const struct utmpx *utmp;
-{
- 	register int i;			/* scratch variable */
-	register struct utmpx *utp;	/* "current" utmpx entry being examined */
-	int wild;			/* flag, true iff wild card
-char seen */
-	unsigned char saveid[IDLEN];	/* the last id we matched that was
-                                           NOT a dead proc */
-
-	wild = 0;
-	for (i = 0; i < IDLEN; i++) {
-		if ((unsigned char) utmp->ut_id[i] == SC_WILDC) {
-			wild = 1;
-			break;
-		}
-	}
-
-	if (wild) {
-
-/*
- * try to lock the utmpx and utmp files, only needed if we're doing
- * wildcard matching
- */
-
-		if (lockutx())
-			return((struct utmpx *) NULL);
-
-		setutxent();
-		/* find the first alphanumeric character */
-		for (i = 0; i < MAXVAL; ++i) {
-			if (isalnum(i))
-                                break;
-		}
-		(void) memset(saveid, i, IDLEN);
-		while (utp = getutxent()) {
-			if (idcmp(utmp->ut_id, utp->ut_id)) {
-                                continue;
-			}
-			else {
-                                if (utp->ut_type == DEAD_PROCESS) {
-                                        break;
-                                }
-                                else {
-                                        (void) memcpy(saveid, utp->ut_id, IDLEN);
-                                }
-			}
-		}
-		if (utp) {
-
-/*
- * found an unused entry, reuse it
- */
-
-			(void) memcpy((char *)(utmp->ut_id), utp->ut_id, IDLEN);
-			utp = pututxline(utmp);
-			if (utp)
-                                updwtmpx(WTMPX_FILE, utp);
-			endutxent();
-			unlockutx();
-			sendpid(ADDPID, (pid_t)utmp->ut_pid);
-			return(utp);
-		}
-		else {
-
-/*
- * nothing available, try to allocate an id
- */
-
-                        if (allocid(utmp->ut_id, saveid)) {
-                                endutxent();
-                                unlockutx();
-                                return((struct utmpx *) NULL);
-                        }
-                        else {
-                              	utp = pututxline(utmp);
-                                if (utp)
-                                        updwtmpx(WTMPX_FILE, utp);
-                                endutxent();
-                                unlockutx();
-                                sendpid(ADDPID, (pid_t)utmp->ut_pid);
-                                return(utp);
-                        }
-		}
-	}
-        else {
-              	utp = pututxline(utmp);
-		if (utp)
-                        updwtmpx(WTMPX_FILE, utp);
-		endutxent();
-		sendpid(ADDPID, (pid_t)utmp->ut_pid);
-		return(utp);
-	}
-}
-
-
-/*
- * modutx - modify a utmpx entry.  Also notify init about new pids or
- *	old pids that it no longer needs to care about
- *
- *	args:	utp- point to utmpx structure to be created
- */
-
-struct utmpx *modutx(utp)
-const struct utmpx *utp;
-{
-	register int i;				/* scratch variable
-*/
-	struct utmpx utmp;			/* holding area */
-	register struct utmpx *ucp = &utmp;	/* and a pointer to
-it */
-	struct utmpx *up;			/* "current" utmpx entry being examined */
-
-	for (i = 0; i < IDLEN; ++i) {
-		if ((unsigned char) utp->ut_id[i] == SC_WILDC)
-			return((struct utmpx *) NULL);
-	}
-	/* copy the supplied utmpx structure someplace safe */
-	utmp = *utp;
-	setutxent();
-	while (up = getutxent()) {
-		if (idcmp(ucp->ut_id, up->ut_id))
-			continue;
-		/* only get here if ids are the same, i.e. found right entry */
-		if (ucp->ut_pid != up->ut_pid) {
-			sendpid(REMPID, (pid_t)up->ut_pid);
-			sendpid(ADDPID, (pid_t)ucp->ut_pid);
-		}
-		break;
-	}
-	up = pututxline(ucp);
-	if (ucp->ut_type == DEAD_PROCESS)
-		sendpid(REMPID, (pid_t)ucp->ut_pid);
-	if (up)
-		updwtmpx(WTMPX_FILE, up);
-	endutxent();
-	return(up);
-}
-
-
-/*
- * idcmp - compare two id strings, return 0 if same, non-zero if not *
- *	args:	s1 - first id string
- *		s2 - second id string
- */
-
-
-static
-idcmp(s1, s2)
-register char *s1;
-register char *s2;
-{
-	register int i;		/* scratch variable */
-
-	for (i = 0; i < IDLEN; ++i) {
-		if ((unsigned char) *s1 != SC_WILDC && (*s1++ != *s2++))
-			return(-1);
-	}
-	return(0);
-}
-
-
-/*
- * allocid - allocate an unused id for utmp, either by recycling a
- *	DEAD_PROCESS entry or creating a new one.  This routine only *	gets called if a wild card character was specified.
- *
- *	args:	srcid - pattern for new id
- *		saveid - last id matching pattern for a non-dead process
- */
-
-
-static
-allocid(srcid, saveid)
-register char *srcid;
-register unsigned char *saveid;
-{
-	register int i;		/* scratch variable */
-	int changed;		/* flag to indicate that a new id has been generated */
-	char copyid[IDLEN];	/* work area */
-
-	(void) memcpy(copyid, srcid, IDLEN);
-	changed = 0;
-	for (i = 0; i < IDLEN; ++i) {
-		/* if this character isn't wild, it'll be part of the generated id */
-		if ((unsigned char) copyid[i] != SC_WILDC)
-			continue;
-		/* it's a wild character, retrieve the character from the saved id */
-		copyid[i] = saveid[i];
-		/* if we haven't changed anything yet, try to find a new char to use */
-		if (!changed && (saveid[i] < MAXVAL)) {
-
-/*
- * Note: this algorithm is taking the "last matched" id and trying to make
- * a 1 character change to it to create a new one.  Rather than special-case
- * the first time (when no perturbation is really necessary), just don't
- * allocate the first valid id.
- */
-
-			while (++saveid[i] <= MAXVAL) {
-                                /* make sure new char is alphanumeric */
-                                if (isalnum(saveid[i])) {
-                                        copyid[i] = saveid[i];
-                                        changed = 1;
-                                        break;
-                                }
-			}
-		}
-	}
-	/* changed is true if we were successful in allocating an id */
-	if (changed) {
-		(void) memcpy(srcid, copyid, IDLEN);
-		return(0);
-	}
-	else {
-		return(-1);
-	}
-}
-
-
-/*
- * lockutx - lock utmpx and utmp files
- */
-
-static
-lockutx()
-{
-	if ((fd = open(UTMPX_FILE, O_RDWR)) < 0)
-		return(-1);
-	if ((fd_u = open(UTMP_FILE, O_RDWR)) < 0) {
-		close(fd);
-		fd = -1;
-		return(-1);
-	}
-	if ((lockf(fd, F_LOCK, 0) < 0) || (lockf(fd_u, F_LOCK, 0) <0)) {
-		close(fd); close(fd_u);
-		fd = -1; fd_u = -1;
-		return(-1);
-	}
-	return(0);
-}
-
-
-/*
- * unlockutx - unlock utmp and utmpx files
- */
-
-static void
-unlockutx()
-{
-	(void) lockf(fd, F_ULOCK, 0);
-	(void) lockf(fd_u, F_ULOCK, 0);
-	(void) close(fd);
-	(void) close(fd_u);
-	fd = fd_u = -1;
-}
-
-
-/*
- * sendpid - send message to init to add or remove a pid from the
- *	"godchild" list
- *
- *	args:	cmd - ADDPID or REMPID
- *		pid - pid of "godchild"
- */
-
-
-static void
-sendpid(cmd, pid)
-int cmd;
-pid_t pid;
-{
-	int pfd;		/* file desc. for init pipe */
-	struct pidrec prec;	/* place for message to be built */
-
-/*
- * if for some reason init didn't open initpipe, open it read/write
- * here to avoid sending SIGPIPE to the calling process
- */
-
-	pfd = open(IPIPE, O_RDWR);
-	if (pfd < 0)
-		return;
-	prec.pd_pid = pid;
-	prec.pd_type = cmd;
-	(void) write(pfd, &prec, sizeof(struct pidrec));
-	(void) close(pfd);
-}
 
 
 #ifdef  ERRDEBUG

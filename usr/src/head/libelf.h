@@ -8,7 +8,7 @@
 #ifndef _LIBELF_H
 #define _LIBELF_H
 
-#ident	"@(#)sgs-inc:common/libelf.h	1.8"
+#ident	"@(#)sgs-inc:common/libelf.h	1.7"
 
 #include <sys/types.h>
 #include "sys/elf.h"
@@ -43,7 +43,6 @@ typedef enum {
 	ELF_C_SET,
 	ELF_C_FDDONE,
 	ELF_C_FDREAD,
-	ELF_C_RDWR,
 	ELF_C_NUM	/* must be last */
 } Elf_Cmd;
 

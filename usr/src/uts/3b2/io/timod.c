@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/timod.c	1.10"
+#ident	"@(#)kernel:io/timod.c	1.7.1.4"
 /*
  * Transport Interface Library cooperating module - issue 2
  */
@@ -315,7 +315,6 @@ register queue_t *q;
 	register struct tim_tim *tp;
 	register struct iocblk *iocbp;
 	register mblk_t *nbp;
-	mblk_t *tmp;
 
 	ASSERT(q != NULL);
 
@@ -454,12 +453,9 @@ rgetnext:
 		if (tp->tim_flags & WAITIOCACK) {
 
 		    ASSERT(tp->tim_iocsave != NULL);
-		    ASSERT(((mp->b_wptr - mp->b_rptr) == sizeof(struct T_info_ack))
-		    ||
-			((mp->b_wptr - mp->b_rptr) == 
-				(sizeof(struct T_info_ack) - sizeof(long))));
 
-		    if (*(long *)tp->tim_iocsave->b_cont->b_rptr != T_INFO_REQ) {
+		    if (*(long *)tp->tim_iocsave->b_cont->b_rptr !=
+		      T_INFO_REQ) {
 			putnext(q, mp);
 			return (0);
 		    }
@@ -470,20 +466,6 @@ rgetnext:
 			tp->tim_flags = (tp->tim_flags & ~CLTS) | COTS;
 		    } else if (pptr->info_ack.SERV_type == T_CLTS) {
 			tp->tim_flags = (tp->tim_flags & ~COTS) | CLTS;
-		    }
-
-		    /*
-		     * make sure the message sent back is the size of
-		     * a T_info_ack.
-		     */
-		    if ((mp->b_wptr - mp->b_rptr) < sizeof(struct T_info_ack)) {
-			    tmp = allocb(sizeof(long), BPRI_MED);
-			    tmp->b_wptr = (tmp->b_wptr + (sizeof(long)));
-			    tmp->b_datap->db_type = mp->b_datap->db_type;
-			    linkb(mp, tmp);
-			    pullupmsg(mp, -1);
-			    pptr = (union T_primitives *)mp->b_rptr;
-			    pptr->info_ack.PROVIDER_flag = 0;
 		    }
 		    goto out;
 		}

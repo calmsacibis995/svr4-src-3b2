@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/startup.c	1.50"
+#ident	"@(#)kernel:os/startup.c	1.41"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/psw.h"
@@ -39,7 +39,6 @@
 #include "sys/sys3b.h"
 #include "sys/file.h"
 #include "sys/uio.h"
-#include "sys/conf.h"
 
 #include "vm/seg.h"
 #include "vm/seg_kmem.h"
@@ -47,7 +46,6 @@
 #include "vm/seg_u.h"
 #include "vm/seg_map.h"
 #include "vm/page.h"
-#include "vm/bootconf.h"
 
 extern void dmainit();
 
@@ -65,7 +63,7 @@ STATIC void p0init();
 STATIC void devinit();
 #endif
 
-int icdblk = 0;
+STATIC int icdblk = 0;
 
 /*
  * The following page table is used for the first
@@ -97,6 +95,7 @@ mlsetup(physclick)
 	register sde_t		*sde;
 	extern int		sbss;		/* Start of kernel bss. */
 	extern int		bssSIZE[];	/* Size of bss in bytes.*/
+	extern int       	ptbl_init();
 	int zero;
 
 	/*
@@ -180,6 +179,10 @@ mlsetup(physclick)
 
 	nextclick = sysseginit(physclick);
 
+	/* Initialize the proc table */
+
+	ptbl_init();
+
 	/*
 	 * Initialize the map used to allocate kernel virtual space.
 	 */
@@ -219,9 +222,6 @@ mlsetup(physclick)
 	 */
 
 	p0init();
-
-	pid_init();
-
 }
 
 
@@ -587,7 +587,7 @@ p0init()
 	if(pp == NULL){
 		cmn_err(CE_PANIC, "process 0 - creation failed\n");
 	}
-	proc_sched  = pp;
+	nproc[0]    = pp;
 	u.u_procp   = pp;
 	u.u_cmask   = (mode_t) CMASK;
 
@@ -601,20 +601,17 @@ p0init()
 	curpri = v.v_maxsyspri;
 
 	pp->p_stat = SONPROC;
-        pp->p_flag = SLOAD | SSYS | SLOCK | SULOAD;
+        pp->p_flag = SLOAD | SSYS | SLOCK | SULOAD | SDETACHED;
         pp->p_pri = v.v_maxsyspri;
         pp->p_cid = 0;
         pp->p_clfuncs = class[0].cl_funcs;
         pp->p_clproc = (caddr_t)pp;
 
-	pp->p_pidp = &pid0;
-	pp->p_pgidp = &pid0;
-	pp->p_sessp = &session0;
-	pid0.pid_pglink = pp;
+	forksession(nproc[0],&session0);
 
 	pp->p_segu = (struct seguser *)p0seguser;
 	addr = (caddr_t)p0seguser;
-	ptptr = (pte_t *)ubptbl(pp);
+	ptptr = (pte_t *)ubptbl(nproc[0]);
 	for (ii = 0; ii < USIZE; ii++, ptptr++) {
 		ptptr->pg_pte =
 			mkpte(PG_V, btoc(kvtophys((char *)&u + ctob(ii))));
@@ -633,9 +630,31 @@ p0init()
 void
 inituname()
 {
+	struct vnode	*vp;
+	int		resid;
+	char 		buf[256];
+	int		len;
 	extern char	*release;
 	extern char	*version;
 
+	/*
+	 * Get nodename if stored.
+	 * NOTE:  Name of machine is stored in a file because the
+	 * non-volatile RAM on the porting base is not large enough
+	 * to hold an internet protocol hostname.  If a machine
+	 * has non-volatile RAM which is large enough, however, it
+	 * would be preferable to store the nodename there.
+	 */
+	if (vn_open("/etc/nodename", UIO_SYSSPACE, FREAD, 0, &vp) == 0) {
+		if (vn_rdwr(UIO_READ, vp, (caddr_t)buf, SYS_NMLN-1, 0, 
+	     	  UIO_SYSSPACE, 0, 0, u.u_cred, &resid) == 0) {
+			len = (SYS_NMLN - 1) - resid;
+			if (len != 0) {
+				strncpy(utsname.nodename, buf, len);
+				utsname.nodename[len] = '\0';
+			}
+		}
+	}
 	/*
 	 * Get the release and version of the system.
 	 */
@@ -647,8 +666,14 @@ inituname()
 		strncpy(utsname.version, version, SYS_NMLN-1);
 		utsname.version[SYS_NMLN-1] = '\0';
 	}
+	cmn_err(CE_CONT, "\nUNIX(R) System V Release %s AT&T %s Version %s\n",
+	  utsname.release, utsname.machine, utsname.version);
+	cmn_err(CE_CONT, "Node %s\n", utsname.nodename);
+	cmn_err(CE_CONT, "Total real memory  = %d\n", ctob(physmem));
+	return;
 }
 	
+
 /*
  * Machine-dependent startup code.
  */
@@ -656,11 +681,6 @@ inituname()
 void
 startup()
 {
-	/*
-	 * This is for (pre-4.0 binary drivers) backward compatibility.
-	 */
-	fix_swtbls();
-
 	/*
 	 * Confirm that the configured number of supplementary groups
 	 * is between the min and the max.  If not, print a message
@@ -700,9 +720,5 @@ devinit()
 		extern dev_t icdmkdev();
 
 		rootdev = icdmkdev(ICDROOT);
-		swapfile.bo_size = 400;		/* The size of swap partition
-						   in ICD. This value should
-						   consistent with the swap
-						   size in the ICD vtoc.  */
 	}
 }

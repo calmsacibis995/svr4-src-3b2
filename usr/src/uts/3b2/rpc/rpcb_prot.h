@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 
-#ident	"@(#)head.sys:sys/rpc/rpcb_prot.h	1.6"
+#ident	"@(#)head.sys:sys/rpc/rpcb_prot.h	1.4"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -24,7 +24,7 @@
 * Notice of copyright on this source code product does not indicate 
 *  publication.
 *
-*	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+*	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */ 
@@ -100,7 +100,6 @@ struct rpcb {
 	u_long r_vers;			/* version number */
 	char *r_netid;			/* network id */
 	char *r_addr;			/* universal address */
-	char *r_owner;			/* owner of the mapping */
 };
 typedef struct rpcb RPCB;
 extern bool_t xdr_rpcb();

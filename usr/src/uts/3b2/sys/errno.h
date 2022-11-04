@@ -8,7 +8,7 @@
 #ifndef _SYS_ERRNO_H
 #define _SYS_ERRNO_H
 
-#ident	"@(#)head.sys:sys/errno.h	11.18"
+#ident	"@(#)head.sys:sys/errno.h	11.17"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -122,7 +122,6 @@
 #define ELIBSCN	85	/* .lib section in a.out corrupted.	*/
 #define ELIBMAX	86	/* Attempting to link in too many libs.	*/
 #define ELIBEXEC 87	/* Attempting to exec a shared library.	*/
-#define	EILSEQ 88	/* Illegal byte sequence. */
 #define ENOSYS 89	/* Unsupported file system operation */
 #define ELOOP	90	/* Symbolic link loop */
 #define	ERESTART 91	/* Restartable system call */
@@ -132,42 +131,41 @@
 
 /* BSD Networking Software */
 	/* argument errors */
-#define	ENOTSOCK	95		/* Socket operation on non-socket */
-#define	EDESTADDRREQ	96		/* Destination address required */
-#define	EMSGSIZE	97		/* Message too long */
-#define	EPROTOTYPE	98		/* Protocol wrong type for socket */
-#define	ENOPROTOOPT	99		/* Protocol not available */
-#define	EPROTONOSUPPORT	120		/* Protocol not supported */
-#define	ESOCKTNOSUPPORT	121		/* Socket type not supported */
-#define	EOPNOTSUPP	122		/* Operation not supported on socket */
-#define	EPFNOSUPPORT	123		/* Protocol family not supported */
-#define	EAFNOSUPPORT	124		/* Address family not supported by 
+#define	ENOTSOCK	96		/* Socket operation on non-socket */
+#define	EDESTADDRREQ	97		/* Destination address required */
+#define	EMSGSIZE	98		/* Message too long */
+#define	EPROTOTYPE	99		/* Protocol wrong type for socket */
+#define	ENOPROTOOPT	100		/* Protocol not available */
+#define	EPROTONOSUPPORT	101		/* Protocol not supported */
+#define	ESOCKTNOSUPPORT	102		/* Socket type not supported */
+#define	EOPNOTSUPP	103		/* Operation not supported on socket */
+#define	EPFNOSUPPORT	104		/* Protocol family not supported */
+#define	EAFNOSUPPORT	105		/* Address family not supported by 
 					   protocol family */
-#define	EADDRINUSE	125		/* Address already in use */
-#define	EADDRNOTAVAIL	126		/* Can't assign requested address */
+#define	EADDRINUSE	106		/* Address already in use */
+#define	EADDRNOTAVAIL	107		/* Can't assign requested address */
 	/* operational errors */
-#define	ENETDOWN	127		/* Network is down */
-#define	ENETUNREACH	128		/* Network is unreachable */
-#define	ENETRESET	129		/* Network dropped connection because
+#define	ENETDOWN	108		/* Network is down */
+#define	ENETUNREACH	109		/* Network is unreachable */
+#define	ENETRESET	110		/* Network dropped connection because
 					   of reset */
-#define	ECONNABORTED	130		/* Software caused connection abort */
-#define	ECONNRESET	131		/* Connection reset by peer */
-#define	ENOBUFS		132	       	/* No buffer space available */
-#define	EISCONN		133		/* Socket is already connected */
-#define	ENOTCONN	134		/* Socket is not connected */
-/* XENIX has 135 - 142 */
-#define	ESHUTDOWN	143		/* Can't send after socket shutdown */
-#define	ETOOMANYREFS	144		/* Too many references: can't splice */
-#define	ETIMEDOUT	145		/* Connection timed out */
-#define	ECONNREFUSED	146		/* Connection refused */
-#define	EHOSTDOWN	147		/* Host is down */
-#define	EHOSTUNREACH	148		/* No route to host */
+#define	ECONNABORTED	111		/* Software caused connection abort */
+#define	ECONNRESET	112		/* Connection reset by peer */
+#define	ENOBUFS		113	       	/* No buffer space available */
+#define	EISCONN		114		/* Socket is already connected */
+#define	ENOTCONN	115		/* Socket is not connected */
+#define	ESHUTDOWN	116		/* Can't send after socket shutdown */
+#define	ETOOMANYREFS	117		/* Too many references: can't splice */
+#define	ETIMEDOUT	118		/* Connection timed out */
+#define	ECONNREFUSED	119		/* Connection refused */
+#define	EHOSTDOWN	120		/* Host is down */
+#define	EHOSTUNREACH	121		/* No route to host */
 #define EWOULDBLOCK	EAGAIN
-#define EALREADY	149		/* operation already in progress */
-#define EINPROGRESS	150		/* operation now in progress */
+#define EALREADY	123
+#define EINPROGRESS	124
 
 /* SUN Network File System */
-#define	ESTALE		151		/* Stale NFS file handle */
+#define	ESTALE		122		/* Stale NFS file handle */
 
 /* #ifdef MERGE */
 /* XENIX error numbers */

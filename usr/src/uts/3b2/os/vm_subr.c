@@ -5,37 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"@(#)kernel:os/vm_subr.c	1.24"
+#ident	"@(#)kernel:os/vm_subr.c	1.19"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/errno.h"
@@ -127,10 +97,10 @@ uiophysio(strat, bp, dev, rw, uio)
 	register struct iovec *iov;
 	register int c;
 	faultcode_t fault_err;
-	struct proc *procp;
-	struct as *asp;
 	char *a;
 	int hpf, s, error = 0;
+
+	ASSERT(uio->uio_iovcnt == 1);	/* XXX */
 
 	ASSERT(syswait.physio >= 0);
 	syswait.physio++;
@@ -155,14 +125,6 @@ uiophysio(strat, bp, dev, rw, uio)
 		splx(s);
 	}
 
-	if (uio->uio_segflg == UIO_USERSPACE) {
-		procp = u.u_procp;
-		asp = procp->p_as;
-	} else {
-		procp = NULL;
-		asp = &kas;
-	}
-
 	while(uio->uio_iovcnt > 0) {
 		iov = uio->uio_iov;
 		if ((uio->uio_segflg == UIO_USERSPACE) &&
@@ -179,8 +141,7 @@ uiophysio(strat, bp, dev, rw, uio)
 
 		bp->b_oerror = 0;		/* old error field */
 		bp->b_error = 0;
-		bp->b_proc = procp;
-
+		bp->b_proc = u.u_procp;
 		while (iov->iov_len > 0) {
 			if (uio->uio_resid == 0)
 				break;
@@ -197,8 +158,9 @@ uiophysio(strat, bp, dev, rw, uio)
 			 */
 			a = bp->b_un.b_addr = iov->iov_base;
 			c = bp->b_bcount = MIN(iov->iov_len, uio->uio_resid);
-			fault_err = as_fault(asp, a, (uint)c, F_SOFTLOCK,
-			  rw == B_READ? S_WRITE : S_READ);
+			fault_err =
+			  as_fault(u.u_procp->p_as, a, (uint)c, F_SOFTLOCK,
+			           rw == B_READ? S_WRITE : S_READ);
 			if (fault_err != 0) {
 				/*
 				 * Even though the range of addresses were
@@ -216,7 +178,7 @@ uiophysio(strat, bp, dev, rw, uio)
 				bp->b_error = error;
 				(void) spl6();
 				if (bp->b_flags & B_WANTED)
-					wakeprocs((caddr_t)bp, PRMPT);
+					wakeup((caddr_t)bp);
 				(void) splx(s);
 				bp->b_flags &= ~(B_BUSY|B_WANTED|B_PHYS);
 				break;
@@ -238,13 +200,13 @@ uiophysio(strat, bp, dev, rw, uio)
 					    !(error = bp->b_oerror))
 						error = EIO; 
 			}
-			if (as_fault(asp, a, (uint)c, F_SOFTUNLOCK,
-			  rw == B_READ ? S_WRITE : S_READ) != 0)
+			if (as_fault(u.u_procp->p_as, a, (uint)c, F_SOFTUNLOCK,
+			             rw == B_READ? S_WRITE : S_READ) != 0)
 				cmn_err(CE_PANIC, "physio unlock");
 
 			(void) spl6();
 			if (bp->b_flags & B_WANTED)
-				wakeprocs((caddr_t)bp, PRMPT);
+				wakeup((caddr_t)bp);
 			(void) splx(s);
 
 			c -= bp->b_resid;
@@ -269,7 +231,7 @@ uiophysio(strat, bp, dev, rw, uio)
 		bp->av_forw = pfreelist.av_forw;
 		pfreelist.av_forw = bp;
 		pfreecnt++;
-		wakeprocs((caddr_t)&pfreelist, PRMPT);
+		wakeup((caddr_t)&pfreelist);
 		splx(s);
 	}
 

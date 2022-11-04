@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/exec.h	1.15"
+#ident	"@(#)head.sys:sys/exec.h	1.12"
 
 
 #define getexmag(x)	(x[0] << 8) + x[1]
@@ -71,8 +71,6 @@ typedef struct exhda {
 
 #define EXHDA_HADERROR	1
 
-#ifdef _KERNEL
-
 #if defined(__STDC__)
 
 extern int exhd_getmap(exhda_t *, off_t, int, int, char *);
@@ -81,8 +79,8 @@ extern int remove_proc(struct uarg *);
 extern int execmap(vnode_t *, caddr_t, size_t, size_t, off_t, int);
 extern void setexecenv(struct execenv *);
 extern int setregs(struct uarg *);
-extern int core_seg(proc_t *, vnode_t *, off_t, caddr_t, size_t, rlim_t, cred_t *);
-extern int gexec(vnode_t **, struct uarg *, int, long *);
+extern int core_seg(vnode_t *, off_t, caddr_t, size_t, rlim_t, cred_t *);
+extern int gexec(vnode_t *, struct uarg *, int, long *);
 extern caddr_t execstk_addr(int, u_int *);
 extern int execpermissions(struct vnode *, struct vattr *, exhda_t *, struct uarg *);
 
@@ -100,8 +98,6 @@ extern caddr_t execstk_addr();
 extern int execpermissions();
 
 #endif	/* __STDC__ */
-
-#endif	/* _KERNEL */
 
 /* flags for exhd_getmap(): */
 #define	EXHD_NOALIGN	0

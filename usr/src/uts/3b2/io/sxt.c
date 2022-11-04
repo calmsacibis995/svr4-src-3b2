@@ -5,7 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/sxt.c	1.7"
+
+#ident	"@(#)kernel:io/sxt.c	1.4"
 /*
  * SXT --  STREAMS Multiplexing Driver for Shell Layers
  */
@@ -27,8 +28,7 @@
 #include "sys/termio.h"
 #include "sys/errno.h"
 #include "sys/strtty.h"
-#include "sys/nsxt.h"
-#include "sys/fcntl.h"
+#include "sys/sxt.h"
 #include "sys/cmn_err.h"
  
 /*
@@ -82,11 +82,6 @@ queue_t *q;
 
 	chan = CHAN(dev);
 
-	if ( ( sxtctl[LINK(dev)].sxt_ttyq == (struct queue *)0 )
-	     && !(chan == 0 && oflag & O_EXCL) ) {
-		u.u_error = EINVAL;
-		return(OPENFAIL);
-	}
 	if( chan == 0 )	/* opening control channel */
 	{
 		if( sxtctl[LINK(dev)].sxt_actq ) /* open this only once! */
@@ -155,9 +150,6 @@ queue_t *q;
 	mblk_t *bp;
 
         chanp = (struct sxt_chan *)q->q_ptr;
-	if(!chanp) {
-		return(-1);
-	}
 
 	if( chanp->schan_chflg&SXTCTL )	/* closing control channel */
 	{
@@ -524,14 +516,12 @@ struct sxt_chan *chanp;
 			break;
 
 		case SXTIOCSTAT:
-#if 0
 			if( !(chanp->schan_chflg&SXTCTL) )
 			{
 				/* must be ctl chan for this ioctl */
 				bp->b_datap->db_type = M_IOCNAK;
 				break;
 			}
-#endif
 			if( (bpt = allocb(sizeof(struct sxtblock), BPRI_MED)) == NULL )
 			{
 				bp->b_datap->db_type = M_IOCNAK;

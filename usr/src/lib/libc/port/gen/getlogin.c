@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/getlogin.c	1.16"
+#ident	"@(#)libc-port:gen/getlogin.c	1.15"
 /*LINTLIBRARY*/
 #ifdef __STDC__
 	#pragma weak getlogin = _getlogin
@@ -14,7 +14,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include "utmp.h"
-#include <unistd.h>
+#include <osfcn.h>
 
 #define NULL 0
 

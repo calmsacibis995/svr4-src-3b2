@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/lock.c	1.34"
+#ident	"@(#)kernel:os/lock.c	1.31"
 #include "sys/types.h"
 #include "sys/bitmap.h"
 #include "sys/sysmacros.h"
@@ -55,9 +55,10 @@ STATIC int ublock();
 STATIC int proclock();
 STATIC void tunlock();
 STATIC void dunlock();
-STATIC void ubunlock();
+STATIC int ubunlock();
 int punlock();
 #endif
+
 
 /* ARGSUSED */
 int
@@ -131,9 +132,12 @@ STATIC void
 tunlock()
 {
 	register struct proc *p = u.u_procp;
+	register int error;
 
-	(void) as_ctl(p->p_as, 0, 0, MC_UNLOCKAS, PROC_TEXT|PRIVATE|PROT_USER,
+	error = as_ctl(p->p_as, 0, 0, MC_UNLOCKAS, PROC_TEXT|PRIVATE|PROT_USER,
 			0, (ulong *)NULL, (size_t)NULL);
+	if (error)
+		cmn_err(CE_PANIC, "tunlock(): unlock failed %d\n", error);
 	u.u_lock &= ~TXTLOCK;
 }
 
@@ -164,9 +168,12 @@ STATIC void
 dunlock()
 {
 	register struct proc *p = u.u_procp;
+	register int error;
 
-	(void) as_ctl(p->p_as, 0, 0, MC_UNLOCKAS, PROC_DATA|PRIVATE|PROT_USER,
+	error = as_ctl(p->p_as, 0, 0, MC_UNLOCKAS, PROC_DATA|PRIVATE|PROT_USER,
 			0, (ulong *)NULL, (size_t)NULL);
+	if (error)
+		cmn_err(CE_PANIC, "dunlock(): unlock failed %d\n", error);
 	u.u_lock &= ~DATLOCK;
 }
 		
@@ -175,16 +182,12 @@ dunlock()
  * Ublocks for system processes are counted in segu_alloc and segu_free.
  * SSYS processes are also SLOCK'ed. We will only do the accounting for
  * non SSYS processes.
- * Allow user to mix plock and memlockall.
  */
 
 STATIC int
 ublock()
 {
 
-	/* return if already locked */
-	if (u.u_lock & (PROCLOCK|MEMLOCK))
-		return 0;
 	if ((u.u_procp->p_flag & (SSYS|SLOCK)) == 0) {
 		if ((availrmem - USIZE) < tune.t_minarmem) {
 			nomemmsg("proclock", USIZE, 0, 1);
@@ -201,9 +204,6 @@ STATIC void
 ubunlock()
 {
 
-	/* return if still locked */
-	if (u.u_lock & (PROCLOCK|MEMLOCK))
-		return;
 	if ((u.u_procp->p_flag & (SSYS|SLOCK)) == SLOCK) {
 		u.u_procp->p_flag &= ~SLOCK;
 		availrmem += USIZE;
@@ -239,8 +239,8 @@ punlock()
 	if ((u.u_lock & (PROCLOCK|TXTLOCK|DATLOCK)) == 0)
 		return EINVAL;
 	if (u.u_lock & PROCLOCK) {
-		u.u_lock &= ~PROCLOCK;
 		ubunlock();
+		u.u_lock &= ~PROCLOCK;
 	}
 	if (u.u_lock & TXTLOCK)
 		tunlock();
@@ -328,7 +328,6 @@ memcntl(uap, rvp)
 		/* do ublock availrmem accounting */
 		if ((error = ublock()) != 0)
 			return error;
-		u.u_lock |= MEMLOCK;
 		sseg = seg = as_pp->a_segs;
 		if (seg == NULL)
 			return 0;
@@ -348,9 +347,6 @@ memcntl(uap, rvp)
 				(u_int)raddr;
 		break;
 	case MC_UNLOCKAS:
-		/* remove claim for ublock */
-		u.u_lock &= ~MEMLOCK;
-		ubunlock();
 	case MC_UNLOCK:
 		mlock_map = NULL;
 		mlock_size = NULL;
@@ -370,7 +366,6 @@ memcntl(uap, rvp)
 		if (error) {
 			if (uap->cmd == MC_LOCKAS) {
 				/* remove claim for ublock */
-				u.u_lock &= ~MEMLOCK;
 				ubunlock();
 
 				inx = 0;

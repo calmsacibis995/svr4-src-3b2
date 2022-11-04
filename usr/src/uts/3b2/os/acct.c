@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/acct.c	1.18"
+#ident	"@(#)kernel:os/acct.c	1.16"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -58,38 +58,30 @@ sysacct(uap, rvp)
 	aclock++;
 	if (uap->fname == NULL) {
 		if (acctvp) {
-			if (error = VOP_CLOSE(acctvp, FWRITE, 1, 0, u.u_cred))
-				goto out;
 			VN_RELE(acctvp);
 			acctvp = NULL;
 		}
 	} else {
-		if (error = vn_open(uap->fname, UIO_USERSPACE, FWRITE,
-		  0, &vp, (enum create)0)) {
-			/* SVID  compliance */
-			if (error == EISDIR)
-				error = EACCES;
+		if (error = lookupname(uap->fname, UIO_USERSPACE,
+		  FOLLOW, NULLVPP, &vp))
 			goto out;
-		}
 		if (acctvp && VN_CMP(acctvp, vp)) {
 			error = EBUSY;
-			goto closevp;
+			VN_RELE(vp);
+			goto out;
 		}
-		if (vp->v_type != VREG) {
+		if (vp->v_type != VREG)
 			error = EACCES;
-			goto closevp;
+		else	
+			error = VOP_ACCESS(vp, VWRITE, 0, u.u_cred);
+		if (error) {
+			VN_RELE(vp);
+			goto out;
 		}
-		if (acctvp) {
-			if (error = VOP_CLOSE(acctvp, FWRITE, 1, 0, u.u_cred))
-				goto closevp;
+		if (acctvp)
 			VN_RELE(acctvp);
-		}
 		acctvp = vp;
 	}
-	goto out;
-closevp:
-	(void)VOP_CLOSE(vp, FWRITE, 1, 0, u.u_cred);
-	VN_RELE(vp);
 out:
 	aclock--;
 	return error;
@@ -129,7 +121,7 @@ void
 #ifdef __STDC__
 acct(char st)
 #else
-acct(st)
+acct(char)
 	char st;
 #endif
 {

@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:gpkgmap.c	1.5.1.1"
+#ident	"@(#)libpkg:gpkgmap.c	1.5"
 
 #include <stdio.h>
 #include <limits.h>
@@ -201,8 +201,9 @@ error:
 
 		/* don't have to check for (mode < 0) since '-'
 		   is not a legal digit */
-		if((ept->ainfo.mode != BADMODE) && ((ept->ainfo.mode > 07777) ||
-		(strchr("cbdxp", ept->ftype) && (ept->ainfo.mode > 02000)))) {
+		if((ept->ainfo.mode > 07777) || 
+		(strchr("cbdxp", ept->ftype) && 
+		(ept->ainfo.mode > 02000))) {
 			errstr = "illegal value for mode";
 			goto error;
 		}

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)klm:klm/klm_kprot.c	1.2"
+#ident	"@(#)klm:klm/klm_kprot.c	1.1"
 /*
  *  		PROPRIETARY NOTICE (Combined)
  *  
@@ -27,7 +27,7 @@
  *  	          All rights reserved.
  */
 #include <rpc/rpc.h>
-#include "klm_prot.h"
+#include <rpcsvc/klm_prot.h>
 
 
 bool_t

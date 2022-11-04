@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:ckdate.c	1.4"
+#ident	"@(#)libadm:ckdate.c	1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -46,7 +46,6 @@ static char	*p_ndigit(),
 #define DELIM1 '/'
 #define DELIM2 '-'
 #define BLANK ' '
-#define TAB '	'
 
 static void
 setmsg(msg, fmt)
@@ -99,15 +98,10 @@ int llim, ulim;
 	char daynum[3];
 	int begin = -1; 
 	int iday = 0;
-	int idaymax = 2;
 
 	daynum[0] = '\0';
-	if (*string == BLANK) {
-		*string++;
-		idaymax--;
-	}
 	copy = string;
-	while (isdigit(*copy) && (iday < idaymax)) {
+	while (isdigit(*copy) && (iday < 3 )) {
 		daynum[iday] = *copy++ ;
 		iday++;
 	}
@@ -155,11 +149,11 @@ char *string, mnabr;
 	int n = 0;
 
 	if(mnabr == 'a') {
-		mlen = 3;
+		mlen = 4;
 		for (icnt = 0; icnt < 12; icnt++)
 			mnth[icnt] = amonth[icnt];
 	} else {
-		mlen = 9;
+		mlen = 10;
 		for (icnt = 0; icnt < 12; icnt++)
 			mnth[icnt] = fmonth[icnt];
 	}
@@ -173,7 +167,7 @@ char *string, mnabr;
 	}
 	mletter[imnth] = '\0';
 	while (!(legit) && (n < 12)) {
-		if(strncmp(mletter, mnth[n], (imnth = strlen(mnth[n]))) == 0)
+		if(strcmp(mletter, mnth[n]) == 0)
 			legit = 1;	/* found legitimate string */
 		n++;
 	}
@@ -205,78 +199,24 @@ char *string, dchoice;
 		return((dlm == dchoice) ? string + 1 : NULL);
 }
 
-int
+void
 ckdate_err(fmt, error)
 char	*fmt, *error;
 {
 	char	defmesg[MSGSIZ];
 
-	if(fmtcheck(fmt) == 1)
-		return(4);
 	setmsg(defmesg, fmt);
 	puterror(stdout, defmesg, error);
-	return(0);
 }
 
-int
+void
 ckdate_hlp(fmt, help)
 char	*fmt, *help;
 {
 	char	defmesg[MSGSIZ];
 
-	if(fmtcheck(fmt) == 1)
-		return(4);
 	setmsg(defmesg, fmt);
 	puthelp(stdout, defmesg, help);
-	return(0);
-}
-
-/*
-*	A little state machine that checks out the format to
-*	make sure it is acceptable.
-*		return value 1: NG
-*		return value 0: OK
-*/
-int
-fmtcheck(fmt)
-char	*fmt;
-{
-	int	percent = 0;
-
-	while(*fmt) {
-		switch(*fmt++) {
-		 	case '%': /* previous state must be start or letter */
-				if(percent == 0)
-					percent = 1;
-				else
-					return(1);
-				break;
-			case 'd': /* previous state must be "%"*/
-			case 'e':
-			case 'm':
-			case 'y':
-			case 'Y':
-			case 'D':
-			case 'h':
-			case 'b':
-			case 'B':
-				if(percent == 1)
-					percent = 0;
-				else
-					return(1);
-				break;
-			case TAB: /* previous state must be start or letter */
-			case BLANK:
-			case DELIM1:
-			case DELIM2:
-				if(percent == 1)
-					return(1);
-				break;
-			default:
-				return(1);
-		}
-	}
-	return(percent);
 }
 
 int
@@ -285,9 +225,6 @@ char *fmt, *input;
 {
 	char ltrl, dfl;
 	int valid = 1; 	/* time of day string is valid for format */
-
-	if((fmt != NULL) && (fmtcheck(fmt) == 1))
-		return(4);
 
 	if(fmt == NULL)
 		fmt = DEFAULT;
@@ -381,7 +318,7 @@ char *fmt, *input;
 		if(*input) 
 			valid = 0;
 	}
-	return((valid == 0)); 
+	return(!valid); 
 }
 
 ckdate(date, fmt, defstr, error, help, prompt)
@@ -396,9 +333,6 @@ char *defstr, *error, *help;
 
 	ept = end;
 	*ept = '\0';
-
-	if((fmt != NULL) && (fmtcheck(fmt) == 1))
-		return(4);
 
 	setmsg(defmesg, fmt);
 	(void) sprintf(ept, "[?,q]");

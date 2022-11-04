@@ -8,7 +8,7 @@
 #ifndef _SYS_STREAM_H
 #define _SYS_STREAM_H
 
-#ident	"@(#)head.sys:sys/stream.h	11.42"
+#ident	"@(#)head.sys:sys/stream.h	11.38"
 
 /*
  * For source compatibility
@@ -260,8 +260,8 @@ struct datab {
 	unsigned char	db_type;
 	unsigned char	db_iswhat;	/* status of the mesg/data/buffer triplet */
 	unsigned int	db_size;
+	long		db_filler[3];	/* reserved for future use */
 	caddr_t		db_msgaddr;	/* triplet mesg header that points to datab */
-	long		db_filler;	/* reserved for future use */
 };
 
 #endif /* _STYPES */
@@ -307,6 +307,15 @@ struct	msgb {
 typedef struct msgb mblk_t;
 typedef struct datab dblk_t;
 typedef struct free_rtn frtn_t;
+
+/* convenient power of 2 */
+#define	FASTBUF	(128 - sizeof(struct msgb) - sizeof(struct datab))
+
+struct	mdbblock {
+	struct	msgb	msgblk;
+	struct	datab	datblk;
+	char	databuf[FASTBUF];
+};
 
 
 /*
@@ -534,7 +543,6 @@ struct stroptions {
 #define SO_DELIM	0x8000	/* messages are delimited */
 #ifndef _STYPES
 #define SO_NODELIM	0x010000	/* turn off delimiters */
-#define SO_STRHOLD	0x020000	/* enable strwrite message coalescing */
 #endif /* _STYPES */
 
 /*

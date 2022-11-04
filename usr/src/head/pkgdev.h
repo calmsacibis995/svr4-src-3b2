@@ -5,18 +5,16 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)oamhdrs:pkgdev.h	1.2.1.1"
+#ident	"@(#)oamhdrs:pkgdev.h	1.2"
 
 struct pkgdev {
 	int	rdonly;
 	int	mntflg;
-	long	capacity; /* number of 512-blocks on device */
 	char	*name;
 	char	*dirname;
-	char	*pathname;
+	char	*norewind;
 	char	*mount;
 	char	*fstyp;
 	char	*cdevice;
 	char	*bdevice;
-	char	*norewind;
 };

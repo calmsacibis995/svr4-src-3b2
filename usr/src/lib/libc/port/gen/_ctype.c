@@ -5,9 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/_ctype.c	1.3"
+#ident	"@(#)libc-port:gen/_ctype.c	1.2"
+#ifndef ABI
 #ifdef __STDC__
 	#pragma weak _ctype = __ctype
+#endif
 #endif
 #include "synonyms.h"
 #include <locale.h>

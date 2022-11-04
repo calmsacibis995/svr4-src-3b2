@@ -5,10 +5,15 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/fs/ufs_quota.h	1.5"
+#ident	"@(#)head.sys:sys/fs/ufs_quota.h	1.3"
 
 #ifndef _SYS_FS_UFS_QUOTA_H
 #define _SYS_FS_UFS_QUOTA_H
+
+/*
+ * Various junk to do with various quotas (etc) imposed upon
+ * the average user (big brother finally hits UNIX).
+ */
 
 /*
  * The following constants define the default amount of time given a user
@@ -102,7 +107,7 @@ extern void dqupdate();                 /* update dquot on disk */
         (dqp)->dq_flags &= ~DQ_LOCKED; \
         if ((dqp)->dq_flags & DQ_WANT) { \
                 (dqp)->dq_flags &= ~DQ_WANT; \
-                wakeprocs((caddr_t)(dqp), PRMPT); \
+                wakeup((caddr_t)(dqp)); \
         } \
 }
 #endif

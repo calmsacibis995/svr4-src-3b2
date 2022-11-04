@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:gpkglist.c	1.6.2.1"
+#ident	"@(#)libpkg:gpkglist.c	1.6.1.1"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -37,8 +37,6 @@ extern CKMENU	*allocmenu();
 #define MAXSIZE	128
 #define MALLOCSIZ 128
 
-#define ERR_MEMORY	"memory allocation failure, errno=%d"
-#define ERR_NOPKG	"no package associated with <%s>"
 #define HEADER	"The following packages are available:"
 #define HELP	\
 	"Please enter the package instances you wish to process \
@@ -103,11 +101,6 @@ char	**pkg;
 				if((++n % MALLOCSIZ) == 0) {
 					nwpkg = (char **) realloc(nwpkg, 
 						(n+MALLOCSIZ)* sizeof(char**));
-					if(nwpkg == NULL) {
-						progerr(ERR_MEMORY, errno);
-						errno = ENOMEM;
-						return(NULL);
-					}
 				}
 				chp = chp->next;
 				nwpkg[n] = NULL;
@@ -137,7 +130,8 @@ char	**pkg;
 			(void) fpkginst(NULL);
 			inst = fpkginst(pkg[i], NULL, NULL);
 			if(inst == NULL) {
-				progerr(ERR_NOPKG, pkg[i]);
+				progerr("no package associated with <%s>",
+					pkg[i]);
 				free(nwpkg);
 				nwpkg = NULL;
 				errno = ESRCH;
@@ -148,17 +142,12 @@ char	**pkg;
 				if((++n % MALLOCSIZ) == 0) {
 					nwpkg = (char **) realloc(nwpkg, 
 						(n+MALLOCSIZ)* sizeof(char**));
-					if(nwpkg == NULL) {
-						progerr(ERR_MEMORY, errno);
-						errno = ENOMEM;
-						return(NULL);
-					}
 				}
-				nwpkg[n] = NULL;
 			} while(inst = fpkginst(pkg[i], NULL, NULL));
 		} else {
 			if(fpkginfo(&info, pkg[i])) {
-				progerr(ERR_NOPKG, pkg[i]);
+				progerr("no package associated with <%s>",
+					pkg[i]);
 				free(nwpkg);
 				nwpkg = NULL;
 				errno = ESRCH;
@@ -168,13 +157,7 @@ char	**pkg;
 			if((++n % MALLOCSIZ) == 0) {
 				nwpkg = (char **) realloc(nwpkg, 
 					(n+MALLOCSIZ)* sizeof(char**));
-				if(nwpkg == NULL) {
-					progerr(ERR_MEMORY, errno);
-					errno = ENOMEM;
-					return(NULL);
-				}
 			}
-			nwpkg[n] = NULL;
 		}
 	} while(pkg[++i]);
 

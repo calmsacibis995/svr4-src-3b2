@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.nsu:prototype	1.19.3.3"
+#ident	"@(#)pkg.nsu:prototype	1.19.2.16"
 #
 #	All files/directories are defined as relocatable. Although
 #	BASENAME is not used at this time (i.e. defaults to /)
@@ -40,13 +40,6 @@ d none	/usr/net
 d none	/usr/net/nls
 d none	/usr/lib/saf	?	?	?
 d none	/usr/sbin	?	?	?
-d none  /usr/sadm	?	?	?
-d none  /usr/sadm/sysadm	?	?	?
-d none  $OAMBASE/menu	?	?	?
-d none  $OAMBASE/menu/netservices	?	?	?
-d none  $OAMBASE/menu/netservices/name_to_addr	?	?	?
-d none  $OAMBASE/menu/netservices/name_to_addr/loopback	?	?	?
-d none  $OAMBASE/menu/netservices/name_to_addr/loopback/bin	?	?	?
 #
 #	driver object files: default owner=root group=root mode=500
 #	use already mkboot-ed files for managability
@@ -93,12 +86,12 @@ f none	/usr/sbin/kmapr
 s none	/usr/bin/kmapr=/usr/sbin/kmapr
 f none	/usr/sbin/kmamkdb
 s none	/usr/bin/kmamkdb=/usr/sbin/kmamkdb
-f none	/usr/sbin/strace
-f none	/usr/sbin/strclean
-f none	/usr/sbin/strerr
-s none	/usr/bin/strace=/usr/sbin/strace
-s none	/usr/bin/strclean=/usr/sbin/strclean
-s none	/usr/bin/strerr=/usr/sbin/strerr
+f none	/usr/bin/strace
+f none	/usr/bin/strclean
+f none	/usr/bin/strerr
+s none	/usr/sbin/strace=/usr/bin/strace
+s none	/usr/sbin/strclean=/usr/bin/strclean
+s none	/usr/sbin/strerr=/usr/bin/strerr
 f none	/usr/sbin/syslogd
 #
 #	header files: default owner=bin group=bin mode=0444
@@ -114,6 +107,7 @@ f none	/usr/include/tiuser.h
 #
 !default 0444 root bin
 f none	/usr/lib/libnls.a
+f none	/usr/lib/libpt.a
 f none	/usr/lib/pt_chmod 04111 root bin
 f none	/usr/lib/libsocket.so
 f none	/usr/lib/libsocket.a
@@ -163,22 +157,3 @@ l OAMadmin	$OAMBASE/add-ons/$PKGINST/netservices/selection/modify/Help=$OAMBASE/
 !default 0755 bin bin
 f OAMadmin	$OAMBASE/bin/nslist
 f OAMadmin	$OAMBASE/bin/chgnetconf
-#
-#	OAM Scripts for Name to Address Mapping...
-#
-!default 0644 bin bin
-f none $OAMBASE/menu/netservices/name_to_addr/Help
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Form.lbserv
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Help
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Menu.loopback
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.badport
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.exists
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.lts
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.lts_ord
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ord
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots_lts
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.ots_ord
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/Text.success
-f none $OAMBASE/menu/netservices/name_to_addr/loopback/bin/loopback.serv 0755 bin bin
-f none $OAMBASE/menu/netservices/name_to_addr/map.menu

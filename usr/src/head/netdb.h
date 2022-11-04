@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.usr:netdb.h	1.2"
+#ident	"@(#)head.usr:netdb.h	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -72,10 +72,17 @@ struct	protoent {
 	int	p_proto;	/* protocol # */
 };
 
+struct rpcent {
+	char	*r_name;	/* name of server for this rpc program */
+	char	**r_aliases;	/* alias list */
+	int	r_number;	/* rpc program number */
+};
+
 struct hostent	*gethostbyname(), *gethostbyaddr(), *gethostent();
 struct netent	*getnetbyname(), *getnetbyaddr(), *getnetent();
 struct servent	*getservbyname(), *getservbyport(), *getservent();
 struct protoent	*getprotobyname(), *getprotobynumber(), *getprotoent();
+struct rpcent	*getrpcbyname(), *getrpcbynumber(), *getrpcent();
 
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()

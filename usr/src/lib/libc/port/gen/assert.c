@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/assert.c	1.4.1.7"
+#ident	"@(#)libc-port:gen/assert.c	1.4.1.6"
 /*LINTLIBRARY*/
 /*
  *	called from "assert" macro; prints without printf or stdio.
@@ -17,7 +17,7 @@
 #include "synonyms.h"
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <osfcn.h>
 
 
 #define WRITE(s, n)	(void) write(2, (s), (n))

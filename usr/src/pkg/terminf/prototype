@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.terminf:terminf/prototype	1.12"
+#ident	"@(#)pkg.terminf:terminf/prototype	1.8"
 
 # packaging and installation scripts
 
@@ -6,8 +6,8 @@ i pkginfo
 i postinstall
 i postremove
 
-d none /usr 775 root sys
-d none /usr/share 755 root sys
+d none /usr
+d none /usr/share
 d none /usr/share/lib 775 root bin
 d none /etc 775 root sys
 f none /usr/share/lib/termcap 444 root bin
@@ -22,8 +22,6 @@ f none /usr/share/lib/tabset/std 444 root bin
 f none /usr/share/lib/tabset/teleray 444 root bin
 f none /usr/share/lib/tabset/vt100 444 root bin
 f none /usr/share/lib/tabset/xerox1720 444 root bin
-f none /usr/share/lib/tabset/hds 444 root bin
-f none /usr/share/lib/tabset/hds3 444 root bin
 
 # the following files should be pulled from the cross-env during packaging
 
@@ -37,10 +35,9 @@ f none /usr/bin/clear 555 bin bin
 d none /tmp 777 sys sys
 d none /tmp/terminf 444 root bin
 v none /tmp/terminf/adds.ti=/usr/share/lib/terminfo/ti/adds.ti 444 root bin
-v none /tmp/terminf/annarbor.ti=/usr/share/lib/terminfo/ti/annarbor.ti 444 root bin
+v none /tmp/terminf/annarbour.ti=/usr/share/lib/terminfo/ti/annarbor.ti 444 root bin
 v none /tmp/terminf/ansi.ti=/usr/share/lib/terminfo/ti/ansi.ti 444 root bin
 v none /tmp/terminf/att.ti=/usr/share/lib/terminfo/ti/att.ti 444 root bin
-v none /tmp/terminf/attprint.ti=/usr/share/lib/terminfo/ti/attprint.ti 444 root bin
 v none /tmp/terminf/beehive.ti=/usr/share/lib/terminfo/ti/beehive.ti 444 root bin
 v none /tmp/terminf/cdc.ti=/usr/share/lib/terminfo/ti/cdc.ti 444 root bin
 v none /tmp/terminf/colorscan.ti=/usr/share/lib/terminfo/ti/colorscan.ti 444 root bin

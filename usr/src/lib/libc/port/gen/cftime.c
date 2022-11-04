@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/cftime.c	1.15"
+#ident	"@(#)libc-port:gen/cftime.c	1.14"
 /*LINTLIBRARY*/
 /*
  * This routine converts time as follows.  The epoch is 0000  Jan  1
@@ -67,7 +67,7 @@ const struct tm *tm;
 	/* Set format string, if not already set */
 	if (format == NULL || *format == '\0') 
 		if (((format = getenv("CFTIME")) == 0) || *format == 0)
-			format =  "%C";
+			format =  "%c";
 
 	return(strftime(buf, LONG_MAX, format, tm));
 }

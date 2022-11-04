@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-m32:sys/sigaction.c	1.5"
+#ident	"@(#)libc-m32:sys/sigaction.c	1.4"
 
 #ifdef __STDC__ 
 	#pragma weak sigaction = _sigaction
@@ -30,11 +30,9 @@ sigacthandler(sig, sip, uap)
 	
 sigaction(sig, nact, oact)
 	int sig;
-	const struct sigaction *nact;
-	struct sigaction *oact;
+	struct sigaction *nact, *oact;
 {
 	struct sigaction tact;
-	register struct sigaction *tactp;
 	void (*ohandler)();
 
 	if (sig <= 0 || sig >= NSIG) {
@@ -44,15 +42,15 @@ sigaction(sig, nact, oact)
 
 	ohandler = _siguhandler[sig];
 
-	if (tactp = (struct sigaction *)nact) {
+	if (nact) {
 		tact = *nact;
-		tactp = &tact;
-		_siguhandler[sig] = tactp->sa_handler;
-		if (tactp->sa_handler != SIG_DFL && tactp->sa_handler != SIG_IGN)
-			tactp->sa_handler = sigacthandler;
+		nact = &tact;
+		_siguhandler[sig] = nact->sa_handler;
+		if (nact->sa_handler != SIG_DFL && nact->sa_handler != SIG_IGN)
+			nact->sa_handler = sigacthandler;
 	}
 
-	if (__sigaction(sig, tactp, oact) == -1) {
+	if (__sigaction(sig, nact, oact) == -1) {
 		_siguhandler[sig] = ohandler;
 		return -1;
 	}

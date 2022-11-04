@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/vfs.c	1.35"
+#ident	"@(#)fs:fs/vfs.c	1.26"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/immu.h"
@@ -83,6 +60,14 @@ mount(uap, rvp)
 	struct vfsops *vfsops;
 	register int error;
 	int remount = 0, ovflags;
+#ifdef RFSUNMOUNTHACK
+	struct pathname pn;
+	char *namecovered;
+	size_t coveredlen;
+
+	extern size_t	strnormlen();
+	extern char	*strnormcpy();
+#endif
 	
 	/*
 	 * Resolve second path name (mount point).
@@ -93,7 +78,7 @@ mount(uap, rvp)
 		VN_RELE(vp);
 		return EBUSY;
 	}
-
+	dnlc_purge();
 	/*
 	 * Backward compatibility: require the user program to
 	 * supply a flag indicating a new-style mount, otherwise
@@ -169,8 +154,40 @@ mount(uap, rvp)
 		vfsp->vfs_flag &= ~VFS_RDONLY;
 
 	} else {
+	
+		/*
+		 * Storing the pathname is an interim measure allowing unmounts
+		 * of file systems under untraversable pathnames, e.g., those
+		 * on crashed NFS and RFS servers.  A full solution will appear
+		 * in a later release.
+		 *
+		 * NOTE:  To be able to free the space used for the name
+		 * later, we MUST call strnormlen before allocating, so that
+		 * strlen + 1 will later give the correct size of the allocated
+		 * storage.
+		 */
+	
+#ifdef RFSUNMOUNTHACK
+		if (error = pn_get(uap->dir, UIO_USERSPACE, &pn)) {
+			VN_RELE(vp);
+			return error;
+		}
+		
+		if ((namecovered =
+		  kmem_alloc((coveredlen = strnormlen(pn.pn_buf)) + 1, KM_SLEEP))
+		  == NULL) {
+			pn_free(&pn);
+			VN_RELE(vp);
+			return EBUSY;
+		}
+		(void)strnormcpy(namecovered, pn.pn_buf);
+		pn_free(&pn);
+#endif
 		if ((vfsp = (vfs_t *) kmem_alloc(sizeof(vfs_t), KM_SLEEP))
 		  == NULL) {
+#ifdef RFSUNMOUNTHACK
+			kmem_free(namecovered, coveredlen);
+#endif
 			VN_RELE(vp);
 			return EBUSY;
 		}
@@ -184,20 +201,24 @@ mount(uap, rvp)
 	if (error = vfs_lock(vfsp)) {
 		VN_RELE(vp);
 		if (!remount) {
+#ifdef RFSUNMOUNTHACK
+			kmem_free(namecovered, coveredlen);
+#endif
 			kmem_free((caddr_t) vfsp, sizeof(struct vfs));
 		}
 		return error;
 	}
-
-		dnlc_purge_vp(vp);
-
 	error = VFS_MOUNT(vfsp, vp, uap, u.u_cred);
 	vfs_unlock(vfsp);
 	if (error) {
 		if (remount)
 			vfsp->vfs_flag = ovflags;
-		else
+		else {
+#ifdef RFSUNMOUNTHACK
+			kmem_free(namecovered, coveredlen);
+#endif
 			kmem_free((caddr_t) vfsp, sizeof(struct vfs));
+		}
 		VN_RELE(vp);
 	} else {
 		if (remount) {
@@ -205,6 +226,9 @@ mount(uap, rvp)
 			VN_RELE(vp);
 		} else {
 			vfs_add(vp, vfsp, uap->flags);
+#ifdef RFSUNMOUNTHACK
+			vfsp->vfs_namecovered = namecovered;
+#endif
 			vp->v_vfsp->vfs_nsubmounts++;
 		}
 	}
@@ -230,7 +254,7 @@ umount(uap, rvp)
 	 * Lookup user-supplied name.
 	 */
 	if (error = lookupname(uap->pathp, UIO_USERSPACE, FOLLOW,
-	  NULLVPP, &fsrootvp))
+	    NULLVPP, &fsrootvp))
 		return error;
 	/*
 	 * Find the vfs to be unmounted.  The caller may have specified
@@ -272,11 +296,7 @@ dounmount(vfsp, cr)
 	if (error = vfs_lock(vfsp))
 		return error;
 
-	/*
-	 * Purge all dnlc entries for this vfs.
-	 */
-	dnlc_purge_vfsp(vfsp, 0);
-
+	dnlc_purge();	/* remove dnlc entries for this file sys */
 	VFS_SYNC(vfsp, 0, cr);
 
 	if (error = VFS_UNMOUNT(vfsp, cr))
@@ -284,9 +304,13 @@ dounmount(vfsp, cr)
 	else {
 		--coveredvp->v_vfsp->vfs_nsubmounts;
 		ASSERT(vfsp->vfs_nsubmounts == 0);
-		vfs_remove(vfsp);
-		kmem_free((caddr_t)vfsp, (u_int)sizeof(*vfsp));
 		VN_RELE(coveredvp);
+		vfs_remove(vfsp);
+#ifdef RFSUNMOUNTHACK
+		kmem_free(vfsp->vfs_namecovered,
+		  strlen(vfsp->vfs_vnodecovered) + 1);
+#endif
+		kmem_free((caddr_t)vfsp, (u_int)sizeof(*vfsp));
 	}
 	return error;
 }
@@ -296,12 +320,14 @@ dounmount(vfsp, cr)
  * each file system type, passing it a NULL vfsp to indicate that all
  * mounted file systems of that type should be updated.
  */
+
 void
 sync()
 {
 	register int i;
 	for (i = 1; i < nfstype; i++)
-		(void) (*vfssw[i].vsw_vfsops->vfs_sync)(NULL, 0, u.u_cred);
+		(void) (*vfssw[i].vsw_vfsops->vfs_sync)
+			(NULL, 0, u.u_cred);
 }
 
 /* ARGSUSED */
@@ -386,9 +412,9 @@ cstatvfs(vfsp, ubp)
 
 /*
  * statfs(2) and fstatfs(2) have been replaced by statvfs(2) and
- * fstatvfs(2) and will be removed from the system in a near-future
- * release.
+ * fstatvfs(2) and will be removed from the system in a near-future release.
  */
+
 struct statfsa {
 	char	*fname;
 	struct	statfs *sbp;
@@ -456,8 +482,7 @@ cstatfs(vfsp, sbp, len)
 {
 	struct statfs sfs;
 	struct statvfs svfs;
-	register int error, i;
-	char *cp, *cp2;
+	register int error;
 	register struct vfssw *vswp;
 
 	if (len < 0 || len > sizeof(struct statfs))
@@ -475,26 +500,9 @@ cstatfs(vfsp, sbp, len)
 	sfs.f_bfree = svfs.f_bfree * (svfs.f_frsize/512);
 	sfs.f_files = svfs.f_files;
 	sfs.f_ffree = svfs.f_ffree;
-
-	cp = svfs.f_fstr;
-	cp2 = sfs.f_fname;
-	i = 0;
-	while (i++ < sizeof(sfs.f_fname))
-		if (*cp != '\0')
-			*cp2++ = *cp++;
-		else
-			*cp2++ = '\0';
-	while (*cp != '\0'
-	  && i++ < (sizeof(svfs.f_fstr) - sizeof(sfs.f_fpack)))
-		cp++;
-	cp++;
-	cp2 = sfs.f_fpack;
-	i = 0;
-	while (i++ < sizeof(sfs.f_fpack))
-		if (*cp != '\0')
-			*cp2++ = *cp++;
-		else
-			*cp2++ = '\0';
+	bcopy(&svfs.f_fstr[0], sfs.f_fname, sizeof(sfs.f_fname));
+	bcopy(&svfs.f_fstr[sizeof(sfs.f_fname)], sfs.f_fpack,
+	  sizeof(sfs.f_fpack));
 	if ((vswp = vfs_getvfssw(svfs.f_basetype)) == NULL)
 		sfs.f_fstyp = 0;
 	else
@@ -509,6 +517,7 @@ cstatfs(vfsp, sbp, len)
 /*
  * System call to map fstype numbers to names, and vice versa.
  */
+
 struct fsa {
 	int	opcode;
 };
@@ -557,7 +566,8 @@ sysfsind(uap, rvp)
 	rval_t *rvp;
 {
 	/*
-	 * Translate fs identifier to an index into the vfssw structure.
+	 * Translate fs identifier to an index into
+	 * the vfssw structure.
 	 */
 	register struct vfssw *vswp;
 	char fsbuf[FSTYPSZ];
@@ -659,6 +669,9 @@ vfs_mountroot()
 	u.u_cdir = rootdir;
 	VN_HOLD(u.u_cdir);
 	u.u_rdir = NULL;
+#ifdef RFSUNMOUNTHACK
+	rootvfs->vfs_namecovered = "/";
+#endif
 }
 
 /*
@@ -754,7 +767,7 @@ vfs_lock(vfsp)
 }
 
 /*
- * Unlock a locked filesystem.
+ * Unlock a locked filesystem.  Panics if it's not locked.
  */
 void
 vfs_unlock(vfsp)
@@ -769,7 +782,7 @@ vfs_unlock(vfsp)
 	 */
 	if (vfsp->vfs_flag & VFS_MWAIT) {
 		vfsp->vfs_flag &= ~VFS_MWAIT;
-		wakeprocs((caddr_t)vfsp, PRMPT);
+		wakeup((caddr_t)vfsp);
 	}
 }
 
@@ -870,7 +883,7 @@ vfsstray()
 }
 
 void
-vfsinit()
+fsinit()
 {
 	register int i;
 

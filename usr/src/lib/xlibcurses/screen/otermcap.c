@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/otermcap.c	1.5"
+#ident	"@(#)curses:screen/otermcap.c	1.3"
 /* Copyright (c) 1979 Regents of the University of California	*/
 /* Modified to:							*/
 /* 1) remember the name of the first tc= parameter		*/
@@ -23,13 +23,8 @@
 
 #include <stdio.h>
 #include <ctype.h>
-
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
-#ifdef SIGSTOP /* SVR4.0 and beyond */
-#define E_TERMCAP "/usr/share/lib/termcap"
-#else
+/* #include "uparm.h"	- TLH all uparm.h had that was needed was E_TERMCAP */
 #define E_TERMCAP "/etc/termcap"
-#endif
 
 /*
  * termcap - routines for dealing with the terminal capability data base

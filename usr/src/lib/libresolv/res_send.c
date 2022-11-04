@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:res_send.c	1.2"
+#ident	"@(#)libresolv:res_send.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -43,7 +43,6 @@
 #include <errno.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-#include "res.h"
 
 extern int errno;
 

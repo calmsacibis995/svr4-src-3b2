@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-m32:gen/atof.c	1.13"
+#ident	"@(#)libc-m32:gen/atof.c	1.12"
 /*LINTLIBRARY*/
 /*
  *	C library - ascii to floating (atof) and string to double (strtod)
@@ -100,6 +100,7 @@ register const char *p;
 	DEC_PTR; /* in case there is no legitimate exponent */
 	if (c == 'E' || c == 'e') { /* accumulate exponent */
 		register int e_exp = 0, neg_exp = 0;
+		STORE_PTR;
 
 		switch (*p) { /* process sign */
 		case '-':

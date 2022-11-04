@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/fs/ufs_inode.h	1.16"
+#ident	"@(#)head.sys:sys/fs/ufs_inode.h	1.12"
 
 #ifndef _SYS_FS_UFS_INODE_H
 #define _SYS_FS_UFS_INODE_H
@@ -41,7 +41,7 @@ struct inode {
 	struct inode  *i_freef;	/* free list forward */
 	struct inode **i_freeb;	/* free list back */
 	ulong	i_vcode;	/* version code attribute */
-	long	i_mapcnt;	/* mappings to file pages */
+	ulong	i_mapcnt;	/* mappings to file pages */
 	int	*i_map;		/* block list for the corresponding file */
 	struct 	icommon {
 		o_mode_t ic_smode;	/*  0: mode and type of file */
@@ -227,7 +227,7 @@ extern int		vttoif_tab[];
 		(ip)->i_flag |= IWANT; \
 		(void) sleep((caddr_t)(ip), PINOD); \
 	} \
-	(ip)->i_rwowner = curproc->p_slot; \
+	(ip)->i_rwowner = (GET_INDEX(curproc->p_pid)); \
 	(ip)->i_flag |= IRWLOCKED; \
 	if (((ip)->i_vnode.v_flag & VISSWAP) != 0){ \
 		curproc->p_swlocks++;	\
@@ -239,21 +239,21 @@ extern int		vttoif_tab[];
 	ASSERT((ip)->i_flag & IRWLOCKED); \
 	if (((ip)->i_vnode.v_flag & VISSWAP) != 0) \
 		if (--curproc->p_swlocks == 0)  \
-			curproc->p_flag &= ~SSWLOCKS; \
+			curproc->p_flag |= SSWLOCKS; \
 	(ip)->i_flag &= ~IRWLOCKED; \
 	if ((ip)->i_flag & IWANT) { \
 		(ip)->i_flag &= ~IWANT; \
-		wakeprocs((caddr_t)(ip), PRMPT); \
+		wakeup((caddr_t)(ip)); \
 	} \
 }
 
 #define	ILOCK(ip) { \
 	while (((ip)->i_flag & ILOCKED) && \
-	    (ip)->i_owner != curproc->p_slot) { \
+	    (ip)->i_owner != (GET_INDEX(curproc->p_pid))) { \
 		(ip)->i_flag |= IWANT; \
 		(void) sleep((caddr_t)(ip), PINOD); \
 	} \
-	(ip)->i_owner = curproc->p_slot; \
+	(ip)->i_owner = (GET_INDEX(curproc->p_pid)); \
 	(ip)->i_count++; \
 	(ip)->i_flag |= ILOCKED; \
 	if (((ip)->i_vnode.v_flag & VISSWAP) != 0){ \
@@ -267,12 +267,12 @@ extern int		vttoif_tab[];
 		panic("IUNLOCK"); \
 	if (((ip)->i_vnode.v_flag & VISSWAP) != 0) \
 		if (--curproc->p_swlocks == 0)  \
-			curproc->p_flag &= ~SSWLOCKS; \
+			curproc->p_flag |= SSWLOCKS; \
 	if ((ip)->i_count == 0) { \
 		(ip)->i_flag &= ~ILOCKED; \
 		if ((ip)->i_flag & IWANT) { \
 			(ip)->i_flag &= ~IWANT; \
-			wakeprocs((caddr_t)(ip), PRMPT); \
+			wakeup((caddr_t)(ip)); \
 		} \
 	} \
 }

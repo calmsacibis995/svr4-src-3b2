@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/fcntl.h	11.38"
+#ident	"@(#)head.sys:sys/fcntl.h	11.33"
 #ifndef _SYS_FCNTL_H
 #define _SYS_FCNTL_H
 
@@ -39,6 +39,8 @@
 #define	F_SETFD		2	/* Set fildes flags */
 #define	F_GETFL		3	/* Get file flags */
 #define	F_SETFL		4	/* Set file flags */
+#define	F_SETLK		6	/* Set file lock */
+#define	F_SETLKW	7	/* Set file lock and wait */
 
 /*
  * Applications that read /dev/mem must be built like the kernel.  A
@@ -61,17 +63,23 @@
 #define	F_SETLK		6	/* Set file lock */
 #define	F_SETLKW	7	/* Set file lock and wait */
 
-#define	F_CHKFL		8	/* Unused */
 
+#define	F_CHKFL		8	/* Unused */
 #define	F_ALLOCSP	10	/* Reserved */
 #define	F_FREESP	11	/* Free file space */
+#define F_BLOCKS	18	/* Get number of BLKSIZE blocks allocated */
+#define F_BLKSIZE	19	/* Get optimal I/O block size */ 
 
 #define F_RSETLK	20	/* Remote SETLK for NFS */
 #define F_RGETLK	21	/* Remote GETLK for NFS */
 #define F_RSETLKW	22	/* Remote SETLKW for NFS */
 
-#define	F_GETOWN	23	/* Get owner (socket emulation) */
-#define	F_SETOWN	24	/* Set owner (socket emulation) */
+#define	F_GETOWN	23	/* Get owner */
+#define	F_SETOWN	24	/* Set owner */
+
+#define F_CNVT		25	/* For NFS Lock Manager */
+
+#define LOCKMGR		26	/* Indicates lock manager lock */
 
 /*
  * File segment locking set data type - information passed to system by user.
@@ -138,7 +146,7 @@ typedef struct flock {
  * POSIX constants 
  */
 
-#define	O_ACCMODE	3	/* Mask for file access modes */
+#define	O_ACCMODE	03477	/* Mask for file access modes */
 #define	FD_CLOEXEC	1	/* close on exec flag */
 
 #endif	/* _SYS_FCNTL_H */

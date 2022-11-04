@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:ypxdr.c	1.2"
+#ident	"@(#)libyp:ypxdr.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -33,7 +32,7 @@ static  char sccsid[] = "@(#)ypxdr.c 1.16 88/03/07 Copyr 1985 Sun Micro";
 #endif
 
 /*
- * This contains xdr routines used by the YP rpc interface.
+ * This contains xdr routines used by the yellowpages rpc interface.
  */
 
 #define NULL 0
@@ -177,6 +176,7 @@ bool
 xdr_ypreq_newname_string(xdrs, ppstring)
 	XDR * xdrs;
 	char **ppstring;
+
 {
 	return (xdr_string(xdrs, ppstring, 256) );
 }

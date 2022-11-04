@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/netlib.c	1.4"
+#ident	"@(#)netinet:netinet/netlib.c	1.3"
 
 /*
  * System V STREAMS TCP - Release 2.0
@@ -259,25 +259,25 @@ T_conn_con(inp)
 	struct inpcb   *inp;
 {
 	mblk_t         *bp;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	struct T_conn_con *conn_con;
 
-	if (!(bp = allocb(sizeof(struct T_conn_con) + sizeof(struct sockaddr_in),
+	if (!(bp = allocb(sizeof(struct T_conn_con) + sizeof(struct taddr_in),
 			  BPRI_HI))) {
-		bufcall(sizeof(struct T_conn_con) + sizeof(struct sockaddr_in),
+		bufcall(sizeof(struct T_conn_con) + sizeof(struct taddr_in),
 			BPRI_HI, T_conn_con, inp);
 		return;
 	}
-	bp->b_wptr += sizeof(struct T_conn_con) + sizeof(struct sockaddr_in);
+	bp->b_wptr += sizeof(struct T_conn_con) + sizeof(struct taddr_in);
 	bp->b_datap->db_type = M_PROTO;
 	conn_con = (struct T_conn_con *) bp->b_rptr;
-	sin = (struct sockaddr_in *) (bp->b_rptr + sizeof(struct T_conn_con));
+	sin = (struct taddr_in *) (bp->b_rptr + sizeof(struct T_conn_con));
 	conn_con->PRIM_type = T_CONN_CON;
-	conn_con->RES_length = sizeof(struct sockaddr_in);
+	conn_con->RES_length = sizeof(struct taddr_in);
 	conn_con->RES_offset = sizeof(struct T_conn_con);
 	conn_con->OPT_length = 0;
 	conn_con->OPT_offset = 0;
-	bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+	bzero((caddr_t) sin, sizeof(struct taddr_in));
 	sin->sin_family = AF_INET;
 	sin->sin_addr = inp->inp_faddr;
 	sin->sin_port = inp->inp_fport;

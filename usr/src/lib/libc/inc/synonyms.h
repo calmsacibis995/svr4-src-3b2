@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc:inc/synonyms.h	1.33"
+#ident	"@(#)libc:inc/synonyms.h	1.20"
 
 #if defined(__STDC__)
 
@@ -30,6 +30,9 @@
 #define async_daemon	_async_daemon
 #define brk		_brk
 #define brkbase		_brkbase
+#define cat_init	_cat_init
+#define cat_malloc_init	_cat_malloc_init
+#define cat_name	_cat_name
 #define catclose	_catclose
 #define catgets		_catgets
 #define catopen		_catopen
@@ -67,6 +70,9 @@
 #define environ		_environ
 #define erand48		_erand48
 #define etext		_etext
+#define ev_traptousr	_ev_traptousr
+#define ev_usrtrapret	_ev_usrtrapret
+#define evsys		_evsys
 #define execl		_execl
 #define execle		_execle
 #define execlp		_execlp
@@ -87,6 +93,7 @@
 #define fgetpwent	_fgetpwent
 #define fgetspent	_fgetspent
 #define finite		_finite
+#define fmount		_fmount
 #define fmtmsg		_fmtmsg
 #define fork		_fork
 #define fpathconf	_fpathconf
@@ -97,17 +104,17 @@
 #define fpsetmask	_fpsetmask
 #define fpsetround	_fpsetround
 #define fpsetsticky	_fpsetsticky
+#define fptrap		_fptrap
 #define fstat		_fstat
 #define fstatvfs	_fstatvfs
 #define fsync		_fsync
 #define ftok		_ftok
 #define ftruncate	_ftruncate
 #define ftw		_ftw
+#define funmount	_funmount
 #define gcvt		_gcvt
 #define getcontext	_getcontext
 #define getcwd		_getcwd
-#define getdate		_getdate
-#define getdate_err	_getdate_err
 #define getdents	_getdents
 #define getegid		_getegid
 #define geteuid		_geteuid
@@ -123,6 +130,7 @@
 #define getmntent	_getmntent
 #define getmsg		_getmsg
 #define getopt		_getopt
+#define getpagesize	_getpagesize
 #define getpass		_getpass
 #define getpgid		_getpgid
 #define getpgrp		_getpgrp
@@ -144,8 +152,6 @@
 #define getutent	_getutent
 #define getutid		_getutid
 #define getutline	_getutline
-#define getutmp		_getutmp
-#define getutmpx	_getutmpx
 #define getutxent	_getutxent
 #define getutxid	_getutxid
 #define getutxline	_getutxline
@@ -204,8 +210,7 @@
 #define lsub		_lsub
 #define ltol3		_ltol3
 #define makecontext	_makecontext
-#define makeut		_makeut
-#define makeutx		_makeutx
+#define mctl		_mctl
 #define memalign	_memalign
 #define memccpy		_memccpy
 #define memcntl		_memcntl
@@ -217,10 +222,7 @@
 #define mlock		_mlock
 #define mlockall	_mlockall
 #define mmap		_mmap
-#define modf		_modf
 #define modff		_modff
-#define modut		_modut
-#define modutx		_modutx
 #define monitor		_monitor
 #define mount		_mount
 #define mprotect	_mprotect
@@ -238,7 +240,6 @@
 #define nfssvc		_nfssvc
 #define nftw		_nftw
 #define nice		_nice
-#define nl_langinfo	_nl_langinfo
 #define nrand48		_nrand48
 #define nuname		_nuname
 #define open		_open
@@ -280,7 +281,6 @@
 #define semctl		_semctl
 #define semget		_semget
 #define semop		_semop
-#define setchrclass	_setchrclass
 #define setcontext	_setcontext
 #define setegid		_setegid
 #define seteuid		_seteuid
@@ -341,9 +341,7 @@
 #define swapctl		_swapctl
 #define symlink		_symlink
 #define sync		_sync
-#define synchutmp	_synchutmp
 #define sys3b		_sys3b
-#define sysi86		_sysi86
 #define sys_errlist	_sys_errlist
 #define sys_nerr	_sys_nerr
 #define syscall		_syscall
@@ -383,11 +381,7 @@
 #define unlink		_unlink
 #define unlockpt	_unlockpt
 #define unordered	_unordered
-#define updutfile	_updutfile
-#define updutxfile	_updutxfile
 #define updutmp		_updutmp
-#define updutmpx	_updutmpx
-#define updwtmp		_updwtmp
 #define updwtmpx	_updwtmpx
 #define utime		_utime
 #define utmpname	_utmpname
@@ -411,41 +405,34 @@
 #ifdef ABI
 
 #define abs		_abi_abs
+#undef altzone
+#define altzone		_abi_altzone
 #define atoi		_abi_atoi
 #define atol		_abi_atol
+#undef _ctype
+#define _ctype		_abi__ctype
+#define __ctype		_abi__ctype
+#undef daylight
+#define daylight	_abi_daylight
 #define difftime	_abi_difftime
-#undef endgrent
-#define endgrent	_abi_endgrent
-#undef endpwent
-#define endpwent	_abi_endpwent
-#undef fgetgrent
-#define fgetgrent	_abi_fgetgrent
-#undef fgetpwent
-#define fgetpwent	_abi_fgetpwent
 #undef ftruncate
 #define ftruncate	_abi_ftruncate
 #undef getdents
 #define getdents	_abi_getdents
-#undef getgrent
-#define getgrent	_abi_getgrent
-#undef getpwent
-#define getpwent	_abi_getpwent
 #define getenv		_abi_getenv
 #define gmtime		_abi_gmtime
 #undef isatty
 #define isatty		_abi_isatty
 #define labs		_abi_labs
 #define localtime	_abi_localtime
-#define memchr		_abi_memchr
+#define memchr		_abi_malloc
 #define memcmp		_abi_memcmp
 #define memcpy		_abi_memcpy
 #define memmove		_abi_memmove
 #define memset		_abi_memset
 #define mktime		_abi_mktime
-#undef setgrent
-#define setgrent	_abi_setgrent
-#undef setpwent
-#define setpwent	_abi_setpwent
+#undef _numeric
+#define _numeric	_abi__numeric
 #undef sleep
 #define sleep		_abi_sleep
 #define strcat		_abi_strcat
@@ -459,12 +446,14 @@
 #define strtol		_abi_strtol
 #undef syscall
 #define syscall		_abi_syscall
-#undef sysi86
-#define sysi86		_abi_sysi86
+#undef timezone
+#define timezone	_abi_timezone
 #undef truncate
 #define truncate	_abi_truncate
 #undef ttyslot
 #define ttyslot		_abi_ttyslot
+#undef tzname
+#define tzname		_abi_tzname
 #undef tzset
 #define tzset		_abi_tzset
 
@@ -473,60 +462,22 @@
 /* names that need to be hidden in the shared library */
 #ifdef DSHLIB
 
-#undef closelog
-#define closelog	_abi_closelog
 #undef ecvt
 #define ecvt		_abi_ecvt
-#undef endgrent
-#define endgrent	_abi_endgrent
-#undef endpwent
-#define endpwent	_abi_endpwent
 #undef fcvt
 #define fcvt		_abi_fcvt
-#undef fgetgrent
-#define fgetgrent	_abi_fgetgrent
-#undef fgetpwent
-#define fgetpwent	_abi_fgetpwent
 #undef ftruncate
 #define ftruncate	_abi_ftruncate
-#undef hrtcntl
-#define hrtcntl		_abi_hrtcntl
 #undef getdents
 #define getdents	_abi_getdents
-#undef getgrent
-#define getgrent	_abi_getgrent
 #undef gethz
 #define gethz		_abi_gethz
-#undef gettimeofday
-#define gettimeofday	_abi_gettimeofday
-#undef getpwent
-#define getpwent	_abi_getpwent
-#undef openlog
-#define openlog		_abi_openlog
-#undef select
-#define select		_abi_select
-#undef setgrent
-#define setgrent	_abi_setgrent
-#undef setlogmask
-#define setlogmask	_abi_setlogmask
-#undef settimeofday
-#define settimeofday	_abi_settimeofday
-#undef setpwent
-#define setpwent	_abi_setpwent
 #undef syscall
 #define syscall		_abi_syscall
-#undef sysi86
-#define sysi86		_abi_sysi86
-#undef syslog
-#define syslog		_abi_syslog
 #undef truncate
 #define truncate	_abi_truncate
 #undef ttyslot
 #define ttyslot		_abi_ttyslot
-#undef vfork
-#define vfork		_abi_vfork
-#undef vsyslog
-#define vsyslog		_abi_vsyslog
 
 #endif /* DSHLIB */
 #endif /* ABI */

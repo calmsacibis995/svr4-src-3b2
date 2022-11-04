@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.rfs:preremove	1.2.1.1"
+#ident	"@(#)pkg.rfs:preremove	1.2"
 #
 # Issue a warning message if RFS is running.
 #
@@ -14,9 +14,4 @@ DRVPATH=/etc/master.d
 /etc/drvinstall -u -f -m $DRVPATH/rfs -v 1.0 || exit 1
 /etc/drvinstall -u -f -m $DRVPATH/sp -v 1.0 || exit 1
 
-#
-# remove log files and lock files created by processes
-#
-rm -f /etc/dfs/osharetab /usr/net/servers/rfs/rfs.log /etc/rfs/.rmnt.lock /etc/rfs/rmnttab
-rm -fr /etc/rfs/auth.info
 exit 0

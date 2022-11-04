@@ -8,7 +8,7 @@
 #ifndef _SYS_FBUF_H
 #define _SYS_FBUF_H
 
-#ident	"@(#)head.sys:sys/fbuf.h	1.3"
+#ident	"@(#)head.sys:sys/fbuf.h	1.2"
 
 /*
  * A struct fbuf is used to get a mapping to part of a file using the
@@ -29,5 +29,6 @@ extern void fbzero(/* vp, off, len, fbpp */);
 extern int fbwrite(/* fbp */);
 extern int fbiwrite(/* fbp, vp, bn, bsize */);
 extern void fbrelse(/* fbp, rw */);
+extern void fbinval(/* vfsp */);
 
 #endif	/* _SYS_FBUF_H */

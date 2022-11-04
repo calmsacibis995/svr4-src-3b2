@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_serve.c	1.12"
+#ident	"@(#)fs:fs/rfs/rf_serve.c	1.7"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -22,12 +22,12 @@
 #include "sys/list.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/psw.h"
 #include "sys/pcb.h"
 #include "sys/cred.h"
 #include "sys/user.h"
+#include "sys/rf_messg.h"
 #include "sys/proc.h"
 #include "sys/inline.h"
 #include "sys/cmn_err.h"
@@ -40,15 +40,11 @@
 #include "sys/acct.h"
 #include "sys/systm.h"
 #include "sys/kmem.h"
-#include "vm/seg_kmem.h"
 #include "rf_auth.h"
 
 /* imports */
 extern void	setsigact();
 extern int	setjmp();
-
-extern rcvd_t	*mountrd;
-extern rcvd_t	*sigrd;
 
 #define RF_MAX_OPCODE DUIUPDATE
 
@@ -69,23 +65,24 @@ STATIC void	rfsr_ret();
 void
 rf_serve()
 {
-	rfsr_state_t	state;
-	register proc_t	*p = u.u_procp;
-	int		sig;
+	rfsr_state_t		state;
+	register rfsr_state_t	*stp = &state;
+	register proc_t		*p = u.u_procp;
+	int			sig;
 
 	++rfsr_nservers;
 	p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
 	u.u_start = hrestime.tv_sec;
 	u.u_ticks = lbolt;
 	u.u_acflag = AFORK;
-	state.sr_cred = crdup(u.u_cred);
+	stp->sr_cred = crdup(u.u_cred);
 	/*
 	 * rf_daemon may have issued a SIGKILL, but that would be discarded
 	 * by any server still in newproc() since the parent (rf_daemon)
 	 * ignores all signals.	 Exit if RFS is stopping.
 	 */
 	if (rf_daemon_flag & RFDKILL) {
-		rfsr_exit(&state);
+		rfsr_exit(stp);
 	}
 
 	/*
@@ -123,10 +120,10 @@ rf_serve()
 			  "1ST rf_server: send descriptor pre-alloc failed\n");
 		}
 		u.u_srchan = NULL;
-		rfsr_exit(&state);
+		rfsr_exit(stp);
 	}
 	bcopy("rf_server", u.u_comm, sizeof("rf_server"));
-	state.sr_in_bp = NULL;
+	stp->sr_in_bp = NULL;
 	u.u_syscall = 0;
 	for (;;) {
 		register sndd_t *srchan = u.u_srchan;
@@ -163,69 +160,58 @@ rf_serve()
 				  sizeof(*p->p_curinfo));
 			}
 		}
-		ASSERT(!state.sr_in_bp);
+		ASSERT(!stp->sr_in_bp);
 		/*
 		 * rfsr_rcvmsg won't return if too many servers, or
 		 * no messages, or signal.
 		 */
-		rfsr_rcvmsg(&state.sr_in_bp, srchan, &state);
+		rfsr_rcvmsg(&stp->sr_in_bp, srchan, stp);
 newmblk:
 		bcopy ("RF_SERVER", u.u_psargs, sizeof("RF_SERVER"));
-		msg = RF_MSG(state.sr_in_bp);
-		req = RF_REQ(state.sr_in_bp);
-		cop = RF_COM(state.sr_in_bp);
+		msg = RF_MSG(stp->sr_in_bp);
+		req = RF_REQ(stp->sr_in_bp);
+		cop = RF_COM(stp->sr_in_bp);
 		req->rq_ulimit <<= ULIMSHIFT;
-		state.sr_gift = NULL;
- 		if (!(state.sr_rdp =
-		  rf_gifttord(&msg->m_dest, state.sr_vcver))) {
-			rfd_stray(state.sr_in_bp);
-			state.sr_in_bp = NULL;
-			rfsr_rmactive(p);
-			continue;
-		}
-
-		ASSERT(state.sr_rdp->rd_qtype == RDSPECIFIC ||
-		  state.sr_rdp == mountrd || state.sr_rdp == sigrd ||
-		  state.sr_rdp->rd_vp);
-
-		state.sr_qp = (queue_t *)msg->m_queue;
-		state.sr_gdpp = QPTOGP(state.sr_qp);
-		state.sr_vcver = state.sr_gdpp->version;
-		state.sr_opcode = cop->co_opcode;
-		state.sr_ret_val = 0;
-		state.sr_out_bp = NULL;
+		stp->sr_gift = NULL;
+		stp->sr_rdp = INXTORD(msg->m_dest);
+		stp->sr_qp = (queue_t *)msg->m_queue;
+		stp->sr_gdpp = QPTOGP(stp->sr_qp);
+		stp->sr_vcver = stp->sr_gdpp->version;
+		stp->sr_opcode = cop->co_opcode;
+		stp->sr_ret_val = 0;
+		stp->sr_out_bp = NULL;
 		error = 0;
 		rfsr_ctrl = SR_NORMAL;
 		/*
 		 * gag - still needed, but only for sanity
 		 * check in rcopyin/rcopyout
 		 */
-		u.u_syscall = state.sr_opcode;
+		u.u_syscall = stp->sr_opcode;
 		p->p_epid = cop->co_pid;
 		/*
 		 * Set sysid to index of stream where message came from.
 		 * In case of SRMOUNT, sysid won't be set up until
 		 * rfsr_mount().
 		 */
-		p->p_sysid = state.sr_gdpp->sysid;
-		state.sr_cred->cr_uid = state.sr_cred->cr_ruid =
-			gluid(state.sr_gdpp, cop->co_uid);
-		state.sr_cred->cr_gid = state.sr_cred->cr_rgid =
-			glgid(state.sr_gdpp, cop->co_gid);
-		if (state.sr_vcver > RFS1DOT0) {
+		p->p_sysid = stp->sr_gdpp->sysid;
+		stp->sr_cred->cr_uid = stp->sr_cred->cr_ruid =
+			gluid(stp->sr_gdpp, cop->co_uid);
+		stp->sr_cred->cr_gid = stp->sr_cred->cr_rgid =
+			glgid(stp->sr_gdpp, cop->co_gid);
+		if (stp->sr_vcver > RFS1DOT0) {
 			ushort gn;
 
-			rfsr_adj_timeskew(state.sr_gdpp,
+			rfsr_adj_timeskew(stp->sr_gdpp,
 			  req->rq_sec, req->rq_nsec);
-			state.sr_cred->cr_ngroups =
-			    (ushort)MIN(state.sr_gdpp->ngroups_max,
+			stp->sr_cred->cr_ngroups =
+			    (ushort)MIN(stp->sr_gdpp->ngroups_max,
 			    		req->rq_ngroups);
-			for (gn = 0; gn < state.sr_cred->cr_ngroups; gn++) {
-				state.sr_cred->cr_groups[gn] =
-				    glgid(state.sr_gdpp, req->rq_groups[gn]);
+			for (gn = 0; gn < stp->sr_cred->cr_ngroups; gn++) {
+				stp->sr_cred->cr_groups[gn] =
+				    glgid(stp->sr_gdpp, req->rq_groups[gn]);
 			}
 		} else {
-			state.sr_cred->cr_ngroups = 0;
+			stp->sr_cred->cr_ngroups = 0;
 		}
 		srchan->sd_srvproc = p;
 		/* keep number of servers w/in bounds */
@@ -233,7 +219,7 @@ newmblk:
 			psignal(p, SIGUSR1);
 		} else if (rfsr_nidle == 0 && rfsr_nservers < maxserve) {
 			rf_daemon_flag |= RFDSERVE;
-			wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
+			wakeup((caddr_t)&rf_daemon_rd->rd_qslp);
 		}
 		if (msg->m_stat & RF_SIGNAL) {
 			/*
@@ -242,32 +228,31 @@ newmblk:
 			 */
 			psignal(p, SIGTERM);
 		}
-		if (state.sr_opcode < 0 || state.sr_opcode > RF_MAX_OPCODE) {
-			(void)rfsr_undef_op(&state, &rfsr_ctrl);
+		if (stp->sr_opcode < 0 || stp->sr_opcode > RF_MAX_OPCODE) {
+			(void)rfsr_undef_op(stp, &rfsr_ctrl);
 			rfsr_rmactive(p);
 			continue;
 		}
 		/*
 		 * fail if resource is in funny state - e.g., in fumount
 		 */
-		if (state.sr_opcode != RFMOUNT && state.sr_opcode != RFUSTAT) {
+		if (stp->sr_opcode != RFMOUNT && stp->sr_opcode != RFUSTAT) {
 			/* See if resource is fumounted.  Note that this
 			 * is ONLY PROBABLISTIC with respect to forgeries
 			 */
-			if ((state.sr_rsrcp = ind_to_rsc(srchan->sd_mntid))
+			if ((stp->sr_rsrcp = ind_to_rsc(srchan->sd_mntid))
 			    == NULL ||
-			  (state.sr_srmp = id_to_srm(state.sr_rsrcp,
-			    state.sr_gdpp->sysid)) == NULL ||
-			  state.sr_srmp->srm_flags & SRM_FUMOUNT){
-				SR_FREEMSG(&state);
-				if (state.sr_opcode != RFCLOSE) {
+			  (stp->sr_srmp = id_to_srm(stp->sr_rsrcp,
+			    stp->sr_gdpp->sysid)) == NULL ||
+			  stp->sr_srmp->srm_flags & SRM_FUMOUNT){
+				SR_FREEMSG(stp);
+				if (stp->sr_opcode != RFCLOSE &&
+				  stp->sr_opcode != RFINACTIVE) {
 					error = EACCES;
 				}
 				rfsr_rmactive(p);
-                                if (state.sr_opcode != RFRSIGNAL &&
-				  state.sr_vcver < RFS2DOT0 ||
-				  state.sr_opcode != RFINACTIVE) {
-                                        rfsr_ret(&state, SR_NORMAL, error);
+                                if (stp->sr_opcode != RFRSIGNAL) {
+                                        rfsr_ret(stp, SR_NORMAL, error);
                                 }
 				continue;
 			}
@@ -278,27 +263,21 @@ newmblk:
 		 */
 		if (setjmp(&u.u_qsav)) {
 			error = rfsr_sigck(&rfsr_ctrl, EINTR);
-                        if (state.sr_vcver > RFS1DOT0 &&
-			  state.sr_opcode == RFINACTIVE) {
-				rf_deliver(state.sr_in_bp);
-				state.sr_in_bp = NULL;
-			} else {
-				rfsr_ret(&state, rfsr_ctrl, error);
-			}
 			rfsr_rmactive(p);
+			rfsr_ret(stp, rfsr_ctrl, error);
 		} else {
-			error =
-			  (*rfsr_ops[state.sr_opcode])(&state, &rfsr_ctrl);
+			error = (*rfsr_ops[stp->sr_opcode])(stp, &rfsr_ctrl);
 			switch(rfsr_ctrl){
 			case SR_NORMAL:
 				if (!error) {
-					if (!state.sr_out_bp) {
-						state.sr_out_bp =
+					if (!stp->sr_out_bp) {
+						stp->sr_out_bp =
 						  rfsr_rpalloc((size_t)0,
-						  state.sr_vcver);
+						    stp->sr_vcver);
 					}
-					if (!state.sr_gift && state.sr_out_bp) {
-						error = rfsr_cacheck(&state,
+					if (stp->sr_vcver > RFS1DOT0 &&
+					  !stp->sr_gift) {
+						error = rfsr_cacheck(stp,
 						  srchan->sd_mntid);
 					}
 				}
@@ -307,14 +286,10 @@ newmblk:
 			case SR_NACK_RESP:
 				error = rfsr_sigck(&rfsr_ctrl, error);
 				rfsr_rmactive(p);
-				rfsr_ret(&state, rfsr_ctrl, error);
+				rfsr_ret(stp, rfsr_ctrl, error);
 				continue;
 			case SR_NO_RESP:
 				rfsr_rmactive(p);
-				if (state.sr_out_bp) {
-					rf_freemsg(state.sr_out_bp);
-					state.sr_out_bp = NULL;
-				}
 				continue;
 			case SR_OUT_OF_BAND:
 				goto newmblk;
@@ -385,7 +360,7 @@ rfsr_ret(stp, rfsr_ctrl, error)
 		 */
 		stp->sr_srmp->srm_slpcnt--;
 		if (!stp->sr_srmp->srm_slpcnt) {
-			wakeprocs((caddr_t)stp->sr_srmp, PRMPT);
+			wakeup((caddr_t)stp->sr_srmp);
 		}
 	}
 	stp->sr_out_bp = NULL;

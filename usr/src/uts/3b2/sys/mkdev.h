@@ -8,7 +8,7 @@
 #ifndef _SYS_MKDEV_H
 #define _SYS_MKDEV_H
 
-#ident	"@(#)head.sys:sys/mkdev.h	1.6"
+#ident	"@(#)head.sys:sys/mkdev.h	1.5"
 
 /* SVR3 device number constants */
 
@@ -49,10 +49,10 @@ minor_t __minor(const int, const dev_t);
 
 #else
 
-dev_t makedev();
+dev_t makdev();
 major_t major();
 minor_t minor();
-dev_t __makedev();
+dev_t __makdev();
 major_t __major();
 minor_t __minor();
 

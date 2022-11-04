@@ -1,9 +1,3 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"dspecial.s"
 .ident	"@(#)libc-m32:fp/dspecial.s	1.4.1.3"
 #	This subroutine returns one of the following values.

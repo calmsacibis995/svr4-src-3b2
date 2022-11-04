@@ -1,0 +1,39 @@
+#ident	"@(#)pkg.npack:preremove	1.3"
+#
+#	preremove script for npack package
+#
+# error function - put out a slightly more descriptive error message
+#	arg 1 is message #
+#	arg 2 is optional argument for message
+#
+error() {
+	errflag=1
+	case $1 in
+	1)
+		echo "ERROR: drvinstall(uninstall) on $2 failed"
+		;;
+	*)
+		echo "ERROR: undefined error"
+		;;
+	esac
+	}
+#
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+#	Remove the entry from /etc/netconfig
+#
+
+grep -v '[ 	]localnet[ 	][ 	]*-[ 	][ 	]*/dev/npack[ 	]' /etc/netconfig 2>/dev/null >/tmp/$$.1
+mv /tmp/$$.1 /etc/netconfig
+
+#
+#	uninstall each supplied driver
+#
+/etc/drvinstall -u -m $MASTER/npack -s $SYSTEM -o $BOOT \
+	-v 1.0 >/dev/null || error 1 NPACK
+echo "NPACKriver uninstalled."
+errflag=`expr 0$errflag + 10`
+exit $errflag

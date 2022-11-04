@@ -1,4 +1,4 @@
-*#ident	"@(#)kernel:master.d/kernel	1.72"
+*#ident	"@(#)kernel:master.d/kernel	1.56.1.1"
 *
 * KERNEL
 *
@@ -8,14 +8,17 @@ none	 -	  -	 -	  -	 -
 							={
 							  &cinit,
 							  &binit,
-							  &vfsinit,
+							  &fsinit,
 							  &finit,
 							  &strinit,
 							  &debuginit,
 							  &aioinit,
 							  0}
+						buf[NBUF] (%0x58)
 						pbuf[NPBUF] (%0x58)
 						hbuf[NHBUF] (%0x10)
+						nproc[NPROC] (%0x4)
+						pincr[NPROC] (%0x8)
 						callout[NCALL] (%0x10)
 						sptmap[SPTMAP] (%0x8)
 						putbuf[PUTBUFSZ] (%c)
@@ -26,7 +29,7 @@ none	 -	  -	 -	  -	 -
 							={NBUF,
 			  				NCALL,
 			  				NPROC,
-							0,
+			  				&nproc+NPROC*#nproc,
 							0,
 							MAXCLSYSPRI,
 			  				NCLIST,
@@ -63,13 +66,13 @@ none	 -	  -	 -	  -	 -
 *tuneable.h
 						tune(%i%i%i%i%i%i%i%i%i%i%i)
 						={	GPGSLO,
+							GPGSHI,
 							0,
 							0,
 							0,
 							0,
 							0,
-							0,
-							0,
+							MAXUMEM,
 							FSFLUSHR,
 							MINARMEM,
 							MINASMEM
@@ -78,8 +81,8 @@ none	 -	  -	 -	  -	 -
 						exec_ncargs(%i) = {ARG_MAX}
 
 * file and record locking *
-						flckinfo(%l%l)
-							= {0, 0}
+						flckinfo(%l%l%l%l)
+							= {FLCKREC}
 * shared libraries *
 						shlbinfo(%l%l%l%l)
 							= {SHLBMAX, 0, 0, 0}
@@ -99,7 +102,7 @@ none	 -	  -	 -	  -	 -
 * sysinfo
                                                 architecture(%6c%c)
                                                         ={ARCHITECTURE,0}
-                                                hw_serial(%1c%c)
+                                                hw_serial(%13c%c)
                                                         ={HW_SERIAL,0}
                                                 hw_provider(%4c%c)
                                                         ={HW_PROVIDER,0}
@@ -110,7 +113,6 @@ none	 -	  -	 -	  -	 -
 						nstrpush (%i) ={NSTRPUSH}
 						strmsgsz (%i) ={STRMSGSZ}
 						strctlsz (%i) ={STRCTLSZ}
-						strthresh(%l) ={STRTHRESH}
 
 * Multiple groups and chown(2) restrictions
 						rstchown (%i) = { RSTCHOWN }
@@ -129,20 +131,17 @@ none	 -	  -	 -	  -	 -
 * state of locore trapping
 						s3btlc_state (%i) = { S3BTLC_DISABLE }
 
-* head of inet statistics list
-						ifstats (%l)
-
 $$$
 
-SYS ="UNIX_System_V"
+SYS ="UNIX System V"
 NODE ="unix"
 REL  = "4.0"
 VER  = "2"
 
 ARCHITECTURE="m32100"
-HW_SERIAL=""
+HW_SERIAL="serial number"
 HW_PROVIDER="AT&T"
-SRPC_DOMAIN=""
+SRPC_DOMAIN="rpcdomain"
 
 *
 * The following entries form the tunable parameter table.
@@ -156,7 +155,7 @@ NCLIST = 0
 * The following stuff is for streams.
 
 NSTRPUSH = 9
-STRCTLSZ = 1024
+STRCTLSZ = 9000
 
 *
 * strmsgsz is the size for the maximum streams message a user can create.
@@ -164,14 +163,6 @@ STRCTLSZ = 1024
 * parameter will disappear entirely in the next release.
 *
 STRMSGSZ = 0
-
-*
-* strthresh is a cap to the amount of dynamic memory that the
-* streams subsystem can consume.  Once passed, pushes, opens of
-* streams devices, and writes will fail for non-root processes.
-* strthresh is in bytes; a value of 0 means no limit
-*
-STRTHRESH = 0
 
 * maxup is the maximum number of processes per user
 
@@ -182,6 +173,10 @@ MAXUP = 25
 NHBUF = 64
 NPBUF = 20
 
+* File region locking
+
+FLCKREC = 100
+
 * Shared Libraries:  Maximum number of libraries that can be
 *                    attached to a process at one time.
 
@@ -189,7 +184,7 @@ SHLBMAX = 2
 
 * Delay for delayed writes
 
-NAUTOUP = 60
+NAUTOUP = 10
 
 * default per process resource limits (set to -1 for infinite limits)
 * -1 is an infinite limit
@@ -219,9 +214,11 @@ HVMMLIM = 0x1000000
 
 * added for paging
 
-SPTMAP = 100
+SPTMAP = 50
 MAXPMEM = 0
 GPGSLO = 25
+GPGSHI = 40
+MAXUMEM = 8192
 FSFLUSHR = 1
 MINARMEM = 25
 MINASMEM = 25
@@ -244,8 +241,8 @@ SYS_NAME = "SYS"
 INITCLASS = "TS"
 
 * XENIX Tunables for shared data
-XSDSEGS = 25
-XSDSLOTS = 3
+XSDSEGS = 0
+XSDSLOTS = 0
 
 * Buffer cache tunables
 BUFHWM = 200

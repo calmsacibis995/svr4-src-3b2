@@ -6,12 +6,12 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libadm:puttext.c	1.2"
+#ident	"@(#)libadm:puttext.c	1.1"
 
 #include <stdio.h>
 #include <ctype.h>
 
-#define MWIDTH	256
+#define MWIDTH	80
 #define WIDTH	60
 
 int

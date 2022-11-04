@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:res_init.c	1.2"
+#ident	"@(#)libresolv:res_init.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -36,7 +36,6 @@
 #include <stdio.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-#include "res.h"
 
 /*
  * Resolver configuration file. Contains the address of the

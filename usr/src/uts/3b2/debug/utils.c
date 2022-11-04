@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)debug:debug/utils.c	1.9"
+#ident	"@(#)debug:debug/utils.c	1.8"
 /*
  */
 
@@ -404,7 +404,7 @@ iodsk(drive, part, block, flags)
 	bp->b_bufsize = 512;
 	bp->b_pages = 0;
 	bp->b_vp = 0;
-	bp->b_flags = B_KERNBUF | B_PHYS | B_BUSY | flags;
+	bp->b_flags = B_PHYS | B_BUSY | flags;
 
 	bp->b_edev = dev;
 	bp->b_dev = cmpdev(dev);

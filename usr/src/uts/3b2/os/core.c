@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/core.c	1.15"
+#ident	"@(#)kernel:os/core.c	1.12"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/psw.h"
@@ -18,7 +18,6 @@
 #include "sys/user.h"
 #include "sys/errno.h"
 #include "sys/proc.h"
-#include "sys/disp.h"
 #include "sys/signal.h"
 #include "sys/siginfo.h"
 #include "sys/fault.h"
@@ -35,7 +34,6 @@
 #include "sys/mman.h"
 #include "sys/rf_messg.h"
 #include "sys/exec.h"
-#include "sys/file.h"
 
 #include "vm/as.h"
 
@@ -53,28 +51,18 @@ core(fp, pp, credp, rlimit, sig)
 	extern int nexectype;
 	struct vnode *vp;
 	struct vattr vattr;
-	register int error, i, closerr;
+	register int error, i;
 	register cred_t *crp = pp->p_cred;
-	mode_t umask = PTOU(pp)->u_cmask;
 
 	if (crp->cr_uid != crp->cr_ruid || !hasprocperm(crp, credp))
 		return EPERM;
 
-	/*
-	 * The original intent of the core function interface was to
-	 * be able to core dump any process, not just the context we
-	 * are currently in. Unfortunately, we never got around to
-	 * writing the code to deal with any other context but the current.
-	 * This is not so bad as currently there is no user interface to 
-	 * get here with a non-current context. We will fix this later when 
-	 * an interface is provided to core dump a selected process.
-	 */
-	if (pp != curproc)  	/* only support current context for now */
-		return EINVAL;
-
+	vattr.va_type = VREG;
+	vattr.va_mode = 0666;
+	vattr.va_mask = AT_TYPE|AT_MODE;
 	PTOU(pp)->u_syscall = DUCOREDUMP;	/* RFS */
-	error = vn_open(fp, UIO_SYSSPACE, FWRITE | FTRUNC | FCREAT,
-	  (0666 & ~umask) & PERMMASK, &vp, CRCORE);
+	error = vn_create(fp, UIO_SYSSPACE, &vattr, NONEXCL, VWRITE,
+	  &vp, CRCORE);
 	if (error)
 		return error;
 
@@ -96,18 +84,15 @@ core(fp, pp, credp, rlimit, sig)
 			error = ENOSYS;
 	}
 
-	closerr = VOP_CLOSE(vp, FWRITE, 1, 0, credp);
 	VN_RELE(vp);
-
-	return error ? error : closerr;
+	return error;
 }
 
 /*
  * Common code to core dump process memory.
  */
 int
-core_seg(pp, vp, offset, addr, size, rlimit, credp)
-	proc_t *pp;
+core_seg(vp, offset, addr, size, rlimit, credp)
 	vnode_t *vp;
 	off_t offset;
 	register caddr_t addr;
@@ -119,6 +104,7 @@ core_seg(pp, vp, offset, addr, size, rlimit, credp)
 	addr_t base;
 	u_int len;
 	register int err = 0;
+	register proc_t *pp = u.u_procp;
 
 	eaddr = (addr_t)(addr + size);
 	for (base = addr; base < eaddr; base += len) {

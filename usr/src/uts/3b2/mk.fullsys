@@ -1,0 +1,49 @@
+#ident	"@(#)kernel:mk.fullsys	1.2"
+i=`id`
+prog=`basename $0 mk`
+mver=`echo $prog | cut -c4-7`
+inc=`pwd`
+
+ENV3B2=/xe/3b2sgs/2.0p/p2/bin
+
+: ${MORECPP:=-DDEBUG}
+
+if [ $# -gt 0 ]
+then
+	eval $*
+fi
+
+ver=
+dat=`date +%m%d`
+for i in "" a b c d e f g h i j k l m n o p q r s t u v w x y z
+do
+	if [ ! -r kernel$dat$i ] 
+	then
+		 ver=$dat$i
+		 break
+	fi
+done
+if [ x$ver = x ]
+then
+	echo Too many systems!
+	exit 1
+fi
+
+ln unix.${mver}.mk unix.mk
+if [ $mver != "noio" ]
+then
+	ln io/io.${mver}.mk io/io.mk
+fi
+
+ln fs/fs.${mver}.mk fs/fs.mk
+echo Making kernel$ver
+
+if u3b
+then
+	PATH=$ENV3B2:$PATH $ENV3B2/make MORECPP=${MORECPP} \
+		INC=$inc VER=$ver -e -f unix.${mver}.mk 
+else
+	make MORECPP=${MORECPP} INC=$inc VER=$ver -f unix.${mver}.mk 
+fi
+
+echo Done

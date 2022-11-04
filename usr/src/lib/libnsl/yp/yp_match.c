@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_match.c	1.2"
+#ident	"@(#)libyp:yp_match.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -273,7 +272,6 @@ domatch (domain, map, key, keylen, pdomb, timeout, val, vallen)
 	
 	resp.valdat.dptr = NULL;
 	resp.valdat.dsize = 0;
-	memset((char *)&resp, 0, sizeof(struct ypresp_val));
 
 	/*
 	 * Do the match request.  If the rpc call failed, return with status

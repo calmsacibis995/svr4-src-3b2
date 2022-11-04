@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_auth.c	1.6"
+#ident	"@(#)fs:fs/rfs/rf_auth.c	1.5"
 
 /*
  * Routines for id mapping
@@ -669,9 +669,9 @@ STATIC void
 rd_unlock()
 {
 	if (!--Tabwlock && Want_wr) {
-		wakeprocs((caddr_t)&Tabwlock, PRMPT);
+		wakeup((caddr_t)&Tabwlock);
 	} else if (Want_rd) {		 /* This may not be necessary */
-		wakeprocs((caddr_t)&Tabrlock, PRMPT);
+		wakeup((caddr_t)&Tabrlock);
 	}
 }
 
@@ -694,9 +694,9 @@ wr_unlock()
 {
 	Tabrlock--;
 	if (Want_wr) {
-		wakeprocs((caddr_t)&Tabwlock, PRMPT);
+		wakeup((caddr_t)&Tabwlock);
 	} else if (Want_rd) {
-		wakeprocs((caddr_t)&Tabrlock, PRMPT);
+		wakeup((caddr_t)&Tabrlock);
 	}
 }
 

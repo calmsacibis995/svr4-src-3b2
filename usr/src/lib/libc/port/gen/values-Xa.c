@@ -5,9 +5,8 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/values-Xa.c	1.3"
+#ident	"@(#)libc-port:gen/values-Xa.c	1.2"
 
-#include "synonyms.h"
 #include <math.h>
 
 /* variables which differ depending on the

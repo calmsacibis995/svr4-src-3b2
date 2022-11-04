@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/strcalls.c	1.20"
+#ident	"@(#)fs:fs/strcalls.c	1.17"
 #include "sys/types.h"
 #include "sys/sysmacros.h"
 #include "sys/param.h"
@@ -27,7 +27,6 @@
 #include "sys/conf.h"
 #include "sys/stropts.h"
 #include "sys/stream.h"
-#include "sys/strsubr.h"
 
 /*
  * STREAMS system calls.
@@ -187,6 +186,8 @@ msgio(uap, rvp, mode, prip, flagsp)
 	vp = fp->f_vnode;
 	if ((vp->v_type != VFIFO && vp->v_type != VCHR) || vp->v_stream == NULL)
 		return (ENOSTR);
+	if (setjmp(&u.u_qsav))
+		return (intrerr(1));
 	if (uap->ctl && copyin((caddr_t)uap->ctl, (caddr_t)&msgctl,
 	    sizeof(struct strbuf)))
 		return (EFAULT);

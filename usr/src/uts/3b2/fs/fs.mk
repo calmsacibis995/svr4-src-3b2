@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/fs.mk	1.39"
+#ident	"@(#)fs:fs/fs.mk	1.33"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -84,7 +84,6 @@ dnlc.o: dnlc.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/param.h \
 	$(INC)/sys/systm.h \
-	$(INC)/sys/vfs.h \
 	$(INC)/sys/vnode.h \
 	$(INC)/sys/cred.h \
 	$(INC)/sys/dnlc.h \
@@ -105,9 +104,7 @@ fs_subr.o: fs_subr.c \
 	$(INC)/sys/errno.h \
 	$(INC)/sys/fcntl.h \
 	$(INC)/sys/flock.h \
-	$(INC)/sys/statvfs.h \
 	$(INC)/sys/uio.h \
-	$(INC)/sys/unistd.h \
 	$(INC)/sys/vfs.h \
 	$(INC)/sys/vnode.h \
 	$(INC)/sys/file.h \
@@ -123,8 +120,6 @@ fs_subr.o: fs_subr.c \
 	$(INC)/sys/cmn_err.h \
 	$(INC)/sys/list.h \
 	$(INC)/sys/stream.h \
-	$(INC)/sys/rf_messg.h \
-	$(INC)/sys/rf_comm.h \
 	$(INC)/sys/rf_comm.h \
 	$(INC)/fs/fs_subr.h \
 	$(FRC)
@@ -274,7 +269,8 @@ vncalls.o: vncalls.c \
 	$(INC)/sys/disp.h \
 	$(INC)/sys/mkdev.h \
 	$(INC)/sys/time.h \
-	$(INC)/sys/unistd.h \
+	$(INC)/rpc/types.h \
+	$(INC)/nfs/nfs.h \
 	$(FRC)
 
 vnode.o: vnode.c \

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/machdep.c	1.30"
+#ident	"@(#)kernel:os/machdep.c	1.26.1.8"
 #include "sys/sysmacros.h"
 #include "sys/param.h"
 #include "sys/types.h"
@@ -202,6 +202,7 @@ extractarg(args)
 	struct uarg	*args;
 {
 	int error;
+	extern int userstrlen();
 	int fnsize;
 	caddr_t nsp;
 	int stgsize;
@@ -216,7 +217,10 @@ extractarg(args)
 	stgsize = args->argsize + args->envsize + args->prefixsize;
 	/* Now allow for the fname prefix change to old argv0: */
 	if (args->prefixc) {
-		fnsize = strlen(args->fname) + 1;
+		fnsize = userstrlen(args->fname) + 1;
+		if (fnsize < 0)
+			return(EFAULT);
+		fnsize++;	/* for the NULL byte */
 		stgsize += fnsize;
 	}
 	stgsize = (stgsize + NBPW-1) & ~(NBPW-1);
@@ -238,8 +242,7 @@ extractarg(args)
 	args->estksize = bsize;
 	args->stacklow = (addr_t) userstack;
 	/* and create it */
-	if (error = as_map(u.u_procp->p_as, nsp, bsize,
-	  segvn_create, zfod_argsp))
+	if (error = as_map(u.u_procp->p_as, nsp, bsize, segvn_create, zfod_argsp))
 		return error;
 
 	/*
@@ -315,10 +318,12 @@ extractarg(args)
 			as_unmap(u.u_procp->p_as, nsp, bsize);
 			return EFAULT;
 		}
-
-		argv0 = cp + args->argsize + args->envsize + args->prefixsize;
-		bcopy(args->fname, argv0, fnsize);
-
+		if (copyout(args->fname, (argv0 =
+		    cp + args->argsize + args->envsize + args->prefixsize),
+		    fnsize)) {
+			as_unmap(u.u_procp->p_as, nsp, bsize);
+			return EFAULT;
+		}
 		argv0 += ptrdelta;
 		if (suword((int *)(ptrstart + NBPW * (1 + args->prefixc)),
 				(int)argv0)) {
@@ -359,8 +364,8 @@ setregs(args)
 	}
 	*sp = '\0';
 
-	p->p_stksize = args->estksize;
-	p->p_stkbase = (caddr_t)userstack;
+	p->p_stksize = howmany(args->estksize, sizeof(int *));
+	p->p_stkbase = userstack;
 
 	u.u_pcb.sub = (int *)((u_int)userstack + args->estksize);
 
@@ -545,17 +550,14 @@ restorecontext(ucp)
 	if (ucp->uc_flags & UC_STACK) {
 		if (pp->p_stkbase != ucp->uc_stack.ss_sp) {
 			pp->p_stkbase = ucp->uc_stack.ss_sp;
-			u.u_pcb.slb = (int *)(_VOID *)ucp->uc_stack.ss_sp;
+			u.u_pcb.slb = ucp->uc_stack.ss_sp;
 			pp->p_stksize = ucp->uc_stack.ss_size;
-			u.u_pcb.sub = (int *)(_VOID *)(pp->p_stkbase 
-				+ pp->p_stksize);
+			u.u_pcb.sub = pp->p_stkbase + pp->p_stksize;
+			if (ucp->uc_stack.ss_sp == u.u_altsp)
+				u.u_altflags |= SS_ONSTACK;
+			else
+				u.u_altflags &= ~SS_ONSTACK;
 		}
-		if (ucp->uc_stack.ss_flags & SS_ONSTACK)
-			bcopy((caddr_t)&ucp->uc_stack,
-			      (caddr_t)&u.u_sigaltstack,
-			      sizeof(struct sigaltstack));
-		else
-			u.u_sigaltstack.ss_flags &= ~SS_ONSTACK;
 	}
 
 	if (ucp->uc_flags & UC_CPU)
@@ -586,8 +588,6 @@ savecontext(ucp, mask)
         ucp->uc_stack.ss_sp = pp->p_stkbase;
         ucp->uc_stack.ss_size = pp->p_stksize;
         ucp->uc_stack.ss_flags = 0;
-	if (pp->p_stkbase == u.u_sigaltstack.ss_sp)
-		ucp->uc_stack.ss_flags |= SS_ONSTACK;
 
 	/*
 	 * Save machine context.
@@ -610,16 +610,15 @@ savecontext(ucp, mask)
 psw_t	sendsig_psw = SIGPSW;
 
 int
-sendsig(sig, sip, hdlr)
+sendsig(sig, hdlr)
 	int sig;
-	k_siginfo_t *sip;
 	register void (*hdlr)();
 {
 	ucontext_t uc;
 	psw_t ill_psw;
 	siginfo_t si;
 	int newstack;		/* if true, switching to alternate stack */
-	int minstacksz;		/* size of stack required to catch signal */
+	int stacksz;		/* size of stack required to catch signal */
  	register int *sp, *ap;
 	proc_t *p = u.u_procp;
 	struct {
@@ -634,33 +633,34 @@ sendsig(sig, sip, hdlr)
 
 	argpframe.signo = sig;
 
- 	minstacksz = 
+ 	stacksz = 
 	  sizeof(ucontext_t) + 	/* user context structure */
 	  sizeof(argpframe) + 	/* current signal */
 	  sizeof(retgframe); 	/* for binary compatibility */
 
-	if (sip != NULL) {
-		bzero((caddr_t)&si, sizeof(si));
-		bcopy((caddr_t)sip, (caddr_t)&si, sizeof(k_siginfo_t));
-		minstacksz += sizeof(siginfo_t);
+	bzero((caddr_t)&si, sizeof(si));
+	if (p->p_curinfo && sigismember(&p->p_siginfo, sig)) {
+		bcopy((caddr_t)&p->p_curinfo->sq_info,
+		  (caddr_t)&si, sizeof(k_siginfo_t));
+		stacksz += sizeof(siginfo_t);
 	}
  
  	newstack = (sigismember(&u.u_sigonstack, sig)
-	   && !(u.u_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
+	   && !(u.u_altflags & (SS_ONSTACK|SS_DISABLE)));
 
  	if (newstack != 0) {
- 		if (minstacksz >= u.u_sigaltstack.ss_size)
+ 		if (stacksz >= u.u_altsize)
 			return 0;
- 		sp = (int *)(_VOID *)u.u_sigaltstack.ss_sp;
+ 		sp = (int *)u.u_altsp;
  	} else {
  		register int *sub;
- 		sub = u.u_pcb.sp + minstacksz / NBPW;
+ 		sub = u.u_pcb.sp + stacksz / NBPW;
  		if (sub >= u.u_pcb.sub && !grow(sub))
 			return 0;
  		sp = u.u_pcb.sp;
 	}
 
-	if (sip != NULL) {
+	if (p->p_curinfo && sigismember(&p->p_siginfo, sig)) {
 		if (copyout((caddr_t)&si, (caddr_t)sp, sizeof(siginfo_t)) < 0)
 			return 0;
 		argpframe.sip = (siginfo_t *)sp;
@@ -711,12 +711,11 @@ sendsig(sig, sip, hdlr)
 	u.u_pcb.psw.OE = ill_psw.OE;
 
 	if (newstack) {
-		u.u_sigaltstack.ss_flags |= SS_ONSTACK;
- 		u.u_pcb.slb = (int *)(_VOID *)u.u_sigaltstack.ss_sp;
-		u.u_pcb.sub = (int *)(_VOID *)(u.u_sigaltstack.ss_sp 
-			+ u.u_sigaltstack.ss_size);
-		u.u_procp->p_stkbase = u.u_sigaltstack.ss_sp;
-		u.u_procp->p_stksize = u.u_sigaltstack.ss_size;
+		u.u_altflags |= SS_ONSTACK;
+ 		u.u_pcb.slb = (int *)u.u_altsp;
+		u.u_pcb.sub = u.u_altsp + u.u_altsize;
+		u.u_procp->p_stkbase = u.u_altsp;
+		u.u_procp->p_stksize = howmany(u.u_altsize, sizeof(int *));
 	}
 
 	return 1;
@@ -728,14 +727,13 @@ sendsig(sig, sip, hdlr)
  * so that it may be restored in ttrap.s.
  */
 int *
-retsig(ucp, pc)
+retsig(ucp)
 	register ucontext_t *ucp;
-	register unsigned int pc;
 {
 	u.u_oldcontext = ucp->uc_link;
 
 	u.u_ipcb.sp = (int *)ucp;
-	u.u_ipcb.pc = (void(*)())pc;
+	u.u_ipcb.pc = (void(*)())ucp->uc_mcontext.gregs[R_PC];
 	u.u_ipcb.psw = *(psw_t *)&(ucp->uc_mcontext.gregs[R_PS]);
 
 	fixuserpsw(&u.u_ipcb.psw);

@@ -8,7 +8,7 @@
 #ifndef	_SYS_SOCKET_H
 #define	_SYS_SOCKET_H
 
-#ident	"@(#)head.sys:sys/socket.h	1.10"
+#ident	"@(#)head.sys:sys/socket.h	1.8"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -27,7 +27,7 @@
  * Notice of copyright on this source code product does not indicate 
  * publication.
  * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
  * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * 	          All rights reserved.
  *  
@@ -54,8 +54,8 @@
 #define	SOCK_STREAM	NC_TPI_COTS	/* stream socket */
 #define	SOCK_DGRAM	NC_TPI_CLTS	/* datagram socket */
 #define	SOCK_RAW	NC_TPI_RAW	/* raw-protocol interface */
-#define	SOCK_RDM	5		/* reliably-delivered message */
-#define	SOCK_SEQPACKET	6		/* sequenced packet stream */
+#define	SOCK_RDM	4		/* reliably-delivered message */
+#define	SOCK_SEQPACKET	5		/* sequenced packet stream */
 
 /*
  * Option flags per-socket.

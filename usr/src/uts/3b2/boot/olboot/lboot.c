@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/olboot/lboot.c	11.11"
+#ident	"@(#)boot:boot/olboot/lboot.c	11.10"
 
 #include	"sys/types.h"
 #include	"sys/psw.h"
@@ -28,7 +28,6 @@
 #include 	"sys/immu.h"
 #include	"sys/nvram.h"
 #include	"sys/vtoc.h"
-#include	"sys/inline.h"
 
 extern lls();
 

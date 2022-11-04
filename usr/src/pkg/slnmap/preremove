@@ -1,0 +1,12 @@
+#ident	"@(#)pkg.slnmap:preremove	1.1"
+
+#
+# Remove the entries from /etc/netconfig
+#
+
+grep -v '[ 	]osinet[ 	][ 	]*-[ 	][ 	]*/dev/starlan[ 	]' /etc/netconfig 2>/dev/null >/tmp/$$.1
+grep -v '[ 	]osinet[ 	][ 	]*-[ 	][ 	]*/dev/starlandg[ 	]' /tmp/$$.1 2>/de/etc/netconfig
+
+rm -f /rmp/$$.1
+
+exit 0

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/ddi.c	1.39"
+#ident	"@(#)kernel:os/ddi.c	1.36"
 
 /*            UNIX Device Driver Interface functions          
 
@@ -56,6 +56,44 @@ extern struct user u;
 extern char MAJOR[256];
 extern char MINOR[256];
 
+
+
+
+/* function: btoc()     
+ * macro in: sysmacros.h 
+ * purpose: convert size in bytes to size in clicks (pages)
+ */
+
+unsigned long
+btoc(bytes)
+register unsigned long bytes;
+{
+
+#ifdef BPCSHIFT
+	return(((unsigned)(bytes)+(NBPC-1))>>BPCSHIFT);
+#else
+	return(((unsigned)(bytes)+(NBPC-1))/NBPC);
+#endif
+
+}
+
+
+
+/* function: ctob()      
+ * macro in: sysmacros.h 
+ * purpose: convert size in clicks (pages) to bytes
+ */
+
+unsigned long
+ctob(clicks)
+register unsigned long clicks;
+{
+#ifdef BPCSHIFT
+	return(((clicks)<<BPCSHIFT));
+#else
+	return(((clicks)*NBPC));
+#endif
+}
 
 
 
@@ -131,7 +169,7 @@ int
 etoimajor(emajnum)
 register major_t emajnum;
 {
-	if (emajnum > MAXMAJ || MAJOR[emajnum] >= max(cdevcnt, bdevcnt))
+	if (emajnum > MAXMAJ)
 		return (-1); /* invalid external major */
 
 	return ( (int) MAJOR[emajnum]);
@@ -331,7 +369,8 @@ putnext(q, mp)
 register queue_t *q;
 register mblk_t *mp;
 {
-	return ((*q->q_next->q_qinfo->qi_putp)(q->q_next, mp));
+	(*q->q_next->q_qinfo->qi_putp)(q->q_next, mp);
+	return(0);
 }
 
 
@@ -473,7 +512,8 @@ register unsigned long value;
 }
 
 
-/* function: physiock()
+
+/* function: physio()
  * purpose:  perform raw device I/O on block devices
  *
  * The arguments are
@@ -499,7 +539,7 @@ daddr_t devsize;
 register struct uio *uiop;
 {
 	register struct iovec *iov;
-	register unsigned over,cnt,iovlen;
+	register unsigned over;
 	register off_t upper, limit;
 	struct a {
 		int	fdes;
@@ -516,7 +556,7 @@ register struct uio *uiop;
 	limit = devsize << SCTRSHFT;
 	if (uiop->uio_offset >= (off_t) limit)
 	{
-		if (rw == B_WRITE)
+		if (uiop->uio_offset > limit || rw == B_WRITE)
 			return(ENXIO);
 		return(0);
 	}
@@ -526,25 +566,15 @@ register struct uio *uiop;
 	 * read(2) system call.
 	 */
 
-	iovlen = 0;
-	for (cnt = 0,iov = uiop->uio_iov; cnt < uiop->uio_iovcnt; cnt++,iov++)
-		iovlen += (off_t) iov->iov_len;
-
-	upper = uiop->uio_offset + iovlen;
-
-	if (upper > limit) {
+	iov = uiop->uio_iov;
+	upper = uiop->uio_offset + (off_t) iov->iov_len;
+	if (upper > limit)
+	{
 		over = upper - limit;
+		iov->iov_len -= over;
+		uiop->uio_resid -= over;
 		uap = (struct a *)u.u_ap;
 		uap->count -= over;
-		for (cnt = 0,iov = uiop->uio_iov; cnt < uiop->uio_iovcnt; cnt++,iov++)
-			if (iov->iov_len <= over) 
-				over -= iov->iov_len;
-			else if (over > 0) {
-				iov->iov_len -= over;
-				over = 0;
-			}
-			else /* over == 0 */
-				iov->iov_len = 0;
 	}
 
 

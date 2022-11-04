@@ -5,8 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/hrtnewres.c	1.3"
+#ident	"@(#)libc-port:gen/hrtnewres.c	1.2"
 
+#ifdef __STDC__
+	#pragma weak hrtnewres = _hrtnewres
+#endif
 #include	"synonyms.h"
 #include	<sys/types.h>
 #include	<sys/dl.h>
@@ -24,7 +27,7 @@
 **	a long, then -1 is returned instead.
 */
 
-_hrtnewres(htp, new_res, round)
+hrtnewres(htp, new_res, round)
 register hrtime_t *htp;
 register ulong new_res;
 long round;

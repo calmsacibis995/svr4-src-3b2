@@ -5,11 +5,9 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_aux.c	1.2"
+#ident	"@(#)fs:fs/nfs/nfs_aux.c	1.1"
 #include "sys/types.h"
 #include "sys/vfs.h"
-#include "sys/kmem.h"
-#include "sys/tiuser.h"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -50,10 +48,10 @@
  * vfs_getnum() and vfs_putnum() and its own private minor device number map.
  */
 
-#define	NBBY		8
-#define	LOGBBY		3
-#define	MAJOR_MIN	128
-#define	vfsNVFS		(&vfssw[nfstype])
+#define NBBY 8
+#define LOGBBY 3
+#define MAJOR_MIN 128
+#define vfsNVFS	(&vfssw[nfstype])
 
 /*
  * Return the reserved major device number for this filesystem type
@@ -108,30 +106,4 @@ vfs_putnum(map, n)
 
 	if (n >= 0)
 		map[n >> LOGBBY] &= ~(1 << (n - ((n >> LOGBBY) << LOGBBY)));
-}
-
-struct netbuf *
-nfs_copyin_netbuf(from)
-	struct netbuf *from;
-{
-	struct netbuf *addr;
-	char *userbufptr;
-
-	addr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
-
-	if (copyin((caddr_t) from, (caddr_t) addr, sizeof (struct netbuf))) {
-		kmem_free((caddr_t) addr, sizeof (struct netbuf));
-		return ((struct netbuf *) 0);
-	}
-
-	userbufptr = addr->buf;
-	addr->buf = kmem_alloc(addr->len, KM_SLEEP);
-	addr->maxlen = addr->len;
-	if (copyin(userbufptr, addr->buf, addr->len)) {
-		kmem_free((caddr_t) addr->buf, addr->len);
-		kmem_free((caddr_t) addr, sizeof (struct netbuf));
-		return ((struct netbuf *) 0);
-	}
-
-	return (addr);
 }

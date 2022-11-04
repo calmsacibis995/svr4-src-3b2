@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-	.ident	"@(#)kernel:ml/ttrap.s	1.29"
+	.ident	"@(#)kernel:ml/ttrap.s	1.25"
 #
 #   NOTE -- CHANGES TO USER.H, PROC.H AND CLASS.H MAY REQUIRE
 #   CORRESPONDING CHANGES TO THE FOLLOWING .SETs.
@@ -31,8 +31,8 @@
 	.set	u_fpovr,0x4ac	# offset of u_fpovr
 	.set	u_procp,0x4e4	# offset of u_procp
 	.set	u_tracepc,0x1cc	# offset to u_tracepc
-	.set	p_clproc,0xe0	# offset to p_clproc
-	.set	p_clfuncs,0xe4	# offset to p_clfuncs
+	.set	p_clproc,0xe4	# offset to p_clproc
+	.set	p_clfuncs,0xe8	# offset to p_clfuncs
 	.set	cl_trapret,0x4c	# offset to cl_trapret in classfuncs struct
 
 	.set	PSW_TE,0x20000	# TM bit in psw.
@@ -538,8 +538,7 @@ nrmx_ilc:
 
 signal_ilc:
 	PUSHAW	-sigframe(%sp)		# push address of user context
-	PUSHW	-20(%sp)		# push possibly corrected pc value
-	CALL	-8(%sp),retsig		# restore user context after RETG
+	CALL	-4(%sp),retsig		# restore user context after RETG
 	MOVW	%r0,%ap			# returns AP at time of sendsig
 
 ilcskip:
@@ -549,16 +548,9 @@ ilcskip:
 
 	ORW2	&0x00000080,u+u_ipcb+u_psw	# I=1
 	TSTW	u+u_fpovr		# user trapping on ovrflow ?
-	BEB	check_oe		# branch if not.
-	ORW2	&0x00400000,u+u_ipcb+u_psw	# restore OE bit
+	BEB	nrmx_ilc2			# branch if not.
 
-#	Chip bug work-around: if the OE bit is on, the V bit must be
-#	off. Otherwise the chip will get upset and UNIX will panic
-#	with a process exception.
-#
-check_oe:
-	BITW	&0x00400000,u+u_ipcb+u_psw	# is the OE bit on ?
-	BEB	nrmx_ilc2			# branch if not
+	ORW2	&0x00400000,u+u_ipcb+u_psw	# restore OE bit
 	ANDW2	&0xfff7ffff,u+u_ipcb+u_psw	# Turn off V bit.
 
 #	The following label must be immediately before the TSTB
@@ -685,12 +677,6 @@ Xsyscall:
 #		+---------------+
 #		| rest of stack	|
 #
-	.data
-	.align 4
-nrmx_pcb:
-	.word 16
-
-	.text
 
 	.globl	nrmx_KK
 
@@ -705,32 +691,7 @@ nrmx_KK:	# normal exception while on kernel stack
 #				  r0ptr[PS] == PSW.
 
 	CALL	-4(%sp),k_trap
-	jz	nrmx_KK_ok
 
-	MOVW -5*4(%sp), nrmx_pcb+0x00	# psw
-	MOVW -6*4(%sp), nrmx_pcb+0x04	# pc
-	MOVAW -6*4(%sp), nrmx_pcb+0x08	# sp
-	MOVW %ap,  nrmx_pcb+0x14	# ap
-	MOVW %fp,  nrmx_pcb+0x18	# fp
-	MOVW -3*4(%sp),  nrmx_pcb+0x1c	# r0
-	MOVW -2*4(%sp),  nrmx_pcb+0x20	# r1
-	MOVW -1*4(%sp),  nrmx_pcb+0x24	# r2
-	MOVW %r3,  nrmx_pcb+0x28
-	MOVW %r4,  nrmx_pcb+0x2c
-	MOVW %r5,  nrmx_pcb+0x30
-	MOVW %r6,  nrmx_pcb+0x34
-	MOVW %r7,  nrmx_pcb+0x38
-	MOVW %r8,  nrmx_pcb+0x3c
-
-	MOVAW nrmx_pcb+0x1c, save_r0ptr
-
-	PUSHW	-0x14(%sp)	# push saved PSW
-	CALL	-4(%sp),krnlflt
-
-#	don't expect krnlflt to ever return
-
-
-nrmx_KK_ok:
 	POPW	%r2		# restore user registers
 	POPW	%r1
 	POPW	%r0

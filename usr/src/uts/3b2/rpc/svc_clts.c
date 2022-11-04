@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/svc_clts.c	1.9"
+#ident	"@(#)krpc:krpc/svc_clts.c	1.5"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)svc_clts.c 1.2 89/01/11 SMI"
 #endif
@@ -40,7 +40,6 @@ static char sccsid[] = "@(#)svc_clts.c 1.2 89/01/11 SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/sysmacros.h>
 #include <rpc/types.h>
 #include <netinet/in.h>
 #include <rpc/xdr.h>
@@ -59,10 +58,8 @@ static char sccsid[] = "@(#)svc_clts.c 1.2 89/01/11 SMI"
 #include <sys/fcntl.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
-#include <sys/systm.h>
 
 #define rpc_buffer(xprt) ((xprt)->xp_p1)
-#define rpc_bufferlen(xprt) ((xprt)->xp_p1len)
 
 static void unhash();
 
@@ -103,7 +100,6 @@ struct udp_data {
 	frtn_t	ud_frtn;			/* message free routine */
 };
 
-#define	UD_MAXSIZE	8800
 
 /*
  * Flags
@@ -129,31 +125,22 @@ struct {
  * There is one transport record per user process which implements a
  * set of services.
  */
-/* ARGSUSED */
-int
-svc_clts_kcreate(tiptr, sendsz, nxprt)
-	register TIUSER			*tiptr;
-	register u_int			sendsz;
-	register SVCXPRT		**nxprt;
+
+/*ARGSUSED*/
+SVCXPRT *
+svc_clts_kcreate(tiptr, sendsz, recvsz)
+register TIUSER *tiptr;
+register u_int  sendsz, recvsz;
 {
-	register struct udp_data	*ud;
-	int				error;
-	SVCXPRT				*xprt;
+	register SVCXPRT	 *xprt;
+	register struct udp_data *ud;
 
-	RPCLOG(4, "svc_clts_kcreate: Entered tiptr %x\n", tiptr);
-
-	if (nxprt == NULL)
-		return EINVAL;
-
-	sendsz = MIN(tiptr->tp_info.tsdu, UD_MAXSIZE);
-	RPCLOG(4, "svc_clts_kcreate: sendsz %d\n", sendsz);
+#ifdef RPCDEBUG
+printf("svc_clts_kcreate: Entered tiptr %x\n", tiptr);
+#endif
 
 	xprt = (SVCXPRT *)kmem_alloc((u_int)sizeof(SVCXPRT), KM_SLEEP);
-
-
-	rpc_buffer(xprt) = (caddr_t)kmem_alloc(sendsz, KM_SLEEP);
-	rpc_bufferlen(xprt) = sendsz;
-
+	rpc_buffer(xprt) = (caddr_t)kmem_alloc((u_int)UDPMSGSIZE, KM_SLEEP);
 	ud = (struct udp_data *)kmem_alloc((u_int)sizeof(struct udp_data), KM_SLEEP);
 	bzero((caddr_t)ud, sizeof(*ud));
 	xprt->xp_p2 = (caddr_t)ud;
@@ -161,22 +148,8 @@ svc_clts_kcreate(tiptr, sendsz, nxprt)
 	xprt->xp_verf.oa_base = ud->ud_verfbody;
 	xprt->xp_ops = &svc_clts_op;
 	xprt->xp_tiptr = tiptr;
-
-	xprt->xp_ltaddr.buf = NULL;
-	xprt->xp_ltaddr.maxlen = 0;
-	xprt->xp_ltaddr.len = 0;
-
-	/* Allocate receive address buffer.
-	 */
-	xprt->xp_rtaddr.buf = kmem_alloc(tiptr->tp_info.addr, KM_SLEEP);
-	xprt->xp_rtaddr.maxlen = tiptr->tp_info.addr;
-	xprt->xp_rtaddr.len = 0;
-	RPCLOG(4, "svc_clts_kcreate: receive address size %d\n", 
-						tiptr->tp_info.addr);
-	
-	*nxprt = xprt;
-
-	return (0);
+	bzero((caddr_t)&xprt->xp_ltaddr, sizeof(struct netbuf));
+	return (xprt);
 }
  
 /*
@@ -185,26 +158,25 @@ svc_clts_kcreate(tiptr, sendsz, nxprt)
  */
 void
 svc_clts_kdestroy(xprt)
-	register SVCXPRT		*xprt;
+	register SVCXPRT   *xprt;
 {
 	/* LINTED pointer alignment */
-	register struct udp_data	*ud = (struct udp_data *)xprt->xp_p2;
-	int				error;
+	register struct udp_data *ud = (struct udp_data *)xprt->xp_p2;
+	/* register struct file *tiptr; */
 
-	RPCLOG(4, "svc_clts_kdestroy %x\n", xprt);
-
-	if (ud->ud_inudata)
-                (void)t_kfree(xprt->xp_tiptr, (char *)ud->ud_inudata,
-						 T_UNITDATA);
+#ifdef RPCDEBUG
+	printf("usr_destroy %x\n", xprt);
+#endif
+	if (ud->ud_inudata) {
+                if (t_kfree(xprt->xp_tiptr, (char *)ud->ud_inudata, T_UNITDATA) < 0)
+                        printf("svc_clts_kdestroy: t_kfree: %d\n", u.u_error);
+	}
 	if (xprt->xp_ltaddr.buf)
 		kmem_free(xprt->xp_ltaddr.buf, xprt->xp_ltaddr.maxlen);
 
-	if (xprt->xp_rtaddr.buf)
-		kmem_free(xprt->xp_rtaddr.buf, xprt->xp_rtaddr.maxlen);
-
 	t_kclose(xprt->xp_tiptr, 0);
 	kmem_free((caddr_t)ud, (u_int)sizeof(struct udp_data));
-	kmem_free((caddr_t)rpc_buffer(xprt), rpc_bufferlen(xprt));
+	kmem_free((caddr_t)rpc_buffer(xprt), (u_int)UDPMSGSIZE);
 	kmem_free((caddr_t)xprt, (u_int)sizeof(SVCXPRT));
 }
 
@@ -215,74 +187,65 @@ svc_clts_kdestroy(xprt)
  */
 bool_t
 svc_clts_krecv(xprt, msg)
-	register SVCXPRT	 	*xprt;
-	struct rpc_msg		 	*msg;
+	register SVCXPRT	 *xprt;
+	struct rpc_msg		 *msg;
 {
 	/* LINTED pointer alignment */
-	register struct udp_data	*ud = (struct udp_data *)xprt->xp_p2;
-	register XDR			*xdrs = &(ud->ud_xdrin);
-	struct t_kunitdata		*inudata;
-	int				type;
-	int				uderr;
-	int				error;
+	register struct udp_data *ud = (struct udp_data *)xprt->xp_p2;
+	register XDR	 *xdrs = &(ud->ud_xdrin);
+	register struct t_kunitdata *inudata;
+	int flags;
 
-	RPCLOG(4, "svc_clts_krecv %x\n", xprt);
-
+#ifdef RPCDEBUG
+	printf("svc_clts_krecv %x\n", xprt);
+#endif
 	/* get a receive buffer
 	 */
-	if ((error = t_kalloc(xprt->xp_tiptr, T_UNITDATA, T_ADDR|T_UDATA,
-					 (char **)&inudata)) != 0) {
-                RPCLOG(1, "svc_clts_krecv: t_kalloc: %d\n", error);
+	if ((inudata = (struct t_kunitdata *)t_kalloc(xprt->xp_tiptr,
+			 /* LINTED pointer alignment */
+			 T_UNITDATA, T_ADDR|T_UDATA)) == (struct t_kunitdata *)NULL) {
+                printf("svc_clts_krecv: t_kalloc: %d\n", u.u_error);
                 goto bad;
         }
 
 	rsstat.rscalls++;
-	if ((error = t_krcvudata(xprt->xp_tiptr, inudata, &type, &uderr))
-								 != 0) {
-                RPCLOG(1, "svc_clts_krecv: t_krcvudata: %d\n", error);
-                if (error == EAGAIN) {
+	if (t_krcvudata(xprt->xp_tiptr, inudata, &flags) < 0) {
+                printf("svc_clts_krecv: t_krcvudata: %d\n", u.u_error);
+                if (u.u_error == EAGAIN) {
                         rsstat.rsnullrecv++;
                         return FALSE;
                 }
                 else    goto bad;
         }
-	if (type != T_DATA) {
-                RPCLOG(1, "svc_clts_krecv: t_krcvudata: bad type %d\n", type);
-		/* Got T_UDERROR_IND
-		 */
-		goto bad;
-	}
-
-	RPCLOG(4, "svc_clts_krecv: t_krcvudata returned %d bytes\n", inudata->udata.len);
-
-	if (inudata->addr.len > xprt->xp_rtaddr.maxlen) {
-		RPCLOG(4, "svc_clts_krecv: Bad address len %d\n",
-						inudata->addr.len);
-		goto bad;
-	}
-	bcopy(inudata->addr.buf, xprt->xp_rtaddr.buf, inudata->addr.len);
+#ifdef RPCDEBUG
+printf("svc_clts_krecv: t_krcvudata returned %d bytes\n", inudata->udata.len);
+#endif
+	xprt->xp_rtaddr.buf = kmem_alloc (inudata->addr.len, KM_SLEEP);
 	xprt->xp_rtaddr.len = inudata->addr.len;
+	xprt->xp_rtaddr.maxlen = inudata->addr.maxlen;
+	bcopy (inudata->addr.buf, xprt->xp_rtaddr.buf, xprt->xp_rtaddr.len);
  
         if (inudata->udata.len < 4*sizeof(u_long)) {
-                RPCLOG(1, "svc_clts_krecv: bad length %d\n", inudata->udata.len);  
-
+                printf("svc_clts_krecv: bad length %d\n", inudata->udata.len);  
                 rsstat.rsbadlen++;
                 goto bad;
         }
 	xdrmblk_init(xdrs, inudata->udata.udata_mp, XDR_DECODE);
         if (! xdr_callmsg(xdrs, msg)) {
-                RPCLOG(1, "svc_clts_krecv: bad xdr_callmsg\n", 0);
+                printf("svc_clts_krecv: bad xdr_callmsg\n");
                 rsstat.rsxdrcall++;
                 goto bad;
         }
         ud->ud_xid = msg->rm_xid;
         ud->ud_inudata = inudata;
 
-	RPCLOG(4, "svc_clts_krecv done\n", 0);
-
+#ifdef RPCDEBUG
+	printf("svc_clts_krecv done\n");
+#endif
 	return (TRUE);
 bad:
-	(void)t_kfree(xprt->xp_tiptr, (char *)inudata, T_UNITDATA);
+	if (t_kfree(xprt->xp_tiptr, (char *)inudata, T_UNITDATA) < 0)
+                printf("svc_clts_krecv: t_kfree %d\n", u.u_error);
         ud->ud_inudata = NULL;
 
 	rsstat.rsbadcalls++;
@@ -294,12 +257,10 @@ static void
 buffree(ud)
 	register struct udp_data *ud;
 {
-	RPCLOG(4, "buffree: (svc) entered ud %x\n", ud);
 	ud->ud_flags &= ~UD_BUSY;
 	if (ud->ud_flags & UD_WANTED) {
 		ud->ud_flags &= ~UD_WANTED;
-		RPCLOG(4, "buffree: (svc) waking sleeper\n", 0);
-		wakeprocs((caddr_t)ud, PRMPT);
+		wakeup((caddr_t)ud);
 	}
 }
 
@@ -311,37 +272,35 @@ buffree(ud)
 bool_t
 /* ARGSUSED */
 svc_clts_ksend(xprt, msg)
-	register SVCXPRT		*xprt; 
-	struct rpc_msg			*msg; 
+	register SVCXPRT *xprt; 
+	struct rpc_msg *msg; 
 {
 	/* LINTED pointer alignment */
-	register struct udp_data	*ud = (struct udp_data *)xprt->xp_p2;
-	register XDR			*xdrs = &(ud->ud_xdrout);
-	register int			slen;
-	register int			stat = FALSE;
-	int				s;
-	struct t_kunitdata		*unitdata;
-	int				error;
+	register struct udp_data *ud = (struct udp_data *)xprt->xp_p2;
+	register XDR *xdrs = &(ud->ud_xdrout);
+	register int slen;
+	register int stat = FALSE;
+	int 	 s;
+	struct   t_kunitdata *unitdata;
 
-	RPCLOG(4, "svc_clts_ksend %x\n", xprt);
-
+#ifdef RPCDEBUG
+	printf("svc_clts_ksend %x\n", xprt);
+#endif
 	s = splstr();
 	while (ud->ud_flags & UD_BUSY) {
-		RPCLOG(4, "svc_clts_ksend: pid %d UD_BUSY set - sleeping\n", u.u_procp->p_pid);
 		ud->ud_flags |= UD_WANTED;
 		(void) sleep((caddr_t)ud, PZERO-2);
 	}
 	ud->ud_flags |= UD_BUSY;
 	(void) splx(s);
-
-	RPCLOG(4, "svc_clts_ksend: pid %d UD_BUSY notset\n", u.u_procp->p_pid);
-	xdrmem_create(xdrs, rpc_buffer(xprt), rpc_bufferlen(xprt), XDR_ENCODE);
+	xdrmem_create(xdrs, rpc_buffer(xprt), UDPMSGSIZE, XDR_ENCODE);
 	msg->rm_xid = ud->ud_xid;
 	if (xdr_replymsg(xdrs, msg)) {
 		slen = (int)XDR_GETPOS(xdrs);
-	        if ((error = t_kalloc(xprt->xp_tiptr, T_UNITDATA,
-				 T_ADDR|T_UDATA, (char **)&unitdata)) != 0) {
-                        RPCLOG(1, "svc_clts_ksend: t_kalloc: %d\n", error);    
+	        if ((unitdata = (struct t_kunitdata *)t_kalloc(xprt->xp_tiptr,   
+			/* LINTED pointer alignment */
+                        T_UNITDATA, T_ADDR)) == (struct t_kunitdata *)NULL) {
+                        printf("svc_clts_ksend: t_kalloc: %d\n", u.u_error);    
                 }
                 else    {
 			unitdata->addr.len = xprt->xp_rtaddr.len;
@@ -353,24 +312,29 @@ svc_clts_ksend(xprt, msg)
                         ud->ud_frtn.free_func = buffree;
                         ud->ud_frtn.free_arg  = (char *)ud;
  
-RPCLOG(4, "svc_clts_ksend: calling t_ksndudata fd = %x\n", xprt->xp_tiptr);
-RPCLOG(4, "svc_clts_ksend: calling t_ksndudata bytes = %d\n", unitdata->udata.len);
-                        if ((error = t_ksndudata(xprt->xp_tiptr, unitdata,
-					 &ud->ud_frtn)) != 0) {
-                                RPCLOG(1,
-				 "svc_clts_ksend: t_ksndudata: %d\n", error);
+#ifdef RPCDEBUG
+printf("svc_clts_ksend: calling t_ksndudata fd = %x, bytes = %d\n", xprt->xp_tiptr, unitdata->udata.len);
+#endif
+                        if (t_ksndudata(xprt->xp_tiptr, unitdata, &ud->ud_frtn) < 0) {
+                                printf("svc_clts_ksend: t_ksndudata: %d\n",     
+                                        u.u_error);
 			}
 			else	{
                                 stat = TRUE;
 	                }
                         /* now we have to free up the unitdata
                          */
-                        (void)t_kfree(xprt->xp_tiptr, (char *)unitdata, 
-					T_UNITDATA);
+                        if (t_kfree(xprt->xp_tiptr, (char *)unitdata, T_UNITDATA) < 0)
+                                printf("svc_clts_ksend: t_kfree: %d\n",
+u.u_error);
                 }
 	} else	{
-		RPCLOG(4, "svc_clts_ksend: xdr_replymsg failed\n", 0);
+#ifdef RPCDEBUG
+printf("svc_clts_ksend: xdr_replymsg failed\n");
+#endif
 		buffree (ud);
+		/* not allocated, so don't free it */
+		/* t_kfree(xprt->xp_tiptr, (char *)unitdata, T_UNITDATA); */
 	}
 	/*
 	 * This is completely disgusting.  If public is set it is
@@ -383,8 +347,9 @@ RPCLOG(4, "svc_clts_ksend: calling t_ksndudata bytes = %d\n", unitdata->udata.le
 		/* LINTED pointer alignment */
 		(**((int (**)())xdrs->x_public))(xdrs->x_public);
 	}
-	RPCLOG(4, "svc_clts_ksend done\n", 0);
-
+#ifdef RPCDEBUG
+	printf("svc_clts_ksend done\n");
+#endif
 	return (stat);
 }
 
@@ -405,9 +370,9 @@ svc_clts_kstat(xprt)
  */
 bool_t
 svc_clts_kgetargs(xprt, xdr_args, args_ptr)
-	SVCXPRT		*xprt;
-	xdrproc_t	xdr_args;
-	caddr_t		args_ptr;
+	SVCXPRT	*xprt;
+	xdrproc_t	 xdr_args;
+	caddr_t		 args_ptr;
 {
 
 	/* LINTED pointer alignment */
@@ -416,23 +381,19 @@ svc_clts_kgetargs(xprt, xdr_args, args_ptr)
 
 bool_t
 svc_clts_kfreeargs(xprt, xdr_args, args_ptr)
-	SVCXPRT				*xprt;
-	xdrproc_t			xdr_args;
-	caddr_t				args_ptr;
+	SVCXPRT	*xprt;
+	xdrproc_t	 xdr_args;
+	caddr_t		 args_ptr;
 {
 	/* LINTED pointer alignment */
-	register XDR			*xdrs;
+	register XDR *xdrs = &(((struct udp_data *)(xprt->xp_p2))->ud_xdrin);
 	/* LINTED pointer alignment */
-	register struct	udp_data	*ud;
-	int				error;
+	register struct udp_data *ud = (struct udp_data *)xprt->xp_p2;
 
-	xdrs = &(((struct udp_data *)(xprt->xp_p2))->ud_xdrin);
-	ud = (struct udp_data *)xprt->xp_p2;
-
-	if (ud->ud_inudata)
-                (void)t_kfree(xprt->xp_tiptr, (char *)ud->ud_inudata,
-					 T_UNITDATA);
-
+	if (ud->ud_inudata) {
+                if (t_kfree(xprt->xp_tiptr, (char *)ud->ud_inudata, T_UNITDATA) < 0)
+                        printf("svc_clts_kfreeargs: t_kfree: %d\n", u.u_error);
+        }
         ud->ud_inudata = (struct t_kunitdata *)NULL;
 	if (args_ptr) {
 		xdrs->x_op = XDR_FREE;
@@ -528,10 +489,9 @@ svc_clts_kdup(req)
 		    dr->dr_prog != req->rq_prog ||
 		    dr->dr_vers != req->rq_vers ||
 		    dr->dr_proc != req->rq_proc ||
-		    dr->dr_addr.len != req->rq_xprt->xp_rtaddr.len ||
-		    bcmp((caddr_t)&dr->dr_addr.buf,
-		     (caddr_t)&req->rq_xprt->xp_rtaddr.buf,
-		     dr->dr_addr.len) != 0) {
+		    bcmp((caddr_t)&dr->dr_addr,
+		     (caddr_t)&req->rq_xprt->xp_rtaddr,
+		     sizeof(dr->dr_addr)) != 0) {
 			dr = dr->dr_chain;
 			continue;
 		} else {

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/svc_gen.c	1.5"
+#ident	"@(#)krpc:krpc/svc_gen.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)svc_generic.c 1.1 88/12/12 SMI"
 #endif
@@ -53,24 +53,25 @@ static char sccsid[] = "@(#)svc_generic.c 1.1 88/12/12 SMI"
 #include <sys/fcntl.h>
 #include <sys/errno.h>
  
-int
-svc_tli_kcreate(fp, sendsz, nxprt)
-	register struct file	*fp;		/* connection end point */
-	u_int			sendsz;		/* max sendsize */
-	SVCXPRT			**nxprt;
+SVCXPRT *svc_clts_kcreate();
+
+SVCXPRT *
+svc_tli_kcreate(fp, sendsz, recvsz)
+register struct file *fp;		/* connection end point */
+u_int sendsz;				/* max sendsize */
+u_int recvsz;				/* max recvsize */
 {
-	SVCXPRT			*xprt = NULL;		/* service handle */
-	TIUSER			*tiptr = NULL;
-	int			error;
+	register SVCXPRT *xprt;		/* service handle */
+	register TIUSER *tiptr;
 
-	error = 0;
-
-	if (fp == NULL || nxprt == NULL)
-		return EINVAL;
-
-	if ((error = t_kopen(fp, -1, FREAD|FWRITE|FNDELAY, &tiptr)) != 0) {
-                RPCLOG(1, "svc_tli_kcreate: t_kopen: %d\n", error);
-         	return error;
+	if (fp == NULL) {
+		u.u_error = EINVAL;
+		return NULL;
+	}
+	if ((tiptr = t_kopen(fp, -1, O_RDWR|O_NDELAY,
+                                        (struct t_info *)NULL)) == NULL) {
+                printf("svc_tli_kcreate: t_kopen: %d\n", u.u_error);
+         	return NULL;
 	}
 
 	/*
@@ -78,27 +79,32 @@ svc_tli_kcreate(fp, sendsz, nxprt)
 	 */
 	switch(tiptr->tp_info.servtype) {
 		case T_CLTS:
-			error = svc_clts_kcreate(tiptr, sendsz, &xprt);
+			xprt = svc_clts_kcreate(tiptr, sendsz, recvsz);
 			break;
 		default:
-                	RPCLOG(1, "svc_tli_kcreate: Bad service type %d\n", 
-				tiptr->tp_info.servtype);
-			error = EINVAL;
-			break;
+                	(void)printf("svc_tli_kcreate: Bad service type\n");
+			u.u_error = EINVAL;
+                	goto freedata;
         }
-	if (error != 0)
+	if (xprt == NULL)
 		goto freedata;
 
 
-	xprt->xp_port = (u_short)-1;	/* To show that it is tli based. Switch */
+	xprt->xp_port = -1UL;	/* To show that it is tli based. Switch */
 
-	*nxprt = xprt;
-	return 0;
+	/* remote address
+	 */
+	xprt->xp_rtaddr.buf = NULL;
+	xprt->xp_rtaddr.len = 0;
+	xprt->xp_rtaddr.maxlen = 0;
+
+	return (xprt);
 
 freedata:
+
 	if (xprt)
 		SVC_DESTROY(xprt);
-	return error;
+	return ((SVCXPRT *)NULL);
 }
 
 

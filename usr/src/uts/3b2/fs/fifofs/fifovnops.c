@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/fifofs/fifovnops.c	1.52"
+#ident	"@(#)fs:fs/fifofs/fifovnops.c	1.42"
 /*
  * FIFOFS file system vnode operations.  This file system
  * type supports STREAMS-based pipes and FIFOs.
@@ -13,7 +13,6 @@
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/systm.h"
-#include "sys/sysmacros.h"
 #include "sys/cred.h"
 #include "sys/errno.h"
 #include "sys/time.h"
@@ -53,7 +52,7 @@ void	fifo_inactive(),		fifo_rwlock(),	fifo_rwunlock();
 extern	int	strwrite(),	strread(),	strioctl(),	strpoll();
 extern	int	strclose(),	strclean(),	putctl();
 extern	int	fifo_stropen(),	nm_unmountall();
-extern	dev_t	fifodev;
+extern	dev_t fifodev;
 extern	void	fifo_flush(),	fifoclearid(),	fiforemove();
 extern	void	runqueues();
 extern  int	cleanlocks();
@@ -101,32 +100,7 @@ struct vnodeops fifo_vnodeops = {
 	fs_nosys,	/* delmap */
 	fifo_poll,
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -165,7 +139,7 @@ fifo_open(vpp, flag, crp)
 	}
 
 	if ((flag & FREAD) && (fnp->fn_rcnt++ == 0))
-		wakeprocs((caddr_t) &fnp->fn_rcnt, PRMPT);
+		wakeup((caddr_t) &fnp->fn_rcnt);
 
 	if (flag & FWRITE) {
 		if ((flag & (FNDELAY|FNONBLOCK)) && fnp->fn_rcnt == 0) {
@@ -173,7 +147,7 @@ fifo_open(vpp, flag, crp)
 			return (ENXIO);
 		}
 		if (fnp->fn_wcnt++ == 0)
-			wakeprocs((caddr_t) &fnp->fn_wcnt, PRMPT);
+			wakeup((caddr_t) &fnp->fn_wcnt);
 	}
 	if (flag & FREAD) {
 		while (fnp->fn_wcnt == 0) {
@@ -242,34 +216,33 @@ fifo_close(vp, flag, count, offset, crp)
 	 */
 	if (flag & FREAD) {
 		fnp->fn_rcnt--;
-		wakeprocs((caddr_t)vp->v_stream->sd_wrq, PRMPT);
-		wakeprocs((caddr_t) &fnp->fn_wcnt, PRMPT);
+		wakeup((caddr_t)vp->v_stream->sd_wrq);
+		wakeup((caddr_t) &fnp->fn_wcnt);
 	}
 	if (flag & FWRITE) {
 		fnp->fn_wcnt--;
-		wakeprocs((caddr_t)RD(vp->v_stream->sd_wrq), PRMPT);
-		wakeprocs((caddr_t) &fnp->fn_rcnt, PRMPT);
+		wakeup((caddr_t)RD(vp->v_stream->sd_wrq));
+		wakeup((caddr_t) &fnp->fn_rcnt);
 	}
-	fnp->fn_open--;
-	if (fnp->fn_open > 0)
-		return (0);
 	/*
 	 * If no more readers and writers, tear down the stream, send
 	 * hangup message to other side and force an unmount of
 	 * other end.
 	 */
-	if ((fnp->fn_flag & ISPIPE) && fnp->fn_mate) {
-		putctl(vp->v_stream->sd_wrq->q_next, M_HANGUP);
-		qenable(vp->v_stream->sd_wrq->q_next);
-		fnp2 = VTOF(fnp->fn_mate);
-		fnp2->fn_mate = NULL;
-		if ((fnp->fn_mate)->v_stream->sd_flag & STRMOUNT) {
-			(void) nm_unmountall(FTOV(fnp2), crp);
+	if (vp->v_count == 1) {
+		if ((fnp->fn_flag & ISPIPE) && fnp->fn_mate) {
+			putctl(vp->v_stream->sd_wrq->q_next, M_HANGUP);
+			qenable(vp->v_stream->sd_wrq->q_next);
+			fnp2 = VTOF(fnp->fn_mate);
+			fnp2->fn_mate = NULL;
+			if ((fnp->fn_mate)->v_stream->sd_flag & STRMOUNT) {
+				(void) nm_unmountall(FTOV(fnp2), crp);
+			}
 		}
+		error = strclose(vp, flag, crp);
+		wakeup((caddr_t) &fnp->fn_unique);
+		fnp->fn_mate = NULL;
 	}
-	error = strclose(vp, flag, crp);
-	wakeprocs((caddr_t) &fnp->fn_unique, PRMPT);
-	fnp->fn_mate = NULL;
 	return (error);
 }
 
@@ -319,12 +292,7 @@ fifo_read(vp, uiop, ioflag, crp)
 			fnp->fn_flag &= ~FIFOREAD;
 		}
 	} while ((error = strread(vp, uiop, crp)) == ESTRPIPE);
-	if (error == 0) {
-		fnp->fn_atime = hrestime.tv_sec;
-		if (fnp->fn_mate)
-			VTOF(fnp->fn_mate)->fn_atime = hrestime.tv_sec;
-	}
-	wakeprocs((caddr_t)vp->v_stream->sd_wrq, PRMPT);
+	wakeup((caddr_t)vp->v_stream->sd_wrq);
 	return (error);
 }
 
@@ -351,7 +319,6 @@ fifo_write(vp, uiop, ioflag, crp)
 {
 	register struct fifonode *fnp = VTOF(vp);
 	register int error = 0;
-	register int write_size = uiop->uio_resid;
 
 	uiop->uio_offset = 0;
 	if (!vp->v_stream)
@@ -360,17 +327,14 @@ fifo_write(vp, uiop, ioflag, crp)
 		psignal(u.u_procp, SIGPIPE);
 		return (EPIPE);
 	}
-	if ((write_size == 0) && !(vp->v_stream->sd_flag & STRSNDZERO))
+	if ((uiop->uio_resid == 0) && !(vp->v_stream->sd_flag & STRSNDZERO))
 			return (0);
 
 	while((error = strwrite(vp, uiop, crp)) == ESTRPIPE) {
 		if (uiop->uio_fmode & FNDELAY)
 			return (0);
 		if (uiop->uio_fmode & FNONBLOCK) {
-			if (uiop->uio_resid < write_size)
-				return (0);
-			else
-				return (EAGAIN);
+			return (EAGAIN);
 		}
 		if (fnp->fn_rcnt == 0 || (!fnp->fn_mate && fnp->fn_flag & ISPIPE)) {
 			psignal(u.u_procp, SIGPIPE);
@@ -383,14 +347,7 @@ fifo_write(vp, uiop, ioflag, crp)
 		fifo_rwlock(FTOV(fnp));
 		fnp->fn_flag &= ~FIFOWRITE;
 	}
-	if (error == 0) {
-		fnp->fn_mtime = fnp->fn_ctime = hrestime.tv_sec;
-		if (fnp->fn_mate) {
-			VTOF(fnp->fn_mate)->fn_mtime = hrestime.tv_sec;
-			VTOF(fnp->fn_mate)->fn_ctime = hrestime.tv_sec;
-		}
-	}
-	wakeprocs((caddr_t)RD(vp->v_stream->sd_wrq), PRMPT);
+	wakeup((caddr_t)RD(vp->v_stream->sd_wrq));
 	return (error);
 }
 
@@ -433,7 +390,7 @@ fifo_ioctl(vp, cmd, arg, mode, cr, rvalp)
 		 */
 		if (arg & FLUSHR) {
 			(void) fifo_flush(RD(stp->sd_wrq));
-			wakeprocs((caddr_t)vp->v_stream->sd_wrq, PRMPT);
+			wakeup((caddr_t)vp->v_stream->sd_wrq);
 		}
 		if ((arg & FLUSHW) && (stp->sd_wrq->q_next)) {
 			(void) fifo_flush(stp->sd_wrq->q_next);
@@ -441,7 +398,7 @@ fifo_ioctl(vp, cmd, arg, mode, cr, rvalp)
 				wakeadr = (caddr_t)(fnp->fn_mate)->v_stream->sd_wrq;
 			else
 				wakeadr = (caddr_t)vp->v_stream->sd_wrq;
-			wakeprocs(wakeadr, PRMPT);
+			wakeup(wakeadr);
 		}
 		/*
 		 * run the queues 
@@ -460,7 +417,6 @@ fifo_ioctl(vp, cmd, arg, mode, cr, rvalp)
 	 * block waiting for the server to recieve the file
 	 * descriptor.
 	 */
-	case I_E_RECVFD:
 	case I_RECVFD: 
 		if (fnp->fn_flag & FIFOSEND)
 			fifo_rwlock(FTOV(fnp));
@@ -469,7 +425,7 @@ fifo_ioctl(vp, cmd, arg, mode, cr, rvalp)
 			if (fnp->fn_flag & FIFOSEND) {
 				fnp->fn_flag &= ~FIFOSEND;
 				fifo_rwunlock(FTOV(fnp));
-				wakeprocs((caddr_t) &fnp->fn_unique, PRMPT);
+				wakeup((caddr_t) &fnp->fn_unique);
 			}
 		}
 		break;
@@ -491,8 +447,6 @@ fifo_getattr(vp, vap, flags, crp)
 {
 	register int error = 0;
 	register struct fifonode *fnp = VTOF(vp);
-	struct queue *qp;
-	struct qband *bandp;
 
 	if (fnp->fn_realvp) {
 		/*
@@ -525,19 +479,11 @@ fifo_getattr(vp, vap, flags, crp)
 	 * nblocks is the unread bytes expressed in blocks.
 	 */
 	if (vp->v_stream) {
-		qp = RD(vp->v_stream->sd_wrq);
-		if (qp->q_nband == 0)
-			vap->va_size = qp->q_count;
-		else {
-			for (vap->va_size = qp->q_count, bandp = qp->q_bandp; 
-				bandp; 
-					bandp = bandp->qb_next)
-						vap->va_size += bandp->qb_count;
-		}
-		vap->va_nblocks = btod(vap->va_size);
+		vap->va_size = RD(vp->v_stream->sd_wrq)->q_count;
+		vap->va_nblocks = vap->va_size/PIPE_BUF;
 	} else {
-		vap->va_size = 0;
 		vap->va_nblocks = 0;
+		vap->va_size = 0;
 	}
 	vap->va_vcode = 0;
 	return (0);
@@ -637,7 +583,7 @@ fifo_inactive(vp, crp)
 {
 	register struct fifonode *fnp = VTOF(vp);
 
-	if ((fnp->fn_flag & ISPIPE) && !fnp->fn_mate)
+	if (fnp->fn_flag & ISPIPE)
 		fifoclearid(fnp->fn_ino);
 	if (fnp->fn_realvp) {
 		(void) fifo_fsync(vp, crp);
@@ -690,7 +636,7 @@ fifo_rwunlock(vp)
 	fnp->fn_flag &= ~FIFOLOCK;
 	if( fnp->fn_flag & FIFOWANT) {
 		fnp->fn_flag &= ~FIFOWANT;
-		wakeprocs((caddr_t) fnp, PRMPT);
+		wakeup((caddr_t) fnp);
 	}
 }
 

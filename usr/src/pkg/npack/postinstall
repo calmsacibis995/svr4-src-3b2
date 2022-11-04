@@ -1,0 +1,83 @@
+#ident	"@(#)pkg.npack:postinstall	1.3 UNOFFICIAL"
+#
+#	postinstall script for npack package
+#
+# error function - put out a slightly more descriptive error message
+#	arg 1 is message #
+#	arg 2 is optional argument for message
+#
+error() {
+	errflag=1
+	case $1 in
+	1)
+		echo ERROR: drvinstall on $2 failed
+		;;
+	2)
+		echo ERROR: could not create $2
+		;;
+	3)
+		echo ERROR: $2 failed
+		;;
+	4)
+		echo ERROR: copy failed
+		;;
+	5)
+		# message put out elsewhere
+		;;
+	6)
+		echo ERROR: installation error
+		;;
+	7)
+		echo ERROR: nlsadmin $2 failed for npack
+		;;
+	*)
+		echo ERROR: undefined error
+		;;
+	esac
+	}
+errflag=0
+BOOT="$BASEDIR/boot"
+MASTER="$BASEDIR/etc/master.d"
+SYSTEM="$BASEDIR/etc/system"
+#
+# Configure drivers and make nodes
+#
+CMAJOR=`/etc/drvinstall -d /boot/CLONE -v 1.0 -nb` || error 1 CLONE
+MAJOR=`/etc/drvinstall -m $MASTER/npack -s $SYSTEM -o $BOOT -c 16 -v 1.0` \
+	>/dev/null || error 1 NPACK
+installf $PKGINST $BASEDIR/dev/npack c $CMAJOR $MAJOR 0666 root sys \
+	|| error 2 $BASEDIR/dev/npack
+#
+# Set up listener files for netspec npack
+#
+nlsadmin -q npack >/dev/null 2>&1
+if [ $? -gt 1 ]
+then
+	/usr/sbin/nlsadmin -i npack || error 7 -i
+	ADDR=`cat /etc/emd*.addr`
+	/usr/sbin/nlsadmin -l\\x00000007${ADDR}0000 npack || error 7 -l
+	/usr/sbin/nlsadmin -a 105 -c "/usr/net/servers/rfs/rfsetup" \
+		-y "RFS Server" npack || error 7 -a
+fi
+
+#
+# Set up entry in /etc/netconfig
+#
+
+if grep '[ 	]localnet[ 	][ 	]*-[ 	][ 	]*/dev/npack[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "npack	tpi_cots	v	localnet	-	/dev/npack	/usr/lib/npack.so" >>/etc/netconfig
+fi
+
+#
+#	finished installing files: tell OAM
+#
+installf -f $PKGINST || error 6
+#
+#	make a new UNIX(R)
+#
+touch $SYSTEM
+errflag=`expr ${errflag:=0} + 10`
+exit $errflag

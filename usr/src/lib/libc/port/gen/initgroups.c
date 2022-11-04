@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/initgroups.c	1.5"
+#ident	"@(#)libc-port:gen/initgroups.c	1.4"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -23,16 +23,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-extern char *_grp_begin();
-extern void _grp_cleanup(), _grp_done();
-extern struct group *_grp_entry();
-
 initgroups(uname, agroup)
 	const char *uname;
 	gid_t agroup;
 {
 	gid_t *groups;
-	char	*current, *after;
 	register struct group *grp;
 	register int i;
 	long ngroups_max;
@@ -46,9 +41,9 @@ initgroups(uname, agroup)
 	if (agroup >= 0)
 		groups[ngroups++] = agroup;
 
-	if ((current = _grp_begin(&after)) == 0)
-		return -1;
-	while((grp = _grp_entry(&current, after)) != 0) {
+	setgrent();
+
+	while (grp = getgrent()) {
 		if (grp->gr_gid == agroup)
 			continue;
 		for (i = 0; grp->gr_mem[i]; i++) {
@@ -61,8 +56,7 @@ initgroups(uname, agroup)
 	}
 
 toomany:
-	_grp_cleanup();
-	_grp_done();
+	endgrent();
 
 	retsave = setgroups(ngroups, groups);
 	errsave = errno;

@@ -5,9 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/catopen.c	1.3"
+#ident	"@(#)libc-port:gen/catopen.c	1.1"
 
 #ifdef __STDC__
+	#pragma weak cat_name = _cat_name
 	#pragma weak catopen = _catopen
 #endif
 #include "synonyms.h"
@@ -16,22 +17,21 @@
 #include <stdio.h>
 #include <nl_types.h>
 #include <locale.h>
-#include <string.h>
-#include <stdlib.h>
+char *getenv(), *strchr(), *setlocale();
+static char path[NL_MAXPATHLEN];
+static char def_nlspath[] = DEF_NLSPATH;
+static struct stat buff;
 
 int _mmp_opened = 0;
 
 static char *
-cat_name(name, path)
+cat_name(name)
   char *name;
-  char *path;
 {
-  const char *nlspath;
-  const char *lang, *ptr, *ptr3;
-  char *ptr2, c, d;
+  char *nlspath;
+  char *lang;
+  char *ptr, *ptr2, *ptr3, c, d;
   struct stat *buf;
-  const char *def_nlspath = DEF_NLSPATH;
-  struct stat buff;
     
   /*
    * A name that contains a slash is a pathname
@@ -161,7 +161,6 @@ catopen(name, mode)
 {
   nl_catd catd;
   int fd;
-  char path[NL_MAXPATHLEN];
   
   /*
    * Allocate space to hold the necessary data
@@ -172,12 +171,12 @@ catopen(name, mode)
   /*
    * Get actual file name and open file
    */
-  if ((name = cat_name(name,path)) != 0){
+  if ((name = cat_name(name)) != 0){
   
     /*
      * init internal data structures
      */
-    if (_cat_init(name, catd))
+    if (cat_init(name, catd))
       return catd;
   }
 

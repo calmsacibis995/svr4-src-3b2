@@ -1,0 +1,10 @@
+#ident	"@(#)pkg.npack:preinstall	1.1"
+#
+#	preinstall script for npack package
+#
+#
+# Remove old device nodes and files
+#
+rm -f $BASEDIR/dev/npack*
+rm -f $BASEDIR/etc/init.d/*npack $BASEDIR/etc/rc0.d/*npack $BASEDIR/etc/rc2.d/*npack
+exit 0

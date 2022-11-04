@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/catgets.c	1.3"
+#ident	"@(#)libc-port:gen/catgets.c	1.1"
 
 #ifdef __STDC__
 	#pragma weak catgets = _catgets
@@ -15,12 +15,10 @@
 #include <locale.h>
 #include <stdio.h>
 #include <nl_types.h>
-#include <string.h>
 #define min(a,b)  (a>b?b:a)
 
 extern char *gettxt();
 extern char *setlocale();
-extern char *_cat_itoa();
 
 char *
 catgets(catd, set_num, msg_num, s)
@@ -91,14 +89,7 @@ catgets(catd, set_num, msg_num, s)
       if (msg_num > set->last_msg)
         return s;
       message_no = set->first_msg + msg_num -1;
-
-      /* sprintf(buf,"%s:%d",catd->info.g.link,message_no); */
-      strcpy(buf,catd->info.g.link);
-      strcat(buf,":");
-      if ((p = _cat_itoa(message_no, 10)) == NULL)
-        return s;
-      strcat(buf, p);
-
+      sprintf(buf,"%s:%d",catd->info.g.link,message_no);
       strcpy(old_locale,setlocale(LC_MESSAGES,""));
       setlocale(LC_MESSAGES,"Xopen");
       p = gettxt(buf,DFLT_MSG);

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5rdwri.c	1.26"
+#ident	"@(#)fs:fs/s5/s5rdwri.c	1.18"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/conf.h"
@@ -15,7 +15,6 @@
 #include "sys/param.h"
 #include "sys/swap.h"
 #include "sys/sysmacros.h"
-#include "sys/resource.h"
 #include "sys/systm.h"
 #include "sys/uio.h"
 #include "sys/vfs.h"
@@ -144,14 +143,15 @@ writei(ip, uiop, ioflag)
 	register unsigned int n, on;
 	off_t off;
 	daddr_t firstlbn, lastlbn;
-	caddr_t base, addr;
+	caddr_t base;
+	unsigned long int limit = uiop->uio_limit;
 	unsigned long int oresid = uiop->uio_resid;
-	rlim_t limit = uiop->uio_limit;
 	int mode = ip->i_mode, error = 0, flags, pagecreate;
 	int bsize = VBSIZE(vp);
-	int alloc_only, i;
+	int alloc_only;
 	off_t osize;
 	int bcnt, index;
+	daddr_t dblist[MAXBSIZE/NBPSCTR];
 
 	if (MANDLOCK(vp, mode)
 	  && (error = chklock(vp, FWRITE,
@@ -165,8 +165,12 @@ writei(ip, uiop, ioflag)
 		ip->i_flag |= ISYNC;
 
 	while (error == 0 && uiop->uio_resid > 0) {
+		if (vp->v_type == VREG && uiop->uio_offset >= limit) {
+			error = EFBIG;
+			goto err;
+		}
 		if ((vp->v_type == VREG || vp->v_type == VDIR)
-		  && uiop->uio_offset >= ip->i_size
+		  && uiop->uio_offset > ip->i_size
 		  && ip->i_map) {
 			ILOCK(ip);
 			s5freemap(ip);
@@ -175,19 +179,23 @@ writei(ip, uiop, ioflag)
 		off = uiop->uio_offset & MAXBMASK;
 		on = uiop->uio_offset & MAXBOFFSET;
 		n = MIN(MAXBSIZE-on, uiop->uio_resid);
-		if (vp->v_type == VREG && uiop->uio_offset + n >= limit) {
-			if (uiop->uio_offset >= limit) {
-				error = EFBIG;
-				goto err;
-			}
-			n = limit - uiop->uio_offset;
-		}
 		base = segmap_getmap(segkmap, vp, off);
+		/*
+		 * We must ensure that any file blocks are allocated before
+		 * we perform the I/O.
+		 */
+		firstlbn = uiop->uio_offset >> s5vfsp->vfs_bshift;
+		lastlbn = (uiop->uio_offset + n - 1) >> s5vfsp->vfs_bshift;
 		if (uiop->uio_offset + n > ip->i_size)
 			alloc_only = (on % PAGESIZE == 0);
 		else
 			alloc_only = (on % PAGESIZE == 0 && n % PAGESIZE == 0);
 
+		error = bmapalloc(ip, firstlbn, lastlbn, alloc_only, &dblist[0]);
+		if (error) {
+			(void) segmap_release(segkmap, base, 0);
+			goto err;
+		}
 		osize = ip->i_size;
 		if (uiop->uio_offset + n > ip->i_size) {
 			ip->i_size = uiop->uio_offset + n;
@@ -197,58 +205,29 @@ writei(ip, uiop, ioflag)
 			 * having to read them in.
 			 */
 			if (on % PAGESIZE == 0) {
-				if (uiop->uio_segflg != UIO_SYSSPACE) {
-					caddr_t	iov_base;
-
-					/*
-					 * Fault in the pages corresponding to
-					 * the from range before
-					 * segmap_pagecreate() is called.
-					 */
-					iov_base = uiop->uio_iov->iov_base;
-					for (i=0, addr=base+on; addr<base+on+n;
-					     addr += PAGESIZE, i++)
-						fubyte((char *)(iov_base
-						  + i*PAGESIZE));	
-				}
 				segmap_pagecreate(segkmap, base+on,
-				  (u_int) n, 0);
+				  (u_int) n, 0, &dblist[0], bsize);
 				pagecreate = 1;
 			} else
 				pagecreate = 0;
 		} else if (on % PAGESIZE == 0 && n % PAGESIZE == 0) {
-			if (uiop->uio_segflg != UIO_SYSSPACE) {
-				caddr_t	iov_base;
-
-				/*
-				 * We're writing an exact number of pages, so
-				 * we can can just create them without having
-				 * to read them in.
-				 */
-				iov_base = uiop->uio_iov->iov_base;
-				for (i=0, addr=base+on; addr<base+on+n;
-				     addr += PAGESIZE, i++)
-					fubyte((char *)(iov_base + i*PAGESIZE));
-			}
-			segmap_pagecreate(segkmap, base+on, (u_int) n, 0);
+			/*
+			 * We're writing an exact number of pages, so we can
+			 * can just create them without having to read them in.
+			 */
+			segmap_pagecreate(segkmap, base+on, (u_int) n, 0,
+				&dblist[0], bsize);
 			pagecreate = 1;
 		} else
 			pagecreate = 0;
 
-		/*
-		 * We must ensure that any file blocks are allocated before
-		 * we perform the I/O.
+		/* 
+		 * This loop has a lot of activities going on
+		 * so we preempt here to let other proceses have
+		 * a chance.
 		 */
-		firstlbn = uiop->uio_offset >> s5vfsp->vfs_bshift;
-		lastlbn = (uiop->uio_offset + n - 1) >> s5vfsp->vfs_bshift;
-		error = bmapalloc(ip, firstlbn, lastlbn, alloc_only);
-		if (error) {
-			(void) segmap_release(segkmap, base, SM_INVAL);
-			ip->i_size = osize;
-			goto err;
-		}
-		error = uiomove(base+on, n, UIO_WRITE, uiop);
 		PREEMPT();
+		error = uiomove(base+on, n, UIO_WRITE, uiop);
 
 		if (pagecreate 
 		  && uiop->uio_offset < roundup(off + on + n, PAGESIZE)) {

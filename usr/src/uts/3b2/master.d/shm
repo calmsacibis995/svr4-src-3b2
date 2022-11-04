@@ -1,4 +1,4 @@
-*#ident	"@(#)kernel:master.d/shm	1.3"
+*#ident	"@(#)kernel:master.d/shm	1.2"
 *
 * SHM
 *
@@ -12,11 +12,12 @@ ox	-	shm	-	-	-	ipc
 						shmtext(){}
 						shmem[SHMMNI] (%0x70)
 						shmmap[SHMMNI/2+2] (%l%l)
-						shminfo(%i%i%i%i)
+						shminfo(%i%i%i%i%i)
 						      ={SHMMAX,
 							SHMMIN,
 							SHMMNI,
-							SHMSEG}
+							SHMSEG,
+							SHMALL}
 						
 
 $$$
@@ -25,3 +26,4 @@ SHMMAX	= 131072
 SHMMIN	= 1
 SHMMNI	= 100
 SHMSEG	= 6
+SHMALL	= 512

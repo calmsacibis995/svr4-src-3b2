@@ -8,7 +8,7 @@
 #ifndef _SYS_RF_COMM_H
 #define _SYS_RF_COMM_H
 
-#ident	"@(#)head.sys:sys/rf_comm.h	1.19"
+#ident	"@(#)head.sys:sys/rf_comm.h	1.13"
 
 /* parameters of this implementation */
 
@@ -27,6 +27,10 @@
 #define NULL	0
 #endif
 
+/* convert rcvd to an index */
+#define RDTOINX(x)	((x) - rcvd)
+/* convert index to a rcvd ptr */
+#define INXTORD(x)	(&rcvd[x])
 /* is a receive queue empty? */
 #define RCVDEMP(RD)	LS_ISEMPTY(&(RD)->rd_rcvdq)
 
@@ -36,7 +40,7 @@ typedef struct naddr	{
 } naddr_t;
 
 /*
- * receive descriptor structure
+ *	receive descriptor structure
  */
 
 typedef struct rcvd	{
@@ -50,12 +54,12 @@ typedef struct rcvd	{
 	struct rd_user	*rd_user_list;	/* one for each time RD is a gift
 					 * - meaningful only for general RD */
 	struct rcvd	*rd_next;	/* pointer to next rcvd */
-	long		rd_gen;		/* generation for gifts */
 	int		rd_qslp;	/* recv desc queue sleep lock */
 	char		rd_stat;	/* flags */
 	char		rd_qtype;	/* RDGENERAL or RDSPECIFIC */
 	ushort		rd_qcnt;	/* how many msgs queued */
-	int		rd_refcnt;	/* how many remote clients */
+	ushort		rd_refcnt;	/* how many remote clients */
+	ushort		rd_connid;	/* connection id */
 } rcvd_t;
 
 #define rd_vp	rd_un.rdun_vp
@@ -104,7 +108,7 @@ extern rcvd_t	*rcvd;
  * reference, and as a temporary channel for a transient reference.
  *
  * Each server has its own private send descriptor that it uses to
- * send replies.  This send descriptor on the server does not point
+ * send replies.	This send descriptor on the server does not point
  * to any particular resource.
  *
  * For the client side send descriptor, the sd_mntid is a cookie
@@ -118,12 +122,13 @@ typedef struct sndd {
 	ls_elt_t	sd_free;	/* for free list links */
 	long		sd_size;
 	char		sd_stat;
-	rf_gift_t	sd_gift;	/* for the remote rcvd */
+	long	 	sd_connid;	/* connect id for the remote rcvd */
 	long 		sd_mntid;	/* denotes remote srmount entry */
 	struct proc	*sd_srvproc;	/* points to proc of dedicated server */
 	struct queue	*sd_queue;	/* points to stream head queue */
 	long		sd_fhandle;	/* file handle for client caching */
 	ulong		sd_vcode;	/* file vcode for client caching */
+        long   		sd_mapcnt;	/* number of mappings of pages */
 	daddr_t		sd_nextr;	/* read-ahead offset */
 	/*
 	 * Clients talking to 3.x servers sometimes hide stuff in sd_stashp.
@@ -153,7 +158,6 @@ typedef struct sndd {
 #define SDWANT		0x10
 #define SDCACHE		0x20	/* remote file is cacheable */
 #define SDMNDLCK	0x40	/* remote file mandatory lock set
-				 * Old protocol only.
 				 * (not updated if someone turns off mandatory
 				 * lock with chmod on remote file before
 				 * last file close)
@@ -191,7 +195,7 @@ typedef struct sndd {
 	(sdp)->sd_stat &= ~SDLOCKED;		\
 	if ((sdp)->sd_stat & SDWANT) {		\
 	    (sdp)->sd_stat &= ~SDWANT;		\
-	    wakeprocs((caddr_t)(sdp), PRMPT);	\
+	    wakeup((caddr_t)(sdp));		\
 	}					\
 }
 
@@ -214,14 +218,14 @@ typedef struct rd_user {
 	long		ru_srmntid;	/* which srmount entry */
 	struct rd_user	*ru_next;	/* next user */
 	struct queue	*ru_queue;	/* which stream queue */
-	int		ru_vcount;	/* references to denoted vnode */
-	ushort		ru_frwcnt;	/* n r/w opens */
-	ushort		ru_frcnt;	/* n read opens */
-	ushort		ru_fwcnt;	/* n write opens */
+	ushort		ru_fcount;	/* n opens and creates */
+	ushort		ru_vcount;	/* references to denoted vnode */
+	ushort		ru_frcnt;	/* n opens/creates for reading pipes */
+	ushort		ru_fwcnt;	/* n opens/creates for writing pipes */
 	ushort		ru_cflag;	/* cache flag */
-	int		ru_mapdstat;	/* for locking */
-	ls_elt_t	ru_mapdlist;	/* heads list of mapping descriptors */
 } rd_user_t;
+
+extern rd_user_t	*rd_user;
 
 /* cache flags */
 #define RU_CACHE_ON		0x1	/* remote cacheing is enabled */
@@ -232,27 +236,6 @@ typedef struct rd_user {
 					 * for old clients who only expect
 					 * vcode and fhandle with gifts.
 					 */
-
-/*
- * Each rd_user_t has a list of rf_mapd_t's describing a client machine's
- * mappings to a file.  rfm_reads, rfm_writes, and rfm_execs are counts
- * of the number of times that the PROT_READ, PROT_WRITE, and PROT_EXEC bits
- * respectively are included in the maxprot of mappings to an
- * offset/length pair.
- */
-typedef struct rf_mapd {
-	ls_elt_t	rfm_list;	/* heads list of mapping descriptors */
-	off_t		rfm_off;	/* file offset of mapping */
-	size_t		rfm_len;	/* length of mapping */
-	int		rfm_reads;
-	int		rfm_writes;
-	int		rfm_execs;
-} rf_mapd_t;
-
-#define MAPDLOCK		0x1
-#define MAPDWANT		0x2
-
-extern rd_user_t	*rd_user;
 
 /* tunables */
 extern int	nrcvd;		/* number of receive descriptors */
@@ -265,21 +248,19 @@ extern int	minserve;
 
 extern void	rf_freeb();
 extern void	rf_freemsg();
-
 extern mblk_t	*rf_dequeue();
 
 extern int	sndd_create();
 extern void	sndd_free();
 
 #if defined(DEBUG)
-#define sndd_set(sd, queue, giftp)				\
-	((void)(ASSERT((sd)->sd_stat & SDUSED),			\
-	  (sd)->sd_queue = (queue_t *)(queue), (sd)->sd_gift = (giftp)[0]))
+#define sndd_set(sd, queue, connid) \
+	((void)(ASSERT((sd)->sd_stat & SDUSED), \
+	  (sd)->sd_queue = (queue), (sd)->sd_connid = (connid)))
 #else
-#define sndd_set(sd, queue, giftp)			\
-	((void)((sd)->sd_queue = (queue_t *)(queue),	\
-		(sd)->sd_gift = (giftp)[0]))
-#endif /* DEBUG */
+#define sndd_set(sd, queue, connid) \
+	((void)((sd)->sd_queue = (queue), (sd)->sd_connid = (connid)))
+#endif /* ASSERT */
 
 extern int	rf_sndmsg();
 extern		rf_rcvmsg();
@@ -302,14 +283,6 @@ extern int	rdu_match();
 #define rdu_match(rdup, sid, mntid) \
   (QPTOGP((rdup)->ru_queue)->sysid == (sid) && (rdup)->ru_srmntid == (mntid))
 #endif
-
-extern int	rfesb_fbread();
-extern int	rfesb_pageio_setup();
-
-#define NULLFRP		((frtn_t *)NULL)
-#define NULLCADDR	((caddr_t)NULL)
-#define NULLUIO		((uio_t *)NULL)
-#define NULLCRED	((cred_t *)NULL)
 
 /*
  * Signal conversion ops.
@@ -343,20 +316,15 @@ extern rd_user_t	*rdu_get();
 extern rd_user_t	*rdu_find();
 extern void		rdu_del();
 extern void		rdu_open();
+extern void		rdu_close();
 
 extern void		rftov_attr();
 extern void		vtorf_attr();
 extern int		rf_pullupmsg();
+extern int		uiomvuio();	/* Move this to sys/uio.h */
 extern void		rf_iov_alloc();
 extern mblk_t		*rf_dropbytes();
 extern caddr_t		rf_msgdata();
-
-extern rcvd_t	*rf_gifttord();
-extern vnode_t	*rf_gifttovp();
-
-/* Gift templates. */
-extern rf_gift_t	rf_daemon_gift;
-extern rf_gift_t	rf_null_gift;
 
 #define RF_IOV_FREE(iovp, niov)	\
 	kmem_free((caddr_t)(iovp), (size_t)((niov) * sizeof(iovec_t)))
@@ -371,14 +339,6 @@ extern rf_gift_t	rf_null_gift;
 #define RF_PULLUP(bp, hdrsz, datasz) \
 	(RF_MSG(bp)->m_size == (hdrsz) + (datasz) && !(bp)->b_cont ? 0 : \
 	  rf_pullupmsg((bp), (hdrsz), (datasz)))
-#endif
-
-#if defined(u3b2) && !defined(lint) && !defined(CXREF)
-asm	int
-ipl()
-{
-	ANDW3 &0x1e000,%psw,%r0
-}
 #endif
 
 #endif /* _KERNEL */

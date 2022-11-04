@@ -8,7 +8,7 @@
 #ifndef _UNISTD_H
 #define _UNISTD_H
 
-#ident	"@(#)head:unistd.h	1.22"
+#ident	"@(#)head:unistd.h	1.14"
 
 /* Symbolic constants for the "access" routine: */
 #define	R_OK	4	/* Test for Read permission */
@@ -31,8 +31,31 @@
 #define	GF_PATH	"/etc/group"	/* Path name of the "group" file */
 #define	PF_PATH	"/etc/passwd"	/* Path name of the "passwd" file */
 
-#include <sys/unistd.h>
 
+/* command names for POSIX sysconf */
+#define _SC_ARG_MAX	1
+#define _SC_CHILD_MAX	2
+#define _SC_CLK_TCK	3
+#define _SC_NGROUPS_MAX 4
+#define _SC_OPEN_MAX	5
+#define _SC_JOB_CONTROL 6
+#define _SC_SAVED_IDS	7
+#define _SC_VERSION	8
+#define _SC_PASS_MAX	9
+#define _SC_LOGNAME_MAX	10
+#define _SC_PAGESIZE	11
+
+/* command names for POSIX pathconf */
+
+#define _PC_LINK_MAX	1
+#define _PC_MAX_CANON	2
+#define _PC_MAX_INPUT	3
+#define _PC_NAME_MAX	4
+#define _PC_PATH_MAX	5
+#define _PC_PIPE_BUF	6
+#define _PC_NO_TRUNC	7
+#define _PC_VDISABLE	8
+#define _PC_CHOWN_RESTRICTED	9
 
 /* compile-time symbolic constants,
 ** Support does not mean the feature is enabled.
@@ -58,8 +81,6 @@
 /* Current version of POSIX */
 #define _POSIX_VERSION		198808L
 
-/* Current version of XOPEN */
-#define _XOPEN_VERSION	3
 
 #if defined(__STDC__)
 
@@ -80,52 +101,54 @@ extern int dup2(int, int);
 extern int execl(const char *, const char *, ...);
 extern int execle(const char *, const char *, ...);
 extern int execlp(const char *, const char *, ...);
-extern int execv(const char *, char *const *);
-extern int execve(const char *, char *const *, char *const *);
-extern int execvp(const char *, char *const *);
+extern int execv(const char *, const char **);
+extern int execve(const char *, const char **, const char**);
+extern int execvp(const char *, const char **);
 extern void exit(int);
 extern void _exit(int);
 extern pid_t fork(void);
-extern long fpathconf(int, int);
+extern int fpathconf(int, int);
 extern char *getcwd(char *, int);
 extern gid_t getegid(void);
 extern uid_t geteuid(void);
 extern gid_t getgid(void);
 extern int getgroups(int, gid_t *);
-extern char *getlogin(void);
+extern char *getlogin();
 extern pid_t getpid(void);
 extern pid_t getppid(void);
 extern pid_t getpgrp(void);
+extern char *getlogin();
 extern uid_t getuid(void);
 extern int ioctl(int, int, ...);
 extern int isatty(int);
 extern int link(const char *, const char *);
 extern int lockf(int, int, long);
-extern off_t lseek(int, off_t, int);
+extern long lseek(int, long, int);
 extern int nice(int);
-extern long pathconf(char *, int);
+extern int pathconf(char *, int);
 extern int pause(void);
 extern int pipe(int *);
 extern void profil(char *, int, int, int);
 extern int ptrace(int, pid_t, int, int);
 extern int read(int, void *, unsigned);
-extern int rename(const char *, const char *);
 extern int rmdir(const char *);
 extern void *sbrk(int);
 extern int setgid(gid_t);
 extern int setpgid(pid_t, pid_t);
 extern pid_t setpgrp(void);
-extern pid_t setsid(void);
+extern pid_t setsid();
 extern int setuid(uid_t);
 extern unsigned sleep(unsigned);
 extern int stime(const time_t *);
 extern void sync(void);
-extern long sysconf(int);
+extern int sysconf(int);
 extern char *ttyname(int);
 extern pid_t tcgetpgrp(int);
 extern int tcsetpgrp(int, pid_t);
 extern char *ttyname(int);
+extern long ulimit(int, long);
 extern int unlink(const char *);
+extern int wait(int *);
 extern int write(int, const void *, unsigned);
 
 #else
@@ -149,25 +172,25 @@ extern int execve();
 extern int execvp();
 extern void exit();
 extern void _exit();
-extern int fork();
-extern long fpathconf();
+extern pid_t fork();
+extern int fpathconf();
 extern char *getcwd();
-extern int getegid();
-extern int geteuid();
-extern int getgid();
+extern gid_t getegid();
+extern uid_t geteuid();
+extern gid_t getgid();
 extern int getgroups();
 extern char *getlogin();
-extern int getpid();
-extern int getppid();
-extern int getpgrp();
-extern int getuid();
+extern pid_t getpid();
+extern pid_t getppid();
+extern pid_t getpgrp();
+extern uid_t getuid();
 extern int ioctl();
 extern int isatty();
 extern int link();
 extern int lockf();
 extern long lseek();
 extern int nice();
-extern long pathconf();
+extern int pathconf();
 extern int pause();
 extern int pipe();
 extern void profil();
@@ -177,17 +200,19 @@ extern int rmdir();
 extern void *sbrk();
 extern int setgid();
 extern int setpgid();
-extern int setpgrp();
-extern int setsid();
+extern pid_t setpgrp();
+extern pid_t setsid();
 extern int setuid();
 extern unsigned sleep();
 extern int stime();
 extern void sync();
-extern long sysconf();
-extern int tcgetpgrp();
+extern int sysconf();
+extern pid_t tcgetpgrp();
 extern int tcsetpgrp();
 extern char *ttyname();
+extern long ulimit();
 extern int unlink();
+extern int wait();
 extern int write();
 
 #endif

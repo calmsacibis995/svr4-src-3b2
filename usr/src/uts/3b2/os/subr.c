@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/subr.c	1.42"
+#ident	"@(#)kernel:os/subr.c	1.37.1.5"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -79,6 +79,28 @@ getudev()
 }
 
 /*
+ * Find a proc table pointer given a process id.  The code attempts
+ * to optimize the case in which repeated calls return successive
+ * proc table slots (as with ps(1)) by remembering where the search
+ * left off the last time.  Interspersed calls can defeat the
+ * optimization but ordinarily this won't happen.
+ */
+proc_t *
+prfind(pid)
+	register pid_t pid;
+{
+
+	unsigned int index;
+
+	index = GET_INDEX(pid);
+	if (index >= v.v_proc || nproc[index] == NULL || nproc[index]->p_stat ==0){
+		return NULL;
+	} else{
+		return(nproc[index]);
+	}
+}
+
+/*
  * C-library string functions.  Assembler versions of others are in
  * ml/string.s.
  */
@@ -138,6 +160,27 @@ bcmp(s1, s2, len)
 }
 
 int
+intrerr(v)
+{
+	register proc_t	*prp;
+
+	if (!v)
+		return 0;
+
+	prp = u.u_procp;
+	if (prp->p_cursig) {
+		if (sigismember(&u.u_sigrestart, prp->p_cursig)) {
+			return ERESTART;
+		}
+	} 
+	 else if (ev_intr_restart(u.u_procp)) {
+		return ERESTART;
+	}
+
+	return EINTR;
+}
+
+int
 memlow()
 {
 	return freemem <= tune.t_gpgslo;
@@ -167,34 +210,6 @@ stoi(str)
 	}
 	*str = p;
 	return n;
-}
-
-/*
- * Simple-minded conversion of a long into a null-terminated character
- * string.  Caller must ensure there's enough space to hold the result.
- */
-void
-numtos(num, s)
-	u_long num;
-	char *s;
-{
-	register int i = 0;
-	register u_long mm = 1000000000;
-	int t;
-
-	if (num < 10) {
-		*s++ = num + '0';
-		*s = '\0';
-	} else while (mm) {
-		t = num / mm;
-		if (i || t) {
-			i++;
-			*s++ = t + '0';
-			num -= t * mm;
-		}
-		mm = mm / 10;
-	}
-	*s = '\0';
 }
 
 int

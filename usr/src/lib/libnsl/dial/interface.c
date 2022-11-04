@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:dial/interface.c	1.2"
+#ident	"@(#)libnsl:dial/interface.c	1.1"
 /*	interface( label )
 	provide alternate definitions for the I/O functions through global
 	interfaces.
@@ -31,7 +31,7 @@ EXTERN int	restline();
 extern int	read(), write();
 static int	usetup(), uteardown();
 
-GLOBAL int	(*Read)() = read,
+EXTERN int	(*Read)() = read,
 	(*Write)() = write,
 #if defined(__STDC__)
 	(*Ioctl)(int,int,...) = ioctl,

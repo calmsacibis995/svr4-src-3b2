@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:svc_raw.c	1.3"
+#ident	"@(#)librpc:svc_raw.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -49,14 +49,14 @@ static char sccsid[] = "@(#)svc_raw.c 1.25 89/01/31 Copyr 1984 Sun Micro";
  * This is the "network" that we will be moving data over
  */
 static struct svc_raw_private {
-	char	*raw_buf;	/* should be shared with the cl handle */
+	char	*_raw_buf;	/* should be shared with the cl handle */
 	SVCXPRT	server;
 	XDR	xdr_stream;
 	char	verf_body[MAX_AUTH_BYTES];
 } *svc_raw_private;
 
 static struct xp_ops *svc_raw_ops();
-extern char *calloc();
+char *calloc();
 
 SVCXPRT *
 svc_raw_create()
@@ -69,7 +69,7 @@ svc_raw_create()
 			return ((SVCXPRT *)NULL);
 		if (_rawcombuf == NULL)
 			_rawcombuf = (char *)calloc(UDPMSGSIZE, sizeof(char));
-		srp->raw_buf = _rawcombuf; /* Share it with the client */
+		srp->_raw_buf = _rawcombuf; /* Share it with the client */
 		svc_raw_private = srp;
 	}
 	srp->server.xp_fd = 0;
@@ -77,7 +77,7 @@ svc_raw_create()
 	srp->server.xp_p3 = NULL;
 	srp->server.xp_ops = svc_raw_ops();
 	srp->server.xp_verf.oa_base = srp->verf_body;
-	xdrmem_create(&srp->xdr_stream, srp->raw_buf, UDPMSGSIZE, XDR_FREE);
+	xdrmem_create(&srp->xdr_stream, srp->_raw_buf, UDPMSGSIZE, XDR_FREE);
 	return (&srp->server);
 }
 

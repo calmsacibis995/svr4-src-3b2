@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:rpc_generic.c	1.11"
+#ident	"@(#)librpc:rpc_generic.c	1.10"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -73,10 +73,12 @@ int
 _rpc_dtbsize()
 {
 	struct rlimit	rl;
+	int retval = 64;
 
-	if ( getrlimit(RLIMIT_NOFILE, &rl) == 0 ) 
-	return(rl.rlim_max); 
+/*	if ( getrlimit(RLIMIT_NOFILE, &rl) == 0 ) */
+/*	return(rl.rlim_max); */
 
+	return(retval);
 }
 
 /*

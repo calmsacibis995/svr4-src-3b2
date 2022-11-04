@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/icd.c	1.18"
+#ident	"@(#)kernel:io/icd.c	1.15"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -20,6 +20,7 @@
 #include "sys/signal.h"
 #include "sys/user.h"
 #include "sys/vtoc.h"
+#include "sys/inline.h"
 #include "sys/systm.h"
 #include "sys/mkdev.h"
 #include "sys/ddi.h"
@@ -76,7 +77,7 @@ icdinit()
 void
 icdwake()
 {
-	wakeprocs((caddr_t)&icdblk, PRMPT);
+	wakeup((caddr_t)&icdblk);
 }
 
 /* ARGSUSED */
@@ -86,10 +87,9 @@ int flag;
 int otyp;
 cred_t *cr;
 {
-	if (icdstate != PRESENT) {
-		cmn_err(CE_WARN, "In-Core Disk not existing\n");
+	if (icdstate != PRESENT)
+		/* The state must be ABSENT or NOTSETUP */
 		return(ENXIO);
-	}
 
 	return(0);
 }
@@ -112,7 +112,7 @@ register struct buf *bp;
 
 	register char *toptr;
 	register char *frmptr;
-	register int  partition;	/* partition number */
+	register char partition;	/* partition number */
 	register long icd_addr;		/* Address of the job */
 	register long end_addr;		/* End address of ICD */
 
@@ -143,13 +143,13 @@ register struct buf *bp;
 
 	bcopy(frmptr, toptr, bp->b_bcount);
 
-	biodone(bp);
+	iodone(bp);
 	return;
 
 error:
 	bp->b_flags |= B_ERROR;
 	bp->b_error = ENXIO;
-	biodone(bp);
+	iodone(bp);
 	return;
 }  
 
@@ -157,10 +157,7 @@ int
 icdsize(dev)
 dev_t dev;
 {
-	int partition;
-
-	partition = ICDPART(dev);
-	return(icdvtoc.v_part[partition].p_size);
+	return icdblk;
 }
 
 dev_t

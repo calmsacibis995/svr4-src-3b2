@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/psiginfo.c	1.2"
+#ident	"@(#)libc-port:gen/psiginfo.c	1.1"
 
 /*
  * Print the name of the siginfo indicated by "sig", along with the
@@ -31,8 +31,6 @@ char	*s;
 	if (sip == 0)
 		return;
 
-	(void) write(2, s, (unsigned)strlen(s));
-	(void) write(2, ": ", 2);
 	c =  _sys_siglist[sip->si_signo];
 	(void) write(2, c, (unsigned)strlen(c));
 	if (sip->si_code == 0) {
@@ -58,5 +56,7 @@ char	*s;
 		(void) write(2, c, (unsigned)strlen(c));
 		(void) write(2, ")", 1);
 	}
+	(void) write(2, ": ", 2);
+	(void) write(2, s, (unsigned)strlen(s));
 	(void) write(2, "\n", 1);
 }

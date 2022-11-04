@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/ttcompat.c	1.7"
+#ident	"@(#)kernel:io/ttcompat.c	1.4"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -24,7 +24,7 @@
  * Notice of copyright on this source code product does not indicate 
  * publication.
  * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
  * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * 	          All rights reserved.
  *  
@@ -241,16 +241,13 @@ ttcompatwput(q, mp)
 		switch (iocbp->ioc_cmd) {
 
 		default:
-	/* these are ioctls with no arguments or are known to stream head */
+	/* these are ioctls with int arguments or are known to stream head */
 	/* process them right away */
 			ttcompat_do_ioctl(tp, q, mp);
 			return;
 		case TIOCSETN:
 		case TIOCSLTC:
 		case TIOCSETC:
-		case TIOCLBIS:
-		case TIOCLBIC:
-		case TIOCLSET:
 			if (iocbp->ioc_count != TRANSPARENT) {
 				putnext(q, mp);
 				return;
@@ -266,15 +263,6 @@ ttcompatwput(q, mp)
 					cqp->cq_size = sizeof(struct ltchars);
 					break;
 				case TIOCSETC:
-					cqp->cq_size = sizeof(struct ltchars);
-					break;
-				case TIOCLBIS:
-					cqp->cq_size = sizeof(struct ltchars);
-					break;
-				case TIOCLBIC:
-					cqp->cq_size = sizeof(struct ltchars);
-					break;
-				case TIOCLSET:
 					cqp->cq_size = sizeof(struct ltchars);
 					break;
 				default:
@@ -300,15 +288,11 @@ ttcompatwput(q, mp)
 		case TIOCSETN:
 		case TIOCSLTC:
 		case TIOCSETC:
-		case TIOCLBIS:
-		case TIOCLBIC:
-		case TIOCLSET:
 			tp->t_state &= ~TS_W_IN;
 			if (csp->cp_rval) {	/* failure */
 				freemsg(mp);
 			} else {	/* make it look like an ioctl */
 				mp->b_datap->db_type = M_IOCTL;
-				mp->b_wptr = mp->b_rptr + sizeof(struct iocblk);
 				iocbp = (struct iocblk *)mp->b_rptr;
 				iocbp->ioc_count = mp->b_cont->b_wptr - mp->b_cont->b_rptr;
 				iocbp->ioc_error = 0;
@@ -318,7 +302,6 @@ ttcompatwput(q, mp)
 			return;
 
 		case TIOCGLTC:
-		case TIOCLGET:
 		case TIOCGETC:
 			tp->t_state &= ~TS_W_OUT;
 			if (csp->cp_rval) {	/* failure */
@@ -377,7 +360,6 @@ ttcompat_do_ioctl(tp, q, mp)
 	 * structure.  Save the existing code and pass it down as a TCGETS.
 	 */
 	case TIOCGETC:
-	case TIOCLGET:
 	case TIOCGLTC:
 		if (iocp->ioc_count != TRANSPARENT) {
 			mp->b_datap->db_type = M_IOCNAK;
@@ -396,6 +378,7 @@ ttcompat_do_ioctl(tp, q, mp)
 		mp->b_cont = NULL;
 		iocp->ioc_count = 0;
  		/* fall thru */
+	case TIOCLGET:
 	case TIOCGETP:
 		goto dogets;
 
@@ -757,15 +740,12 @@ ttcompat_ioctl_ack(q, mp)
 			/* recycle the reply's buffer */
 		*(int *)datap->b_wptr = ((unsigned) tp->t_curstate.t_flags) >> 16;
 		datap->b_wptr += (sizeof (int))/(sizeof *datap->b_wptr);
-#if 0
 		iocp->ioc_count = sizeof (int);
 		tp->t_state &= ~TS_IOCWAIT;	/* we got what we wanted */
 		iocp->ioc_rval = 0;
 		iocp->ioc_cmd =  tp->t_ioccmd;
 		putnext(q, mp);  
 		return;
-#endif
-		break;
 
 #ifdef SUN
 	case TIOCGETX:
@@ -970,7 +950,6 @@ senddown:
 	 */
 	tp->t_state &= ~TS_IOCWAIT;
 	mp->b_datap->db_type = M_IOCTL;
-	mp->b_wptr = mp->b_rptr + sizeof(struct iocblk);
 	putnext(WR(q), mp);
 }
 /* Called from ttcompatrput M_IOCACK processing. */
@@ -995,9 +974,6 @@ ttcopyout(q, mp)
 			break;
 		case TIOCGETC:
 			cqp->cq_size = sizeof(struct tchars);
-			break;
-		case TIOCLGET:
-			cqp->cq_size = sizeof(int);
 			break;
 		default:
 			cmn_err(CE_CONT,"TTCOMPAT: Unknown ioctl to copyout\n");

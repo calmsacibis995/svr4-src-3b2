@@ -8,7 +8,7 @@
 #ifndef _SYS_SIGNAL_H
 #define _SYS_SIGNAL_H
 
-#ident	"@(#)head.sys:sys/signal.h	11.42"
+#ident	"@(#)head.sys:sys/signal.h	11.39"
 
 #define	SIGHUP	1	/* hangup */
 #define	SIGINT	2	/* interrupt (rubout) */
@@ -45,7 +45,19 @@
 #define SIGXCPU 30	/* exceeded cpu limit */
 #define SIGXFSZ 31	/* exceeded file size limit */
 
-#define	SIG_DFL	(void(*)())0
+#if (__STDC__ != 1)	
+#define	NSIG	32	/* valid signals range from 1 to NSIG-1 */
+#define MAXSIG	32	/* size of u_signal[], NSIG-1 <= MAXSIG */
+#endif
+
+#define S_SIGNAL	1
+#define S_SIGSET	2
+#define S_SIGACTION	3
+#define S_NONE		4
+
+#define SIG_BLOCK	1
+#define SIG_UNBLOCK	2
+#define SIG_SETMASK	3
 
 #if defined(lint)
 #define SIG_ERR (void(*)())0
@@ -56,21 +68,10 @@
 #define	SIG_IGN	(void (*)())1
 #define SIG_HOLD (void(*)())2
 #endif
+#define	SIG_DFL	(void(*)())0
 
-#define SIG_BLOCK	1
-#define SIG_UNBLOCK	2
-#define SIG_SETMASK	3
-
-#define SIGNO_MASK	0xFF
-#define SIGDEFER	0x100
-#define SIGHOLD		0x200
-#define SIGRELSE	0x400
-#define SIGIGNORE	0x800
-#define SIGPAUSE	0x1000
-
-#if __STDC__ - 0 == 0
 typedef struct {		/* signal set type */
-	unsigned long	sigbits[4];
+	unsigned long	word[4];
 } sigset_t;
 
 struct sigaction {
@@ -80,14 +81,8 @@ struct sigaction {
 	int sa_resv[2];
 };
 
-/* these are only valid for SIGCLD */
-#define SA_NOCLDSTOP	0x00020000	/* don't send job control SIGCLD's */
-#endif
-
-#if (__STDC__ - 0 == 0) && !defined(_XOPEN_SOURCE) && !defined(_POSIX_SOURCE)
-			/* non-comformant ANSI compilation	*/
-
 /* definitions for the sa_flags field */
+
 #define SA_ONSTACK	0x00000001
 #define SA_RESETHAND	0x00000002
 #define SA_RESTART	0x00000004
@@ -96,42 +91,41 @@ struct sigaction {
 
 /* these are only valid for SIGCLD */
 #define SA_NOCLDWAIT	0x00010000	/* don't save zombie children	 */
-
-#define NSIG	32	/* valid signals range from 1 to NSIG-1 */
-#define MAXSIG	32	/* size of u_signal[], NSIG-1 <= MAXSIG */
-
-#define S_SIGNAL	1
-#define S_SIGSET	2
-#define S_SIGACTION	3
-#define S_NONE		4
-
-#define MINSIGSTKSZ	512
-#define SIGSTKSZ	8192
-
-#define SS_ONSTACK	0x00000001
-#define SS_DISABLE	0x00000002
+#define SA_NOCLDSTOP	0x00020000	/* don't send job control SIGCLD's */
 
 struct sigaltstack {
-	char	*ss_sp;
-	int	ss_size;
+	int	*ss_sp;
+	int	ss_size;	/* number of words of type (int *) */
 	int	ss_flags;
 };
 
 typedef struct sigaltstack stack_t;
 
-#endif
+#define MINSIGSTKSZ	(512/sizeof(int *))
+#define SIGSTKSZ	(8192/sizeof(int *))
+
+#define SS_ONSTACK	0x00000001 /* this is current execution stack */
+#define SS_DISABLE	0x00000002 /* this stack cannot be used */
+
+#define SIGNO_MASK	0xFF
+#define SIGDEFER	0x100
+#define SIGHOLD		0x200
+#define SIGRELSE	0x400
+#define SIGIGNORE	0x800
+#define SIGPAUSE	0x1000
 
 #ifdef _KERNEL 
 
 extern k_sigset_t	
-
-	fillset,		/* valid signals, guaranteed contiguous */
+	fillset,		/* set of valid signals,
+				 * guaranteed contiguous */
 	holdvfork,		/* held while doing vfork */
 	cantmask,		/* cannot be caught or ignored */
 	cantreset,		/* cannot be reset after catching */
 	ignoredefault,		/* ignored by default */
 	stopdefault,		/* stop by default */
 	coredefault;		/* dumps core by default */
+
 
 #define	sigmask(n)		((unsigned long)1 << ((n) - 1))
 
@@ -144,11 +138,12 @@ extern k_sigset_t
 #define sigorset(s1,s2)		(*(s1) |= *(s2))
 #define	sigandset(s1,s2)	(*(s1) &= *(s2))
 #define	sigdiffset(s1,s2)	(*(s1) &= ~(*(s2)))
-#define sigutok(us,ks)		(*(ks) = (us)->sigbits[0])
-#define sigktou(ks,us)		((us)->sigbits[0] = *(ks),	\
-				 (us)->sigbits[1] = 0,	\
-				 (us)->sigbits[2] = 0,	\
-				 (us)->sigbits[3] = 0)
+#define	sigintset(s1,s2)	(*(s1) & *(s2))
+#define sigutok(us,ks)		(*(ks) = (us)->word[0])
+#define sigktou(ks,us)		((us)->word[0] = *(ks),	\
+				 (us)->word[1] = 0,	\
+				 (us)->word[2] = 0,	\
+				 (us)->word[3] = 0)
 
 typedef struct {
 	int	sig;

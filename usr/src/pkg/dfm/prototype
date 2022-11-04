@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.dfm:prototype	1.14"
+#ident	"@(#)pkg.dfm:prototype	1.12 UNOFFICIAL"
 # source locations releative to the prototype file
 
 # packaging files
@@ -11,13 +11,11 @@ i postinstall
 d none	/bin		?	?	?
 d none	/usr		?	?	?
 d none	/usr/bin	?	?	?
-d none	/usr/ccs	?	?	?
-d none	/usr/ccs/bin	?	?	?
 d none	/usr/lib	?	?	?
 
 # package objects:
 !default 555 bin bin
-f none	/usr/ccs/bin/ar
+f none	/bin/ar
 f none 	/usr/bin/od
 f none 	/usr/bin/sum
 f none	/usr/bin/tail
@@ -40,7 +38,8 @@ f none	/usr/bin/oawk
 f none	/usr/bin/pack
 f none	/usr/bin/paste
 f none	/usr/bin/sdiff
-f none	/usr/bin/strings
+#f none	/usr/bin/strings
+f none	/bin/strings
 f none	/usr/bin/split
 f none	/usr/bin/tr
 f none	/usr/bin/uniq
@@ -57,4 +56,3 @@ l none	/usr/bin/zcat=/usr/bin/compress
 f none	/usr/bin/more
 l none	/usr/bin/page=/usr/bin/more
 f none	/usr/bin/gcore
-f none	/usr/lib/more.help	0644	bin	bin

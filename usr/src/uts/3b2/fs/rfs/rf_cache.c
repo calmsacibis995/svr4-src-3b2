@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_cache.c	1.16"
+#ident	"@(#)fs:fs/rfs/rf_cache.c	1.10.1.1"
 
 #include "sys/list.h"
 #include "sys/types.h"
@@ -37,7 +37,6 @@
 #include "sys/vfs.h"
 #include "sys/stat.h"
 #include "sys/statfs.h"
-#include "sys/buf.h"
 #include "rf_cache.h"
 #include "rfcl_subr.h"
 #include "sys/immu.h"
@@ -120,7 +119,6 @@ rfc_pagelist(vp, offset, len, pfxp, sfxp)
 	*pfxp = *sfxp = NULL;
 	for ( ; offset < end; offset += PAGESIZE) {
 		rfc_info.rfci_ptread++;
-
 		/*
 		 * First find and hold all resident pages in the requested
 		 * range.
@@ -128,16 +126,13 @@ rfc_pagelist(vp, offset, len, pfxp, sfxp)
 		 * Build a resident prefix in *pfxp until we find a nonresident
 		 * page, then put any further resident pages into *sfxp.
 		 */
-
 		if ((pp = page_lookup(vp, offset)) != NULL) {
-
-			/* page_lookup doesn't hold the page. */
-
+			/*
+			 * page_lookup doesn't hold the page.
+			 */
 			PAGE_HOLD(pp);
 			ASSERT(pp->p_keepcnt > 0);
-			rfc_pagelock(pp);
 			page_sortadd(lnrpoff == -1 ? pfxp : sfxp, pp);
-
 		} else {
 			rfc_info.rfci_pmread++;
 			lnrpoff = offset;
@@ -154,7 +149,6 @@ rfc_pagelist(vp, offset, len, pfxp, sfxp)
 		while ((pp = *sfxp) != NULL && pp->p_offset < lnrpoff) {
 			rfc_info.rfci_pmread++;
 			page_sub(sfxp, pp);
-			rfc_pageunlock(pp);
 			ASSERT(pp->p_keepcnt > 0);
 			PAGE_RELE(pp);
 		}
@@ -166,31 +160,6 @@ rfc_pagelist(vp, offset, len, pfxp, sfxp)
 		ASSERT(!*sfxp);
 	}
 	return 0;
-}
-
-/*
- * Lookup the page denoted by vp and off, and sort it into ppp.
- * Holds and locks the page.  Returns a pointer to the page found
- * for success, NULL for failure.
- */
-page_t *
-rfc_page_lookup(vp, off, ppp)
-	vnode_t	*vp;
-	off_t	off;
-	page_t	**ppp;
-{
-	page_t	*pp;
-
-	ASSERT(!(off & PAGEOFFSET));
-
-	pp = page_lookup(vp, off); 
-	if (pp) {
-		PAGE_HOLD(pp);
-		ASSERT(pp->p_keepcnt > 0);
-		page_lock(pp); 
-		page_sortadd(ppp, pp);
-	}
-	return pp;
 }
 
 /*
@@ -230,7 +199,7 @@ rfc_readmove(rf_rwap, bpp, chansdp, move_errorp)
 	long			copysync = resp->rp_copyout.copysync;
 	rf_message_t		*mp = RF_MSG(*bpp);
 	queue_t			*qp = (queue_t *)mp->m_queue;
-	rf_gift_t		gift; 
+	long			giftid = mp->m_giftid;
 	int			error = 0;
 
 	/*
@@ -248,7 +217,6 @@ rfc_readmove(rf_rwap, bpp, chansdp, move_errorp)
 	if (rf_rwap->rd_nextnrb == rf_rwap->rd_firstnrb && !move_error) {
 		move_error = rfc_readrp1(chansdp, rf_rwap);
 	}
-	gift = mp->m_gift;
 	ctl = *rf_rwap->rd_ctlp;	/* may be set by rfc_readrp1 */
 	if (ctl == RFC_INCACHE && !move_error &&
 	  (opcode == RFCOPYOUT || !resp->rp_nodata)) {
@@ -261,7 +229,7 @@ rfc_readmove(rf_rwap, bpp, chansdp, move_errorp)
 	rf_freemsg(*bpp);
 	*bpp = NULL;
 	if (opcode == RFCOPYOUT && copysync) {
-		error = rfcl_copysync(rf_rwap->replysdp, qp, &gift);
+		error = rfcl_copysync(rf_rwap->replysdp, qp, giftid);
 	} else if (opcode == RFREAD && ctl == RFC_INCACHE &&
 	  !move_error && !error) {
 		move_error = rfc_readend(chansdp, rf_rwap);
@@ -451,9 +419,9 @@ rfc_readend(sdp, rf_rwap)
 		/* Zap the balance of the page and make it resident. */
 
 		bzero(rfc_pptokv(pp) + on, nleft);
+		rfc_pageunlock(pp);
 		rf_rwap->rd_nextnrb += nleft;
 		page_sub(&rf_rwap->rd_infix, pp);
-		rfc_pageunlock(pp);
 		ASSERT(pp->p_keepcnt > 0);
 		PAGE_RELE(pp);
 		ASSERT(!rf_rwap->rd_infix);
@@ -511,11 +479,10 @@ rfc_plmove(plp, uiop, end_data)
 					UIO_READ, uiop);
 		}
 		if (end_data >= pp->p_offset + PAGESIZE) {
-
-			/* Whole page. */
-
+			/*
+			 * Whole page.
+			 */
 			page_sub(plp, pp);
-			rfc_pageunlock(pp);
 			ASSERT(pp->p_keepcnt > 0);
 			PAGE_RELE(pp);
 			pp = *plp;
@@ -549,7 +516,7 @@ rfc_writefill(vp, uiop, nbytes)
 		register off_t	poff = uiop->uio_offset & PAGEMASK;
 		register off_t	pon = uiop->uio_offset & PAGEOFFSET;
 		register page_t	*pp = page_lookup(vp, poff);
-		register long	nbin = MIN(PAGESIZE - pon, nbytes);
+		register long	nbin = MIN(PAGESIZE, nbytes);
 
 		rfc_info.rfci_ptwrite++;
 
@@ -659,8 +626,7 @@ rfc_dismsout(rdup, vp, sdp, rdp, vcode)
 	if (gp->constate != GDPCONNECT) {
 		return;
 	}
-	sndd_set(sdp, qp, &rf_daemon_gift);
-	rdp->rd_sdp = sdp;
+	sndd_set(sdp, qp, RECOVER_RD);
 	(void)rf_allocmsg(minreq, (size_t)0, BPRI_MED, FALSE, NULLCADDR,
 	  NULLFRP, &bp);
 	ASSERT(bp);
@@ -674,7 +640,6 @@ rfc_dismsout(rdup, vp, sdp, rdp, vcode)
 	if (rf_sndmsg(sdp, bp, minreq, rdp, FALSE) == 0) {
 		(void)rf_rcvmsg(rdp, &bp);
 	}
-	rdp->rd_sdp = NULL;
 	rf_freemsg(bp);
 }
 
@@ -701,14 +666,14 @@ rfc_sdabort(rfvfsp)
 /*
  * Look for a cached send descriptor matching the reference in the response
  * denoted by rp.  Return the send descriptor with sd_queue, sd_stat, and
- * sd_gift initialized, or NULL for failure.
+ * sd_connid initialized, or NULL for failure.
  */
 sndd_t *
-rfc_sdsearch(rfvfsp, rp, qp, giftp)
+rfc_sdsearch(rfvfsp, rp, qp, connid)
 	rf_vfs_t		*rfvfsp;
 	register rf_response_t	*rp;
 	register queue_t	*qp;
-	rf_gift_t		*giftp;
+	long			connid;
 {
 	register ls_elt_t	*vfhash = &rfvfsp->rfvfs_sdhash;
 	register ls_elt_t	*sdhash = vfhash->ls_next;
@@ -736,11 +701,9 @@ rfc_sdsearch(rfvfsp, rp, qp, giftp)
 		 */
 		sndd_unhash(sdp);
 		if (sdp->sd_vcode == vcode) {
-
 			/* cache hit; define sd */
-
 			sdp->sd_stat |= SDUSED;
-			sndd_set(sdp, qp, giftp);
+			sndd_set(sdp, qp, connid);
 			rfvfsp->rfvfs_refcnt++;	/* remember SD */
 			VN_HOLD(SDTOV(sdp));
 		} else {
@@ -926,7 +889,6 @@ rfc_plrele(plp)
 
 	while ((pp = *plp) != NULL) {
 		page_sub(plp, pp);
-		rfc_pageunlock(pp);
 		ASSERT(pp->p_keepcnt > 0);
 		PAGE_RELE(pp);
 	}
@@ -1129,6 +1091,7 @@ rfc_dopageabort(pp)
 	if (pp->p_keepcnt) {
 		pp->p_gone = 1;
 	} else {
+		page_hashout(pp);
 		page_abort(pp);
 	}
 }

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/ctypefcns.c	1.4"
+#ident	"@(#)libc-port:gen/ctypefcns.c	1.3"
 #include "synonyms.h"
 #include <ctype.h>
 
@@ -24,13 +24,6 @@
 #undef _toupper
 #undef _tolower
 #undef toascii
-
-#ifdef __STDC__
-	#pragma weak isascii = _isascii
-	#pragma weak toascii = _toascii
-#define isascii _isascii
-#define toascii _toascii
-#endif
 
 int
 isalpha(c)

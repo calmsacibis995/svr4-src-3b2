@@ -8,7 +8,7 @@
 #ifndef _LIMITS_H
 #define _LIMITS_H
 
-#ident	"@(#)head:limits.h	1.28"
+#ident	"@(#)head:limits.h	1.25"
 
 /* Sizes of integral types */
 #define CHAR_BIT        8       	/* max # of bits in a "char" */
@@ -49,6 +49,7 @@
 #if __STDC__ - 0 == 0 || defined(_POSIX_SOURCE) || defined(_XOPEN_SOURCE)
 
 #define	ARG_MAX		5120		/* max length of arguments to exec */
+#define	CHILD_MAX	25		/* max # of processes per user id */
 #define	LINK_MAX	1000		/* max # of links to a single file */
 
 #ifndef MAX_CANON
@@ -59,6 +60,7 @@
 #define	MAX_INPUT	512		/* max size of a char input buffer */
 #endif
 
+#define	NAME_MAX	14		/* max # of characters in a file name */
 #define NGROUPS_MAX	16		/* max number of groups for a user */
 
 
@@ -100,11 +102,7 @@
 #define _POSIX_PATH_MAX		 255
 #define _POSIX_PIPE_BUF		 512
 
-#ifndef CLK_TCK
-#define CLK_TCK	_sysconf(3)	/* 3B2 clock ticks per second */
-				/* 3 is _SC_CLK_TCK */
-#endif
-
+#define CLK_TCK         100             /* UNIX ticks in a second */
 #define	DBL_DIG		15		/* digits of precision of a "double" */
 #define	DBL_MAX		1.7976931348623157E+308  /* max decimal value of a "double"*/
 #define	DBL_MIN		2.2250738585072014E-308  /* min decimal value of a "double"*/
@@ -137,8 +135,6 @@
 
 #define	FCHR_MAX	1048576		/* max size of a file in bytes */
 #define	PID_MAX		30000		/* max value for a process ID */
-#define	CHILD_MAX	25		/* max # of processes per user id */
-#define	NAME_MAX	14		/* max # of characters in a file name */
 
 #ifndef OPEN_MAX
 #define	OPEN_MAX	20		/* max # of files a process can have open */
@@ -164,8 +160,9 @@
 #define	SYSPID_MAX	1		/* max pid of system processes */
 
 #if !defined(_STYPES)
-#define SYS_NMLN	257	/* 4.0 size of utsname elements */
-				/* also defined in sys/utsname.h */
+#define SYS_NMLN	256	/* 4.0 size of utsname elements */
+				/* THIS MUST CHANGE TO 257 TO SUPPORT
+				 * INTERNET HOSTNAMES */
 #else
 #define SYS_NMLN	9	/* old size of utsname elements */
 #endif	/* _STYPES */

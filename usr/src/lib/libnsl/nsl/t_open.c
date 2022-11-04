@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libnsl:nsl/t_open.c	1.5.3.3"
+#ident	"@(#)libnsl:nsl/t_open.c	1.5.3.1"
 #include "sys/param.h"
 #include "sys/types.h"
 #include "sys/errno.h"
@@ -15,7 +15,6 @@
 #include "sys/timod.h"
 #include "sys/tiuser.h"
 #include "sys/signal.h"
-#include "sys/fcntl.h"
 #include "_import.h"
 
 
@@ -43,16 +42,11 @@ register struct t_info *info;
 	void (*sigsave)();
 
 
-	if (!(flags & O_RDWR)) {
-		errno = 0;
-		t_errno = TBADFLAG;
-		return (-1);
-	}
-
 	if ((fd = open(path, flags)) < 0) {
 		t_errno = TSYSERR;
 		return(-1);
 	}
+
 
 	/*
 	 * is module already pushed
@@ -62,6 +56,7 @@ register struct t_info *info;
 		close(fd);
 		return(-1);
 	}
+
 
 	if (!retval)
 		if (ioctl(fd, I_PUSH, "timod") < 0) {

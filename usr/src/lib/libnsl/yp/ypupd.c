@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libyp:ypupd.c	1.2"
+#ident	"@(#)libyp:ypupd.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -33,7 +33,7 @@
  */
 
 #include <rpc/rpc.h>
-#include <rpcsvc/ypupd.h>
+#include "ypupd.h"
 /* @(#)ypupdate_prot.x 1.4 88/02/08 Copyr 1986, Sun Micro */
 
 /*

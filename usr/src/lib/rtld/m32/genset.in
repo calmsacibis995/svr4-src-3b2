@@ -1,20 +1,11 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-#ident	"@(#)rtld:m32/genset.in	1.7.1.1"
+#ident	"@(#)rtld:m32/genset.in	1.5"
 
 errno	MIN
 _fp_hw	MIN
 _asr	MIN
 _environ	MIN
 __flt_rounds	MIN
-__ctype	MIN
-_fpfault	MIN
-_fpftype	MIN
-_getdate_err
+__ctype	MIN	_abi
 
 # defined in opt_data.o
 optind
@@ -33,13 +24,13 @@ _lib_version
 
 # defined in _loc_data.o
 _cur_locale	MIN
-_numeric	MIN
+_numeric	MIN	_abi_
 
 # defined in time_gdata.o
-_altzone	MIN
-_daylight	MIN
-_timezone	MIN
-_tzname	MIN
+_altzone	MIN	_abi
+_daylight	MIN	_abi
+_timezone	MIN	_abi
+_tzname	MIN	_abi
 
 # defined in import_def.o
 malloc	PRE	_libc_

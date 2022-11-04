@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fgets.c	3.15"
+#ident	"@(#)libc-port:stdio/fgets.c	3.14"
 /*LINTLIBRARY*/
 
 #include "synonyms.h"
@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include "stdiom.h"
 #include <memory.h>
-#include <errno.h>
 
 char *
 fgets(buf, size, iop)	/* read size-max line from stream, including '\n' */
@@ -26,10 +25,8 @@ fgets(buf, size, iop)	/* read size-max line from stream, including '\n' */
 	register Uchar *bufend;
 	register char *p;
 
-	if (!(iop->_flag & (_IOREAD | _IORW))) {
-		errno = EBADF;
+	if (!(iop->_flag & (_IOREAD | _IORW)))
 		return 0;
-	}
 
 	if (iop->_base == 0)
 	{

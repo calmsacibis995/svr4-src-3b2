@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfssys.c	1.3"
+#ident	"@(#)fs:fs/nfs/nfssys.c	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -45,9 +45,7 @@ rval_t *rvp;
 	switch ((int) uap->opcode) {
 		case NFS_SVC:
 			/* NFS server daemon */
-			if (copyin((caddr_t) uap->nfssysarg_svc,
-				(caddr_t) &a.nfs_svc_args_u,
-				sizeof(a.nfs_svc_args_u)))
+			if (copyin((caddr_t) uap->nfssysarg_svc, (caddr_t) &a.nfs_svc_args_u, sizeof(a.nfs_svc_args_u)))
 				return(EFAULT);
 			else
 				return(nfs_svc(&a.nfs_svc_args_u));
@@ -63,10 +61,6 @@ rval_t *rvp;
 		case NFS_GETFH:
 			/* get a file handle */
 			return(nfs_getfh(uap->nfssysarg_getfh));
-
-		case NFS_CNVT:
-			/* open a file referred to by a file handle */
-			return(nfs_cnvt(uap->nfssysarg_cnvt, rvp));
 
 		default:
 			return(EINVAL);

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/putpwent.c	1.10"
+#ident	"@(#)libc-port:gen/putpwent.c	1.9"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -18,21 +18,36 @@
 #include <stdio.h>
 #include <pwd.h>
 
+#ifdef __STDC__
+	int	_putpwbuf(const struct passwd *,
+			int (*)(void *, char *, size_t), void *);
+#else
+	int	_putpwbuf();
+#endif
+
+static int
+#ifdef __STDC__
+fls(void *f, char *buf, size_t n)
+#else
+fls(f, buf, n)
+	char	*f;
+	char	*buf;
+	size_t	n;
+#endif
+{
+	fwrite(buf, n, 1, (FILE *)f);
+	return ferror(((FILE *)f));
+}
+
+
 int
 putpwent(p, f)
 register const struct passwd *p;
 register FILE *f;
 {
-	(void) fprintf(f, "%s:%s", p->pw_name, p->pw_passwd);
-	if((*p->pw_age) != '\0')
-		(void) fprintf(f, ",%s", p->pw_age);
-	(void) fprintf(f, ":%u:%u:%s:%s:%s",
-		p->pw_uid,
-		p->pw_gid,
-		p->pw_gecos,
-		p->pw_dir,
-		p->pw_shell);
-	(void) putc('\n', f);
-	(void) fflush(f);
-	return(ferror(f));
+	int	err;
+
+	err = _putpwbuf(p, fls, (char *)f);
+	(void)fflush(f);
+	return err | ferror(f);
 }

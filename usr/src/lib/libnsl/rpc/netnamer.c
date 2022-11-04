@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:netnamer.c	1.3"
+#ident	"@(#)librpc:netnamer.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -19,19 +18,18 @@
 *
 *
 *
-*	Copyright Notice
+*	Copyright Notice 
 *
-* Notice of copyright on this source code product does not indicate
+* Notice of copyright on this source code product does not indicate 
 *  publication.
 *
 *	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
-*/
+*/ 
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)netnamer.c 1.4 89/03/20 Copyr 1986 Sun Micro";
 #endif
-
 /*
  * netname utility routines convert from unix names to network names and
  * vice-versa This module is operating system dependent! What we define here
@@ -51,28 +49,28 @@ static char    *NETID = "netid.byname";
 static char    *NETIDFILE = "/etc/netid";
 
 #ifndef NGROUPS
-#define	NGROUPS 16
+#define NGROUPS 16
 #endif
 
 /*
  * Convert network-name into unix credential
  */
 netname2user(netname, uidp, gidp, gidlenp, gidlist)
-	char netname[MAXNETNAMELEN + 1];
-	uid_t *uidp;
-	gid_t *gidp;
-	int *gidlenp;
-	gid_t *gidlist;
+	char            netname[MAXNETNAMELEN + 1];
+	uid_t            *uidp;
+	gid_t            *gidp;
+	int            *gidlenp;
+	gid_t	       *gidlist;
 {
-	char *p;
-	int gidlen;
-	uid_t uid;
-	struct passwd *pwd;
-	char val[1024];
-	char *val1, *val2;
-	char *domain;
-	int vallen;
-	int err;
+	char           *p;
+	int             gidlen;
+	uid_t           uid;
+	struct passwd  *pwd;
+	char            val[1024];
+	char           *val1, *val2;
+	char           *domain;
+	int             vallen;
+	int             err;
 
 	if (getnetid(netname, val)) {
 		p = strtok(val, ":");
@@ -98,8 +96,7 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 	val1 = strchr(netname, '.');
 	if (val1 == NULL)
 		return (0);
-	if (strncmp(netname, OPSYS, (val1-netname)))
-		return (0);
+	if (strncmp(netname,OPSYS,(val1-netname))) return(0);
 	val1++;
 	val2 = strchr(val1, '@');
 	if (val2 == NULL)
@@ -132,18 +129,18 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 /*
  * initgroups
  */
-struct group *getgrent();
+struct group   *getgrent();
 
 static
 getgroups(uname, groups)
-	char *uname;
-	int groups[NGROUPS];
+	char           *uname;
+	int             groups[NGROUPS];
 {
-	gid_t ngroups = 0;
+	gid_t           ngroups = 0;
 	register struct group *grp;
-	register int i;
-	register int j;
-	int filter;
+	register int    i;
+	register int    j;
+	int             filter;
 
 	setgrent();
 	while (grp = getgrent()) {
@@ -152,7 +149,7 @@ getgroups(uname, groups)
 				if (ngroups == NGROUPS) {
 #ifdef DEBUG
 					fprintf(stderr,
-		"initgroups: %s is in too many groups\n", uname);
+				"initgroups: %s is in too many groups\n", uname);
 #endif
 					goto toomany;
 				}
@@ -176,16 +173,16 @@ toomany:
  * Convert network-name to hostname
  */
 netname2host(netname, hostname, hostlen)
-	char netname[MAXNETNAMELEN + 1];
-	char *hostname;
-	int hostlen;
+	char            netname[MAXNETNAMELEN + 1];
+	char           *hostname;
+	int             hostlen;
 {
-	int err;
-	char valbuf[1024];
-	char *val;
-	char *val2;
-	int vallen;
-	char *domain;
+	int             err;
+	char            valbuf[1024];
+	char           *val;
+	char           *val2;
+	int             vallen;
+	char           *domain;
 
 	if (getnetid(netname, valbuf)) {
 		val = valbuf;
@@ -198,7 +195,7 @@ netname2host(netname, hostname, hostlen)
 	if (val == NULL)
 		return (0);
 	if (strncmp(netname, OPSYS, (val - netname)))
-		return (0);
+		return(0);
 	val++;
 	val2 = strchr(val, '@');
 	if (val2 == NULL)
@@ -225,21 +222,21 @@ netname2host(netname, hostname, hostlen)
  */
 int
 getnetid(key, ret)
-	char *key, *ret;
+	char           *key, *ret;
 {
-	char buf[1024];	/* big enough */
-	char *res;
-	char *mkey;
-	char *mval;
-	char *domain;
-	int err;
-	char *lookup;
-	int len;
-	FILE *fd;
+	char            buf[1024];	/* big enough */
+	char           *res;
+	char           *mkey;
+	char           *mval;
+	char           *domain;
+	int             err;
+	char           *lookup;
+	int             len;
+	FILE           *fd;
 
 	fd = fopen(NETIDFILE, "r");
 	if (fd == (FILE *) 0) {
-#ifdef YP
+#ifdef TRYYP
 		res = "+";
 		goto getnetidyp;
 #else
@@ -257,15 +254,14 @@ getnetid(key, ret)
 		if (res[0] == '#')
 			continue;
 		else if (res[0] == '+') {
-#ifdef YP
+#ifdef TRYYP
 	getnetidyp:
 			err = yp_get_default_domain(&domain);
 			if (err) {
 				continue;
 			}
 			lookup = NULL;
-			err = yp_match(domain, NETID, key,
-				strlen(key), &lookup, &len);
+			err = yp_match(domain, NETID, key, strlen(key), &lookup, &len);
 			if (err) {
 #ifdef DEBUG
 				fprintf(stderr, "match failed error %d\n", err);
@@ -277,25 +273,21 @@ getnetid(key, ret)
 			free(lookup);
 			fclose(fd);
 			return (2);
-#else	/* YP */
+#else
 #ifdef DEBUG
-			fprintf(stderr,
-"Bad record in %s '+' -- yp not supported in this library copy\n",
-				NETIDFILE);
+			fprintf(stderr, "Bad record in %s '+' -- yp not supported in this library copy\n", NETIDFILE);
 #endif
 			continue;
-#endif	/* YP */
+#endif
 		} else {
 			mkey = strtok(buf, "\t ");
 			if (mkey == NULL) {
-				fprintf(stderr,
-		"Bad record in %s -- %s", NETIDFILE, buf);
+				fprintf(stderr, "Bad record in %s -- %s", NETIDFILE, buf);
 				continue;
 			}
 			mval = strtok(NULL, " \t#\n");
 			if (mval == NULL) {
-				fprintf(stderr,
-		"Bad record in %s val problem - %s", NETIDFILE, buf);
+				fprintf(stderr, "Bad record in %s val problem - %s", NETIDFILE, buf);
 				continue;
 			}
 			if (strcmp(mkey, key) == 0) {

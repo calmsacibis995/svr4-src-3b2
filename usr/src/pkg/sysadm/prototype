@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.sysadm:prototype	1.27.2.5"
+#ident	"@(#)pkg.sysadm:prototype	1.20"
 
 # packaging files
 
@@ -18,14 +18,6 @@ d	none	/usr/bin 	?	?	?
 d	none	/usr/sbin 	775	root	sys
 d	none	/usr/lib/fs 	775	root	sys
 d	none	/usr/lib/fs/s5 	775	root	sys
-d	none	/usr/lib/locale 775	root	sys
-d	none	/usr/lib/locale/C 775	root	sys
-d	none	/usr/lib/locale/Xopen 775	root	sys
-d	none	/usr/lib/locale/Xopen1 775	root	sys
-d	none	/usr/lib/locale/Xopen/LC_MESSAGES 777	root	sys
-d	none	/usr/lib/locale/Xopen1/LC_MESSAGES 777	root	sys
-d	none	/usr/lib/locale/TZ 755	bin	bin
-d	none	/usr/lib/locale/C/LC_MESSAGES 775	root	sys
 
 # package objects:
 
@@ -38,7 +30,6 @@ f	none	/usr/bin/gettxt
 f	none	/usr/bin/printf
 f	none	/usr/bin/iconv
 f	none	/usr/bin/gencat
-f	none	/usr/bin/mkfifo 555	root	root
 f	none	/usr/bin/mkmsgs	555	root	root
 f	none	/usr/bin/srchtxt
 f	none	/usr/sbin/chroot
@@ -51,13 +42,17 @@ f	none	/usr/sbin/dfsck
 s	none	/etc/dfsck=/usr/sbin/dfsck
 f	none	/usr/sbin/ff
 s	none	/etc/ff=/usr/sbin/ff
-f	none	/usr/sbin/dcopy
+l	none	/usr/sbin/dcopy=/usr/sbin/ff
 s	none	/etc/dcopy=/usr/sbin/dcopy
 f	none	/sbin/fsdb
+f	none	/usr/lib/fs/s5/dcopy
+f	none	/usr/lib/fs/s5/ff
+f	none	/usr/lib/fs/s5/ncheck
+f	none	/etc/fs/s5/fsdb
 f	none	/usr/sbin/fuser
 s	none	/etc/fuser=/usr/sbin/fuser
 f	none	/usr/sbin/grpck
-s	none	/etc/grpck=/usr/sbin/grpck
+s	none	/etc/grpchk=/usr/sbin/grpck
 f	none	/usr/sbin/ldsysdump
 s	none	/etc/ldsysdump=/usr/sbin/ldsysdump
 f	none	/usr/sbin/link	500	root	bin
@@ -75,19 +70,6 @@ f	none	/usr/sbin/volcopy
 s	none	/etc/volcopy=/usr/sbin/volcopy
 f	none	/usr/sbin/whodo	4555	root	bin
 s	none	/etc/whodo=/usr/sbin/whodo	4555	root	bin
-f	none	/usr/sbin/zic
-f	none	/usr/sbin/zdump
-f	none	/usr/lib/locale/C/LC_TIME 444	root	bin
-f	none	/usr/lib/locale/C/chrtbl_C 444	root	bin
-f	none	/usr/lib/locale/C/colltbl_C 444	root	bin
-f	none	/usr/lib/locale/C/montbl_C 444	root	bin
-f	none	/usr/lib/locale/TZ/asia	644	bin	bin
-f	none	/usr/lib/locale/TZ/australasia	644	bin	bin
-f	none	/usr/lib/locale/TZ/etcetera	644	bin	bin
-f	none	/usr/lib/locale/TZ/europe	644	bin	bin
-f	none	/usr/lib/locale/TZ/northamerica	644	bin	bin
-f	none	/usr/lib/locale/TZ/pacificnew	644	bin	bin
-f	none	/usr/lib/locale/TZ/southamerica	644	bin	bin
 
 # set the default permissions if none are specified
 !OAMBASE=/usr/sadm/sysadm
@@ -130,6 +112,7 @@ f bkrs /usr/lib/getdate/bkrsdates 444 bin bin
 f bkrs /usr/lib/libadmIO/CTC 700 root sys
 f bkrs /usr/include/table.h 444 bin bin
 f bkrs /usr/include/bkrs.h 444 bin bin
+f bkrs /usr/include/sys/libadmIO.h 444 bin bin
 
 f bkrs /usr/sbin/bkstatus 100 root sys
 f bkrs /usr/sbin/bkexcept 100 root sys
@@ -206,8 +189,6 @@ x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service 0755 root sys
 f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/Help
 x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup 0755 root sys
 f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Help
-f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Text.bkpok
-f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Text.bkpnok
 f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/backup/Form.backup
 x OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history 0755 root sys
 f OAMadmin $OAMBASE/add-ons/$PKGINST/backup_service/history/Help
@@ -462,10 +443,25 @@ f edsys $OAMBASE/edmenu/Form.savepkg 0644 bin bin
 f edsys $OAMBASE/edmenu/Form.select 0644 bin bin
 f edsys $OAMBASE/edmenu/Form.test 0644 bin bin
 f edsys $OAMBASE/edmenu/Form.overwrite 0644 bin bin
-f edsys $OAMBASE/edmenu/Form.redo 0644 bin bin
 f edsys $OAMBASE/edmenu/Menu.pkg 0644 bin bin
 f edsys $OAMBASE/edmenu/Menu.choices 0644 bin bin
 f edsys $OAMBASE/edmenu/Menu.menu 0644 bin bin
 f edsys $OAMBASE/edmenu/Menu.task 0644 bin bin
 f edsys $OAMBASE/edmenu/Menu.testmenu 0644 bin bin
-f edsys $OAMBASE/edmenu/Help 0755 bin bin
+d edsys $OAMBASE/edmenu/HELP 0755 bin bin
+f edsys $OAMBASE/edmenu/HELP/chgmen.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/chgtsk.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/choice.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/collsn.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/error.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/gpkg.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/menu.help  0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/pkg.help  0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/pkgmen.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/pkgtsk.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/save.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/select.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/svpkg.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/task.help 0644 bin bin
+f edsys $OAMBASE/edmenu/HELP/test.help 0644 bin bin
+

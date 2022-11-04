@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:verify.c	1.21.1.1"
+#ident	"@(#)libpkg:verify.c	1.21"
 
 #include <stdio.h>
 #include <limits.h>
@@ -124,7 +124,7 @@ struct cinfo *cinfo;
 	/* -1	requires modtimes to be the same */
 	/*  0   reports modtime failure */
 	/*  1   fixes modtimes */
-	if(setval || (cinfo->modtime == BADCONT))
+	if(setval || (cinfo->modtime < 0))
 		cinfo->modtime = status.st_mtime;
 	else if(status.st_mtime != cinfo->modtime) {
 		if(fix > 0) {
@@ -144,7 +144,7 @@ struct cinfo *cinfo;
 		} /*else
 			retcode = VE_TIME;*/
 	} 
-	if(setval || (cinfo->size == BADCONT))
+	if(setval || (cinfo->size < 0))
 		cinfo->size = status.st_size;
 	else if(status.st_size != cinfo->size) {
 		if(!retcode /*|| (retcode == VE_TIME)*/)
@@ -153,7 +153,7 @@ struct cinfo *cinfo;
 	} 
 
 	mycksum = docksum(path);
-	if(setval || (cinfo->cksum == BADCONT))
+	if(setval || (cinfo->cksum < 0))
 		cinfo->cksum = mycksum;
 	else if((mycksum != cinfo->cksum) || cksumerr) {
 		if(!retcode /*|| (retcode == VE_TIME)*/)
@@ -365,7 +365,7 @@ struct ainfo *ainfo;
 	}
 
 	/* compare specified mode w/ actual mode excluding sticky bit */
-	if(setval || (ainfo->mode == BADMODE))
+	if(setval || (ainfo->mode < 0))
 		ainfo->mode = status.st_mode & 07777;
 	else if((ainfo->mode & 06777) != (status.st_mode & 06777)) {
 		if(fix) {
@@ -385,7 +385,7 @@ struct ainfo *ainfo;
 	dochown = 0;
 
 	/* get group entry for specified group */
-	if(setval || !strcmp(ainfo->group, BADGROUP)) {
+	if(setval || !strcmp(ainfo->group, "?")) {
 		grp = getgrgid(status.st_gid);
 		if(grp)
 			(void) strcpy(ainfo->group, grp->gr_name);
@@ -416,7 +416,7 @@ struct ainfo *ainfo;
 	setpwent();
 
 	/* get password entry for specified owner */
-	if(setval || !strcmp(ainfo->owner, BADOWNER)) {
+	if(setval || !strcmp(ainfo->owner, "?")) {
 		pwd = getpwuid((int)status.st_uid);
 		if(pwd)
 			(void) strcpy(ainfo->owner, pwd->pw_name);

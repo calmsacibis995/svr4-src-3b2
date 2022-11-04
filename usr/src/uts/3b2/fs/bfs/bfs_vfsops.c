@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/bfs/bfs_vfsops.c	1.33"
+#ident	"@(#)fs:fs/bfs/bfs_vfsops.c	1.27"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -35,6 +35,8 @@
 
 struct vnode *specvp(), *bdevvp();
 
+#define BFS_BUFSIZE 1024
+
 struct vnode *specvp(), *makespecvp();
 
 /*
@@ -56,10 +58,6 @@ struct vfsops bfsvfsops = {
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 };
 
 extern int bfstype;
@@ -75,7 +73,7 @@ bfs_mount(vfsp, mvp, uap, cr)
 	daddr_t lastblock, lastoff;
 	struct vnode *bvp, *rvp;
 	struct bsuper *bfs_super;
-	long superbuf[7];
+	long superbuf[3];
 	struct bfs_dirent *dir;
 	int rdonly = (uap->flags & MS_RDONLY);
 	int error;
@@ -118,7 +116,6 @@ bfs_mount(vfsp, mvp, uap, cr)
 	 * on this vnode.
 	 */
 	bvp = makespecvp(dev, VBLK);
-	bvp->v_vfsp = vfsp;
 
 	if (error = VOP_OPEN(&bvp, rdonly ? FREAD : FREAD|FWRITE, u.u_cred)) {
 		VN_RELE(bvp);
@@ -136,35 +133,20 @@ bfs_mount(vfsp, mvp, uap, cr)
 		vfsp->vfs_flag |= VFS_RDONLY;
 
 	/*
-	 * The first three words are the magic number, the start and end blocks
-	 * of the file data. The next four words are the sanity words.
+	 * The first three words are the start and end blocks of the file data,
+	 * and the magic number.
 	 */
 	error = vn_rdwr(UIO_READ, bvp, (caddr_t) superbuf, sizeof(superbuf),
 	  BFS_SUPEROFF, UIO_SYSSPACE, 0, 0, cr, (int *)0);
 
 	if (error) {
-		VOP_CLOSE(bvp, rdonly ? FREAD : FREAD|FWRITE, 1,
-		  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
 		VN_RELE(bvp);
 		return error;
 	}
 
 	if (superbuf[0] != BFS_MAGIC) {
-		VOP_CLOSE(bvp, rdonly ? FREAD : FREAD|FWRITE, 1,
-		  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
 		VN_RELE(bvp);
 		return EINVAL;
-	}
-
-	/*
-	 * If the last 2 sanity words are not set to "-1", the file system
-	 * must be checked before is mounted.
-	 */
-	if (superbuf[5] != -1 && superbuf[6] != -1) {
-		VOP_CLOSE(bvp, rdonly ? FREAD : FREAD|FWRITE, 1,
-		  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
-		VN_RELE(bvp);
-		return ENOSPC;
 	}
 
 	/*
@@ -177,8 +159,6 @@ bfs_mount(vfsp, mvp, uap, cr)
 	bfs_super = (struct bsuper *)
 	  kmem_alloc(sizeof(struct bsuper), KM_SLEEP);
 	if (bfs_super == NULL) {
-		VOP_CLOSE(bvp, rdonly ? FREAD : FREAD|FWRITE, 1,
-		  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
 		VN_RELE(bvp);
 		return EBUSY;
 	}
@@ -227,8 +207,6 @@ bfs_mount(vfsp, mvp, uap, cr)
 	for (i = BFS_DIRSTART; i < bfs_super->bsup_start;
 	     i += sizeof(struct bfs_dirent)) {
 		if (BFS_GETINODE(bvp, i, dir, cr)) {
-			VOP_CLOSE(bvp, rdonly ? FREAD : FREAD|FWRITE, 1,
-			  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
 			VN_RELE(bvp);
 			kmem_free(dir, sizeof(struct bfs_dirent));
 			kmem_free(bfs_super, sizeof(struct bsuper));
@@ -249,7 +227,10 @@ bfs_mount(vfsp, mvp, uap, cr)
 	}
 	kmem_free((caddr_t)dir, sizeof(struct bfs_dirent));
 
-	vfsp->vfs_bsize = BFS_BSIZE;
+		/* invalidate blocks with the dev were mounting on */
+	binval(dev);			/* FIX FOR VM!!!!! */
+	fbinval(vfsp);
+	vfsp->vfs_bsize = BFS_BUFSIZE;
 	vfsp->vfs_bcount = 0;
 	vfsp->vfs_fstype = bfstype;
 
@@ -274,7 +255,6 @@ bfs_unmount(vfsp, cr)
 	struct vfs *vfsp;
 	struct cred *cr;
 {
-	dev_t dev;
 	register struct vnode *bvp;
 	register struct bfs_core_vnode *cvp;
 	register struct bsuper *bs = (struct bsuper *)vfsp->vfs_data;
@@ -291,12 +271,10 @@ bfs_unmount(vfsp, cr)
 	}
 
 	bvp = BFS_DEVNODE(vfsp);
-	dev = vfsp->vfs_dev;
 	VOP_CLOSE(bvp, (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE, 1,
 	  (off_t) BFS_INO2OFF(BFSROOTINO), cr);
 	kmem_free(vfsp->vfs_data,sizeof(struct bsuper));
 	VN_RELE(bvp);
-	binval(dev);
 	return 0;
 }
 

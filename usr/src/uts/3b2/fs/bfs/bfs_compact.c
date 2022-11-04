@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/bfs/bfs_compact.c	1.19"
+#ident	"@(#)fs:fs/bfs/bfs_compact.c	1.17"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -39,8 +39,11 @@
 #define	BFSBUFSIZE 8192
 
 char bfs_buffer[BFSBUFSIZE];
-int bfs_debugcomp;
 
+/*
+ * All I/O in this file is done such that it could be called from within the
+ * kernel or user-level.  See bfs_compact.h for further details.
+ */
 int
 bfs_compact(bs, cr)
 	struct bsuper *bs;
@@ -55,7 +58,9 @@ bfs_compact(bs, cr)
 
 	BFS_LOCK(bs);	/* No I/O while compacting */
 
+#ifdef DEBUG
 	cmn_err(CE_CONT,"Compacting BFS filesystem\n");
+#endif
 
 	off = bfs_getnxtcblock(bs, 0, &dir, cr);	/* Get first file */
 	eblock = (bs->bsup_start / BFS_BSIZE);
@@ -70,11 +75,10 @@ bfs_compact(bs, cr)
 
 			gapsize =  (dir.d_sblock - eblock) - 1;
 #ifdef DEBUG
-			if (bfs_debugcomp)
-			    cmn_err(CE_CONT,"Found a gap.  New gapsize is %d\n",
-			      gapsize);
+			cmn_err(CE_CONT,"Found a gap.  New gapsize is %d\n",
+			  gapsize);
 #endif
-			bfs_shiftfile(bs, &dir, gapsize, off, cr);
+			bfs_shiftfile(bs, &dir, gapsize, off, 0, cr);
 			cnt++;
 		}
 		eblock = dir.d_eblock;
@@ -86,10 +90,12 @@ bfs_compact(bs, cr)
 
 	bs->bsup_compacted = BFS_YES;
 
+#ifdef DEBUG
 	if (cnt)
 		cmn_err(CE_CONT, "Compaction of BFS filesystem completed\n");
 	else
-		cmn_err(CE_CONT, "BFS filesystem was already compacted\n");
+		cmn_err(CE_CONT, "BFS filesystem was compacted\n");
+#endif
 
 	bfs_unlock(bs);
 	return 0;
@@ -118,14 +124,13 @@ bfs_getnxtcblock(bs, curblock, drent, cr)
 	 */
 	for (i = BFS_DIRSTART; i < bs->bsup_start;
 	     i += sizeof(struct bfs_dirent)) {
-		BFS_GETINODE(bs->bsup_devnode, i, &dir, cr);
+		BFS_CCT_GETINODE(bs->bsup_devnode, i, &dir, cr);
 
 		if (dir.d_ino == 0)
 			continue;
 
 		if (dir.d_sblock > curblock && dir.d_sblock < drent->d_sblock) {
 #ifdef DEBUG
-		    if (bfs_debugcomp)
 			cmn_err(CE_CONT,"nxt: fnd sblk %d, gt than %d, lt %d\n",
 			  dir.d_sblock, curblock, drent->d_sblock);
 #endif
@@ -140,11 +145,12 @@ bfs_getnxtcblock(bs, curblock, drent, cr)
  * Shift the file described by dirent "dir", "gapsize" blocks.  "Offset"
  * describes the location on the disk of the dirent.
  */
-bfs_shiftfile(bs, dir, gapsize, offset, cr)
+bfs_shiftfile(bs, dir, gapsize, offset, foffset, cr)
 	struct bsuper *bs;
 	struct bfs_dirent *dir;
 	long gapsize;
 	off_t offset;
+	daddr_t foffset;
 	struct cred *cr;
 {
 	long maxshift;
@@ -159,13 +165,12 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 		daddr_t	btoblock;
 	} sw;
 
-	sw.fromblock = dir->d_sblock;
-	sw.toblock = dir->d_sblock - gapsize;
+	sw.fromblock = dir->d_sblock + foffset;
+	sw.toblock = (dir->d_sblock - gapsize) + foffset;
 
 #ifdef DEBUG
-	if (bfs_debugcomp)
-		cmn_err(CE_CONT,"Shifting a file  inode %d   from %d to %d\n",
-		  dir->d_ino, sw.fromblock, sw.toblock);
+	cmn_err(CE_CONT,"Shifting a file  inode %d   from %d to %d\n",
+	  dir->d_ino, sw.fromblock, sw.toblock);
 #endif
 
 	maxshift = min(BFSBUFSIZE, gapsize*512);
@@ -175,7 +180,7 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 	 */
 	sw.bfromblock = sw.fromblock;
 	sw.btoblock = sw.toblock;
-	BFS_CCT_WRITE(bs->bsup_devnode,BFS_SANITYWSTART,
+	BFS_CCT_WRITE(bs->bsup_devnode,BFS_COMPACTSTART,
 		      sizeof(struct sanityw),&sw,cr);
 
 	/*
@@ -212,7 +217,7 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 		if (gapsize*512 < filesize) {
 			sw.bfromblock = sw.fromblock;
 			sw.btoblock = sw.toblock;
-			BFS_CCT_WRITE(bs->bsup_devnode,BFS_SANITYWSTART,
+			BFS_CCT_WRITE(bs->bsup_devnode,BFS_COMPACTSTART,
 			  sizeof(struct sanityw), &sw, cr);
 		}
 
@@ -231,7 +236,7 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 		 * is.
 		 */
 		if (gapsize*512 < filesize)
-			BFS_CCT_WRITE(bs->bsup_devnode,BFS_SANITYWSTART,
+			BFS_CCT_WRITE(bs->bsup_devnode,BFS_COMPACTSTART,
 			  sizeof(w4fsck), w4fsck, cr);
 	}
 
@@ -240,7 +245,7 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 	 */
 	dir->d_sblock -= gapsize;
 	dir->d_eblock -= gapsize;
-	BFS_PUTINODE(bs->bsup_devnode, offset, dir,cr);
+	BFS_CCT_PUTINODE(bs->bsup_devnode, offset, dir,cr);
 
 	/*
 	 * Must write "-1" to all 4 sanity words for fsck to denote that
@@ -250,11 +255,61 @@ bfs_shiftfile(bs, dir, gapsize, offset, cr)
 	sw.toblock = -1;
 	sw.bfromblock = -1;
 	sw.btoblock = -1;
-	BFS_CCT_WRITE(bs->bsup_devnode,BFS_SANITYWSTART,
+	BFS_CCT_WRITE(bs->bsup_devnode,BFS_COMPACTSTART,
 	  sizeof(struct sanityw), &sw, cr);
 #ifdef DEBUG
-	if (bfs_debugcomp)
-		cmn_err(CE_CONT,"File shifted\n");
+	cmn_err(CE_CONT,"File shifted\n");
 #endif
+	return 0;
+}
+
+/*
+ * Function to write fsck sanity words.
+ */
+int
+bfs_csanity(bvp, sanityno, value, cr)
+	struct vnode *bvp;
+	short sanityno;
+	long value;
+	struct cred *cr;
+{
+	BFS_CCT_WRITE(bvp, BFS_COMPACTSTART + ((sanityno-1)*sizeof(long)), 
+		      sizeof(long), &value, cr);
+	return 0;
+}
+
+/*
+ * The following functions are for use when compaction is being done from
+ * user mode.
+ */
+#ifndef _KERNEL
+int
+seek_read(fd, offset, len, buf)
+	int fd;
+	off_t offset;
+	long len;
+	char *buf;
+{
+	lseek(fd, offset, 0);
+	read(fd, buf, len);
+	return 0;
+}
+
+int
+seek_write(fd, offset, len, buf)
+	int fd;
+	off_t offset;
+	long len;
+	char *buf;
+{
+	lseek(fd, offset, 0);
+	write(fd, buf, len);
+	return 0;
+}
+#endif
+
+int
+bfs_donothing()
+{
 	return 0;
 }

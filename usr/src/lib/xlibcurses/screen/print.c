@@ -5,13 +5,12 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/print.c	1.11"
+#ident	"@(#)curses:screen/print.c	1.9"
 
 #include "curses.h"
 #include "print.h"
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
 
-#ifdef SIGSTOP	/* SVR4.0 and beyond */
+#ifdef __STDC__
 #define	_ULIBTI	"/usr/share/lib/terminfo"
 #else
 #define	_ULIBTI	"/usr/lib/terminfo"
@@ -165,7 +164,11 @@ register char *term, *synonyms;
 				/* 
 					All hope is lost 
 				*/
-				fprintf(stderr, "Error: Term \"%s\" not found in %s or %s\n", term, _ULIBTI, getenv("TERMINFO"));
+#ifdef __STDC__
+				fprintf(stderr, "Error: Term \"%s\" not found in /usr/share/lib/terminfo or %s\n", term, getenv("TERMINFO"));
+#else
+				fprintf(stderr, "Error: Term \"%s\" not found in /usr/lib/terminfo or %s\n", term, getenv("TERMINFO"));
+#endif
 			} else do_print = 1;
 		}
 	} else do_print = 1;

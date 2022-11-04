@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/s5/s5alloc.c	1.33"
+#ident	"@(#)fs:fs/s5/s5alloc.c	1.29"
 #include "sys/types.h"
 #include "sys/buf.h"
 #include "sys/cmn_err.h"
@@ -28,8 +28,8 @@
 
 #include "vm/pvn.h"
 
-#include "sys/proc.h"
-#include "sys/disp.h"
+#include "sys/proc.h"	/* XXX -- needed for user-context kludge in ILOCK */
+#include "sys/disp.h"	/* XXX */
 
 #include "sys/fs/s5param.h"
 #include "sys/fs/s5fblk.h"
@@ -88,7 +88,7 @@ blkalloc(vfsp, bnp)
 		bp->b_flags |= B_STALE|B_AGE;
 		brelse(bp);
 		fp->s_flock = 0;
-		wakeprocs((caddr_t)&fp->s_flock, PRMPT);
+		wakeup((caddr_t)&fp->s_flock);
 	}
 	if (fp->s_nfree <= 0 || fp->s_nfree > NICFREE) {
 		prdev("Bad free count", dev);
@@ -140,7 +140,7 @@ blkfree(vfsp, bno)
 		fp->s_nfree = 0;
 		bdwrite(bp);
 		fp->s_flock = 0;
-		wakeprocs((caddr_t)&fp->s_flock, PRMPT);
+		wakeup((caddr_t)&fp->s_flock);
 	} else if (incore(dev, bno, bsize)) {
 		/*
 		 * There may be a leftover in-core buffer for this block;
@@ -221,7 +221,7 @@ loop1:
 	if (fp->s_ninode > 0 && (ino = fp->s_inode[--fp->s_ninode])) {
 		if (error = iget(vfsp, ino, &ip)) {
 			fp->s_ilock = 0;
-			wakeprocs(&fp->s_ilock, PRMPT);
+			wakeup(&fp->s_ilock);
 			return error;
 		}
 		vp = ITOV(ip);
@@ -249,21 +249,21 @@ loop1:
 				ip->i_major = getemajor(rdev);
 				ip->i_minor = geteminor(rdev);
 				ip->i_bcflag |= NDEVFORMAT;
-				/*
-				 * To preserve backward compatibility we store
-				 * dev in old format if it fits, otherwise
-				 * NODEV is assigned.
-				 */
+
+				/* to preserve backward compatibility we store
+				** dev in old format if it fits, otherwise
+				** NODEV is assigned.
+				*/
+
 				if ((oldrdev = cmpdev(rdev)) != (o_dev_t) NODEV)
 					ip->i_oldrdev = (daddr_t)oldrdev;
 				else
 					ip->i_oldrdev = (daddr_t)NODEV;
 
 			} else if (type == VXNAM) {
-				/*
-				 * Believe it or not. XENIX stores 
-				 * semaphore info in rdev.
-				 */
+				/* Believe it or not XENIX stores 
+				** semaphore info in rdev.
+				*/
 				ip->i_rdev = rdev;
 				ip->i_oldrdev = rdev; /* need this for iupdat */
 			}
@@ -274,7 +274,7 @@ loop1:
 			fp->s_fmod = 1;
 			iupdat(ip);
 			fp->s_ilock = 0;
-			wakeprocs(&fp->s_ilock, PRMPT);
+			wakeup(&fp->s_ilock);
 			*ipp = ip;
 			return 0;
 		}
@@ -284,7 +284,7 @@ loop1:
 		cmn_err(CE_NOTE, "ialloc: inode was already allocated\n");
 		iupdat(ip);
 		fp->s_ilock = 0;
-		wakeprocs(&fp->s_ilock, PRMPT);
+		wakeup(&fp->s_ilock);
 		iput(ip);
 		goto loop;
 	}
@@ -326,7 +326,7 @@ loop1:
 	fp->s_ninode = 0;
 	fp->s_tinode = 0;
 	fp->s_ilock = 0;
-	wakeprocs((caddr_t)&fp->s_ilock, PRMPT);
+	wakeup((caddr_t)&fp->s_ilock);
 	prdev("Out of inodes", dev);
 	return ENOSPC;
 }
@@ -344,9 +344,7 @@ ifree(ip)
 	register struct vnode *vp = ITOV(ip);
 
 	ASSERT(ip->i_flag & ILOCKED);
-	/*
-	 * Don't put an already free inode on the free list.
-	 */
+	/* Don't put an already free inode on the free list. */
 	if (ip->i_mode == 0)
 		return 0;
 	ino = ip->i_number;
@@ -369,7 +367,7 @@ ifree(ip)
 	} else
 		fp->s_inode[fp->s_ninode++] = ino;
 	fp->s_ilock--;
-	wakeprocs((caddr_t)&fp->s_ilock, PRMPT);
+	wakeup((caddr_t)&fp->s_ilock);
 	return 0;
 }
 
@@ -427,35 +425,6 @@ s5freesp(vp, lp, flag)
 	s5vfsp = S5VFS(vfsp);
 	nindir = s5vfsp->vfs_nindir;
 
-	/*
-	 * Check if there is any active mandatory lock on the
-	 * range that will be truncated/expanded.
-	 */
-	if (MANDLOCK(vp, ip->i_mode)) {
-		int save_start;
-
-		save_start = lp->l_start;
-
-		if (ip->i_size < lp->l_start) {
-			/*
-			 * "Truncate up" case: need to make sure there
-			 * is no lock beyond current end-of-file. To
-			 * do so, we need to set l_start to the size
-			 * of the file temporarily.
-			 */
-			lp->l_start = ip->i_size;
-		}
-		lp->l_type = F_WRLCK;
-		lp->l_sysid = u.u_procp->p_sysid;
-		lp->l_pid = u.u_procp->p_epid;
-		i = (flag & (FNDELAY|FNONBLOCK)) ? 0 : SLPFLCK;
-		if ((i = reclock(vp, lp, i, 0, lp->l_start)) != 0
-		  || lp->l_type != F_UNLCK)
-			return i ? i : EAGAIN;
-
-		lp->l_start = save_start;
-	}
-
 	if (ip->i_size < lp->l_start) {
 		/*
 		 * "Truncate up" case: the file is grown to the size
@@ -467,7 +436,7 @@ s5freesp(vp, lp, flag)
 		ILOCK(ip);
 		if (ip->i_map)
 			s5freemap(ip);
-		if (error = bmapalloc(ip, lastblock, lastblock, 0)) {
+		if (error = bmapalloc(ip, lastblock, lastblock, 0, 0)) {
 			IUNLOCK(ip);
 			return error;
 		}
@@ -476,6 +445,20 @@ s5freesp(vp, lp, flag)
 		ITIMES(ip);
 		IUNLOCK(ip);
 		return 0;
+	}
+
+	/*
+	 * Truncation honors mandatory record locking protocol
+	 * exactly as writing does.
+	 */
+	if (MANDLOCK(vp, ip->i_mode)) {
+		lp->l_type = F_WRLCK;
+		lp->l_sysid = u.u_procp->p_sysid;
+		lp->l_pid = u.u_procp->p_epid;
+		i = (flag & (FNDELAY|FNONBLOCK)) ? 0 : SLPFLCK;
+		if ((i = reclock(vp, lp, i, 0, lp->l_start)) != 0
+		  || lp->l_type != F_UNLCK)
+			return i ? i : EAGAIN;
 	}
 
 	ILOCK(ip);
@@ -496,7 +479,7 @@ s5freesp(vp, lp, flag)
 	 * of subsequent file growth.
 	 */
 	pvn_vptrunc(vp, lp->l_start,
-	  (u_int)(bsize - (lp->l_start & s5vfsp->vfs_bmask)));
+	  (uint)(bsize - (lp->l_start & s5vfsp->vfs_bmask)));
 
 	/*
 	 * Calculate index into inode's block list of last block

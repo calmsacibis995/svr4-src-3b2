@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:clnt_generic.c	1.3"
+#ident	"@(#)librpc:clnt_generic.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -43,8 +43,8 @@ static char sccsid[] = "@(#)clnt_generic.c 1.32 89/03/16 Copyr 1988 Sun Micro";
 
 extern int errno;
 extern int t_errno;
+
 extern char *strdup();
-extern char *malloc();
 
 /*
  * Top level client creation routine.
@@ -71,6 +71,7 @@ clnt_create(hostname, prog, vers, nettype)
 	int net;
 
 	if ((net = _rpc_setconf(nettype)) == 0) {
+	printf("CLNT_GENERIC, _rpc_setconf failed\n");
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 		return ((CLIENT *)NULL);
 	}
@@ -78,6 +79,7 @@ clnt_create(hostname, prog, vers, nettype)
 	while (clnt == (CLIENT *)NULL) {
 		if ((nconf = _rpc_getconf(net)) == (struct netconfig *)NULL) {
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
+	printf("CLNT_GENERIC, _rpc_getconf failed\n");
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 			break;
 		}
@@ -108,6 +110,7 @@ clnt_tp_create(hostname, prog, vers, nconf)
 	int fd;					/* end point descriptor */
 
 	if (nconf == (struct netconfig *)NULL) {
+	printf("CLNT_GENERIC, nconf NULL\n");
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 		return ((CLIENT *)NULL);
 	}
@@ -172,6 +175,7 @@ clnt_tli_create(fd, nconf, svcaddr, prog, vers, sendsz, recvsz)
 
 	if (fd == RPC_ANYFD) {
 		if (nconf == (struct netconfig *)NULL) {
+	printf("CLNT_GENERIC, nconf NULL\n");
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 			return ((CLIENT *)NULL);
 		}

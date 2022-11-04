@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/xnamfs/xnamvnops.c	1.12.1.6"
+#ident	"@(#)fs:fs/xnamfs/xnamvnops.c	1.12.1.4"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/systm.h"
@@ -55,6 +55,7 @@ STATIC int xnam_close();
 STATIC int xnam_getattr();
 STATIC int xnam_setattr();
 STATIC int xnam_access();
+STATIC int xnam_link();
 STATIC int xnam_fsync();
 STATIC void xnam_inactive();
 STATIC int xnam_fid();
@@ -74,7 +75,7 @@ struct vnodeops xnam_vnodeops = {
 	fs_nosys,	/* lookup */
 	fs_nosys,	/* create */
 	fs_nosys,	/* remove */
-	fs_nosys,	/* link */
+	xnam_link,	/* link */
 	fs_nosys,	/* rename */
 	fs_nosys,	/* mkdir */
 	fs_nosys,	/* rmdir */
@@ -98,32 +99,7 @@ struct vnodeops xnam_vnodeops = {
 	fs_nosys,	/* delmap */
 	fs_nosys,	/* poll */
 	fs_nosys,	/* dump */
-	fs_pathconf,
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -233,6 +209,16 @@ xnam_access(vp, mode, flags, cr)
 	struct cred *cr;
 {
 	return VOP_ACCESS(VTOXNAM(vp)->x_realvp, mode, flags, cr);
+}
+
+STATIC int
+xnam_link(tdvp, vp, tnm, cr)
+	struct vnode *tdvp;
+	struct vnode *vp;
+	char *tnm;
+	struct cred *cr;
+{
+	return VOP_LINK(tdvp, VTOXNAM(vp)->x_realvp, tnm, cr);
 }
 
 STATIC int

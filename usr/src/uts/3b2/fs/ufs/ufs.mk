@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/ufs/ufs.mk	1.12"
+#ident	"@(#)fs:fs/ufs/ufs.mk	1.10"
 
 ROOT =
 STRIP = strip
@@ -175,13 +175,11 @@ quota_ufs.L: quota_ufs.c \
 
 ufs_alloc.o: ufs_alloc.c \
         $(INC)/sys/types.h \
-        $(INC)/sys/debug.h \
         $(INC)/sys/param.h \
         $(INC)/sys/systm.h \
         $(INC)/sys/signal.h \
         $(INC)/sys/cred.h \
         $(INC)/sys/proc.h \
-        $(INC)/sys/disp.h \
         $(INC)/sys/user.h \
         $(INC)/sys/buf.h \
         $(INC)/sys/vfs.h \
@@ -192,22 +190,16 @@ ufs_alloc.o: ufs_alloc.c \
         $(INC)/sys/errno.h \
 	$(INC)/sys/time.h \
         $(INC)/sys/sysmacros.h \
-	$(INC)/sys/file.h \
-	$(INC)/sys/fcntl.h \
-	$(INC)/sys/flock.h \
-	$(INC)/fs/fs_subr.h \
-	$(INC)/sys/cmn_err.h
+	$(INC)/fs/fs_subr.h
 	${CC} -c ${CFLAGS} ufs_alloc.c
  
 ufs_alloc.L: ufs_alloc.c \
         $(INC)/sys/types.h \
-        $(INC)/sys/debug.h \
         $(INC)/sys/param.h \
         $(INC)/sys/systm.h \
         $(INC)/sys/signal.h \
         $(INC)/sys/cred.h \
         $(INC)/sys/proc.h \
-        $(INC)/sys/disp.h \
         $(INC)/sys/user.h \
         $(INC)/sys/buf.h \
         $(INC)/sys/vfs.h \
@@ -216,13 +208,9 @@ ufs_alloc.L: ufs_alloc.c \
         $(INC)/sys/fs/ufs_inode.h \
         $(INC)/sys/fs/ufs_quota.h \
         $(INC)/sys/errno.h \
-	$(INC)/sys/time.h \
+ 	$(INC)/sys/time.h \
         $(INC)/sys/sysmacros.h \
-	$(INC)/sys/file.h \
-	$(INC)/sys/fcntl.h \
-	$(INC)/sys/flock.h \
-	$(INC)/fs/fs_subr.h \
-	$(INC)/sys/cmn_err.h
+	$(INC)/fs/fs_subr.h
 	@echo ufs_alloc.c:
 	@-(${CPP} ${LCOPTS} ufs_alloc.c | \
 	  ${LINT1} ${LOPTS} > ufs_alloc.L ) 2>&1 | ${LTAIL}

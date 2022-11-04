@@ -8,7 +8,7 @@
 #ifndef	_NET_IF_H
 #define	_NET_IF_H
 
-#ident	"@(#)head.sys:sys/net/if.h	1.3"
+#ident	"@(#)head.sys:sys/net/if.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -68,7 +68,7 @@
  * (Would like to call this struct ``if'', but C isn't PL/1.)
  */
 struct ifnet {
-	char	*if_name;		/* name, e.g. ``emd'' or ``lo'' */
+	char	*if_name;		/* name, e.g. ``en'' or ``lo'' */
 	short	if_unit;		/* sub-unit for lower level driver */
 	short	if_mtu;			/* maximum transmission unit */
 	short	if_flags;		/* up/down, broadcast, etc. */
@@ -236,7 +236,7 @@ struct ifaddr {
  */
 struct	ifreq {
 #define	IFNAMSIZ	16
-	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "emd1" */
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
 	union {
 		struct	sockaddr ifru_addr;
 		struct	sockaddr ifru_dstaddr;

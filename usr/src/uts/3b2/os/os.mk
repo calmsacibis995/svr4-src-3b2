@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)kernel:os/os.mk	1.62"
+#ident	"@(#)kernel:os/os.mk	1.59.1.9"
 
 ROOT = 
 STRIP = strip
@@ -23,7 +23,6 @@ FILES = \
 	$(LIBNAME)(bio.o) \
 	$(LIBNAME)(bitmap.o) \
 	$(LIBNAME)(bitmasks.o) \
-	$(LIBNAME)(predki.o) \
 	$(LIBNAME)(clock.o) \
 	$(LIBNAME)(cmn_err.o) \
 	$(LIBNAME)(core.o) \
@@ -46,7 +45,6 @@ FILES = \
 	$(LIBNAME)(malloc.o) \
 	$(LIBNAME)(move.o) \
 	$(LIBNAME)(pgrp.o) \
-	$(LIBNAME)(pid.o) \
 	$(LIBNAME)(pipe.o) \
 	$(LIBNAME)(procset.o) \
 	$(LIBNAME)(scalls.o) \
@@ -367,26 +365,6 @@ $(LIBNAME)(bitmap.o): bitmap.c \
 $(LIBNAME)(bitmasks.o): bitmasks.c \
 	$(FRC)
 
-$(LIBNAME)(predki.o): predki.c \
-	$(INC)/sys/types.h \
-	$(INC)/sys/param.h \
-	$(INC)/sys/sbd.h \
-	$(INC)/sys/conf.h \
-	$(INC)/sys/systm.h \
-	$(INC)/sys/errno.h \
-	$(INC)/sys/debug.h \
-	$(INC)/sys/user.h \
-	$(INC)/sys/buf.h \
-	$(INC)/sys/iobuf.h \
-	$(INC)/sys/var.h \
-	$(INC)/sys/vnode.h \
-	$(INC)/sys/cmn_err.h \
-	$(INC)/vm/page.h \
-	$(INC)/sys/cred.h \
-	$(INC)/sys/uio.h \
-	$(INC)/sys/ddi.h \
-	$(FRC)
-
 $(LIBNAME)(clock.o): clock.c \
 	$(INC)/sys/param.h \
 	$(INC)/sys/types.h \
@@ -473,7 +451,6 @@ $(LIBNAME)(core.o): core.c \
 	$(INC)/sys/uio.h \
 	$(INC)/sys/exec.h \
 	$(INC)/sys/mman.h \
-	$(INC)/sys/file.h \
 	$(INC)/vm/as.h \
 	$(FRC)
 
@@ -991,28 +968,6 @@ $(LIBNAME)(pgrp.o): pgrp.c \
 	$(INC)/sys/strsubr.h \
 	$(FRC)
 
-$(LIBNAME)(pid.o): pid.c \
-	$(INC)/sys/file.h \
-	$(INC)/sys/vfs.h \
-	$(INC)/sys/vnode.h \
-	$(INC)/sys/types.h \
-	$(INC)/sys/param.h \
-	$(INC)/sys/sysmacros.h \
-	$(INC)/sys/session.h \
-	$(INC)/sys/debug.h \
-	$(INC)/sys/proc.h \
-	$(INC)/sys/kmem.h \
-	$(INC)/sys/tuneable.h \
-	$(INC)/sys/inline.h \
-	$(INC)/sys/var.h \
-	$(INC)/sys/debug.h \
-	$(INC)/sys/cmn_err.h \
-	$(INC)/sys/cred.h \
-	$(INC)/sys/user.h \
-	$(INC)/sys/systm.h \
-	$(INC)/sys/sysinfo.h \
-	$(FRC)
-
 $(LIBNAME)(pipe.o): pipe.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/sysmacros.h \
@@ -1113,7 +1068,6 @@ $(LIBNAME)(scalls.o): scalls.c \
 	$(INC)/sys/hrtcntl.h \
 	$(INC)/sys/disp.h \
 	$(INC)/sys/systeminfo.h \
-	$(INC)/sys/unistd.h \
 	$(INC)/vm/hat.h \
 	$(INC)/vm/as.h \
 	$(INC)/vm/seg.h \
@@ -1294,7 +1248,6 @@ $(LIBNAME)(startup.o): startup.c \
 	$(INC)/vm/seg_u.h \
 	$(INC)/vm/seg_map.h \
 	$(INC)/vm/page.h \
-	$(INC)/vm/bootconf.h \
 	$(FRC)
 
 $(LIBNAME)(streamio.o): streamio.c \

@@ -1,6 +1,6 @@
 /dev/null
 3226 416
-d--755 0 3
+d--775 0 3
 	unix		---500 0 0	../COREunix
 	dgmon		---500 0 0	../init/fwnull
 	filledt		---500 0 0	../filledt
@@ -118,18 +118,16 @@ d--755 0 3
 			c1d1se		c--600 0 3	17 30
 			c1d1sf		c--600 0 3	17 31
 		$
-		rroot		c--600 0 3	17 0
 		root		b--600 0 3	17 0
 		tty		c--666 0 3	20 0
-		fd		d--555 0 0
-		$
 	$
 	tmp	d--777 4 4
 		$
 	etc	d--775 0 3
 		TIMEZONE	---444 0 3	../etc/TIMEZONE
+		init		---555 0 2	../etc/init
 		inittab		---664 0 3	inst/etc/inittabf
-		iu.ap		---644 0 3	../etc/iu.ap
+		iu.ap		---664 0 3	../etc/iu.ap
 		mnttab		---644 0 2	/dev/null
 		group		---644 0 3	../etc/group
 		passwd		---644 0 3	../etc/passwd
@@ -144,9 +142,6 @@ d--755 0 3
 				fsck	---555 2 2	../etc/fs/s5/fsck
 				mkfs	---555 2 2	../etc/fs/s5/mkfs
 				mount	---555 2 2	../etc/fs/s5/mount
-			$
-			fd	d--775 0 3
-				mount	---555 2 2	../etc/fs/fd/mount
 			$
 		$
 	$
@@ -172,18 +167,10 @@ d--755 0 3
 		$
 		etc	d--775 0 3
 			define		---444 2 2	inst/etc/define
-			define.min	---444 2 2	inst/etc/define.min
 			do_setup	---444 2 2	inst/etc/do_setup
 			inittabh	---444 2 2	inst/etc/inittabh
-			inittabl	---444 2 2	inst/etc/inittabl
-			inittabt	---444 2 2	inst/etc/inittabt
-			inittabht	---444 2 2	inst/etc/inittabht
 			instf		---555 2 2	inst/etc/instf
-			asktype		---555 2 2	inst/etc/asktype
-			instl		---555 2 2	inst/etc/instl
-			instt		---555 2 2	inst/etc/instt
 			instth		---555 2 2	inst/etc/instth
-			instht		---555 2 2	inst/etc/instht
 			insth		---555 2 2	inst/etc/insth
 			p_check		---555 2 2	inst/etc/p_check
 		$
@@ -203,13 +190,12 @@ d--755 0 3
 		root	d--775 0 3
 		$
 	$
-	sbin	d--775 0 3
-		init		---555 0 2	../sbin/init
+	sbin	d--775 0 2
 		fmthard		---555 0 0	../sbin/fmthard
 		uadmin		---555 0 3	../sbin/uadmin
 		sh		---555 2 0	../sbin/sh
 		sync		---555 2 2	../sbin/sync
-		autopush	---555 0 3	../sbin/autopush
+		autopush	---555 2 0	../sbin/autopush
 		umount		---555 2 2	../sbin/umount
 	$
 	usr	d--775 0 3
@@ -260,4 +246,4 @@ d--755 0 3
 	bin 	d--775 0 3
 	$
 $
-:#ident	"@(#)core:proto.core1	1.15.4.6"
+:#ident	"@(#)core:proto.core1	1.15.3.5"

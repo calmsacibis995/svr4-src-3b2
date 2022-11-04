@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/lsearch.c	1.16"
+#ident	"@(#)libc-port:gen/lsearch.c	1.15"
 /*LINTLIBRARY*/
 /*
  * Linear search algorithm, generalized from Knuth (6.1) Algorithm Q.
@@ -29,7 +29,7 @@
 VOID * 
 lsearch(ky, bs, nelp, width, compar)
 const VOID *ky;			/* Key to be located */
-VOID *bs;			/* Beginning of table */
+register const VOID *bs;	/* Beginning of table */
 size_t *nelp;			/* Pointer to current table size */
 register size_t width;		/* Width of an element (bytes) */
 int (*compar)();		/* Comparison function */

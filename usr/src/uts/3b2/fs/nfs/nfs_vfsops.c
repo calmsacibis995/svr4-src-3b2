@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/nfs/nfs_vfsops.c	1.15"
+#ident	"@(#)fs:fs/nfs/nfs_vfsops.c	1.10"
 
 /*	@(#)nfs_vfsops.c 2.91 88/10/17 SMI 	*/
 
@@ -27,7 +27,7 @@
  *  	          All rights reserved.
  */
 
-#define	NFSCLIENT
+#define NFSCLIENT
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -39,6 +39,8 @@
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/uio.h>
+#include <sys/socket.h>
+/* #include <sys/socketvar.h> */
 #include <sys/tiuser.h>
 #include <sys/sysmacros.h>
 #include <sys/kmem.h>
@@ -47,6 +49,7 @@
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
 #include <rpc/clnt.h>
+#include <rpc/pmap_prot.h>
 #include <nfs/nfs.h>
 #include <nfs/nfs_clnt.h>
 #include <nfs/rnode.h>
@@ -58,13 +61,15 @@
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 
+#define	satosin(sa)	((struct sockaddr_in *)(sa))
+
 #ifdef NFSDEBUG
 extern int nfsdebug;
 #endif
 
 STATIC int nfsrootvp();
 extern struct vnode *makenfsnode();
-#define	MAPSIZE  (256/NBBY)
+#define MAPSIZE  256/NBBY
 static char nfs_minmap[MAPSIZE]; /* Map for minor device allocation */
 
 /*
@@ -90,13 +95,9 @@ struct vfsops nfs_vfsops = {
 	nfs_mountroot,
 	nfs_swapvp,
 	nfs_nosys,	/* filler */
-	nfs_nosys,
-	nfs_nosys,
-	nfs_nosys,
-	nfs_nosys,
-	nfs_nosys,
-	nfs_nosys,
-	nfs_nosys
+	nfs_nosys,	/*   "    */
+	nfs_nosys,	/*   "    */
+	nfs_nosys	/*   "    */
 };
 
 /*
@@ -120,120 +121,81 @@ nfsinit(vswp, fstyp)
  */
 /*ARGSUSED*/
 STATIC int
+/* nfs_mount(vfsp, special, path, flags, data, datalen, cred) */
 nfs_mount(vfsp, mvp, uap, cred)
 	struct vfs *vfsp;
 	struct vnode *mvp;
 	struct mounta *uap;
 	struct cred *cred;
 {
+	/* char *path = uap->dir; */
+	/* int flags = uap->flags; */
 	char *data = uap->dataptr;
 	int datalen = uap->datalen;
 	int error;
 	struct vnode *rtvp = NULL;	/* the server's root */
 	struct mntinfo *mi;		/* mount info, pointed at by vfs */
 	fhandle_t fh;			/* root fhandle */
-	struct nfs_args args;		/* nfs mount arguments */
-	struct netbuf addr;		/* server's address */
-	int hlen;			/* length of hostname */
+	struct sockaddr_in saddr;	/* server's address */
 	char shostname[HOSTNAMESZ];	/* server's hostname */
-	int nlen;			/* length of netname */
+	int hlen;			/* length of hostname */
 	char netname[MAXNETNAMELEN+1];	/* server's netname */
-	struct netbuf syncaddr;		/* AUTH_DES time sync addr */
-	struct knetconfig *knconf;	/* transport knetconfig structure */
+	int nlen;			/* length of netname */
+	struct nfs_args args;		/* nfs mount arguments */
+	struct netbuf addr;		/* TLI-converted saddr */
+	/* int fd; */			/* bound TLI fd */
 
 	/*
 	 * For now, ignore remount option.
 	 */
-	if (vfsp->vfs_flag & VFS_REMOUNT)
+	if (vfsp->vfs_flag & VFS_REMOUNT) {
 		return (0);
+	}
 
 	if (mvp->v_type != VDIR)
-		return (ENOTDIR);
+		return ENOTDIR;
 
-	/* make sure things are zeroed for errout: */
-	bzero((caddr_t) &addr, sizeof (addr));
-	bzero((caddr_t) &syncaddr, sizeof (syncaddr));
+	/*
+	 *	XXX - why is this not a generic function?
+	 *  XXX - it is now.
+	 */
+	/*
+	 *	if (flags & MS_RDONLY)
+	 *		vfsp->vfs_flag |= VFS_RDONLY;
+	 */
 
 	/*
 	 * get arguments
 	 */
-	if (datalen != sizeof (args))
-		return (EINVAL);
+	if (datalen != sizeof(args))
+		error = EINVAL;
 	else
-		if (copyin(data, (caddr_t)&args, sizeof (args)))
-			return (EFAULT);
-
-	/*
-	 * A valid knetconfig structure is required.
-	 */
-	if (args.flags & NFSMNT_KNCONF) {
-		/*
-		 *	Allocate space for a knetconfig structure and
-		 *	its strings and copy in from user-land.
-		 */
-		knconf = (struct knetconfig *)
-		    kmem_alloc(sizeof (struct knetconfig), KM_SLEEP);
-		if (copyin((caddr_t) args.knconf, (caddr_t) knconf,
-			sizeof (struct knetconfig)) == -1) {
-			kmem_free(knconf, sizeof (struct knetconfig));
-			return (EFAULT);
-		} else {
-			size_t nmoved_tmp;
-			char *p, *pf;
-
-			pf = (char *) kmem_alloc(KNC_STRSIZE, KM_SLEEP);
-			p = (char *) kmem_alloc(KNC_STRSIZE, KM_SLEEP);
-			error = copyinstr((caddr_t) knconf->knc_protofmly, pf,
-				KNC_STRSIZE, &nmoved_tmp);
-			if (!error) {
-				error = copyinstr((caddr_t) knconf->knc_proto,
-				    p, KNC_STRSIZE, &nmoved_tmp);
-				if (!error) {
-					knconf->knc_protofmly = pf;
-					knconf->knc_proto = p;
-				} else {
-					kmem_free(pf, KNC_STRSIZE);
-					kmem_free(p, KNC_STRSIZE);
-					kmem_free(knconf,
-					    sizeof (struct knetconfig));
-					return (error);
-				}
-			} else {
-				kmem_free(pf, KNC_STRSIZE);
-				kmem_free(p, KNC_STRSIZE);
-				kmem_free(knconf, sizeof (struct knetconfig));
-				return (error);
-			}
-		}
-	} else
-		return (EINVAL);
+		error = copyin(data, (caddr_t)&args, sizeof (args));
+	if (error) {
+		goto errout;
+	}
 
 	/*
 	 * Get server address
 	 */
-	if (copyin((caddr_t) args.addr, (caddr_t) &addr,
-		sizeof (struct netbuf))) {
-		addr.buf = (char *) NULL;
-		error = EFAULT;
-	} else {
-		char *userbufptr = addr.buf;
-
-		addr.buf = kmem_alloc(addr.len, KM_SLEEP);
-		addr.maxlen = addr.len;
-		if (copyin(userbufptr, addr.buf, addr.len)) {
-			kmem_free(addr.buf, addr.len);
-			addr.buf = (char *) NULL;
-			error = EFAULT;
-		}
-	}
-	if (error)
+	error = copyin((caddr_t)args.addr, (caddr_t)&saddr,
+	    sizeof (saddr));
+	if (error) {
 		goto errout;
+	}
+	/*
+	 * For now we just support AF_INET
+	 */
+	if (saddr.sin_family != AF_INET) {
+		error = EPFNOSUPPORT;
+		goto errout;
+	}
 
 	/*
 	 * Get the root fhandle
 	 */
-	if (copyin((caddr_t)args.fh, (caddr_t)&fh, sizeof (fh))) {
-		error = EFAULT;
+	error = copyin((caddr_t)args.fh, (caddr_t)&fh, sizeof (fh));
+	if (error) {
 		goto errout;
 	}
 
@@ -247,62 +209,36 @@ nfs_mount(vfsp, mvp, uap, cred)
 			goto errout;
 		}
 	} else
-		(void) strncpy(shostname, "unknown-host", sizeof (shostname));
+		(void) strncpy(shostname, "unknown-host", sizeof(shostname));
+		
 
-
+	/*
+	 * Get server's netname
+	 */
 	if (args.flags & NFSMNT_SECURE) {
-		/*
-		 * If using AUTH_DES, get time sync netbuf ...
-		 */
-		if (args.syncaddr == (struct netbuf *) NULL)
-			error = EINVAL;
-		else {
-			if (copyin((caddr_t) args.syncaddr, (caddr_t) &syncaddr,
-				sizeof (struct netbuf))) {
-				syncaddr.buf = (char *) NULL;
-				error = EFAULT;
-			} else {
-				char *userbufptr = syncaddr.buf;
-
-				syncaddr.buf = kmem_alloc(syncaddr.len,
-				    KM_SLEEP);
-				syncaddr.maxlen = syncaddr.len;
-				if (copyin(userbufptr, syncaddr.buf,
-					syncaddr.len)) {
-					kmem_free(syncaddr.buf, syncaddr.len);
-					syncaddr.buf = (char *) NULL;
-					error = EFAULT;
-				}
-			}
-
-			/*
-			 * ... and server's netname
-			 */
-			if (!error)
-				error = copyinstr(args.netname, netname,
-					sizeof (netname), (u_int *) &nlen);
-		}
+		error = copyinstr(args.netname, netname, sizeof (netname),
+			(u_int *)&nlen);
 	} else {
 		nlen = -1;
 	}
-	if (error)
+
+	/*
+	 * Convert saddr to a netbuf
+	 */
+	if ((addr.buf = (char *) kmem_alloc(sizeof(saddr), KM_SLEEP)) == (char *) NULL) {
+		error = ENOMEM;
 		goto errout;
+	}
+	addr.maxlen = addr.len = sizeof(saddr);
+	bcopy((caddr_t) &saddr, addr.buf, sizeof(saddr));
 
 	/*
 	 * Get root vnode.
 	 */
-	error = nfsrootvp(&rtvp, vfsp, knconf, &addr, &syncaddr, &fh, shostname,
+	error = nfsrootvp(&rtvp, vfsp, args.tlidev, &addr, &fh, shostname,
 		netname, nlen, args.flags);
-	if (error) {
-		kmem_free(knconf->knc_protofmly, KNC_STRSIZE);
-		kmem_free(knconf->knc_proto, KNC_STRSIZE);
-		kmem_free(knconf, sizeof (struct knetconfig));
-		if (addr.buf)
-			kmem_free(addr.buf, addr.len);
-		if (syncaddr.buf)
-			kmem_free(syncaddr.buf, syncaddr.len);
+	if (error)
 		return (error);
-	}
 
 	/*
 	 * Set option fields in mount info record
@@ -397,6 +333,8 @@ nfs_mount(vfsp, mvp, uap, cred)
 			mi->mi_acdirmax = MIN(args.acdirmax, ACMAXMAX);
 		}
 	}
+	mi->mi_authflavor =
+		(args.flags & NFSMNT_SECURE) ? AUTH_DES : AUTH_UNIX;
 
 #ifdef NFSDEBUG
 	printf("nfs_mount: hard %d timeo %d retries %d wsize %d rsize %d\n",
@@ -411,24 +349,16 @@ errout:
 		if (rtvp) {
 			VN_RELE(rtvp);
 		}
-		kmem_free(knconf->knc_protofmly, KNC_STRSIZE);
-		kmem_free(knconf->knc_proto, KNC_STRSIZE);
-		kmem_free(knconf, sizeof (struct knetconfig));
-		if (addr.buf)
-			kmem_free(addr.buf, addr.len);
-		if (syncaddr.buf)
-			kmem_free(syncaddr.buf, syncaddr.len);
 	}
 	return (error);
 }
 
 STATIC int
-nfsrootvp(rtvpp, vfsp, kp, addr, syncaddr, fh, shostname, netname, nlen, flags)
+nfsrootvp(rtvpp, vfsp, dev, addr, fh, shostname, netname, nlen, flags)
 	struct vnode **rtvpp;		/* where to return root vp */
 	register struct vfs *vfsp;	/* vfs of fs, if NULL make one */
-	struct knetconfig *kp;		/* transport knetconfig structure */
+	dev_t dev;			/* TLI device number */
 	struct netbuf *addr;		/* server address */
-	struct netbuf *syncaddr;	/* AUTH_DES time sync address */
 	fhandle_t *fh;			/* swap file fhandle */
 	char *shostname;		/* server's hostname */
 	char *netname;			/* server's netname */
@@ -436,13 +366,13 @@ nfsrootvp(rtvpp, vfsp, kp, addr, syncaddr, fh, shostname, netname, nlen, flags)
 	int flags;			/* mount flags */
 {
 	register struct vnode *rtvp = NULL;	/* the server's root */
-	register struct mntinfo *mi = NULL;	/* mount info */
-						/* pointed at by vfs */
+	register struct mntinfo *mi = NULL;	/* mount info, pointed at by vfs */
 	struct vattr va;		/* root vnode attributes */
 	struct nfsfattr na;		/* root vnode attributes in nfs form */
 	struct statvfs sb;		/* server's file system stats */
 	register int error;
 	/* struct ifaddr *ifa; */
+	/* struct knetconfig *kp; */
 
 	/*
 	 * Create a mount record and link it to the vfs struct.
@@ -451,9 +381,14 @@ nfsrootvp(rtvpp, vfsp, kp, addr, syncaddr, fh, shostname, netname, nlen, flags)
 	mi->mi_hard = ((flags & NFSMNT_SOFT) == 0);
 	mi->mi_int = ((flags & NFSMNT_INT) != 0);
 	mi->mi_addr = *addr;
-	if (flags & NFSMNT_SECURE)
-		mi->mi_syncaddr = *syncaddr;
-	mi->mi_knetconfig = kp;
+	mi->mi_knetconfig = (struct knetconfig *) kmem_alloc(sizeof (struct knetconfig), KM_SLEEP);
+	mi->mi_knetconfig->nc_rdev = dev;
+	/*
+	 *	XXX
+	 *	Horrible kludge that shouldn't be here - pass in entire
+	 *	knetconfig structure instead.
+	 */
+	mi->mi_knetconfig->nc_protofmly = AF_INET;
 	mi->mi_retrans = NFS_RETRIES;
 	mi->mi_timeo = NFS_TIMEO;
 	mi->mi_mntno = vfs_getnum(nfs_minmap, MAPSIZE);
@@ -467,10 +402,20 @@ nfsrootvp(rtvpp, vfsp, kp, addr, syncaddr, fh, shostname, netname, nlen, flags)
 		mi->mi_netname = (char *)kmem_alloc((u_int)nlen, KM_SLEEP);
 		bcopy(netname, mi->mi_netname, (u_int)nlen);
 	}
-	mi->mi_authflavor = (flags & NFSMNT_SECURE) ?  AUTH_DES : AUTH_UNIX;
-	mi->mi_rpctimesync = (flags & NFSMNT_RPCTIMESYNC) ? 1 : 0;
 
+#ifdef	notdef
+	/*
+	 * Use heuristic to turn off transfer size adjustment
+	 */
+	ifa = ifa_ifwithdstaddr((struct sockaddr *)sin);
+	if (ifa == (struct ifaddr *)0)
+		ifa = ifa_ifwithnet((struct sockaddr *)sin);
+	mi->mi_dynamic = (ifa == (struct ifaddr *)0 ||
+	        ifa->ifa_ifp == (struct ifnet *)0 ||
+		ifa->ifa_ifp->if_mtu < ETHERMTU );
+#else /* notdef */
 	mi->mi_dynamic = 0;
+#endif	/* notdef */
 	/*
 	 * Make a vfs struct for nfs.  We do this here instead of below
 	 * because rtvp needs a vfs before we can do a getattr on it.
@@ -527,8 +472,7 @@ nfsrootvp(rtvpp, vfsp, kp, addr, syncaddr, fh, shostname, netname, nlen, flags)
 bad:
 	if (mi) {
 		if (mi->mi_netnamelen >= 0) {
-			kmem_free((caddr_t)mi->mi_netname,
-				(u_int)mi->mi_netnamelen);
+			kmem_free((caddr_t)mi->mi_netname, (u_int)mi->mi_netnamelen);
 		}
 		kmem_free((caddr_t)mi, sizeof (*mi));
 	}
@@ -551,7 +495,7 @@ nfs_unmount(vfsp, cr)
 	struct mntinfo *mi = (struct mntinfo *)vfsp->vfs_data;
 
 	if (!suser(cr))
-		return (EPERM);
+		return(EPERM);
 
 #ifdef NFSDEBUG
 	printf("nfs_unmount(%x) mi = %x\n", vfsp, mi);
@@ -562,25 +506,17 @@ nfs_unmount(vfsp, cr)
 	if (mi->mi_refct != 1 || mi->mi_rootvp->v_count != 1) {
 		return (EBUSY);
 	}
-	/*
-	 *	Release root vnode -- but first manually remove its identity
-	 *	and pages, since VN_RELE() might decide to hang onto them
-	 */
+	VN_RELE(mi->mi_rootvp);
 	/* LINTED pointer alignment */
 	rp_rmhash(vtor(mi->mi_rootvp));
 	/* LINTED pointer alignment */
 	rinactive(vtor(mi->mi_rootvp));
-	VN_RELE(mi->mi_rootvp);
 	vfs_putnum(nfs_minmap, mi->mi_mntno);
 	if (mi->mi_netnamelen >= 0) {
 		kmem_free((caddr_t)mi->mi_netname, (u_int)mi->mi_netnamelen);
 	}
-	kmem_free(mi->mi_addr.buf, mi->mi_addr.len);
-	if (mi->mi_authflavor == AUTH_DES)
-		kmem_free(mi->mi_syncaddr.buf, mi->mi_syncaddr.len);
-	kmem_free(mi->mi_knetconfig->knc_protofmly, KNC_STRSIZE);
-	kmem_free(mi->mi_knetconfig->knc_proto, KNC_STRSIZE);
-	kmem_free(mi->mi_knetconfig, sizeof (struct knetconfig));
+	kmem_free((caddr_t) mi->mi_addr.buf, mi->mi_addr.len);
+	kmem_free((caddr_t) mi->mi_knetconfig, sizeof(struct knetconfig));
 	kmem_free((caddr_t)mi, sizeof (*mi));
 	return (0);
 }
@@ -636,22 +572,23 @@ nfs_statvfs(vfsp, sbp)
 			mi->mi_curwrite = mi->mi_stsize;
 		}
 		sbp->f_bsize = fs.fs_bsize;
+		/* sbp->f_frsize = 0; */	/* XXX - does 0 mean unsupported? */
 		sbp->f_frsize = fs.fs_bsize;
 		sbp->f_blocks = fs.fs_blocks;
 		sbp->f_bfree = fs.fs_bfree;
 		sbp->f_bavail = fs.fs_bavail;
-		sbp->f_files = (u_long)-1;
-		sbp->f_ffree = (u_long)-1;
-		sbp->f_favail = (u_long)-1;
+		sbp->f_files = -1UL;
+		sbp->f_ffree = -1UL;
+#ifdef	notneeded
 		/*
-		 *	XXX - This is wrong, should be a real fsid
+		 * XXX - This is wrong, should be a real fsid
 		 */
-		bcopy((caddr_t)&vfsp->vfs_fsid, (caddr_t)&sbp->f_fsid,
-		    sizeof (fsid_t));
-		strncpy(sbp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name,
-			FSTYPSZ);
+		bcopy((caddr_t)&vfsp->vfs_fsid,
+		    (caddr_t)&sbp->f_fsid, sizeof (fsid_t));
+#endif
+		strncpy(sbp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name, FSTYPSZ);
 		sbp->f_flag = vf_to_stf(vfsp->vfs_flag);
-		sbp->f_namemax = (u_long)-1;
+		sbp->f_namemax = -1UL;
 	}
 #ifdef NFSDEBUG
 	printf("nfs_statvfs returning %d\n", error);
@@ -718,5 +655,5 @@ nfs_swapvp(vfsp, vpp, nm)
 STATIC int
 nfs_nosys()
 {
-	return (ENOSYS);
+	return(ENOSYS);
 }

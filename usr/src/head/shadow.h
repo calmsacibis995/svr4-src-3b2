@@ -1,11 +1,11 @@
-/*	Copyright (c) 1988 AT&T	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 /*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T	*/
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:shadow.h	1.2"
+#ident	"@(#)head.usr:shadow.h	1.2"
 
 #define PASSWD 		"/etc/passwd"
 #define SHADOW		"/etc/shadow"
@@ -33,7 +33,7 @@ struct spwd {
 	long sp_warn ; /* number of days to warn user to change passwd */
 	long sp_inact ; /* number of days the login may be inactive */
 	long sp_expire ; /* date when the login is no longer valid */
-	unsigned long  sp_flag; /* currently not being used */
+	int  sp_flag; /* currently not being used */
 } ;
 
 #if defined(__STDC__)

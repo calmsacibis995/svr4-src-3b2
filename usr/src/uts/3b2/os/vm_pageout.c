@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)kernel:os/vm_pageout.c	1.18"
+#ident	"@(#)kernel:os/vm_pageout.c	1.14"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -209,7 +186,7 @@ schedpaging()
 			nz(lotsfree) / RATETOSCHEDPAGING;
 	if (freemem < lotsfree) {
 		trace1(TR_PAGEOUT_CALL, 3);
-		wakeprocs((caddr_t)proc_pageout, PRMPT);
+		wakeup((caddr_t)nproc[2]);
 	}
 	timeout(schedpaging, (caddr_t)0, HZ / RATETOSCHEDPAGING);
 }
@@ -277,7 +254,7 @@ loop:
 		goto loop;
 	}
 	pageout_asleep = 1;
-	(void) sleep((caddr_t)proc_pageout, PSWP+1);
+	(void) sleep((caddr_t)nproc[2], PSWP+1);
 	pageout_asleep = 0;
 	(void) spl0();
 	if (!dopageout) goto loop;
@@ -332,7 +309,7 @@ pageout()
 {
 
 	for(;;) {
-		(void) sleep((caddr_t)proc_pageout, PSWP+1);
+		(void) sleep((caddr_t)nproc[2], PSWP+1);
 loop:
 		/*
 		 * XXX:	Add trace points to the loop below.
@@ -510,7 +487,7 @@ swdone(bp)
 		if (pp) {
 			do {
 				if (pp->p_want) {
-					wakeprocs((caddr_t)pp, PRMPT);
+					wakeup((caddr_t)pp);
 					pp->p_want = 0;
 					break;
 				}
@@ -523,7 +500,7 @@ swdone(bp)
  */
 	if ((bp->b_flags & B_PHYS)
 	    && pfreecnt == 0 && (pfreelist.b_flags & B_WANTED))
-		wakeprocs((caddr_t)&pfreelist, PRMPT);
+		wakeup((caddr_t)&pfreelist);
 }
 
 /*

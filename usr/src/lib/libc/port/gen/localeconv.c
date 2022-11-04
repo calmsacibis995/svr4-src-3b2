@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/localeconv.c	1.6"
+#ident	"@(#)libc-port:gen/localeconv.c	1.5"
 #include "synonyms.h"
 #include "shlib.h"
 #include <locale.h>
@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <osfcn.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 

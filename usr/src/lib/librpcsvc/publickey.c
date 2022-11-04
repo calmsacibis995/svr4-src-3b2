@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpcsvc:publickey.c	1.2"
+#ident	"@(#)librpcsvc:publickey.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -96,7 +95,7 @@ getpublicandprivatekey(key, ret)
 		if (res[0] == '#')
 			continue;
 		else if (res[0] == '+') {
-#ifdef YP
+#ifdef TRYYP
 			char *PKMAP = "publickey.byname";
 			char *lookup;
 			char *domain;
@@ -120,14 +119,13 @@ getpublicandprivatekey(key, ret)
 			fclose(fd);
 			free(lookup);
 			return (2);
-#else /* YP */
+#else /* TRYYP */
 #ifdef DEBUG
 			fprintf(stderr,
-"Bad record in %s '+' -- yp not supported in this library copy\n",
-				PKFILE);
+"Bad record in %s '+' -- yp not supported in this library copy\n", PKFILE);
 #endif /* DEBUG */
 			continue;
-#endif /* YP */
+#endif /* TRYYP */
 		} else {
 			mkey = strtok(buf, "\t ");
 			if (mkey == NULL) {

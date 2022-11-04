@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/putw.c	1.11"
+#ident	"@(#)libc-port:stdio/putw.c	1.10"
 /*	3.0 SID #	1.2	*/
 /*LINTLIBRARY*/
 /*
@@ -28,7 +28,7 @@ putw(w, stream)
 	register char *s = (char *)&w;
 	register int i = sizeof(int);
 
-	while (--i >= 0 && putc(*s++, stream) != EOF)
-		;
+	while (--i >= 0)
+		(void) putc (*s++, stream);
 	return stream->_flag & _IOERR;
 }

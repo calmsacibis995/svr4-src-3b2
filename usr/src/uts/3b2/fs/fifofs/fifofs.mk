@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/fifofs/fifofs.mk	1.11"
+#ident	"@(#)fs:fs/fifofs/fifofs.mk	1.10"
 ROOT =
 STRIP = strip
 INC = $(ROOT)/usr/include
@@ -73,7 +73,6 @@ fifovnops.o: fifovnops.c \
 	$(INC)/sys/types.h \
 	$(INC)/sys/param.h \
 	$(INC)/sys/systm.h \
-	$(INC)/sys/sysmacros.h \
 	$(INC)/sys/cred.h \
 	$(INC)/sys/errno.h \
 	$(INC)/sys/time.h \

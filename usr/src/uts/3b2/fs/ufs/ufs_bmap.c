@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_bmap.c	1.11"
+#ident	"@(#)fs:fs/ufs/ufs_bmap.c	1.9"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -37,7 +14,6 @@
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/buf.h>
-#include <sys/disp.h>
 #include <sys/proc.h>
 #include <sys/conf.h>
 #include <sys/fs/ufs_inode.h>
@@ -108,16 +84,7 @@ ufs_bmap(ip, lbn, bnp, rabnp, size, rw, alloc_only)
 		if (bnp) {
 			*bnp = ip->i_map[lbn];
 			if (*bnp == 0)
-				if (rw != S_WRITE) {
-					*bnp = UFS_HOLE;
-					return 0;
-				}
-				else {
-					ILOCK(ip);
-					ufs_freemap(ip);
-					IUNLOCK(ip);
-					goto lbmap;
-				}	
+				*bnp = UFS_HOLE;
 		}
 		if (rabnp) {
 			if ((lbn + 1) >= nblks) {
@@ -130,7 +97,7 @@ ufs_bmap(ip, lbn, bnp, rabnp, size, rw, alloc_only)
 		}
 		return 0;
 	}
-lbmap:
+
 	fs = ip->i_fs;
 	llbn = lblkno(fs, ip->i_size - 1);
 	isdir = ((ip->i_mode & IFMT) == IFDIR);

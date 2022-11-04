@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)krpc:krpc/svc_authu.c	1.4"
+#ident	"@(#)krpc:krpc/svc_authu.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)svc_auth_unix.c 1.3 89/01/11 SMI"
 #endif
@@ -88,7 +88,7 @@ _svcauth_unix(rqst, msg)
 	area = (struct area *) rqst->rq_clntcred;
 	aup = &area->area_aup;
 	aup->aup_machname = area->area_machname;
-	aup->aup_gids = (gid_t *)area->area_gids;
+	aup->aup_gids = area->area_gids;
 	auth_len = (u_int)msg->rm_call.cb_cred.oa_length;
 	xdrmem_create(&xdrs, msg->rm_call.cb_cred.oa_base, auth_len,XDR_DECODE);
 	buf = XDR_INLINE(&xdrs, auth_len);

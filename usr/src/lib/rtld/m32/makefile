@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)rtld:m32/makefile	1.19"
+#ident	"@(#)rtld:m32/makefile	1.18"
 
 # makefile for 3B2 version of the run-time linker
 # we first build the pic version of libsys and
@@ -18,6 +18,7 @@ MACH=m32
 MACHDIR=../$(MACH)
 DEFLIST=-DM32
 INCLIST= -I$(COMDIR) -I$(MACHDIR) -I$(SGSINC)/common -I$(SGSINC)/m32
+PROPTS= -dxerox -omode=l -omode=h
 AWK=awk
 ECHO=echo
 
@@ -26,7 +27,8 @@ HFILES= $(COMDIR)/rtld.h $(COMDIR)/dllib.h $(COMDIR)/externs.h \
 
 SOURCES= $(COMDIR)/dlfcns.c $(COMDIR)/globals.c $(COMDIR)/map.c \
 	 $(COMDIR)/rtfcns.c $(COMDIR)/rtld.c $(COMDIR)/paths.c  \
-	 $(MACHDIR)/reloc.c $(MACHDIR)/rtsetup.c $(MACHDIR)/binder.c 
+	 $(MACHDIR)/reloc.c $(MACHDIR)/rtsetup.c $(MACHDIR)/binder.c \
+	 $(MACHDIR)/rtisastream.c
 
 AS_SOURCES= $(MACHDIR)/rtbinder.s $(MACHDIR)/rtboot.s $(MACHDIR)/rtmemcpy.s \
 	 $(MACHDIR)/clrpage.s $(MACHDIR)/align.s $(MACHDIR)/rtsyscall.s
@@ -34,7 +36,7 @@ AS_SOURCES= $(MACHDIR)/rtbinder.s $(MACHDIR)/rtboot.s $(MACHDIR)/rtmemcpy.s \
 # rtboot.o, which contains the startup code, must be linked first
 OBJECTS= align.o rtboot.o binder.o dlfcns.o globals.o map.o paths.o reloc.o \
 	rtfcns.o rtld.o rtsetup.o rtbinder.o clrpage.o rtsetaddr.o rtmemcpy.o \
-	rtabiaddr.o rtsyscall.o
+	rtabiaddr.o rtisastream.o rtsyscall.o
 
 PRODUCTS= $(OBJECTS)
 
@@ -67,6 +69,9 @@ rtsetup.o:	$(MACHDIR)/rtsetup.c $(HFILES)
 
 reloc.o:	$(MACHDIR)/reloc.c $(HFILES)
 	$(CC) -c $(CFLAGS) $(MODE) $(DEFLIST) $(INCLIST) $(MACHDIR)/reloc.c
+
+rtisastream.o:	$(MACHDIR)/rtisastream.c $(HFILES)
+	$(CC) -c $(CFLAGS) $(MODE) $(DEFLIST) $(INCLIST) $(MACHDIR)/rtisastream.c
 
 rtboot.o:	$(MACHDIR)/rtboot.s $(HFILES)
 	$(CC) -c $(CFLAGS) $(MODE) $(MACHDIR)/rtboot.s
@@ -101,3 +106,6 @@ clean:
 
 clobber:	clean
 	-rm -f rtsetaddr.s rtabiaddr.s
+
+print:	$(SOURCES) $(AS_SOURCES) $(HFILES)
+	pr -n $(SOURCES) $(AS_SOURCES) $(HFILES) | lp $(PROPTS) 

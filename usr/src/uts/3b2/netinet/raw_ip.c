@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/raw_ip.c	1.4"
+#ident	"@(#)netinet:netinet/raw_ip.c	1.3"
 
 /*
  *	System V STREAMS TCP - Release 2.0
@@ -88,7 +88,7 @@
 extern struct inpcb rawcb;
 extern queue_t *rip_qbot;
 extern u_char   ip_protox[];
-static struct sockaddr_in ripsrc = {AF_INET};
+static struct taddr_in ripsrc = {AF_INET};
 /*
  * Setup generic address and protocol structures for raw_input routine, then
  * pass them along with mblk chain.
@@ -112,23 +112,23 @@ rip_input(q, bp0)
 	ripsrc.sin_addr = ip_src = ip->ip_src;
 	ip_dst = ip->ip_dst;
 	ip_p = ip->ip_p;
-	bp0 = allocb(sizeof(struct T_unitdata_ind) + sizeof(struct sockaddr_in),
+	bp0 = allocb(sizeof(struct T_unitdata_ind) + sizeof(struct taddr_in),
 		     BPRI_HI);
 	if (!bp0) {
 		freemsg(bp);
 		return;
 	}
 	bp0->b_datap->db_type = M_PROTO;
-	bp0->b_wptr += sizeof(struct T_unitdata_ind) + sizeof(struct sockaddr_in);
+	bp0->b_wptr += sizeof(struct T_unitdata_ind) + sizeof(struct taddr_in);
 	ind = (struct T_unitdata_ind *) bp0->b_rptr;
 	ind->PRIM_type = T_UNITDATA_IND;
-	ind->SRC_length = sizeof(struct sockaddr_in);
+	ind->SRC_length = sizeof(struct taddr_in);
 	ind->SRC_offset = sizeof(struct T_unitdata_ind);
 	ind->OPT_length = 0;
 	ind->OPT_offset = 0;
 	bcopy((caddr_t) & ripsrc,
 	      (caddr_t) bp0->b_rptr + sizeof(struct T_unitdata_ind),
-	      sizeof(struct sockaddr_in));
+	      sizeof(struct taddr_in));
 	bp0->b_cont = bp;
 	for (inp = rawcb.inp_next; inp != &rawcb; inp = inp->inp_next) {
 		if (inp->inp_state & SS_CANTRCVMORE ||

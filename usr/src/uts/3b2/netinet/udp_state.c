@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/udp_state.c	1.5"
+#ident	"@(#)netinet:netinet/udp_state.c	1.3"
 
 /*
  * System V STREAMS TCP - Release 2.0
@@ -104,7 +104,7 @@ udp_state(q, bp)
 	register struct inpcb *inp = qtoinp(q);
 	int             error = 0;
 	mblk_t         *head;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	struct in_addr  laddr;
 
 	/*
@@ -149,7 +149,7 @@ udp_state(q, bp)
 		t_prim->info_ack.ETSDU_size = -2;
 		t_prim->info_ack.CDATA_size = -2;	/* ==> not supported */
 		t_prim->info_ack.DDATA_size = -2;
-		t_prim->info_ack.ADDR_size = sizeof(struct sockaddr_in);
+		t_prim->info_ack.ADDR_size = sizeof(struct taddr_in);
 		t_prim->info_ack.OPT_size = -1;
 		t_prim->info_ack.TIDU_size = 16 * 1024;
 		t_prim->info_ack.SERV_type = T_CLTS;
@@ -165,7 +165,8 @@ udp_state(q, bp)
 		if (t_prim->bind_req.ADDR_length == 0) {
 			error = in_pcbbind(inp, (mblk_t *) NULL);
 		} else {
-			if (!in_chkaddrlen(t_prim->bind_req.ADDR_length)) {
+			if (t_prim->bind_req.ADDR_length
+			    != sizeof(struct taddr_in)) {
 				T_errorack(q, bp, TBADADDR, 0);
 				break;
 			}
@@ -182,19 +183,19 @@ udp_state(q, bp)
 			break;
 		inp->inp_tstate = TS_IDLE;
 		if ((bp = reallocb(bp, sizeof(struct T_bind_ack)
-				   + sizeof(struct sockaddr_in), 1))
+				   + sizeof(struct taddr_in), 1))
 		    == NULL) {
 			return;
 		}
 		t_prim = (union T_primitives *) bp->b_rptr;
 		t_prim->bind_ack.PRIM_type = T_BIND_ACK;
-		t_prim->bind_ack.ADDR_length = sizeof(struct sockaddr_in);
+		t_prim->bind_ack.ADDR_length = sizeof(struct taddr_in);
 		t_prim->bind_ack.ADDR_offset = sizeof(struct T_bind_req);
-		sin = (struct sockaddr_in *)
+		sin = (struct taddr_in *)
 			(bp->b_rptr + sizeof(struct T_bind_ack));
 		bp->b_wptr = (unsigned char *)
-			(((caddr_t) sin) + sizeof(struct sockaddr_in));
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+			(((caddr_t) sin) + sizeof(struct taddr_in));
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_addr = inp->inp_laddr;
 		sin->sin_port = inp->inp_lport;

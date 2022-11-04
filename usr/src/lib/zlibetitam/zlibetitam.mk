@@ -1,4 +1,4 @@
-#	Copyright (c) 1988 AT&T
+#	Copyright (c) 1984 AT&T
 #	  All Rights Reserved
 
 #	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
@@ -117,7 +117,7 @@ lintit:		$(LLIBLN)
 install:	all
 		install -f $(CCSLIB) -m 644 -u $(OWN) -g $(GRP) libtam.a
 		install -f $(CCSLIB) -m 644 -u $(OWN) -g $(GRP) llib-ltam
-		install -f $(CCSLIB) -m 644 -u $(OWN) -g $(GRP) llib-ltam.ln
+#		install -f $(CCSLIB) -m 644 -u $(OWN) -g $(GRP) llib-ltam.ln
 		install -f $(CCSLIB) -m 644 -u $(OWN) -g $(GRP) tamhelp
 		if [ ! -d $(ROOT)/usr/add-on ]; \
 		then \

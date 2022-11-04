@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/streamio.c	1.83"
+#ident	"@(#)kernel:os/streamio.c	1.75.1.13"
 
 #include "sys/types.h"
 #include "sys/sysmacros.h"
@@ -39,7 +39,6 @@
 #include "sys/sad.h"
 #include "sys/priocntl.h"
 #include "sys/hrtcntl.h"
-#include "sys/jioctl.h"
 #include "sys/procset.h"
 #include "sys/events.h"
 #include "sys/evsys.h"
@@ -53,6 +52,10 @@
  */
 STATIC long ioc_id;
 
+/*
+ * id value used to distinguish between different multiplexor links
+ */
+STATIC long lnk_id;
 
 /*
  *  Qinit structure and Module_info structures
@@ -66,8 +69,6 @@ struct	qinit stwdata = { NULL, strwsrv, NULL, NULL, NULL, &stwm_info, NULL };
 
 extern struct streamtab fifoinfo;
 extern char qrunflag;
-extern long Strcount;
-extern long strthresh;
 
 
 STATIC int strhold = 1;	/* switch for small message consolidation feature */
@@ -85,13 +86,12 @@ stropen(vp, devp, flag, crp)
 	register struct stdata *stp;
 	register queue_t *qp;
 	register int s;
-	dev_t dummydev, savedev;
+	pid_t *oldttyp = u.u_ttyp;
+	dev_t dummydev;
 	struct autopush *ap;
 	int error = 0;
 	int freed = 0;
 	extern vnode_t *specfind();
-
-	savedev = *devp;
 
 	/*
 	 * If the stream already exists, wait for any open in progress
@@ -140,7 +140,7 @@ retry:
 			if (qp->q_flag & QOLD) {	/* old interface */
 				dev_t oldev;
 
-			/* check if dev is too large for old interface */
+				/* check if dev is too large for old interface */
 				if ((oldev = cmpdev(*devp)) == NODEV){
 					error = ENXIO;
 					break;
@@ -183,8 +183,10 @@ ckreturn:
 						strclose(vp, flag, crp);
 				}
 			}
+		} else {
+			strctty(stp, oldttyp, flag);
 		}
-		wakeprocs((caddr_t)stp, PRMPT);
+		wakeup((caddr_t)stp);
 		return (error);
 	} 
 
@@ -192,12 +194,7 @@ ckreturn:
 	 * This vnode isn't streaming.  SPECFS already
 	 * checked for multiple vnodes pointing to the
 	 * same stream, so create a stream to the driver.
-	 *
-	 * firewall - don't use too much memory
 	 */
-
-	if (strthresh && (Strcount > strthresh) && !suser(u.u_cred))
-		return (ENOSR);
 
 	if (!(qp = allocq())) {
 		cmn_err(CE_CONT, "stropen: out of queues\n");
@@ -223,8 +220,8 @@ ckreturn:
 	stp->sd_mark = NULL;
 	stp->sd_closetime = STRTIMOUT * HZ;
 	splx(s);
-	stp->sd_sidp = NULL;
-	stp->sd_pgidp = NULL;
+	stp->sd_sid = 0;
+	stp->sd_pgrp = 0;
 	stp->sd_vnode = vp;
 	stp->sd_rerror = 0;
 	stp->sd_werror = 0;
@@ -320,7 +317,7 @@ opendone:
 	s = splstr();
 	stp->sd_flag &= ~STWOPEN;
 	splx(s);
-	wakeprocs((caddr_t)stp, PRMPT);
+	wakeup((caddr_t)stp);
 	if (error) {
 		if (!freed) {
 			vp->v_stream = NULL;
@@ -331,6 +328,7 @@ opendone:
 		return (error);
 	}
 
+	strctty(stp, oldttyp, flag);
 	return (0);
 }
 
@@ -363,13 +361,6 @@ strclose(vp, flag, crp)
 	qp = stp->sd_wrq;
 
 	ASSERT(stp->sd_pollist.ph_list == NULL);
-
-        /* freectty should have been called by now */
-	ASSERT(stp->sd_sidp == NULL);
-
-        /* cleanup any possible sockets references */
-	if (stp->sd_pgidp != NULL)
-		PID_RELE(stp->sd_pgidp);
 
 	s = splstr();
 	stp->sd_flag |= STRCLOSE;
@@ -405,9 +396,6 @@ strclose(vp, flag, crp)
 			putnext(qp, mp);
 	}
 
-	stp->sd_flag &= ~(STRDERR|STWRERR);	/* help unlink succeed */
-	stp->sd_rerror = 0;
-	stp->sd_werror = 0;
 	(void) munlinkall(stp, LINKCLOSE|LINKNORMAL, crp, &rval);
 
 	while (SAMESTR(qp)) {
@@ -468,7 +456,7 @@ strclose(vp, flag, crp)
 	vp->v_stream = NULL;
 	stp->sd_flag &= ~STRCLOSE;
 	splx(s);
-	wakeprocs((caddr_t)stp, PRMPT);
+	wakeup((caddr_t)stp);
 	shfree(stp);
 	return (0);
 }
@@ -490,6 +478,14 @@ strclean(vp)
 	stp = vp->v_stream;
 	psep = NULL;
 	s = splstr();
+	if ((stp->sd_pgrp < 0) && (-stp->sd_pgrp == u.u_procp->p_pid)) {
+		/*
+		 * This is a compromise rather than searching the list
+		 * of stream heads when the process exits.
+		 */
+		stp->sd_pgrp = 0;
+		stp->sd_procp = 0;
+	}
 	sep = stp->sd_siglist;
 	while (sep) {
 		if (sep->se_procp == u.u_procp) {
@@ -653,7 +649,7 @@ strread(vp, uiop, crp)
 
 		case M_DATA:
 ismdata:
-			if (msgdsize(bp) == 0) {
+			if ((bp->b_wptr - bp->b_rptr) == 0) {
 				if (mark || delim) {
 					freemsg(bp);
 				} else if (rflg) {
@@ -871,10 +867,7 @@ strrput(q, bp)
 		 */
 		if (stp->sd_flag & RSLEEP) {
 			stp->sd_flag &= ~RSLEEP;
-			if (stp->sd_vnode->v_type == VFIFO)
-				wakeprocs((caddr_t)q, NOPRMPT); /*don't thrash*/
-			else
-				wakeprocs((caddr_t)q, PRMPT);
+			wakeupnp((caddr_t)q);
 		}
 
 		putq(q, bp);
@@ -947,9 +940,9 @@ strrput(q, bp)
 			}
 			splx(s);
 			if (rw) {
-				wakeprocs((caddr_t)q, PRMPT); /* readers */
-				wakeprocs((caddr_t)WR(q), PRMPT); /* writers */
-				wakeprocs((caddr_t)stp, PRMPT);	/* ioctllers */
+				wakeup((caddr_t)q);	/* the readers */
+				wakeup((caddr_t)WR(q));	/* the writers */
+				wakeup((caddr_t)stp);	/* the ioctllers */
 
 				s = splstr();
 				if (stp->sd_sigflags & S_ERROR) 
@@ -976,9 +969,9 @@ strrput(q, bp)
 			stp->sd_rerror = *bp->b_rptr;
 			stp->sd_werror = *bp->b_rptr;
 			splx(s);
-			wakeprocs((caddr_t)q, PRMPT); /* the readers */
-			wakeprocs((caddr_t)WR(q), PRMPT); /* the writers */
-			wakeprocs((caddr_t)stp, PRMPT); /* the ioctllers */
+			wakeup((caddr_t)q);	/* the readers */
+			wakeup((caddr_t)WR(q));	/* the writers */
+			wakeup((caddr_t)stp);	/* the ioctllers */
 
 			s = splstr();
 			if (stp->sd_sigflags & S_ERROR) 
@@ -1010,23 +1003,28 @@ strrput(q, bp)
 		/*
 		 * send signal if controlling tty
 		 */
-
-                if (stp->sd_sidp) {
-                        prsignal(stp->sd_sidp, SIGHUP);
-                        if (stp->sd_sidp != stp->sd_pgidp)
-                                pgsignal(stp->sd_pgidp, SIGTSTP);
+		if (stp->sd_sid) {
+			ASSERT(stp->sd_pgrp >= 0);
+			psignal(prfind(stp->sd_sid), SIGHUP);
+			if (stp->sd_sid != stp->sd_pgrp)
+				signal(stp->sd_pgrp, SIGTSTP);
 		}
 
-		wakeprocs((caddr_t)q, PRMPT);	/* the readers */
-		wakeprocs((caddr_t)WR(q), PRMPT);	/* the writers */
-		wakeprocs((caddr_t)stp, PRMPT);	/* the ioctllers */
+		wakeup((caddr_t)q);	/* the readers */
+		wakeup((caddr_t)WR(q));	/* the writers */
+		wakeup((caddr_t)stp);	/* the ioctllers */
 
 		/*
 		 * wake up read, write, and exception pollers and
 		 * reset wakeup mechanism.
 		 */
-
-		strhup(stp);
+		s = splstr();
+		if (stp->sd_sigflags & S_HANGUP) 
+			strsendsig(stp->sd_siglist, S_HANGUP, 0L);
+		pollwakeup(&stp->sd_pollist, POLLHUP);
+		if (stp->sd_eventflags & S_HANGUP)
+			strevpost(stp, S_HANGUP, 0L);
+		splx(s);
 		return;
 
 
@@ -1152,17 +1150,10 @@ strrput(q, bp)
 				    if (mp->b_datap->db_type == M_PASSFP) 
 					closef(((struct strrecvfd *)
 					  mp->b_rptr)->f.fp);
-				    rmvq(q, mp);
-				    freemsg(mp);
+					rmvq(q, mp);
+					freemsg(mp);
 				}
 				mp = nmp;
-			    }
-			    if (mp && mp->b_band == pri) {
-				if (mp->b_datap->db_type == M_PASSFP) 
-				    closef(((struct strrecvfd *)
-				      mp->b_rptr)->f.fp);
-				rmvq(q, mp);
-				freemsg(mp);
 			    }
 			}
 		    } else {	/* flush entire queue */
@@ -1185,7 +1176,7 @@ strrput(q, bp)
 			    freemsg(mp);
 			    mp = nmp;
 			}
-			bzero((caddr_t)qbf, NBAND);
+			bzero((caddr_t)qbf, 256);
 			bpri = 1;
 			for (qbp = q->q_bandp; qbp; qbp = qbp->qb_next) {
 			    if ((qbp->qb_flag & QB_WANTW) &&
@@ -1256,7 +1247,7 @@ wrapflush:
 		 */
 		stp->sd_iocblk = bp;
 		splx(s);
-		wakeprocs((caddr_t)stp, PRMPT);
+		wakeup((caddr_t)stp);
 		return;
 
 	case M_COPYIN:
@@ -1291,7 +1282,7 @@ wrapflush:
 		 */
 		stp->sd_iocblk = bp;
 		splx(s);
-		wakeprocs((caddr_t)stp, PRMPT);
+		wakeup((caddr_t)stp);
 		return;
 
 	case M_SETOPTS:
@@ -1387,8 +1378,6 @@ wrapflush:
 #ifndef _STYPES
 		if (sop->so_flags & SO_NODELIM)
 			stp->sd_flag &= ~STRDELIM;
-		if (sop->so_flags & SO_STRHOLD)
-			stp->sd_flag |= STRHOLD;
 #endif /* _STYPES */
 
 		freemsg(bp);
@@ -1503,18 +1492,8 @@ strwrite(vp, uiop, crp)
 
 	if (error = straccess(stp, JCWRITE))
 		return (error);
-	/* this is for POSIX compatibility */
-	if (stp->sd_flag & STRHUP)
-		return(EIO);
-	if (stp->sd_flag & (STWRERR|STPLEX))
+	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX))
 		return ((stp->sd_flag & STPLEX) ? EINVAL : stp->sd_werror);
-
-	/*
-	 * firewall - don't use too much memory
-	 */
-
-	if (strthresh && (Strcount > strthresh) && !suser(u.u_cred))
-		return (ENOSR);
 
 	/*
 	 * Check the min/max packet size constraints.  If min packet size
@@ -1613,21 +1592,23 @@ strwrite(vp, uiop, crp)
 				iosize = uiop->uio_resid;
 			else	iosize = MIN(uiop->uio_resid, rmax);
 
-			if ((error = strmakemsg((struct strbuf *)NULL,
-			    iosize, uiop, stp, (long)0, &amp)) || !amp)
+			if (error = strmakemsg((struct strbuf *)NULL,
+			    iosize, uiop, stp, (long)0, &amp))
 				return (error);
 			mp = amp;
 
 			/*
-			 * When explicitly enabled (typically for TTYs), check to
-			 * see if data might be coalesced for better performance.
-			 *
 			 * Policy:  Use the size of this write as predictor of the
 			 * size of the next write.  If this msg buffer has space for
 			 * another write of the same size, hold onto it for a while.
+			 * 
+			 * Since pipes are sometimes used with small (single byte)
+			 * writes as a "fast" interprocess sychronization mechanism,
+			 * the hold feature is disabled for streams pipes.
 			 */
-			if (strhold && (stp->sd_flag & STRHOLD) &&
-			   size <= (mp->b_datap->db_lim - mp->b_wptr))  {
+			if (strhold && (vp->v_type != VFIFO) &&
+			   size <= (mp->b_datap->db_lim - mp->b_wptr) &&
+			   size == iosize && !(stp->sd_flag & STRDELIM))  {
 
 				extern struct queue *scanqhead, *scanqtail;
 				extern strscanflag;
@@ -1704,10 +1685,7 @@ strwsrv(q)
 
 	if (stp->sd_flag & WSLEEP) {
 		stp->sd_flag &= ~WSLEEP;
-		if (stp->sd_vnode->v_type == VFIFO)
-			wakeprocs((caddr_t)q, NOPRMPT); /*don't thrash*/
-		else
-			wakeprocs((caddr_t)q, PRMPT);
+		wakeupnp((caddr_t)q);
 	}
 
 	if ((tq = q->q_next) == NULL) {
@@ -1732,7 +1710,7 @@ strwsrv(q)
 
 	isevent = 0;
 	i = 1;
-	bzero((caddr_t)qbf, NBAND);
+	bzero((caddr_t)qbf, 256);
 	myqbp = q->q_bandp;
 	for (qbp = tq->q_bandp; qbp; qbp = qbp->qb_next) {
 		ASSERT(myqbp);
@@ -1778,6 +1756,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 	struct strioctl strioc;
 	struct uio uio;
 	struct iovec iov;
+	pid_t *oldttyp = u.u_ttyp;
 	enum jcaccess access;
 	int error = 0;
 	int done = 0;
@@ -1786,24 +1765,6 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 	ASSERT(vp->v_stream);
 	ASSERT(copyflag == U_TO_K || copyflag == K_TO_K);
 	stp = vp->v_stream;
-
-	/*
-	 *  if a message is being "held" awaiting possible consolidation,
-	 *  send it downstream before processing ioctl.
-	 */
-	{
-		register queue_t *q = stp->sd_wrq;
-		register mblk_t *mp;
-
-		s = splstr();
-		if (mp = q->q_first)  {
-			q->q_first = NULL;
-
-			splx(s);
-			putnext(q, mp);
-		}
-		else	splx(s);
-	}
 
 	switch (cmd) {
 	case I_RECVFD:
@@ -1820,8 +1781,6 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 	case TCGETS:
 	case TIOCGETP:
 	case TIOCGPGRP:
-	case SIOCGPGRP:
-	case JWINSIZE:
 	case TIOCGSID:
 	case TIOCMGET:
 	case LDGETT:
@@ -1973,6 +1932,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 
 	case I_NREAD:
 	case FIONREAD:
+	case FIORDCHK:
 		/*
 		 * Return number of bytes of data in first message
 		 * in queue in "arg" and return the number of messages
@@ -1990,23 +1950,6 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 			return (error);
 		*rvalp = qsize(RD(stp->sd_wrq));
 		return (error);
-	    }
-	case FIORDCHK:
-		/*
-		 * FIORDCHK does not use arg value (like FIONREAD),
-	         * instead a count is returned. I_NREAD value may
-		 * not be accurate but safe. The real thing to do is
-		 * to add the msgdsizes of all data  messages until
-		 * a non-data message.
-		 */
-	    {
-		int size = 0;
-		mblk_t *bp;
-
-		if (bp = RD(stp->sd_wrq)->q_first)
-			size = msgdsize(bp);
-		*rvalp = size;
-		return (0);
 	    }
 
 	case I_FIND:
@@ -2055,13 +1998,6 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 			return (ENXIO);
 		if (stp->sd_pushcnt >= nstrpush)
 			return (EINVAL);
-
-		/*
-		 * firewall - don't use too much memory
-		 */
-
-		if (strthresh && (Strcount > strthresh) && !suser(u.u_cred))
-			return (ENOSR);
 		
 		/*
 		 * Get module name and look up in fmodsw.
@@ -2095,6 +2031,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		dummydev = vp->v_rdev;
 		if ((error = qattach(RD(stp->sd_wrq), &dummydev, 0, FMODSW, i, crp)) == 0) {
 
+			strctty(stp, oldttyp, flag);
 			stp->sd_pushcnt++;
 		}
 
@@ -2113,7 +2050,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		s = splstr();
 		stp->sd_flag &= ~STWOPEN;
 		splx(s);
-		wakeprocs((caddr_t)stp, PRMPT);
+		wakeup((caddr_t)stp);
 		return (error);
 	    }
 
@@ -2226,9 +2163,9 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		 * waiting on the lower stream.  These will all
 		 * error out.
 		 */
-		wakeprocs((caddr_t)rq, PRMPT);
-		wakeprocs((caddr_t)WR(rq), PRMPT);
-		wakeprocs((caddr_t)stpdown, PRMPT);
+		wakeup((caddr_t)rq);
+		wakeup((caddr_t)WR(rq));
+		wakeup((caddr_t)stpdown);
 		*rvalp = linkp->li_lblk.l_index;
 		return (0);
 	    }
@@ -2245,6 +2182,8 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		struct linkinfo *linkp;
 		int type;
 
+		if (stp->sd_flag & STRHUP)
+			return (ENXIO);
 		if (vp->v_type == VFIFO)
 			return (EINVAL);
 		if (cmd == I_UNLINK)
@@ -2274,7 +2213,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		 * FLUSHRW - flush read/write queue
 		 */
 		if (stp->sd_flag & STRHUP)
-			return (ENXIO);
+			return (EINVAL);
 		if (arg & ~FLUSHRW)
 			return (EINVAL);
 		while (!putctl1(stp->sd_wrq->q_next, M_FLUSH, arg))
@@ -2295,7 +2234,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		if (error)
 			return (error);
 		if (stp->sd_flag & STRHUP)
-			return (ENXIO);
+			return (EINVAL);
 		if (binfo.bi_flag & ~FLUSHRW)
 			return (EINVAL);
 		while (!(mp = allocb(2, BPRI_HI))) {
@@ -2779,9 +2718,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		long rmin, rmax;
 		int strmakemsg();
 
-		if (stp->sd_flag & STRHUP)
-			return (ENXIO);
-		if (stp->sd_flag & (STRDERR|STWRERR|STPLEX))
+		if (stp->sd_flag & (STRDERR|STWRERR|STRHUP|STPLEX))
 			return ((stp->sd_flag & STPLEX) ? EINVAL :
 			    (stp->sd_werror ? stp->sd_werror : stp->sd_rerror));
 		error = strcopyin((caddr_t)arg, (caddr_t)&strfdinsert, 
@@ -2858,9 +2795,9 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		    UIO_SYSSPACE;
 		uio.uio_fmode = 0;
 		uio.uio_resid = iov.iov_len;
-		if ((error = strmakemsg(&strfdinsert.ctlbuf,
+		if (error = strmakemsg(&strfdinsert.ctlbuf,
 		    strfdinsert.databuf.len, &uio, stp,
-		    strfdinsert.flags, &mp)) || !mp)
+		    strfdinsert.flags, &mp)) 
 			return (error);
 
 		/*
@@ -2902,8 +2839,8 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		mp->b_wptr += sizeof(struct strrecvfd);
 		mp->b_datap->db_type = M_PASSFP;
 		srf->f.fp = fp;
-		srf->uid = u.u_cred->cr_uid;
-		srf->gid = u.u_cred->cr_gid;
+		srf->uid = crp->cr_uid;
+		srf->gid = crp->cr_gid;
 		fp->f_count++;
 		strrput(qp, mp);
 		return (0);
@@ -3075,7 +3012,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		queue_t *q = RD(stp->sd_wrq);
 		qband_t *qbp;
 
-		if ((arg < 0) || (arg >= NBAND))
+		if (arg < 0)
 			return (EINVAL);
 		if (arg > (int)q->q_nband) {
 			*rvalp = 0;
@@ -3134,7 +3071,7 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 	    {
 		char band;
 
-		if ((arg < 0) || (arg >= NBAND))
+		if ((arg > 255) || (arg < 0))
 			return (EINVAL);
 		band = (char)arg;
 		*rvalp = bcanput(stp->sd_wrq->q_next, band);
@@ -3174,110 +3111,82 @@ strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp)
 		return (error);
 	    }
 
-        case TIOCSSID:
-	{
-         	pid_t sid;
-		register error;
-
-                if (stp->sd_sidp != u.u_procp->p_sessp->s_sidp)
-                        return ENOTTY;
-		if (error = strcopyin(arg, (caddr_t)&sid, sizeof(pid_t),
-                    STRPIDT, copyflag))
-                        return error;
-		return realloctty(u.u_procp, sid);
-	}
-
 	case TIOCGSID:
-		if (stp->sd_sidp == NULL)
-			return ENOTTY;
-		return strcopyout((caddr_t)&stp->sd_sidp->pid_id,
-                  arg, sizeof(pid_t), STRPIDT, copyflag);
-
-	case TIOCSPGRP:
 	{
-		pid_t pgrp;
-		proc_t *q, *pgfind();
-
-
-		if (stp->sd_sidp != u.u_procp->p_sessp->s_sidp)
-			return ENOTTY;
-		if (error = strcopyin(arg, (caddr_t)&pgrp, sizeof(pid_t),
-                    STRPIDT, copyflag))
-			return (error);
-		if (pgrp == stp->sd_pgidp->pid_id)
-			return 0;
-		if (pgrp <= 0 || pgrp >= MAXPID)
-			return EINVAL;
-		if ((q = pgfind(pgrp)) == NULL
-                  || q->p_sessp != u.u_procp->p_sessp)
-			return EPERM;
-		PID_RELE(stp->sd_pgidp);
-		stp->sd_pgidp = q->p_pgidp;
-		PID_HOLD(stp->sd_pgidp);
-		return 0;
+	 	pid_t sid = stp->sd_sid;
+		return strcopyout((caddr_t)&sid, arg, sizeof(pid_t),
+		    STRPIDT, copyflag);
 	}
 
 	case TIOCGPGRP:
-		if (stp->sd_sidp == NULL)
-			return ENOTTY;
-		return strcopyout((caddr_t)&stp->sd_pgidp->pid_id,
-                  arg, sizeof(pid_t), STRPIDT, copyflag);
+	{
+	 	pid_t pgrp = stp->sd_pgrp;
+
+		if (u.u_procp->p_sessp->s_sid != stp->sd_sid)
+			return (ENOTTY);
+		if (pgrp == 0)
+			return (EACCES);
+		if (pgrp < 0)	/* it's a socket, not a terminal */
+			return (EINVAL);
+		return (strcopyout((caddr_t)&pgrp, arg, sizeof(pid_t),
+			    STRPIDT, copyflag));
+	}
+
+	case TIOCSPGRP:
+	{
+	 	pid_t pgrp;
+
+		if (u.u_procp->p_sessp->s_sid != stp->sd_sid)
+			return (ENOTTY);
+		if (error = strcopyin(arg, (caddr_t)&pgrp, sizeof(pid_t),
+		    STRPIDT, copyflag))
+			return (error);
+		if (pgrp <= 0 || pgrp >= MAXPID)
+			return (EINVAL);
+		if (!checkpg(u.u_procp->p_sessp->s_sid, pgrp))
+			return (EPERM);
+		stp->sd_pgrp = pgrp;
+		return (0);
+	}
 
 	/*
 	 * The next two are for sockets.  The user expects pgrp
 	 * to be positive for a process id and negative for a
 	 * process group.  The stream head stores it oppositely.
 	 */
+	case SIOCGPGRP:
+	{
+	 	pid_t pgrp = -stp->sd_pgrp;
+
+		return (strcopyout((caddr_t)&pgrp, arg, sizeof(pid_t),
+			    STRPIDT, copyflag));
+	}
 
 	case SIOCSPGRP:
 	{
-		pid_t pid;
-		proc_t *prp;
-		struct pid *pidp;
+	 	pid_t pgrp;
 
-		if (stp->sd_sidp != NULL)
-			return EPERM;
-		if (error = strcopyin(arg, (caddr_t)&pid, sizeof(pid_t),
-                    STRPIDT, copyflag))
-			return error;
-		if (pid == 0)
-			pidp = NULL;
-		else if (pid < 0) {		/* it's a pgrp */
-			if ((prp = pgfind(-pid)) == NULL)
-                                return ESRCH;
-			if (prp->p_sessp != u.u_procp->p_sessp)
-                                return EPERM;
-			pidp = prp->p_pgidp;
-			stp->sd_flag &= ~STRPID;
+		if (stp->sd_sid != 0)
+			return (EPERM);
+		if (error = strcopyin(arg, (caddr_t)&pgrp, sizeof(pid_t),
+		    STRPIDT, copyflag))
+			return (error);
+		if (pgrp == 0)
+			return (EINVAL);
+		if (pgrp < 0) {		/* it's a pgrp */
+			pgrp  = -pgrp;
+			if (pgrp >= MAXPID)
+				return (EINVAL);
+			if (!checkpg(u.u_procp->p_sessp->s_sid, pgrp))
+				return (EPERM);
 		} else {		/* it's a pid */
-			if ((prp = prfind(pid)) == NULL)
-                                return ESRCH;
-			if (prp->p_sessp != u.u_procp->p_sessp)
-                                return EPERM;
-			pidp = prp->p_pidp;
-			stp->sd_flag |= STRPID;
+			if (pgrp != u.u_procp->p_pid)
+				return (EINVAL);
+			pgrp = -pgrp;
+			stp->sd_procp = u.u_procp;
 		}
-		if (pidp != stp->sd_pgidp) {
-			if (pidp != NULL)
-                                PID_HOLD(pidp);
-			if (stp->sd_pgidp != NULL)
-                                PID_RELE(stp->sd_pgidp);
-			stp->sd_pgidp = pidp;
-		}
-		return 0;
-	}
-
-	case SIOCGPGRP:
-	{
-		pid_t pid;
-		if (stp->sd_pgidp != NULL) {
-			pid = stp->sd_pgidp->pid_id;
-			if (!(stp->sd_flag & STRPID))
-                                pid = -pid;
-		} else
-			pid = 0;
-		return (strcopyout((caddr_t)&pid, arg, sizeof(pid_t),
-                            STRPIDT, copyflag));
+		stp->sd_pgrp = pgrp;
+		return (0);
 	}
 
 	case FIONBIO:
@@ -3472,7 +3381,7 @@ waitioc:
 			if (strioc->ic_timout >= 0)
 				untimeout(id);
 			splx(s);
-			wakeprocs((caddr_t)&(stp->sd_iocwait), PRMPT);
+			wakeup((caddr_t)&(stp->sd_iocwait));
 			crfree(crp);
 			return (error);
 		}
@@ -3509,7 +3418,7 @@ waitioc:
 				} else
 					freemsg(bp);
 			}
-			wakeprocs((caddr_t)&(stp->sd_iocwait), PRMPT);
+			wakeup((caddr_t)&(stp->sd_iocwait));
 			crfree(crp);
 			return (error);
 		}
@@ -3522,7 +3431,7 @@ waitioc:
 		if (strioc->ic_timout >= 0)
 			untimeout(id);
 		splx(s);
-		wakeprocs((caddr_t)&(stp->sd_iocwait), PRMPT);
+		wakeup((caddr_t)&(stp->sd_iocwait));
 	} else {
 		splx(s);
 	}
@@ -4017,13 +3926,6 @@ strputmsg(vp, mctl, mdata, pri, flag, fmode)
 		return ((stp->sd_flag & STPLEX) ? EINVAL : stp->sd_werror);
 
 	/*
-	 * firewall - don't use too much memory
-	 */
-
-	if (strthresh && (Strcount > strthresh) && !suser(u.u_cred))
-		return (ENOSR);
-
-	/*
 	 * Check for legal flag value.
 	 */
 	switch (flag) {
@@ -4080,7 +3982,7 @@ strputmsg(vp, mctl, mdata, pri, flag, fmode)
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_fmode = 0;
 	uio.uio_resid = iov.iov_len;
-	if ((error = strmakemsg(mctl, mdata->len, &uio, stp, (long)flag, &mp)) || !mp)
+	if (error = strmakemsg(mctl, mdata->len, &uio, stp, (long)flag, &mp))
 		return (error);
 	mp->b_band = pri;
 

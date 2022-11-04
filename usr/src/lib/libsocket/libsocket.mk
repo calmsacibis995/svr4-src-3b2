@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libsocket:libsocket.mk	1.12"
+#ident	"@(#)libsocket:libsocket.mk	1.11"
 
 #
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -32,13 +32,12 @@
 ROOT=
 USRLIB=		$(ROOT)/usr/lib
 INC=		$(ROOT)/usr/include
-INS=	install
+INSTALL=	install
 LORDER=		lorder
 TSORT=		tsort
 
 DASHO=		-O
-PICOPT=	-Kpic
-CFLAGS=		$(DASHO) $(MORECPP) -DSYSV $(PICOPT) -I$(INC)
+CFLAGS=		$(DASHO) $(MORECPP) -DSYSV -Kpic -I$(INC)
 
 INETOBJS=	bindresvport.o byteorder.o ether_addr.o getnetbyaddr.o \
 		getnetbyname.o getnetent.o getproto.o getprotoent.o \
@@ -67,23 +66,14 @@ all:
 		@for i in inet socket;\
 		do\
 			cd $$i;\
-			if [ x$(CCSTYPE) = xCOFF ] ; \
-			then \
-			echo "\n===== $(MAKE) -f $$i.mk all PICOPT= $(PASSECHO)";\
-			$(MAKE) -f $$i.mk all PICOPT= $(PASSTHRU);\
-			else \
 			echo "\n===== $(MAKE) -f $$i.mk all $(PASSECHO)";\
 			$(MAKE) -f $$i.mk all $(PASSTHRU);\
-			fi ;\
 			cd ..;\
 		done;\
 		wait
 		rm -f $(ARNAME) $(LIBNAME)
 		$(AR) crv $(ARNAME) `$(LORDER) $(OBJS) | $(TSORT)`
-		if [ x$(CCSTYPE) != xCOFF ] ; \
-		then \
-		$(CC) -G -dy -ztext -o $(LIBNAME) $(OBJS) ;\
-		fi
+		$(CC) -G -dy -ztext -o $(LIBNAME) $(OBJS)
 		rm -f $(OBJS)
 
 $(LIBNAME):	all
@@ -91,11 +81,8 @@ $(LIBNAME):	all
 $(ARNAME):	all
 
 install:	all
-		if [ x$(CCSTYPE) != xCOFF ] ; \
-		then \
-		$(INS) -f $(USRLIB) -m 0444 -u root -g bin $(LIBNAME) ;\
-		fi
-		$(INS) -f $(USRLIB) -m 0444 -u root -g bin $(ARNAME)
+		$(INSTALL) -f $(USRLIB) -m 0644 -u bin -g bin $(LIBNAME)
+		$(INSTALL) -f $(USRLIB) -m 0644 -u bin -g bin $(ARNAME)
 
 clean:
 		@for i in inet socket;\

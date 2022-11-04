@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:clnt_raw.c	1.3"
+#ident	"@(#)librpc:clnt_raw.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -59,14 +59,15 @@ static char sccsid[] = "@(#)clnt_raw.c 1.34 89/02/28 Copyr 1984 Sun Micro";
 static struct clnt_raw_private {
 	CLIENT	client_object;
 	XDR	xdr_stream;
-	char	*raw_buf;	/* should be shared with server handle */
+	char	*_raw_buf;	/* should be shared with server handle */
 	char	mashl_callmsg[MCALL_MSG_SIZE];
 	u_int	mcnt;
 } *clnt_raw_private;
 
 static struct clnt_ops *clnt_raw_ops();
 
-extern char	*calloc();
+void	svc_getreq();
+char	*calloc();
 
 /*
  * Create a client handle for memory based rpc.
@@ -87,7 +88,7 @@ clnt_raw_create(prog, vers)
 			return ((CLIENT *)NULL);
 		if (_rawcombuf == NULL)
 			_rawcombuf = (char *)calloc(UDPMSGSIZE, sizeof(char));
-		clp->raw_buf = _rawcombuf; /* Share it with the server */
+		clp->_raw_buf = _rawcombuf; /* Share it with the server */
 		clnt_raw_private = clp;
 	}
 	xdrs = &clp->xdr_stream;
@@ -110,7 +111,7 @@ clnt_raw_create(prog, vers)
 	/*
 	 * Set xdrmem for client/server shared buffer
 	 */
-	xdrmem_create(xdrs, clp->raw_buf, UDPMSGSIZE, XDR_FREE);
+	xdrmem_create(xdrs, clp->_raw_buf, UDPMSGSIZE, XDR_FREE);
 
 	/*
 	 * create client handle
@@ -144,7 +145,7 @@ call_again:
 	 */
 	xdrs->x_op = XDR_ENCODE;
 	XDR_SETPOS(xdrs, 0);
-	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid++ ;
+	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid ++ ;
 	if ((! XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
 	    (! XDR_PUTLONG(xdrs, (long *)&proc)) ||
 	    (! AUTH_MARSHALL(h->cl_auth, xdrs)) ||

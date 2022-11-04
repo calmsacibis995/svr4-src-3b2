@@ -8,14 +8,13 @@
 #ifndef _SYS_FLOCK_H
 #define _SYS_FLOCK_H
 
-#ident	"@(#)head.sys:sys/flock.h	11.11"
+#ident	"@(#)head.sys:sys/flock.h	11.9"
 
-#define	INOFLCK		1	/* Vnode is locked when reclock() is called. */
-#define	SETFLCK		2	/* Set a file lock. */
-#define	SLPFLCK		4	/* Wait if blocked. */
-#define	RCMDLCK		8	/* RGETLK/RSETLK/RSETLKW specified */
+#define INOFLCK		1	/* Vnode is locked when reclock() is called. */
+#define SETFLCK		2	/* Set a file lock. */
+#define SLPFLCK		4	/* Wait if blocked. */
 
-#define IGN_PID		(-1)	/* ignore epid when cleaning locks */
+#define IGN_PID		-1	/* ignore epid when cleaning locks	*/
 
 /* file locking structure (connected to vnode) */
 
@@ -41,7 +40,9 @@ typedef struct filock {
 /* file and record locking configuration structure */
 /* record use total may overflow */
 struct flckinfo {
+	long recs;	/* number of records configured on system */
 	long reccnt;	/* number of records currently in use */
+	long recovf;	/* number of times system ran out of record locks. */
 	long rectot;	/* number of records used since system boot */
 };
 

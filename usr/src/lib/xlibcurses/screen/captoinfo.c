@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)curses:screen/captoinfo.c	1.12"
+#ident	"@(#)curses:screen/captoinfo.c	1.11"
 /*
     NAME
 	captoinfo - convert a termcap description to a terminfo description
@@ -1328,17 +1328,10 @@ captoinfo ()
 	print_no_use_entry ();
 }
 
-
-#include <signal.h>   /* use this file to determine if this is SVR4.0 system */
-
 use_etc_termcap ()
 {
     if (verbose)
-#ifdef  SIGSTOP
-	(void) fprintf (trace, "reading from /usr/share/lib/termcap\n");
-#else   /* SIGSTOP */
 	(void) fprintf (trace, "reading from /etc/termcap\n");
-#endif  /* SIGSTOP */
     term_name = getenv ("TERM");
     captoinfo ();
 }
@@ -1527,7 +1520,7 @@ char **argv;
 		verbose++;
 		break;
 	    case 'V':
-		printf("%s: version %s\n", progname, "@(#)curses:screen/captoinfo.c	1.12");
+		printf("@(#)curses:screen/captoinfo.c	1.11");
 		fflush(stdout);
 		exit (0);
 	    case '?':

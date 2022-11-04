@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/syslog.c	1.4"
+#ident	"@(#)libc-port:gen/syslog.c	1.3"
 
 /* from "@(#)syslog.c 1.18 88/02/08 SMI"; from UCB 5.9 5/7/86 */
 
@@ -44,14 +44,12 @@
  * The output of this routine is intended to be read by /etc/syslogd.
  */
 
-#ifndef DSHLIB
 #ifdef __STDC__
 	#pragma weak syslog = _syslog
 	#pragma weak vsyslog = _vsyslog
 	#pragma weak openlog = _openlog
 	#pragma weak closelog = _closelog
 	#pragma weak setlogmask = _setlogmask
-#endif
 #endif
 #include "synonyms.h"
 #include <sys/types.h>
@@ -63,8 +61,6 @@
 #include <string.h>
 #include <varargs.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <string.h>
 /*#include <vfork.h>*/
 
 #define	MAXLINE	1024			/* max message size */
@@ -74,13 +70,13 @@
 #define PRIFAC(p)	(((p) & LOG_FACMASK) >> 3)
 #define IMPORTANT 	LOG_ERR
 
-#define logname "/dev/conslog"
-#define ctty "/dev/syscon"
+static char	logname[] = "/dev/conslog";
+static char	ctty[] = "/dev/syscon";
 
 static struct __syslog {
 	int	_LogFile;
 	int	_LogStat;
-	const char	*_LogTag;
+	char	*_LogTag;
 	int	_LogMask;
 	char	*_SyslogHost;
 	int	_LogFacility;
@@ -93,7 +89,8 @@ static struct __syslog {
 #define	SyslogHost (__syslog->_SyslogHost)
 #define	LogFacility (__syslog->_LogFacility)
 
-extern	int errno;
+extern	int errno, sys_nerr;
+extern	char *sys_errlist[];
 
 /*VARARGS2*/
 syslog(pri, fmt, va_alist)
@@ -162,7 +159,6 @@ vsyslog(pri, fmt, ap)
 	b = buf;
 	f = fmt;
 	while ((c = *f++) != '\0' && c != '\n' && b < &buf[MAXLINE]) {
-		char *errmsg;
 		if (c != '%') {
 			*b++ = c;
 			continue;
@@ -172,10 +168,10 @@ vsyslog(pri, fmt, ap)
 			*b++ = c;
 			continue;
 		}
-		if ((errmsg = strerror(olderrno)) == NULL)
+		if ((unsigned)olderrno > sys_nerr)
 			sprintf(b, "error %d", olderrno);
 		else
-			strcpy(b, errmsg);
+			strcpy(b, sys_errlist[olderrno]);
 		b += strlen(b);
 	}
 	*b++ = '\n';

@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.face:prototype	1.7"
+#ident	"@(#)pkg.face:prototype	1.6"
 
 # packaging files
 i	pkginfo
@@ -185,7 +185,6 @@ f none /home/vmsys/HELP/rename 0644 vmsys vm
 f none /home/vmsys/HELP/run 0644 vmsys vm
 f none /home/vmsys/HELP/security 0644 vmsys vm
 f none /home/vmsys/HELP/select 0644 vmsys vm
-f none /home/vmsys/HELP/show-path 0644 vmsys vm
 f none /home/vmsys/HELP/time 0644 vmsys vm
 f none /home/vmsys/HELP/undelete 0644 vmsys vm
 f none /home/vmsys/HELP/unix 0644 vmsys vm

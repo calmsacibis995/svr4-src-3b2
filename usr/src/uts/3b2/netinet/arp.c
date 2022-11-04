@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/arp.c	1.5"
+#ident	"@(#)netinet:netinet/arp.c	1.4"
 
 /*
  * System V STREAMS TCP - Release 2.0 
@@ -684,8 +684,8 @@ arpuwput(q, bp)
 		lp = (struct linkblk *) bp->b_cont->b_rptr;
 
 		for (i = 0; i < N_ARP; i++) {
-			if (arp_pcb[i].arp_qtop &&
-			    arp_pcb[i].arp_index == lp->l_index) {
+			if (arp_pcb[i].arp_qtop == RD(q)
+			    && arp_pcb[i].arp_index == lp->l_index) {
 				ar = (struct arp_pcb *) & arp_pcb[i];
 				break;
 			}

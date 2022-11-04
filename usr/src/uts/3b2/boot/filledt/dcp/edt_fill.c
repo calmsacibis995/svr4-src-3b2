@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)boot:boot/filledt/dcp/edt_fill.c	1.7"
+#ident	"@(#)boot:boot/filledt/dcp/edt_fill.c	1.5"
 
 
 
@@ -21,7 +21,6 @@
 #include <sys/lboot.h>
 #include <sys/dsd.h>
 #include <sys/vtoc.h>
-#include <sys/inline.h>
 
 
 
@@ -383,9 +382,7 @@ xbusgen()
 			}
 
 		p = path;		/* edtgen file */
-		strcpy(p, edtname);
-		strcat(p, EDTP(i)->dev_name);
-		strcat(p, "/");
+		strcat(strcat(strcpy(p, edtname), EDTP(i)->dev_name), "/");
 		strcat(p, gename);
 
 		if ( findfile(p) == NOTFOUND){
@@ -432,7 +429,7 @@ long startsector,first,last;
 
 
 	sect = PHYS_INFO[P_CMDQ->b_dev - HARDDISK0].logicalst;
-	sect += startsector;
+	sect += BOOTVTOC->v_part[7].p_start + startsector;
 	mp =first;
 	numsect = (last - first + (BSIZE-1))/BSIZE;
 

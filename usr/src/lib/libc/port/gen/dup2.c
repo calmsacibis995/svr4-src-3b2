@@ -5,14 +5,14 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/dup2.c	1.8"
+#ident	"@(#)libc-port:gen/dup2.c	1.7"
 #ifdef __STDC__
 	#pragma weak dup2 = _dup2
 #endif
 #include 	"synonyms.h"
 #include	<limits.h>	/* Get definition for OPEN_MAX */
 #include	<fcntl.h>
-#include	<unistd.h>
+#include	<osfcn.h>
 #include	<sys/errno.h>	/* Get definition for EBADF */
 
 int

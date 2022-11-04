@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libresolv:gthostnamadr.c	1.2"
+#ident	"@(#)libresolv:gthostnamadr.c	1.1"
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -40,7 +40,6 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-#include "res.h"
 
 #define	MAXALIASES	35
 #define	MAXADDRS	35

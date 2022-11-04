@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/ip_icmp.c	1.9"
+#ident	"@(#)netinet:netinet/ip_icmp.c	1.7"
 
 /*
  * System V STREAMS TCP - Release 2.0
@@ -466,7 +466,7 @@ icmp_state(q, bp)
 	register struct inpcb *inp = qtoinp(q);
 	int             error = 0;
 	mblk_t         *head;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 	struct in_addr  laddr;
 
 	/*
@@ -511,7 +511,7 @@ icmp_state(q, bp)
 		t_prim->info_ack.ETSDU_size = 1;
 		t_prim->info_ack.CDATA_size = -2;	/* ==> not supported */
 		t_prim->info_ack.DDATA_size = -2;
-		t_prim->info_ack.ADDR_size = sizeof(struct sockaddr_in);
+		t_prim->info_ack.ADDR_size = sizeof(struct taddr_in);
 		t_prim->info_ack.OPT_size = -1;
 		t_prim->info_ack.TIDU_size = 16 * 1024;
 		t_prim->info_ack.SERV_type = T_CLTS;
@@ -531,12 +531,13 @@ icmp_state(q, bp)
 		if (t_prim->bind_req.ADDR_length == 0) {
 			error = in_pcbbind(inp, (mblk_t *) NULL);
 		} else {
-			if (!in_chkaddrlen(t_prim->bind_req.ADDR_length)) {
+			if (t_prim->bind_req.ADDR_length
+			    != sizeof(struct taddr_in)) {
 				T_errorack(q, bp, TBADADDR, 0);
 				break;
 			}
 			bp->b_rptr += t_prim->bind_req.ADDR_offset;
-			sin = (struct sockaddr_in *) bp->b_rptr;
+			sin = (struct taddr_in *) bp->b_rptr;
 			if (sin->sin_port == 0)
 				sin->sin_port = 1;
 			error = in_pcbbind(inp, bp);
@@ -546,19 +547,19 @@ icmp_state(q, bp)
 			break;
 		inp->inp_tstate = TS_IDLE;
 		if ((bp = reallocb(bp, sizeof(struct T_bind_ack)
-				   + sizeof(struct sockaddr_in), 1))
+				   + sizeof(struct taddr_in), 1))
 		    == NULL) {
 			return;
 		}
 		t_prim = (union T_primitives *) bp->b_rptr;
 		t_prim->bind_ack.PRIM_type = T_BIND_ACK;
-		t_prim->bind_ack.ADDR_length = sizeof(struct sockaddr_in);
+		t_prim->bind_ack.ADDR_length = sizeof(struct taddr_in);
 		t_prim->bind_ack.ADDR_offset = sizeof(struct T_bind_ack);
-		sin = (struct sockaddr_in *)
+		sin = (struct taddr_in *)
 			(bp->b_rptr + sizeof(struct T_bind_ack));
 		bp->b_wptr = (unsigned char *)
-			(((caddr_t) sin) + sizeof(struct sockaddr_in));
-		bzero((caddr_t) sin, sizeof(struct sockaddr_in));
+			(((caddr_t) sin) + sizeof(struct taddr_in));
+		bzero((caddr_t) sin, sizeof(struct taddr_in));
 		sin->sin_family = AF_INET;
 		sin->sin_addr = inp->inp_laddr;
 		sin->sin_port = inp->inp_lport;
@@ -588,7 +589,7 @@ icmp_state(q, bp)
 			break;
 		}
 		bp->b_rptr += t_prim->conn_req.DEST_offset;
-		sin = (struct sockaddr_in *) bp->b_rptr;
+		sin = (struct taddr_in *) bp->b_rptr;
 		if (sin->sin_port == 0)
 			sin->sin_port = 1;
 		if (error = in_pcbconnect(inp, bp))
@@ -638,7 +639,7 @@ icmp_state(q, bp)
 			break;
 		}
 		bp->b_rptr += t_prim->unitdata_req.DEST_offset;
-		sin = (struct sockaddr_in *) bp->b_rptr;
+		sin = (struct taddr_in *) bp->b_rptr;
 		if (sin->sin_port == 0)
 			sin->sin_port = 1;
 		if (error = in_pcbconnect(inp, bp))
@@ -852,7 +853,7 @@ icmp_error(oip, type, code, q, dest)
 static struct in_addr icmpsrc;
 static struct in_addr icmpdst;
 static struct in_addr icmpgw;
-static struct sockaddr_in icmpsin = {AF_INET};
+static struct taddr_in icmpsin = {AF_INET};
 
 /*
  * Process a received ICMP message.
@@ -1052,21 +1053,21 @@ raw:
 
 	icmpsin.sin_addr = ip->ip_src;
 	Obp = allocb(sizeof(struct T_unitdata_ind) +
-		     sizeof(struct sockaddr_in), BPRI_HI);
+		     sizeof(struct taddr_in), BPRI_HI);
 	if (Obp == 0) {
 		goto free;
 	}
 	Obp->b_datap->db_type = M_PROTO;
 	hdr = (struct T_unitdata_ind *) Obp->b_rptr;
 	Obp->b_wptr += sizeof(struct T_unitdata_ind) +
-		sizeof(struct sockaddr_in);
+		sizeof(struct taddr_in);
 	hdr->PRIM_type = T_UNITDATA_IND;
-	hdr->SRC_length = sizeof(struct sockaddr_in);
+	hdr->SRC_length = sizeof(struct taddr_in);
 	hdr->SRC_offset = sizeof(struct T_unitdata_ind);
 	hdr->OPT_length = 0;
 	hdr->OPT_offset = 0;
 	bcopy((caddr_t) & icmpsin, (caddr_t) Obp->b_rptr +
-	      sizeof(struct T_unitdata_ind), sizeof(struct sockaddr_in));
+	      sizeof(struct T_unitdata_ind), sizeof(struct taddr_in));
 	Obp->b_cont = bp;
 
 	for (inp = icmb.inp_next; inp != &icmb; inp = inp->inp_next) {
@@ -1277,7 +1278,7 @@ struct inpcb *inp;
 {
 	mblk_t *mp;
 	struct T_uderror_ind *uderr;
-	struct sockaddr_in *sin;
+	struct taddr_in *sin;
 
 	if (!inp->inp_q)
 		return;
@@ -1292,7 +1293,7 @@ struct inpcb *inp;
 	uderr->OPT_length = 0;
 	uderr->OPT_offset = 0;
 	uderr->ERROR_type = inp->inp_error;
-	sin = (struct sockaddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
+	sin = (struct taddr_in *) (mp->b_rptr+sizeof(struct T_uderror_ind));
 	bzero(sin, sizeof(*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_addr = inp->inp_faddr;
@@ -1308,7 +1309,7 @@ icmp_uderr(bp)
 mblk_t *bp;
 {
 	struct N_uderror_ind *uderr;
-	struct sockaddr_in sin;
+	struct taddr_in sin;
 
 	uderr = (struct N_uderror_ind *) bp->b_rptr;
 	if (uderr->ERROR_type == ENOSR) {

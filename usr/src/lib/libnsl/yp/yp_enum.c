@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)libyp:yp_enum.c	1.2"
+#ident	"@(#)libyp:yp_enum.c	1.1"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -136,8 +135,6 @@ dofirst (domain, map, pdomb, timeout, key, keylen, val, vallen)
 	 * from this point.
 	 */
 	
-	memset((char *)&resp, 0, sizeof(struct ypresp_key_val));
-
 	if(clnt_call(pdomb->dom_client, YPPROC_FIRST, xdr_ypreq_nokey,
 	    &req, xdr_ypresp_key_val, &resp, timeout) != RPC_SUCCESS) {
 		return (YPERR_RPC);

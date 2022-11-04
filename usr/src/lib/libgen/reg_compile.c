@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libgen:reg_compile.c	1.2.7.3"
+#ident	"@(#)libgen:reg_compile.c	1.2.7.2"
 
 #ifdef __STDC__
 	#pragma weak nbra = _nbra
@@ -36,7 +36,7 @@
 
 int	nbra = 0, regerrno = 0, reglength = 0;
 
-static unsigned char	_bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+static char	_bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 char *_compile();
 char *strchr();
 

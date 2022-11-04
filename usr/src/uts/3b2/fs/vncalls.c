@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/vncalls.c	1.95"
+#ident	"@(#)fs:fs/vncalls.c	1.66"
 /*
  * System call routines for operations on files.  These manipulate
  * the global and per-process file table entries which refer to
@@ -109,7 +86,10 @@
 #include "sys/disp.h"
 #include "sys/mkdev.h"
 #include "sys/time.h"
-#include "sys/unistd.h"
+
+#include "rpc/types.h"
+#define NFSSERVER
+#include "nfs/nfs.h"
 
 /*
  * Open a file.
@@ -131,7 +111,7 @@ open(uap, rvp)
 	register struct opena *uap;
 	rval_t *rvp;
 {
-	return copen(uap->fname, (int)(uap->fmode-FOPEN), uap->cmode, rvp);
+	return copen(uap->fname, (int)(uap->fmode - FOPEN), uap->cmode, rvp);
 }
 
 /*
@@ -164,9 +144,7 @@ copen(fname, filemode, createmode, rvp)
 	vnode_t *vp;
 	file_t *fp;
 	register int error;
-	int fd, dupfd;
-	enum vtype type;
-	enum create crwhy;
+	int fd;
 
 	if ((filemode & (FREAD|FWRITE)) == 0)
 		return EINVAL;
@@ -176,34 +154,11 @@ copen(fname, filemode, createmode, rvp)
 
 	if (error = falloc((vnode_t *)NULL, filemode & FMASK, &fp, &fd))
 		return error;
-	
-	/*
-	 * Last arg is a don't-care term if !(filemode & FCREAT).
-	 */
 	error = vn_open(fname, UIO_USERSPACE, filemode,
-	  (int)((createmode & MODEMASK) & ~u.u_cmask), &vp, CRCREAT);
+	  (int)((createmode & MODEMASK) & ~u.u_cmask), &vp);
 	if (error) {
 		setf(fd, NULLFP);
 		unfalloc(fp);
-	} else if (vp->v_flag & VDUP) {
-		/*
-		 * Special handling for /dev/fd.  Give up the file pointer
-		 * and dup the indicated file descriptor (in v_rdev).  This
-		 * is ugly, but I've seen worse.
-		 */
-		setf(fd, NULLFP);
-		unfalloc(fp);
-		dupfd = getminor(vp->v_rdev);
-		type = vp->v_type;
-		vp->v_flag &= ~VDUP;
-		VN_RELE(vp);
-		if (type != VCHR)
-			return EINVAL;
-		if (error = getf(dupfd, &fp))
-			return error;
-		setf(fd, fp);
-		fp->f_count++;
-		rvp->r_val1 = fd;
 	} else {
 		fp->f_vnode = vp;
 		rvp->r_val1 = fd;
@@ -230,9 +185,8 @@ close(uap, rvp)
 
 	if (error = getf(uap->fdes, &fp))
 		return error;
-	error = closef(fp);
 	setf(uap->fdes, NULLFP);
-	return error;
+	return closef(fp);
 }
 
 /*
@@ -384,6 +338,19 @@ rdwr(fp, uio, rvp, mode)
 	}
 	vp = fp->f_vnode;
 	type = vp->v_type;
+	if (type == VREG || type == VDIR) {
+		/*
+		 * Make sure that the user can write all the way up
+		 * to the rlimit value.
+		 */
+      	        if (type == VREG && mode == FWRITE) {
+      	      	        register ulong rlimit =
+      	      	          u.u_rlimit[RLIMIT_FSIZE].rlim_cur - fp->f_offset;
+			/* LINTED */
+      	      	        if (rlimit < uio->uio_resid && rlimit > 0)
+      	      	      	        uio->uio_resid = rlimit;
+      	        }
+	}
 	count = uio->uio_resid;
 	uio->uio_offset = fp->f_offset;
 	uio->uio_segflg = UIO_USERSPACE;
@@ -395,20 +362,16 @@ rdwr(fp, uio, rvp, mode)
 	if (fp->f_flag & FSYNC)
 		ioflag |= IO_SYNC;
 	VOP_RWLOCK(vp);
-	if (setjmp(&u.u_qsav)) {
-		error = EINTR;
-	} else {
+	if (setjmp(&u.u_qsav))
+		error = intrerr(uio->uio_resid == count);
+	else {
 		if (mode == FREAD) {
 			error = VOP_READ(vp, uio, ioflag, fp->f_cred);
 		} else {
 			error = VOP_WRITE(vp, uio, ioflag, fp->f_cred);
 		}
 	}
-
 	VOP_RWUNLOCK(vp);
-
-	if (error == EINTR && uio->uio_resid != count)
-		error = 0;
 
 	rvp->r_val1 = count - uio->uio_resid;
 	u.u_ioch += (unsigned)rvp->r_val1;
@@ -620,17 +583,13 @@ cmknod(version, fname, fmode, dev, rvp)
 	if (vattr.va_type == VCHR || vattr.va_type == VBLK
 	  || vattr.va_type == VXNAM) {
 		if (version == MKNOD_VER && vattr.va_type != VXNAM) {
-			if (dev == (dev_t)NODEV || 
-				getemajor(dev) == (dev_t)NODEV)
-
-				return EINVAL;
-			else
+			if (dev != (u_int)NODEV)
 				vattr.va_rdev = dev;
+			else
+				return EINVAL;
 		} else {
 			/* dev is in old format */
-			if ((emajor(dev)) == (dev_t)NODEV ||
-				dev == (dev_t)NODEV)
-
+			if ((emajor(dev)) > O_MAXMAJ)
 				return EINVAL;
 			else
 				vattr.va_rdev = expdev(dev);
@@ -1191,72 +1150,6 @@ xcstat(vp, ubp)
 	return error;
 }
 
-#if defined(__STDC__)
-STATIC int	cpathconf(vnode_t *, int, rval_t *);
-#else
-STATIC int	cpathconf();
-#endif
-
-/* fpathconf/pathconf interfaces */
-
-struct fpathconfa {
-	int	fdes;
-	int	name;
-};
-
-/* ARGSUSED */
-int
-fpathconf(uap, rvp)
-	register struct fpathconfa *uap;
-	rval_t *rvp;
-{
-	file_t *fp;
-	register int error;
-
-	if (error = getf(uap->fdes, &fp))
-		return error;
-	return cpathconf(fp->f_vnode, uap->name, rvp);
-}
-
-struct pathconfa {
-	char	*fname;
-	int	name;
-};
-
-/* ARGSUSED */
-int
-pathconf(uap, rvp)
-	register struct pathconfa *uap;
-	rval_t *rvp;
-{
-	vnode_t *vp;
-	register int error;
-
-	if (error = lookupname(uap->fname, UIO_USERSPACE,
-	  FOLLOW, NULLVPP, &vp))
-		return error;
-	error = cpathconf(vp, uap->name, rvp);
-	VN_RELE(vp);
-	return error;
-}
-/*
- * Common code for pathconf(), fpathconf() system calls
- */
-STATIC int
-cpathconf(vp, cmd, rvp)
-	register vnode_t *vp;
-	int cmd;
-	rval_t *rvp;
-{
-	register int error;
-	u_long val;
-
-	if ((error = VOP_PATHCONF(vp, cmd, &val, u.u_cred)) == 0)
-		rvp->r_val1 = val;
-
-	return error;
-}
-
 /*
  * Read the contents of a symbolic link.
  */
@@ -1365,15 +1258,12 @@ chown(uap, rvp)
 {
 	struct vattr vattr;
 
-	if (uap->uid < (uid_t)-1 || uap->uid > MAXUID
-	  || uap->gid < (gid_t)-1 || uap->gid > MAXUID)
-		return EINVAL;
 	vattr.va_uid = uap->uid;
 	vattr.va_gid = uap->gid;
 	vattr.va_mask = 0;
-	if (vattr.va_uid != (uid_t)-1)
+	if (vattr.va_uid != -1)
 		vattr.va_mask |= AT_UID;
-	if (vattr.va_gid != (gid_t)-1)
+	if (vattr.va_gid != -1)
 		vattr.va_mask |= AT_GID;
 	return namesetattr(uap->fname, FOLLOW, &vattr, 0);
 }
@@ -1386,15 +1276,12 @@ lchown(uap, rvp)
 {
 	struct vattr vattr;
 
-	if (uap->uid < (uid_t)-1 || uap->uid > MAXUID
-	  || uap->gid < (gid_t)-1 || uap->gid > MAXUID)
-		return EINVAL;
 	vattr.va_uid = uap->uid;
 	vattr.va_gid = uap->gid;
 	vattr.va_mask = 0;
-	if (vattr.va_uid != (uid_t)-1)
+	if (vattr.va_uid != -1)
 		vattr.va_mask |= AT_UID;
-	if (vattr.va_gid != (gid_t)-1)
+	if (vattr.va_gid != -1)
 		vattr.va_mask |= AT_GID;
 	return namesetattr(uap->fname, NO_FOLLOW, &vattr, 0);
 }
@@ -1416,15 +1303,12 @@ fchown(uap, rvp)
 {
 	struct vattr vattr;
 
-	if (uap->uid < (uid_t)-1 || uap->uid > MAXUID
-	  || uap->gid < (gid_t)-1 || uap->gid > MAXUID)
-		return EINVAL;
 	vattr.va_uid = uap->uid;
 	vattr.va_gid = uap->gid;
 	vattr.va_mask = 0;
-	if (vattr.va_uid != (uid_t)-1)
+	if (vattr.va_uid != -1)
 		vattr.va_mask |= AT_UID;
-	if (vattr.va_gid != (gid_t)-1)
+	if (vattr.va_gid != -1)
 		vattr.va_mask |= AT_GID;
 	return fdsetattr(uap->fd, &vattr);
 }
@@ -1449,7 +1333,7 @@ chsize(uap, rvp)
 	struct flock bf;
 
 	if (uap->size < 0L || uap->size > u.u_rlimit[RLIMIT_FSIZE].rlim_cur)
-		return EFBIG;
+		return EINVAL;
 	if (error = getf(uap->fdes, &fp))
 		return error;
 	if ((fp->f_flag & FWRITE) == 0)
@@ -1457,6 +1341,11 @@ chsize(uap, rvp)
 	vp = fp->f_vnode;
 	if (vp->v_type != VREG)
 		return EINVAL;         /* could have better error */
+	if (vp->v_flag & VTEXT) {
+		xrele(vp);		/* try once to free text */
+		if (vp->v_flag & VTEXT)
+			return ETXTBSY;
+	}
 	bf.l_whence = 0;
 	bf.l_start = uap->size;
 	bf.l_type = F_WRLCK;
@@ -1488,19 +1377,11 @@ rdchk(uap, rvp)
 		return EBADF;
 	vp = fp->f_vnode;
 	if (vp->v_type == VCHR || vp->v_type == VFIFO) {
-		if (vp->v_type == VCHR) {
-			error = spec_rdchk(vp, u.u_cred, &rvp->r_val1);
-		}
-		else if (vp->v_type == VFIFO) {
-			vattr.va_mask = AT_SIZE;
-			if (error = VOP_GETATTR(vp, &vattr, 0, u.u_cred))
-				return error;
-			if (vattr.va_size > 0 || fifo_rdchk(vp) <= 0
-			  || fp->f_flag & (FNDELAY|FNONBLOCK))
-				rvp->r_val1 = 1;
-			else
-				rvp->r_val1 = 0;
-		}
+		vattr.va_mask = AT_SIZE;
+		if (error = VOP_GETATTR(vp, &vattr, 0, u.u_cred))
+			return error;
+		/* LINTED */
+		rvp->r_val1 = (vattr.va_size > 0);
 	} else
 		rvp->r_val1 = 1;
 
@@ -1580,11 +1461,16 @@ locking(uap, rvp)
 		bf.l_len = uap->size;
 	}
 
-	error = VOP_FRLOCK(fp->f_vnode, cmd, &bf, fp->f_flag,
-	  fp->f_offset, fp->f_cred);
-
-	if (!error && uap->mode != LK_UNLCK)
+	if ((error = VOP_FRLOCK(fp->f_vnode, cmd, &bf, fp->f_flag,
+	  fp->f_offset, fp->f_cred)) != 0) {
+		if (error == EAGAIN)
+			error = EACCES;
+	} else if (uap->mode != LK_UNLCK) {
+		/*
+		 * Turn on lock-enforcement bit.
+		 */
 		fp->f_vnode->v_flag |= VXLOCKED;
+	}
 
 	return error;
 }
@@ -1701,6 +1587,11 @@ struct fcntla {
 	int arg;
 };
 
+struct f_cnvt_arg {
+	fhandle_t *fh;
+	int filemode;
+};
+
 int
 fcntl(uap, rvp)
 	register struct fcntla *uap;
@@ -1713,7 +1604,13 @@ fcntl(uap, rvp)
 	int flag, fd;
 	struct flock bf;
 	struct o_flock obf;
-	char flags;
+	/* the next 7 are for NFS file/record locks */
+	struct f_cnvt_arg a;
+	register struct f_cnvt_arg *ap;
+	fhandle_t tfh;
+	register int filemode;
+	int mode;
+	struct vnode *myfhtovp();
 	extern struct fileops vnodefops;
 	
 	if (error = getf(uap->fdes, &fp))
@@ -1730,9 +1627,6 @@ fcntl(uap, rvp)
 			error = EINVAL;
 		else if ((error = ufalloc(i, &fd)) == 0) {
 			setf(fd, fp);
-			flags = getpof(fd);
-			flags = flags & ~FCLOSEXEC;
-			setpof(fd, flags);
 			fp->f_count++;
 			rvp->r_val1 = fd;
 			break;
@@ -1772,9 +1666,9 @@ fcntl(uap, rvp)
 			error = EFAULT;
 			break;
 		}
-		if ((uap->cmd == F_SETLK || uap->cmd == F_SETLKW) &&
-			bf.l_type != F_UNLCK) {
-			setpof(uap->fdes, getpof(uap->fdes)|UF_FDLOCK);
+		if (bf.l_type != F_UNLCK) {
+			u.u_procp->p_flag |= SLKDONE;
+			setpof (uap->fdes, getpof(uap->fdes) | UF_FDLOCK);
 		}
 		if (error =
 		  VOP_FRLOCK(vp, uap->cmd, &bf, flag, offset, fp->f_cred)) {
@@ -1785,20 +1679,6 @@ fcntl(uap, rvp)
 				error = EACCES;
 			break;
 		}
-
-		/*
-		 * If command is GETLK and no lock is found, only
-		 * the type field is changed.
-		 */
-		if ((uap->cmd == F_O_GETLK || uap->cmd == F_GETLK)
-		  && bf.l_type == F_UNLCK) {
-			if (copyout((caddr_t)&bf.l_type,
-			  (caddr_t)&((struct flock *)uap->arg)->l_type,
-			  sizeof(bf.l_type)))
-				error = EFAULT;
-			break;
-		}
-
 		if (uap->cmd == F_O_GETLK) {
 			/*
 			 * Return an SVR3 flock structure to the user.
@@ -1828,6 +1708,7 @@ fcntl(uap, rvp)
 			int i;
 
 			for (i = 0; i < 4; i++)
+				/* Initialize pad until it's allocated. */
 				bf.pad[i] = 0;
 		    	if (copyout((caddr_t)&bf, (caddr_t)uap->arg, sizeof bf))
 			  	error = EFAULT;
@@ -1847,6 +1728,9 @@ fcntl(uap, rvp)
 			error = EFAULT;
 			break;
 		}
+		if (bf.l_type != F_UNLCK) {
+			u.u_procp->p_flag |= SLKDONE;
+		}
 		if (error =
 		  VOP_FRLOCK(vp, uap->cmd, &bf, flag, offset, fp->f_cred)) {
 			/*
@@ -1859,6 +1743,126 @@ fcntl(uap, rvp)
 		if (uap->cmd == F_RGETLK
 		  && copyout((caddr_t)&bf, (caddr_t)uap->arg, sizeof bf))
 			  error = EFAULT;
+		break;
+
+	/*
+	 *      F_CNVT fcntl:  given a pointer to an fhandle_t and a mode, open
+	 *      the file corresponding to the fhandle_t with the given mode and
+	 *      return a file descriptor.  Note:  uap->fd is unused.
+	 */
+	 case F_CNVT:
+		if (!suser(u.u_cred)) {
+			error = EPERM;
+			break;
+		}
+ 
+		if (error = copyin((caddr_t) uap->arg, (caddr_t) &a, sizeof(a))) {
+			break;
+		}
+		else
+			ap = &a;
+		if (error = copyin((caddr_t) ap->fh, (caddr_t) &tfh, sizeof(tfh))) {
+			break;
+		}
+ 
+		filemode = ap->filemode - FOPEN;
+		if (filemode & FCREAT) {
+			error = EINVAL;
+			break;
+		}
+		mode = 0;
+		if (filemode & FREAD)
+			mode |= VREAD;
+		if (filemode & (FWRITE | FTRUNC))
+			mode |= VWRITE;
+ 
+		/*
+		 *      Adapted from copen:
+		 */
+		error = falloc((struct vnode *)NULL, filemode & FMASK,
+			&fp, &fd);
+		if (error)
+			return error;
+ 
+		/*
+		 *      This takes the place of lookupname in copen.  Note that
+		 *      we can't use the normal fhtovp function because we want
+		 *      this to work on files that may not have been exported.
+		 */
+		if ((vp = myfhtovp(&tfh)) == (struct vnode *) NULL) {
+			error = ESTALE;
+			goto out;
+		}
+ 
+		/*
+		 *      Adapted from vn_open:
+		 */
+		if (filemode & (FWRITE | FTRUNC)) {
+			struct vattr vattr;
+
+			if (vp->v_type == VDIR) {
+				error = EISDIR;
+				goto out;
+			}
+			if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
+				error = EROFS;
+				goto out;
+			}
+			/*
+			 * If there's shared text associated with
+			 * the vnode, try to free it up once.
+			 * If we fail, we can't allow writing.
+			 */
+			if (vp->v_flag & VTEXT) {
+				xrele(vp);
+				if (vp->v_flag & VTEXT) {
+					error = ETXTBSY;
+					goto out;
+				}
+			}
+			/*
+			 * Can't truncate files on which mandatory locking
+			 * is in effect.
+			 */
+			if ((filemode & FTRUNC) && vp->v_filocks != NULL) {
+				vattr.va_mask = AT_MODE;
+				if ((error = VOP_GETATTR(vp, &vattr, 0, u.u_cred)) == 0
+				  && MANDLOCK(vp, vattr.va_mode))
+					error = EAGAIN;
+			}
+			if (error)
+				goto out;
+		}
+		/*
+		 * Check permissions.
+		 * Must have read and write permission to open a file for
+		 * private access.
+		 */
+		if (error = VOP_ACCESS(vp, mode, 0, u.u_cred)) {
+			goto out;
+		}
+		error = VOP_OPEN(&vp, filemode, u.u_cred);
+		if ((error == 0) && (filemode & FTRUNC)) {
+			struct vattr vattr;
+ 
+			vattr.va_size = 0;
+			vattr.va_mask = AT_SIZE;
+			error = VOP_SETATTR(vp, &vattr, 0, u.u_cred);
+	       }
+	       if (error)
+			goto out;
+ 
+		/*
+		 *      Adapted from copen:
+		 */
+		fp->f_vnode = vp;
+		rvp->r_val1 = fd;
+		break;
+out:
+		crfree(fp->f_cred);
+		fp->f_count = 0;
+		if (vp)
+			VN_RELE(vp);
 		break;
 
 	case F_CHKFL:
@@ -1888,12 +1892,51 @@ fcntl(uap, rvp)
 			 VOP_SPACE(vp, uap->cmd, &bf, flag, offset, fp->f_cred);
 		break;
 
+	case F_BLOCKS:
+	case F_BLKSIZE:
+	{
+		struct vattr vattr;		
+		long int n;
+
+		vattr.va_mask = AT_BLKSIZE | AT_NBLOCKS;
+		if (error = VOP_GETATTR(vp, &vattr, 0, u.u_cred))
+			break;
+		n = (uap->cmd == F_BLOCKS) ?
+		  vattr.va_nblocks : vattr.va_blksize;
+		if (copyout((caddr_t)&n, (caddr_t)uap->arg, sizeof(long)))
+			error = EFAULT;
+		break;
+	}
+
 	default:
 		error = EINVAL;
 		break;
 	}
 
 	return error;
+}
+
+/*
+ * We require a version of fhtovp that simply converts an fhandle_t to
+ * a vnode without any ancillary checking (e.g., whether it's exported).
+ */
+STATIC struct vnode *
+myfhtovp(fh)
+	fhandle_t *fh;
+{
+	int error;
+	struct vnode *vp;
+	register struct vfs *vfsp;
+
+	vfsp = getvfs(&fh->fh_fsid);
+	if (vfsp == (struct vfs *) NULL) {
+		return ((struct vnode *) NULL);
+	}
+	error = VFS_VGET(vfsp, &vp, (struct fid *)&(fh->fh_len));
+	if (error || vp == (struct vnode *) NULL) {
+		return ((struct vnode *) NULL);
+	}
+	return (vp);
 }
 
 /*
@@ -1945,6 +1988,8 @@ ioctl(uap, rvp)
 
 	if (error = getf(uap->fdes, &fp))
 		return error;
+	if (setjmp(&u.u_qsav))
+		return intrerr(1);
 	vp = fp->f_vnode;
 
 	if (vp->v_type == VREG || vp->v_type == VDIR) {
@@ -2127,14 +2172,13 @@ retry:
 		savehp = NULL;
 	}
 	curdat = darray;
-	php = NULL;
 	for (i = 0; i < uap->nfds; i++) {
+		php = NULL;
 		if (pollp[i].fd < 0) 
 			pollp[i].revents = 0;
 		else if (pollp[i].fd >= u.u_nofiles || getf(pollp[i].fd, &fp))
 			pollp[i].revents = POLLNVAL;
 		else {
-			php = NULL;
 			error = VOP_POLL(fp->f_vnode, pollp[i].events, fdcnt,
 			    &pollp[i].revents, &php);
 			if (error)

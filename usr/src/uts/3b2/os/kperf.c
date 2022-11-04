@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/kperf.c	1.5"
+#ident	"@(#)kernel:os/kperf.c	1.4"
 #include "sys/types.h" 
 #ifdef	KPERF
 #include "sys/param.h"
@@ -99,10 +99,10 @@ proc_t *kproc;
 			/* don't write any more records, otherwise infinite loop */
 			outbuf = 1;
 			kpftraceflg = 0;
-			wakeprocs((caddr_t) &kpft[takephase*NUMRC], PRMPT);
+			wakeup((caddr_t) &kpft[takephase*NUMRC]);
 			return;
 		}
-		wakeprocs((caddr_t)&kpft[takephase*NUMRC], PRMPT);
+		wakeup((caddr_t)&kpft[takephase*NUMRC]);
 	}
 	/* get out of critical section */
 	/* restore psw before exiting the critical section */

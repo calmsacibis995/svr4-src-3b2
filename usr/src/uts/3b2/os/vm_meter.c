@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)kernel:os/vm_meter.c	1.15"
+#ident	"@(#)kernel:os/vm_meter.c	1.11"
 
 #include "sys/types.h"
 #include "sys/param.h"
@@ -123,11 +100,13 @@ vmmeter()
 		sum.v_swpout += cnt.v_swpout;
 		cnt.v_swpout = 0;
 	}
-	if (avefree < minfree && runout) {
+	if (avefree < minfree && runout
+	   /* || nproc[0]->p_slptime > maxslp/2 */
+	    ) {
 		runout = 0;
 		runin = 0;
-		wakeprocs((caddr_t)&runin, PRMPT);
-		wakeprocs((caddr_t)&runout, PRMPT);
+		wakeup((caddr_t)&runin);
+		wakeup((caddr_t)&runout);
 	}
 }
 
@@ -145,28 +124,30 @@ vmmeter()
 void
 vmtotal()
 {
-	register struct proc *p;
+	register struct proc **p;
 	int nrun = 0;
 
 	bzero((caddr_t)&total, sizeof (total));
-	for (p = practive; p != NULL ; p = p->p_next) {
-		if (p->p_flag & SSYS)
+	for (p = &nproc[0]; p < v.ve_proc; p++) {
+		if ( *p == NULL )	/* NOT USED */
 			continue;
-		total.t_rm += rm_asrss(p->p_as);
-		switch (p->p_stat) {
+		if ((*p)->p_flag & SSYS)
+			continue;
+		total.t_rm += rm_asrss((*p)->p_as);
+		switch ((*p)->p_stat) {
 
 		case SSLEEP:
 		case SSTOP:
-			if (p->p_pri <= PZERO)
+			if ((*p)->p_pri <= PZERO)
 				nrun++;
-			if (p->p_flag & SLOAD) {
-				if (p->p_pri <= PZERO)
+			if ((*p)->p_flag & SLOAD) {
+				if ((*p)->p_pri <= PZERO)
 					total.t_dw++;
-				else /* if (p->p_slptime < maxslp) */
+				else /* if ((*p)->p_slptime < maxslp) */
 					total.t_sl++;
-			} else /* if (p->p_slptime < maxslp) */
+			} else /* if ((*p)->p_slptime < maxslp) */
 				total.t_sw++;
-			/* if (p->p_slptime < maxslp)
+			/* if ((*p)->p_slptime < maxslp)
 				goto active;
 			*/
 			break;
@@ -174,12 +155,12 @@ vmtotal()
 		case SRUN:
 		case SIDL:
 			nrun++;
-			if (p->p_flag & SLOAD)
+			if ((*p)->p_flag & SLOAD)
 				total.t_rq++;
 			else
 				total.t_sw++;
 active:
-			total.t_arm += rm_asrss(p->p_as);
+			total.t_arm += rm_asrss((*p)->p_as);
 			break;
 		}
 	}

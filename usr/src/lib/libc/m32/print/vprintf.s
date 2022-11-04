@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"vprintf.s"
-.ident	"@(#)libc-u3b:print/vprintf.s	1.18"
+.ident	"@(#)libc-u3b:print/vprintf.s	1.16"
 
 #---------------------------------------------------------------#
 #								#
@@ -38,7 +32,6 @@ _m4_ifdef_(`DSHLIB',
 	jnz	.wset
 	bitb	&_IORW,_flag(iop)	# Check that read-write flag set
 	jnz	.rwset
-	movw	&9,_dref_(errno)	# Set errno to EBADF
 	mnegw	&EOFN,%r0		# Set error return
 	ret	&.Rcnt
 .rwset:	orb2	&_IOWRT,_flag(iop)	# Set write bit

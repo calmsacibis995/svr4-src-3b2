@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/ufs/ufs_inode.c	1.26"
+#ident	"@(#)fs:fs/ufs/ufs_inode.c	1.21"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -188,6 +165,7 @@ ufs_iget(vfsp, fs, ino, ipp)
 	register struct inode *iq;
 	register struct vnode *vp;
 	int error;
+	int checkhash;
 
 	sysinfo.iget++;
 	/*
@@ -202,7 +180,7 @@ loop:
 			 * Found it - check for locks.
 			 */
 			if ((ip->i_flag & (IRWLOCKED | ILOCKED)) &&
-			    ip->i_owner != curproc->p_slot) {
+			    ip->i_owner != GET_INDEX(curproc->p_pid)) {
 				ip->i_flag |= IWANT;
 				(void) sleep((caddr_t)ip, PINOD);
 				goto loop;
@@ -236,7 +214,9 @@ loop:
 	 * in an attempt to reclaim some inodes.  Give up only when
 	 * there are no more name cache entries to purge.
 	 */
+	checkhash = 0;
 	while (ifreeh == NULL) {
+		checkhash = 1;
 	/*
 	 * dnlc_purge1 might go to sleep. So we have to check the hash chain again
 	 * to handle possible race condition.
@@ -252,28 +232,41 @@ loop:
 		return (ENFILE);
 	}
 	if (ip->i_mode != 0 && ITOV(ip)->v_pages != NULL)
-		sysinfo.ufsipage++;
-	else
-		sysinfo.ufsinopage++;
 	iq = ip->i_freef;
 	if (iq)
-		iq->i_freeb = &ifreeh;
-	ifreeh = iq;
+		iq->i_freeb = ip->i_freeb;
+	else
+		ifreet = ip->i_freeb;
+	*ip->i_freeb = iq;	
 	ip->i_freef = NULL;
 	ip->i_freeb = NULL;
 
 	ip->i_flag = IREF;
 	ILOCK(ip);
-	if (ufs_syncip(ip, B_INVAL) != 0 || (ip->i_flag & IWANT) != 0) {
-		VN_HOLD(ITOV(ip));
-		idrop(ip);
-		goto loop;
-	}
-	for (iq = ih->ih_chain[0]; iq != (struct inode *)ih; iq = iq->i_forw) {
-		if (ino == iq->i_number && vfsp->vfs_dev == iq->i_dev) {
+	if (ip->i_fs != NULL && ITOV(ip)->v_pages != NULL &&
+	    ITOV(ip)->v_type != VCHR) {
+		int err;
+	/* We need to invalidate all the pages for the vnode here before we
+	   can reuse the inode. Since we might go to sleep and context switch
+	   here, there is a potential race condition when someone else also
+	   tries to iget the same (dev, ino). 
+	 */
+
+		err = VOP_PUTPAGE(ITOV(ip), 0, 0, B_INVAL, (struct ucred *)0);
+		if (err != 0 || (ip->i_flag & IWANT) != 0) {
 			VN_HOLD(ITOV(ip));
 			idrop(ip);
 			goto loop;
+		}
+		checkhash = 1;
+	}
+	if (checkhash) {
+		for (iq = ih->ih_chain[0]; iq != (struct inode *)ih; iq = iq->i_forw) {
+			if (ino == iq->i_number && vfsp->vfs_dev == iq->i_dev) {
+				VN_HOLD(ITOV(ip));
+				idrop(ip);
+				goto loop;
+			}
 		}
 	}
 
@@ -692,11 +685,9 @@ ufs_itrunc(oip, length)
 	/* caller never check the return code, why bother return errno ? */
 		return (EINVAL);
 	}
-	if (length == oip->i_size) {
-	/* update ctime and mtime to please POSIX tests */
-		oip->i_flag |= ICHG |IUPD;
+	if (length == oip->i_size)
 		return (0);
-	}
+
 	if (((oip->i_mode &IFMT) == IFREG) && oip->i_map)
 		ufs_freemap(oip);
 	
@@ -994,6 +985,11 @@ ufs_iaccess(ip, mode, cr)
 				return (EROFS);
 			}
 		}
+		if (vp->v_flag & VTEXT) {
+			xrele(vp);
+			if (vp->v_flag & VTEXT)
+				return ETXTBSY;
+		}
 	}
 	/*
 	 * If you're the super-user,
@@ -1029,7 +1025,6 @@ struct inode *ip;
 {
 	ip->i_back->i_forw = ip->i_forw;
 	ip->i_forw->i_back = ip->i_back;
-	ip->i_forw = ip->i_back = ip;
 	return;
 }
 

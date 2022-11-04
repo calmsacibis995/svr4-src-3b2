@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/clone.c	1.10"
+#ident	"@(#)kernel:io/clone.c	1.9"
 /*
  * Clone Driver.
  */
@@ -27,6 +27,7 @@
 #include "sys/ddi.h"
 #include "sys/conf.h"
 #include "sys/debug.h"
+#include "sys/inline.h"
 #include "sys/cred.h"
 #include "sys/mkdev.h"
 

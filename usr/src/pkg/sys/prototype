@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.sys:prototype	1.2.19.3"
+#ident	"@(#)pkg.sys:prototype	1.2.13.3"
 # the package files
 
 i pkginfo
@@ -16,11 +16,13 @@ d none /usr/include/arpa  0755 root sys
 d none /usr/include/des  0755 root sys
 d none /usr/include/net 0755 root sys
 d none /usr/include/netinet 0755 root sys
+d none /usr/include/nfs 0755 root sys
 d none /usr/include/protocols 0755 root sys
 d none /usr/include/rpc 0755 root sys
 
 # the objects: files
 !default 0444 bin bin
+f none /usr/include/fmtmsg.h
 f none /usr/include/nserve.h
 f none /usr/include/pn.h
 f none /usr/include/sys/acct.h
@@ -63,6 +65,7 @@ f none /usr/include/sys/elog.h
 f none /usr/include/sys/elf.h
 f none /usr/include/sys/elf_M32.h
 f none /usr/include/sys/elftypes.h
+f none /usr/include/sys/erec.h
 f none /usr/include/sys/err.h
 f none /usr/include/sys/errno.h
 f none /usr/include/sys/ertyp.h
@@ -72,7 +75,6 @@ f none /usr/include/sys/evecb.h
 f none /usr/include/sys/events.h
 f none /usr/include/sys/evsys.h
 f none /usr/include/sys/evsyscall.h
-f none /usr/include/sys/exec.h
 f none /usr/include/sys/extbus.h
 f none /usr/include/sys/fault.h
 f none /usr/include/sys/fblk.h
@@ -87,6 +89,7 @@ f none /usr/include/sys/fsiboot.h
 f none /usr/include/sys/fsid.h
 f none /usr/include/sys/fstyp.h
 f none /usr/include/sys/gate.h
+f none /usr/include/sys/gdpstr.h
 f none /usr/include/sys/hdeioctl.h
 f none /usr/include/sys/hdelog.h
 f none /usr/include/sys/hetero.h
@@ -157,7 +160,6 @@ f none /usr/include/sys/ptms.h
 f none /usr/include/sys/pump.h
 f none /usr/include/sys/queue.h
 f none /usr/include/sys/reg.h
-f none /usr/include/sys/regset.h
 f none /usr/include/sys/resource.h
 f none /usr/include/sys/rf_adv.h
 f none /usr/include/sys/rf_cirmgr.h
@@ -176,6 +178,7 @@ f none /usr/include/sys/sem.h
 f none /usr/include/sys/session.h
 f none /usr/include/sys/sgs.h
 f none /usr/include/sys/shm.h
+f none /usr/include/sys/sigaction.h
 f none /usr/include/sys/siginfo.h
 f none /usr/include/sys/signal.h
 f none /usr/include/sys/sit.h
@@ -198,7 +201,7 @@ f none /usr/include/sys/strpump.h
 f none /usr/include/sys/strstat.h
 f none /usr/include/sys/strtty.h
 f none /usr/include/sys/swap.h
-f none /usr/include/sys/nsxt.h
+f none /usr/include/sys/sxt.h
 f none /usr/include/sys/sys3b.h
 f none /usr/include/sys/syscall.h
 f none /usr/include/sys/sysgdb.h
@@ -227,15 +230,12 @@ f none /usr/include/sys/tspriocntl.h
 f none /usr/include/sys/ttcompat.h
 f none /usr/include/sys/ttold.h
 f none /usr/include/sys/tty.h
-f none /usr/include/sys/ttydev.h
-f none /usr/include/sys/ttychars.h
 f none /usr/include/sys/tuneable.h
 f none /usr/include/sys/types.h
 f none /usr/include/sys/uadmin.h
 f none /usr/include/sys/ucontext.h
 f none /usr/include/sys/uio.h
 f none /usr/include/sys/ulimit.h
-f none /usr/include/sys/unistd.h
 f none /usr/include/sys/user.h
 f none /usr/include/sys/ustat.h
 f none /usr/include/sys/utime.h
@@ -298,6 +298,12 @@ f none /usr/include/netinet/tcp_var.h
 f none /usr/include/netinet/tcpip.h
 f none /usr/include/netinet/udp.h
 f none /usr/include/netinet/udp_var.h
+f none /usr/include/nfs/export.h
+f none /usr/include/nfs/mount.h
+f none /usr/include/nfs/nfs.h
+f none /usr/include/nfs/nfs_clnt.h
+f none /usr/include/nfs/nfssys.h
+f none /usr/include/nfs/rnode.h
 f none /usr/include/rpc/auth.h
 f none /usr/include/rpc/auth_des.h
 f none /usr/include/rpc/auth_sys.h
@@ -354,5 +360,8 @@ f none /usr/include/vm/vpage.h
 
 # /usr/include symlinks to /usr/include/sys directories
 !default 0775 root sys
+s none /usr/include/sys/des=/usr/include/des
 s none /usr/include/sys/net=/usr/include/net
 s none /usr/include/sys/netinet=/usr/include/netinet
+s none /usr/include/sys/nfs=/usr/include/nfs
+s none /usr/include/sys/rpc=/usr/include/rpc

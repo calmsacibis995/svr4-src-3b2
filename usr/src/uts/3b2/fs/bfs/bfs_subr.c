@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/bfs/bfs_subr.c	1.28"
+#ident	"@(#)fs:fs/bfs/bfs_subr.c	1.23"
 #include "sys/types.h"
 #include "sys/time.h"
 #include "sys/param.h"
@@ -101,7 +101,7 @@ bfs_searchdir(vfsp, nm, cr)
 	char *nm;
 	struct cred *cr;
 {
-	ushort ino = 0;
+	o_ino_t ino = 0;
 	off_t ino_offset = 0;
 	int error;
 
@@ -127,7 +127,7 @@ bfs_rmdirent(vfsp, nm, cr)
 
 	register struct bsuper *bs = (struct bsuper *)vfsp->vfs_data;
 	register struct bfs_dirent *dir;
-	ushort ino = 0;
+	o_ino_t ino = 0;
 	off_t offset = 0;
 	int error = 0;
 
@@ -167,7 +167,7 @@ bfs_rmdirent(vfsp, nm, cr)
 		/*
 		 * Update the ROOT inode
 		 */
-		BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO),
+		error = BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO),
 					dir, cr);
 	}
 	BFS_IOEND(bs);
@@ -184,14 +184,14 @@ int
 bfs_addirent(vfsp, nm, inode, cr)
 	struct vfs *vfsp;
 	char *nm;
-	ushort inode;
+	o_ino_t inode;
 	struct cred *cr;
 {
 
 	register struct bsuper *bs = (struct bsuper *)vfsp->vfs_data;
 	register struct bfs_dirent *dir;
 	struct bfs_ldirs ld;
-	ushort ino = 0;
+	o_ino_t ino = 0;
 	off_t offset = 0;
 	int error = 0;
 	int i;
@@ -225,7 +225,7 @@ bfs_addirent(vfsp, nm, inode, cr)
 	 */
 	if (ino == 0  &&  offset == 0) {
 		if ( (dir->d_eoffset + sizeof(struct bfs_ldirs)) < 
-		     (dir->d_eblock + 1) * BFS_BSIZE) {
+		     dir->d_eblock * BFS_BSIZE) {
 			offset = dir->d_eoffset +1;
 			dir->d_eoffset += sizeof(struct bfs_ldirs);
 		}
@@ -287,7 +287,7 @@ bfs_rendirent(vfsp, snm, tnm, cr)
 	register struct bsuper *bs = (struct bsuper *)vfsp->vfs_data;
 	register struct bfs_dirent *dir;
 	struct bfs_ldirs ld;
-	ushort ino = 0;
+	o_ino_t ino = 0;
 	off_t offset = 0;
 	int error = 0;
 	int i;
@@ -335,7 +335,7 @@ bfs_rendirent(vfsp, snm, tnm, cr)
 		/*
 		 * Update the ROOT inode
 		 */
-		BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO),
+		error = BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO),
 					dir, cr);
 	}
 	BFS_IOEND(bs);
@@ -355,7 +355,7 @@ bfs_dotsearch(vfsp, nm, cr, inop, offp)
 	struct vfs *vfsp;
 	char *nm;
 	struct cred *cr;
-	ushort *inop;
+	o_ino_t *inop;
 	off_t *offp;
 {
 	register struct bsuper *bs = (struct bsuper *)vfsp->vfs_data;
@@ -423,7 +423,7 @@ bfs_dotsearch(vfsp, nm, cr, inop, offp)
 	 * Update the access time of the ROOT inode
 	 */
 	dir->d_fattr.va_atime = hrestime.tv_sec;
-	BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO), dir,cr);
+	error = BFS_PUTINODE(bs->bsup_devnode, BFS_INO2OFF(BFSROOTINO), dir,cr);
 
 	kmem_free(dir, sizeof(struct bfs_dirent));
 	kmem_free(buf, chunksize);
@@ -575,7 +575,7 @@ bfs_filetoend(bs, dir, offset, cr)
 	kmem_free(buf, chunksize);
 	dir->d_eoffset = offset1 -1;
 	dir->d_sblock = newblock;
-	dir->d_eblock = dir->d_eoffset / BFS_BSIZE;
+	dir->d_eblock = offset1 / BFS_BSIZE;
 
 	/*
 	 * Write the updated inode entry.
@@ -601,7 +601,7 @@ bfs_unlock(bs)
 	struct bsuper *bs;
 {
 	bs->bsup_fslocked = BFS_NO;
-	wakeprocs((caddr_t)&bs->bsup_fslocked, PRMPT);
+	wakeup((caddr_t)&bs->bsup_fslocked);
 	return 0;
 }
 
@@ -628,21 +628,13 @@ bfs_truncate(bs, diroff, length, cr)
 	if (!dir->d_sblock) {
 		BFS_IOEND(bs);
 		kmem_free(dir, sizeof(struct bfs_dirent));
-		if (length == 0)
-			return 0;
-		else
-			return EINVAL;
+		return 0;
 	}
 
-	if (dir->d_eoffset + 1 - (dir->d_sblock*BFS_BSIZE) == length) {
+	if (dir->d_eoffset - (dir->d_sblock*BFS_BSIZE) <= length) {
 		BFS_IOEND(bs);
 		kmem_free(dir, sizeof(struct bfs_dirent));
 		return 0;
-	}
-	if (dir->d_eoffset + 1 - (dir->d_sblock*BFS_BSIZE) < length) {
-		BFS_IOEND(bs);
-		kmem_free(dir, sizeof(struct bfs_dirent));
-		return EINVAL;
 	}
 
 	oeblock = dir->d_eblock;
@@ -658,7 +650,6 @@ bfs_truncate(bs, diroff, length, cr)
 	if (dir->d_eoffset == ((dir->d_sblock * BFS_BSIZE) - 1)) {
 		dir->d_sblock = 0;
 		dir->d_eblock = 0;
-		dir->d_eoffset = 0;
 
 		BFS_PUTINODE(bs->bsup_devnode, diroff, dir, cr);
 

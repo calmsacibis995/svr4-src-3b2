@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/proc/prvfsops.c	1.25"
+#ident	"@(#)fs:fs/proc/prvfsops.c	1.22"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/cred.h"
@@ -54,10 +54,6 @@ struct vfsops prvfsops = {
 	fs_nosys,	/* mountroot */
 	fs_nosys,	/* swapvp */
 	fs_nosys,	/* filler */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -118,7 +114,7 @@ prunmount(vfsp, cr)
 	struct vfs *vfsp;
 	struct cred *cr;
 {
-	register proc_t *p;
+	register proc_t **p;
 
 	if (!suser(cr))
 		return EPERM;
@@ -127,11 +123,10 @@ prunmount(vfsp, cr)
 	 */
 	if (prrootnode.pr_vnode.v_count > 1)
 		return EBUSY;
-
-	for (p = practive; p != NULL; p = p->p_next)
-		if (p->p_trace != NULL)
+	for (p = nproc; p < v.ve_proc; p++) {
+		if (*p && (*p)->p_stat != 0 && (*p)->p_trace != NULL)
 			return EBUSY;
-
+	}
 	VN_RELE(&prrootnode.pr_vnode);
 	prmounted = 0;
 	procvfs = NULL;
@@ -156,11 +151,8 @@ prstatvfs(vfsp, sp)
 	struct vfs *vfsp;
 	register struct statvfs *sp;
 {
-	register int i, n;
-
-        for (n = v.v_proc, i = 0; i < v.v_proc; i++)
-		if (pid_entry(i) != NULL)
-                        n--;
+	register proc_t **p;
+	register long int n;
 
 	bzero((caddr_t)sp, sizeof(*sp));
 	sp->f_bsize	= 1024;
@@ -169,13 +161,15 @@ prstatvfs(vfsp, sp)
 	sp->f_bfree	= 0;
 	sp->f_bavail	= 0;
 	sp->f_files	= v.v_proc + 2;
+	for (n = v.v_proc, p = nproc; p < v.ve_proc; p++)
+		if (*p && (*p)->p_stat)
+			n--;
 	sp->f_ffree	= n;
 	sp->f_favail	= n;
 	sp->f_fsid	= vfsp->vfs_dev;
 	strcpy(sp->f_basetype, vfssw[procfstype].vsw_name);
 	sp->f_flag = vf_to_stf(vfsp->vfs_flag);
 	sp->f_namemax = PNSIZ;
-	strcpy(sp->f_fstr, "/proc");
-	strcpy(&sp->f_fstr[6], "/proc");
+	strcpy(sp->f_fstr, "/proc /proc");
 	return 0;
 }

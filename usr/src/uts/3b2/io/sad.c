@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/sad.c	1.19"
+#ident	"@(#)kernel:io/sad.c	1.18"
 
 /*
  * STREAMS Administrative Driver
@@ -336,9 +336,7 @@ apush_iocdata(qp, mp)
 		freemsg(mp);
 		return;
 	}
-	if (mp->b_cont)
-		/* sap needed only if mp->b_cont is set */
-		sap = (struct strapush *)mp->b_cont->b_rptr;
+	sap = (struct strapush *)mp->b_cont->b_rptr;
 	switch (csp->cp_cmd) {
 	case SAD_SAP:
 		switch ((int)csp->cp_private) {

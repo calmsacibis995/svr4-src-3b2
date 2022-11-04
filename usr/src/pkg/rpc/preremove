@@ -1,28 +1,23 @@
-#ident	"@(#)pkg.rpc:preremove	1.4"
+#ident	"@(#)pkg.rpc:preremove	1.3"
 
 #-----Remove administrative files
 
+rm -rf /var/yp || exit 1
+rm -rf /etc/net || exit 1
 rm -f /etc/publickey || exit 1
 rm -f /etc/netid || exit 1
 
-#-----Remove drivers
-FAILURE=2		# exit code if anything goes wrong
-MASTER=/etc/master.d	# home of master.d files
 
-/etc/drvinstall -u -m $MASTER/ktli -v 1.0	|| exit $FAILURE
-/etc/drvinstall -u -m $MASTER/krpc -v 1.0	|| exit $FAILURE
-/etc/drvinstall -u -m $MASTER/ides -v 1.0	|| exit $FAILURE
+#-----Remove etc/system entries
 
-
-#-----Remove /etc/system entries
 ETCSYSTEM=/etc/system
-COMMENTOUT="*INCLUDE:IDES"
+IDES="INCLUDE:IDES"
 
 if [ -f $ETCSYSTEM ]; then
-	if grep "$COMMENTOUT" $ETCSYSTEM >/dev/null 2>&1
+	if grep "$IDES" $ETCSYSTEM >/dev/null 2>&1
 	then
 	ed $ETCSYSTEM <<-!  >/dev/null 2>&1
-		g/$COMMENTOUT/d
+		g/$IDES/d
 		w
 		q
 	!
@@ -32,5 +27,12 @@ else
 	echo "The entry will have to be deleted manually at a later time."
 fi
 
+#-----Remove drivers
+FAILURE=2		# exit code if anything goes wrong
+MASTER=/etc/master.d	# home of master.d files
+
+/etc/drvinstall -u -m $MASTER/ktli -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/krpc -v 1.0	|| exit $FAILURE
+/etc/drvinstall -u -m $MASTER/ides -v 1.0	|| exit $FAILURE
 
 exit 10			# indicates that the system should be rebooted

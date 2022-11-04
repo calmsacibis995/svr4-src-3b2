@@ -8,7 +8,7 @@
 #ifndef _NETINET_TCP_TIMER_H
 #define _NETINET_TCP_TIMER_H
 
-#ident	"@(#)head.sys:sys/netinet/tcp_timer.h	1.3"
+#ident	"@(#)head.sys:sys/netinet/tcp_timer.h	1.2"
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -32,36 +32,16 @@
  */
 
 /*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
- */
-
-/*
  * Definitions of the TCP timers.  These timers are counted
  * down PR_SLOWHZ times a second.
  */
 
-#define	TCPT_NTIMERS	5
+#define	TCPT_NTIMERS	4
 
-#define	TCPT_REXMT	0	/* retransmit */
-#define	TCPT_PERSIST	1	/* retransmit persistance */
-#define	TCPT_KEEP	2	/* keep alive */
-#define	TCPT_2MSL	3	/* 2*msl quiet time timer */
-#define	TCPT_LINGER	4	/* linger on close imer */
+#define	TCPT_REXMT	0		/* retransmit */
+#define	TCPT_PERSIST	1		/* retransmit persistance */
+#define	TCPT_KEEP	2		/* keep alive */
+#define	TCPT_2MSL	3		/* 2*msl quiet time timer */
 
 /*
  * The TCPT_REXMT timer is used to force retransmissions.
@@ -124,8 +104,8 @@
 #define	TCP_MAXRXTSHIFT	12			/* maximum retransmits */
 
 #ifdef	TCPTIMERS
-char           *tcptimers[] =
-{"REXMT", "PERSIST", "KEEP", "2MSL", "LINGER"};
+char *tcptimers[] =
+    { "REXMT", "PERSIST", "KEEP", "2MSL" };
 #endif
 
 /*

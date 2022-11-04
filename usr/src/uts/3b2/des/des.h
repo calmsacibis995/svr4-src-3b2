@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 
-#ident	"@(#)head.sys:des/des.h	1.3"
+#ident	"@(#)head.sys:des/des.h	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -24,7 +24,7 @@
 * Notice of copyright on this source code product does not indicate 
 *  publication.
 *
-*	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
+*	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
 *	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
 *          All rights reserved.
 */ 

@@ -5,14 +5,14 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)attwin:lib/libagent/makefile	1.8.2.1"
+#ident	"@(#)attwin:lib/libagent/makefile	1.8.1.1"
 #
 #		Copyright 1985 AT&T
 #
 
 CC = cc
 AR = ar
-USRLIB = $(ROOT)/usr/lib
+LIB = $(ROOT)/usr/lib
 CFLAGS = -O -I$(INC)
 INC = $(ROOT)/usr/include
 INS = install
@@ -33,7 +33,7 @@ libwindows.o:	$(INC)/sys/nxtproto.h
 	$(CC) $(CFLAGS) -c libwindows.c
 
 install:	all
-	$(INS) -f $(USRLIB) -u bin -g bin -m 644 libwindows.a
+	$(INS) -f $(LIB) -u bin -g bin -m 644 libwindows.a
 
 clean:
 	rm -f libwindows.o

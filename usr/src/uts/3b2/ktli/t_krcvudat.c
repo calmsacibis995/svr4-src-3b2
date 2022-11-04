@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)ktli:ktli/t_krcvudat.c	1.4"
+#ident	"@(#)ktli:ktli/t_krcvudat.c	1.3"
 #if !defined(lint) && defined(SCCSIDS)
 static char sccsid[] = "@(#)t_krcvudata.c 1.1 88/12/12 SMI"
 #endif
@@ -36,13 +36,9 @@ static char sccsid[] = "@(#)t_krcvudata.c 1.1 88/12/12 SMI"
  *	transport endpoints stream head.
  *
  *	Returns:
- *		0	On success or positive error code.
- *			On sucess, type is set to:
  *		T_DATA		If normal data has been received
- *		T_UDERR		If an error indication has been received,
- *				in which case uderr contains the unitdata
- *				error number.
- *		T_ERROR
+ *		T_UDERR		If an error indication has been received.
+ *		-1 		On failure
  *
  */
 
@@ -62,230 +58,229 @@ static char sccsid[] = "@(#)t_krcvudata.c 1.1 88/12/12 SMI"
 
 
 int
-t_krcvudata(tiptr, unitdata, type, uderr)
-	register TIUSER			*tiptr;
-	register struct t_kunitdata	*unitdata;
-	register int 			*type;
-	register int			*uderr;
+t_krcvudata(tiptr, unitdata, errtype)
+register TIUSER *tiptr;
+register struct t_kunitdata *unitdata;
+register long *errtype;
 
 {
-	register int			len;
-	register int			hdrsz;
-	register union T_primitives	*pptr;
-	register struct file		*fp;
-	mblk_t				*bp;
-	register mblk_t			*nbp;
-	register mblk_t			*mp;
-	register mblk_t			*tmp;
-	register int			error;
+	register int len, retval, hdrsz;
+	register union T_primitives *pptr;
+	register struct file *fp;
+	mblk_t *bp;
+	register mblk_t *nbp, *mp, *tmp;
 
 	fp = tiptr->fp;
 
-	if (type == NULL || uderr == NULL)
-		return EINVAL;
-
-	error = 0;
+	retval = 0;
 	unitdata->udata.buf = (char *)NULL;
 
 	if (unitdata->udata.udata_mp) {
-		KTLILOG(2, "t_krcvudata: freeing existing message block\n", 0);
+#ifdef KTLIDEBUG
+printf("t_krcvudata: freeing existing message block\n");
+#endif
 		freemsg(unitdata->udata.udata_mp);
 		unitdata->udata.udata_mp = NULL;
 	}
 
-	if ((error = tli_recv(tiptr, &bp, fp->f_flag)) != 0)
-		return error;
+	if (tli_recv(tiptr, &bp, fp->f_flag) < 0)
+		return -1;
 
 	/* Got something
 	 */
 	switch (bp->b_datap->db_type) {
-	case M_PROTO:
-		/* LINTED pointer alignment */
-		pptr = (union T_primitives *)bp->b_rptr;
-		switch (pptr->type) {
-		case T_UNITDATA_IND:
-			KTLILOG(2, "t_krcvudata: Got T_UNITDATA_IND\n", 0);
-			hdrsz = bp->b_wptr - bp->b_rptr;
-
-			/* check everything for consistency
-			 */
-			if (hdrsz < TUNITDATAINDSZ ||
-		 	 	hdrsz < (pptr->unitdata_ind.OPT_length+
-			 	pptr->unitdata_ind.OPT_offset) ||
-			 	hdrsz < (pptr->unitdata_ind.SRC_length+
-			 	pptr->unitdata_ind.SRC_offset) ) {
-				error = EPROTO;
-				freemsg(bp);
-				break;
+		case M_DATA:
+#ifdef KTLIDEBUG
+printf("t_krcvudata: tli_recv returned M_DATA\n");
+#endif
+			while (bp->b_cont && bp->b_rptr >= bp->b_wptr) {
+				nbp = bp;
+				bp = bp->b_cont;
+				freeb(nbp);
 			}
-
-			/* okay, so now we copy them
-			 */
-			len = min(pptr->unitdata_ind.SRC_length,
-					unitdata->addr.maxlen);
-			bcopy(bp->b_rptr+pptr->unitdata_ind.SRC_offset,
-					unitdata->addr.buf, len);
-			unitdata->addr.len = len;
-
-			len = min(pptr->unitdata_ind.OPT_length,
-					unitdata->opt.maxlen);
-			bcopy(bp->b_rptr+pptr->unitdata_ind.OPT_offset,
-					unitdata->opt.buf, len);
-			unitdata->opt.len = len;
-
-			bp->b_rptr += hdrsz;
-
-			/* we assume that the client knows
-			 * how to deal with a set of linked
-			 * mblks, so all we do is make a pass
-			 * and remove any that are zero length.
-			 */
-			nbp = NULL;
-			mp = bp;
-			while (mp) {
-				if (!(bp->b_wptr-bp->b_rptr)){
-					KTLILOG(2,
-			 "t_krcvudata: zero length block\n", 0);
-					tmp = mp->b_cont;
-					if (nbp)
-						nbp->b_cont = tmp;
-					else	bp = tmp;
-
-					freeb(mp);
-					mp = tmp;
-				}
-				else	{
-					nbp = mp;
-					mp = mp->b_cont;
-				}
+			if ((bp->b_wptr - bp->b_rptr) != 0) {
+				unitdata->udata.buf = (char *)bp->b_rptr;
+				unitdata->udata.len = bp->b_wptr-bp->b_rptr;
+				unitdata->udata.udata_mp = bp;
 			}
-#ifdef DEBUG
+			retval = T_DATA;
+			break;
+
+		case M_PROTO:
+			/* LINTED pointer alignment */
+			pptr = (union T_primitives *)bp->b_rptr;
+			switch (pptr->type) {
+				case T_UNITDATA_IND:
+#ifdef KTLIDEBUG
+printf("t_krcvudata: Got T_UNITDATA_IND\n");
+#endif
+					hdrsz = bp->b_wptr - bp->b_rptr;
+
+					/* check everything for consistency
+					 */
+					if (hdrsz < TUNITDATAINDSZ ||
+				 	 hdrsz < (pptr->unitdata_ind.OPT_length+
+					 pptr->unitdata_ind.OPT_offset) ||
+					 hdrsz < (pptr->unitdata_ind.SRC_length+
+					 pptr->unitdata_ind.SRC_offset) ) {
+						u.u_error = EPROTO;
+						retval = -1;
+						break;
+					}
+
+					/* okay, so now we copy them
+					 */
+					len = min(pptr->unitdata_ind.SRC_length,
+							unitdata->addr.maxlen);
+					bcopy(bp->b_rptr+pptr->unitdata_ind.SRC_offset,
+						unitdata->addr.buf, len);
+					unitdata->addr.len = len;
+
+					len = min(pptr->unitdata_ind.OPT_length,
+							unitdata->opt.maxlen);
+					bcopy(bp->b_rptr+pptr->unitdata_ind.OPT_offset,
+						unitdata->opt.buf, len);
+					unitdata->opt.len = len;
+
+					bp->b_rptr += hdrsz;
+
+					/* we assume that the client knows
+					 * how to deal with a set of linked
+					 * mblks, so all we do is make a pass
+					 * and remove any that are zero length.
+					 */
+					nbp = NULL;
+					mp = bp;
+					while (mp) {
+						if (!(bp->b_wptr-bp->b_rptr)){
+#ifdef KTLIDEBUG
+printf("t_krcvudata: zero length block\n");
+#endif
+							tmp = mp->b_cont;
+							if (nbp)
+								nbp->b_cont = tmp;
+							else	bp = tmp;
+
+							freeb(mp);
+							mp = tmp;
+						}
+						else	{
+							nbp = mp;
+							mp = mp->b_cont;
+						}
+					}
+#ifdef KTLIDEBUG
 {
-	mblk_t *tp;
+mblk_t *tp;
+tp = bp;
+while (tp) {
+	struct datab *dmp;
 
-	tp = bp;
-	while (tp) {
-		struct datab *dmp;
-
-		dmp = tp->b_datap;
-
-		KTLILOG(2, "t_krcvudata: bp %x, ", tp);
-		KTLILOG(2, "db_size %x, ", dmp->db_size);
-		KTLILOG(2, "db_ref %x", dmp->db_ref);
-
-		if (dmp->db_frtnp) {
-			KTLILOG(2, ", func: %x", dmp->db_frtnp->free_func);
-			KTLILOG(2, ", arg %x\n", dmp->db_frtnp->free_arg);
-		} else
-			KTLILOG(2, "\n", 0);
-		tp = tp->b_cont;
-	}
+	dmp = tp->b_datap;
+/*
+	printf("t_krcvudata: bp %x, b_cont %x, rptr %x, wptr %x\n", tp, tp->b_cont, tp->b_rptr, tp->b_wptr);
+	printf("t_krcvudata: db_base %x, db_lim %x, db_size %x, db_class %d, db_ref %x, db_type %x\n", dmp->db_base, dmp->db_lim, dmp->db_size, dmp->db_class, dmp->db_ref, dmp->db_type);
+*/
+	if (tp->b_datap->db_size < 0)
+		printf("t_krcvudata: bp %x, func: %x, arg %x\n", tp, dmp->db_frtnp->free_func, dmp->db_frtnp->free_arg);
+	tp = tp->b_cont;
+}
 }
 #endif
 
-			/* now just point the users mblk
-			 * pointer to what we received.
-			 */
-			if (bp == NULL) {
-				KTLILOG(2, "t_krcvudata: No data\n", 0);
-				error = EPROTO; 
-				break;
-			}
-			if ((bp->b_wptr - bp->b_rptr) != 0) {
-				if (!str_aligned(bp->b_rptr))
-					if (!pullupmsg(bp, bp->b_wptr - bp->b_rptr)) {
-						KTLILOG(1, 
-					"t_krcvudata:  pullupmsg failed\n", 0);
-						error = EIO;
-						freemsg(bp);
+					/* now just point the users mblk
+					 * pointer to what we received.
+					 */
+					if (bp == NULL) {
+						printf("t_krcvudata: No data\n");
+						u.u_error = EPROTO; 
+						retval = -1;
 						break;
 					}
-				unitdata->udata.buf = (char *)bp->b_rptr;
-				unitdata->udata.len = bp->b_wptr-bp->b_rptr;
+					if ((bp->b_wptr - bp->b_rptr) != 0) {
+						if (!str_aligned(bp->b_rptr))
+							if (!pullupmsg(bp, bp->b_wptr - bp->b_rptr)) {
+								printf("t_krcvudata:  pullupmsg failed\n");
+								retval = -1;
+								break;
+							}
+						unitdata->udata.buf = (char *)bp->b_rptr;
+						unitdata->udata.len = bp->b_wptr-bp->b_rptr;
 
-				KTLILOG(2,
- 			"t_krcvudata: got %d bytes\n", unitdata->udata.len);
-				unitdata->udata.udata_mp = bp;
-			}
-			else	{
-				KTLILOG(2,
-				"t_krcvudata: 0 length data message\n", 0);
-				freemsg(bp);
-				unitdata->udata.len = 0;
-			}
-			*type = T_DATA;
-			break;
+#ifdef KTLIDEBUG
+printf("t_krcvudata: got %d bytes\n", unitdata->udata.len);
+#endif
+						unitdata->udata.udata_mp = bp;
+					}
+					else	printf("t_krcvudata: 0 length data message\n");
+					retval = T_DATA;
+					break;
 
-		case T_UDERROR_IND:
-			KTLILOG(2, "t_krcvudata: Got T_UDERROR_IND\n", 0);
-			hdrsz = bp->b_wptr - bp->b_rptr;
+				/* only other thing that can be there with
+				 * CLTS is a datagram error indication.
+				 */
+				case T_UDERROR_IND:
+#ifdef KTLIDEBUG
+printf("t_krcvudata: Got T_UDERROR_IND\n");
+#endif
+					hdrsz = bp->b_wptr - bp->b_rptr;
 
-			/* check everything for consistency
-			 */
-			if (hdrsz < TUDERRORINDSZ ||
-		 	 	hdrsz < (pptr->uderror_ind.OPT_length+
-			 	pptr->uderror_ind.OPT_offset) ||
-			 	hdrsz < (pptr->uderror_ind.DEST_length+
-			 	pptr->uderror_ind.DEST_offset) ) {
-				error = EPROTO;
-				freemsg(bp);
-				break;
-			}
+					/* check everything for consistency
+					 */
+					if (hdrsz < TUDERRORINDSZ ||
+				 	 hdrsz < (pptr->uderror_ind.OPT_length+
+					 pptr->uderror_ind.OPT_offset) ||
+					 hdrsz < (pptr->uderror_ind.DEST_length+
+					 pptr->uderror_ind.DEST_offset) ) {
+						u.u_error = EPROTO;
+						retval = -1;
+						break;
+					}
 
-			if (pptr->uderror_ind.DEST_length >
+					if (pptr->uderror_ind.DEST_length >
 						(int)unitdata->addr.maxlen ||
-			    			pptr->uderror_ind.OPT_length >
+					    pptr->uderror_ind.OPT_length >
 						(int)unitdata->opt.maxlen) {
-				error = EMSGSIZE;
-				freemsg(bp);
-				break;
+						u.u_error = TBUFOVFLW;
+						retval = -1;
+						break;
+					}
+
+					/* okay, so now we copy them
+					 */
+					bcopy(bp->b_rptr+pptr->uderror_ind.DEST_offset,
+					unitdata->addr.buf,
+					(int)pptr->uderror_ind.DEST_length);
+					unitdata->addr.len = pptr->uderror_ind.DEST_length;
+
+					bcopy(bp->b_rptr+pptr->uderror_ind.OPT_offset,
+					unitdata->opt.buf,
+					(int)pptr->uderror_ind.OPT_length);
+					unitdata->addr.len = pptr->uderror_ind.OPT_length;
+
+					*errtype =  pptr->uderror_ind.ERROR_type;
+					unitdata->udata.buf = NULL;
+					unitdata->udata.udata_mp = NULL;
+
+					freemsg(bp);
+
+					retval = T_UDERR;
+					break;
+				default:
+					printf("t_krcvudata: Unknown transport primitive type %d\n", pptr->type);
+					break;
 			}
-
-			/* okay, so now we copy them
-			 */
-			bcopy(bp->b_rptr+pptr->uderror_ind.DEST_offset,
-							unitdata->addr.buf,
-			(int)pptr->uderror_ind.DEST_length);
-			unitdata->addr.len = pptr->uderror_ind.DEST_length;
-
-			bcopy(bp->b_rptr+pptr->uderror_ind.OPT_offset,
-							unitdata->opt.buf,
-			(int)pptr->uderror_ind.OPT_length);
-			unitdata->opt.len = pptr->uderror_ind.OPT_length;
-
-			*uderr =  pptr->uderror_ind.ERROR_type;
-
-			unitdata->udata.buf = NULL;
-			unitdata->udata.udata_mp = NULL;
-			unitdata->udata.len = 0;
-
-			freemsg(bp);
-
-			*type = T_UDERR;
 			break;
+
 		default:
-			KTLILOG(1, 
-		"t_krcvudata: Unknown transport primitive %d\n", pptr->type);
-			error = EPROTO;
-			freemsg(bp);
+#ifdef KTLIDEBUG
+printf("t_krcvudata: tli_recv returned unknown message type\n");
+#endif
+			u.u_error = EPROTO;
+			retval = -1;
 			break;
-		}
-		break;
-
-	case M_FLUSH:
-		KTLILOG(1, "t_krcvudata: tli_recv returned M_FLUSH\n", 0);
-		freemsg(bp);
-		*type = T_ERROR;
-		break;
-
-	default:
-		KTLILOG(1, "t_krcvudata: unknown message type %x\n",
-						bp->b_datap->db_type);
-		freemsg(bp);
-		*type = T_ERROR;
-		break;
 	}
-	return error;
+	return retval;
 }
 
 /******************************************************************************/

@@ -5,8 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/cat_init.c	1.3"
-
+#ident	"@(#)libc-port:gen/cat_init.c	1.1"
+#ifdef __STDC__
+	#pragma weak cat_init = _cat_init
+	#pragma weak cat_malloc_init = _cat_malloc_init
+#endif
 #include "synonyms.h"
 #include <sys/types.h>
 #include <sys/file.h>
@@ -17,20 +20,17 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <nl_types.h>
-#include <string.h>
 
 extern	caddr_t mmap();
 extern	void	munmap();
 extern char *malloc();
 extern int errno;
 
-extern char *_cat_itoa();
-static int cat_malloc_init();
 
 /*
  * Read a catalog and init the internal structure
  */
-_cat_init(name, res)
+cat_init(name, res)
   char *name;
   nl_catd res;
 {
@@ -61,7 +61,6 @@ _cat_init(name, res)
 /*
  * Read a malloc catalog and init the internal structure
  */
-static
 cat_malloc_init(fd, res)
   int fd;
   nl_catd res;
@@ -110,7 +109,6 @@ cat_mmp_init (fd,catname,res)
   int bytes;
   struct stat sb;
   caddr_t addr;
-  char *ptr;
   static int count = 1;
   extern char *getcwd();
 
@@ -152,38 +150,12 @@ cat_mmp_init (fd,catname,res)
    * Create the link for gettxt
    */
 
-  /* sprintf(symb_name,"gencat.%x.%x",getpid(),count++); */
-  strcpy(symb_name,"gencat.");
-  if ((ptr = _cat_itoa(getpid(), 16)) == NULL) {
-    munmap(addr, sb.st_size);
-    close(fd);
-    return 0;
-  }
-  strcat(symb_name, ptr);
-  strcat(symb_name, ".");
-  if ((ptr = _cat_itoa(count++, 16)) == NULL) {
-    munmap(addr, sb.st_size);
-    close(fd);
-    return 0;
-  }
-  strcat(symb_name, ptr);
-
-  /* sprintf(symb_path,"%s/%s",(const char *)XOPEN_DIRECTORY,symb_name); */
-  strcpy(symb_path,(const char *)XOPEN_DIRECTORY);
-  strcat(symb_path,"/");
-  strcat(symb_path,symb_name);
-
-  if (catname[0] == '/') {
-    /* sprintf(message_file,"%s%s",catname,(const char *)M_EXTENSION); */
-    strcpy(message_file, catname);
-    strcat(message_file, (const char *)M_EXTENSION);
-  } else  {
-    /* sprintf(message_file,"%s/%s%s",getcwd(buf,MAXNAMLEN),catname,(const char *)M_EXTENSION); */
-    strcpy(message_file, getcwd(buf,MAXNAMLEN));
-    strcat(message_file, "/");
-    strcat(message_file, catname);
-    strcat(message_file, (const char *)M_EXTENSION);
-  }
+  sprintf(symb_name,"gencat.%x.%x",getpid(),count++);
+  sprintf(symb_path,"%s/%s",XOPEN_DIRECTORY,symb_name);
+  if (catname[0] == '/')
+    sprintf(message_file,"%s%s",catname,M_EXTENSION);
+  else 
+    sprintf(message_file,"%s/%s%s",getcwd(buf,MAXNAMLEN),catname,M_EXTENSION);
   if (symlink(message_file,symb_path) < 0)  {
     munmap(addr, sb.st_size);
     close(fd);
@@ -209,33 +181,3 @@ cat_mmp_init (fd,catname,res)
   return 1;
 }
 
-static const char *hex_digs = "0123456789abcdef";
-static char *buf;
-
-#define MAXDIGS 13	/* Max. length of an integer representation */
-
-char *
-_cat_itoa(num, base)
-register int num;
-register int base;
-{
-	register char	*ptr;
-	register int	len = MAXDIGS;
-
-	if (!buf) {
-		if ((buf = malloc(MAXDIGS)) == NULL)
-			return(NULL);
-	}
-	ptr = &(buf[MAXDIGS - 1]);
-	*ptr = '\0';
-	while (--len > 0 && num != 0) {
-		if (base == 16) {
-			*(--ptr) = hex_digs[num % 16];
-			num /= 16;
-		} else {
-			*(--ptr) = num % 10 + '0';
-			num /= 10;
-		}
-	}
-	return(ptr);
-}

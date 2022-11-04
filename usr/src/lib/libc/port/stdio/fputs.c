@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/fputs.c	3.18"
+#ident	"@(#)libc-port:stdio/fputs.c	3.16"
 /*LINTLIBRARY*/
 /*
  * Ptr args aren't checked for NULL because the program would be a
@@ -62,11 +62,7 @@ register FILE *iop;
 		/* write out to an unbuffered file */
 		register unsigned int cnt = strlen(ptr);
 
-		if (cnt != write(iop->_file, ptr, cnt))
-		{
-			iop->_flag |= _IOERR;
-			return EOF;
-		}
+		(void)write(iop->_file, ptr, cnt);
 		return cnt;
 	}
 }

@@ -8,7 +8,7 @@
 #ifndef _RPC_TYPES_H
 #define _RPC_TYPES_H
 
-#ident	"@(#)head.sys:sys/rpc/types.h	1.5"
+#ident	"@(#)head.sys:sys/rpc/types.h	1.1"
 
 /*      @(#)types.h 1.23 88/10/25 SMI      */
 
@@ -55,6 +55,7 @@
 #endif
 
 #ifndef _KERNEL
+extern char *malloc();
 #define mem_alloc(bsize)	malloc(bsize)
 #define mem_free(ptr, bsize)	free(ptr)
 #else
@@ -62,26 +63,6 @@
 extern _VOID *kmem_alloc();
 #define mem_alloc(bsize)	kmem_alloc((u_int)bsize, KM_SLEEP)
 #define mem_free(ptr, bsize)	kmem_free((caddr_t)(ptr), (u_int)(bsize))
-
-#ifdef DEBUG
-extern int	rpc_log();
-extern int	rpclog;
-
-#define		RPCLOG(A, B, C) ((void)((rpclog) && rpc_log((A), (B), (C))))
-#else
-#define		RPCLOG(A, B, C)
-#endif
-
-#endif
-
-#ifdef _NSL_RPC_ABI
-/* For internal use only when building the libnsl RPC routines */
-#define select	_abi_select
-#define gettimeofday	_abi_gettimeofday
-#define syslog	_abi_syslog
-#define getgrent	_abi_getgrent
-#define endgrent	_abi_endgrent
-#define setgrent	_abi_setgrent
 #endif
 
 #include <sys/time.h>

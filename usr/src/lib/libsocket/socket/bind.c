@@ -5,8 +5,30 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libsocket:bind.c	1.8"
+#ident	"@(#)libsocket:bind.c	1.5"
 
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 		PROPRIETARY NOTICE (Combined)
+ * 
+ * This source code is unpublished proprietary information
+ * constituting, or derived under license from AT&T's UNIX(r) System V.
+ * In addition, portions of such source code were derived from Berkeley
+ * 4.3 BSD under license from the Regents of the University of
+ * California.
+ * 
+ * 
+ * 
+ * 		Copyright Notice 
+ * 
+ * Notice of copyright on this source code product does not indicate 
+ * publication.
+ * 
+ * 	(c) 1986,1987,1988.1989  Sun Microsystems, Inc
+ * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ * 	          All rights reserved.
+ *  
+ */
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -22,7 +44,9 @@
 #include <sys/signal.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
-#include <syslog.h>
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 
 extern int	errno;
 static int	_unbind();
@@ -168,13 +192,16 @@ _bind(siptr, name, namelen, raddr, raddrlen)
 			rname = (struct sockaddr_in *)buf;
 			aname = (struct sockaddr_in *)name;
 	
+#ifdef DEBUG
+fprintf(stdout, "bind: AF_INET: aport %d, aaddr %x: gport %d gaddr %x\n", aname->sin_port, aname->sin_addr.s_addr, rname->sin_port, rname->sin_addr.s_addr);
+#endif
 			if (aname->sin_port != 0 &&
 					 aname->sin_port != rname->sin_port)
 				errno = EADDRINUSE;
 	
 			if (aname->sin_addr.s_addr != INADDR_ANY &&
 			    aname->sin_addr.s_addr != rname->sin_addr.s_addr)
-				errno = EADDRNOTAVAIL;
+				errno = EADDRINUSE;
 		}
 		else
 		if (name->sa_family == AF_UNIX) {
@@ -182,6 +209,9 @@ _bind(siptr, name, namelen, raddr, raddrlen)
 				register struct bind_ux	*rbind_ux;
 	
 				rbind_ux = (struct bind_ux *)buf;
+#ifdef DEBUG
+fprintf(stdout, "bind: UNIX domain, got dev %x, ino %x\n", rbind_ux->extdev, rbind_ux->extino);
+#endif
 				if (rbind_ux->extdev != bind_ux.extdev ||
 			    	    rbind_ux->extino != bind_ux.extino)
 					errno = EADDRINUSE;
@@ -189,7 +219,9 @@ _bind(siptr, name, namelen, raddr, raddrlen)
 		}
 		else 	{
 			struct sockaddr	*rname;
-
+#ifdef DEBUG
+fprintf(stdout, "bind: non-AF_INET:\n");
+#endif
 			if (namelen > sizeof(name->sa_family)) {
 				rname = (struct sockaddr *)buf;
 				if (memcmp(name->sa_data, rname->sa_data, 
@@ -200,21 +232,24 @@ _bind(siptr, name, namelen, raddr, raddrlen)
 	}
 
 	if (errno) {
-		register int error;
+		int	inuse;
 
-		error = errno;			/* Save it */
+		inuse = (errno == EADDRINUSE);	/* errno may be reset */
 		(void)_unbind(siptr);
 		if (name && name->sa_family == AF_UNIX && fflag)
 			(void)unlink(name->sa_data);
-		errno = error;
+		if (inuse)
+			errno = EADDRINUSE;
 		return -1;
 	}
 
 	/* Copy back the bound address if requested.
 	 */
-	if (raddr != NULL)
-		*raddrlen = _s_cpaddr(siptr, raddr, *raddrlen,
-				buf, bind_ack->ADDR_length);
+	if (raddr != NULL) {
+		if (bind_ack->ADDR_length < *raddrlen)
+			*raddrlen = bind_ack->ADDR_length;
+		(void)memcpy(raddr, buf, *raddrlen);
+	}
 
 	siptr->udata.so_state |= SS_ISBOUND;
 

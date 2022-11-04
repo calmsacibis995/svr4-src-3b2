@@ -5,10 +5,10 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/elf_386.h	1.2"
-
 #ifndef _SYS_ELF_I386_H
 #define _SYS_ELF_I386_H
+
+#ident	"@(#)head.sys:sys/elf_386.h	1.1"
 
 #define R_386_NONE		0	/* relocation type */
 #define R_386_32		1
@@ -22,7 +22,5 @@
 #define R_386_GOTOFF		9
 #define R_386_GOTPC		10
 #define R_386_NUM		11
-
-#define ELF_386_MAXPGSZ		0x1000	/* maximum page size */
 
 #endif

@@ -5,30 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * 		PROPRIETARY NOTICE (Combined)
- * 
- * This source code is unpublished proprietary information
- * constituting, or derived under license from AT&T's UNIX(r) System V.
- * In addition, portions of such source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of
- * California.
- * 
- * 
- * 
- * 		Copyright Notice 
- * 
- * Notice of copyright on this source code product does not indicate 
- * publication.
- * 
- * 	(c) 1986,1987,1988,1989  Sun Microsystems, Inc
- * 	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- * 	          All rights reserved.
- *  
- */
-
-#ident	"@(#)fs:fs/vnode.c	1.31"
+#ident	"@(#)fs:fs/vnode.c	1.19"
 #include "sys/types.h"
 #include "sys/param.h"
 #include "sys/psw.h"
@@ -102,6 +79,8 @@ vn_rdwr(rw, vp, base, len, offset, seg, ioflag, ulimit, cr, residp)
 	if (rw == UIO_WRITE) {
 		uio.uio_fmode = FWRITE;
 		error = VOP_WRITE(vp, &uio, ioflag, cr);
+		if (error == EFBIG)
+			psignal(u.u_procp, SIGXFSZ);
 	} else {
 		uio.uio_fmode = FREAD;
 		error = VOP_READ(vp, &uio, ioflag, cr);
@@ -131,16 +110,15 @@ vn_rele(vp)
  * Open/create a vnode.
  * This may be callable by the kernel, the only known use
  * of user context being that the current user credentials
- * are used for permissions.  crwhy is defined iff filemode & FCREAT.
+ * are used for permissions.
  */
 int
-vn_open(pnamep, seg, filemode, createmode, vpp, crwhy)
+vn_open(pnamep, seg, filemode, createmode, vpp)
 	char *pnamep;
 	enum uio_seg seg;
 	register int filemode;
 	int createmode;
 	struct vnode **vpp;
-	enum create crwhy;
 {
 	struct vnode *vp;
 	register int mode;
@@ -177,7 +155,7 @@ vn_open(pnamep, seg, filemode, createmode, vpp, crwhy)
 		 */
 		PREEMPT();
 		if (error =
-		  vn_create(pnamep, seg, &vattr, excl, mode, &vp, crwhy))
+		  vn_create(pnamep, seg, &vattr, excl, mode, &vp, CRCREAT))
 			return error;
 		PREEMPT();
 	} else {
@@ -201,6 +179,18 @@ vn_open(pnamep, seg, filemode, createmode, vpp, crwhy)
 			if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
 				error = EROFS;
 				goto out;
+			}
+			/*
+			 * If there's shared text associated with
+			 * the vnode, try to free it up once.
+			 * If we fail, we can't allow writing.
+			 */
+			if (vp->v_flag & VTEXT) {
+				xrele(vp);
+				if (vp->v_flag & VTEXT) {
+					error = ETXTBSY;
+					goto out;
+				}
 			}
 			/*
 			 * Can't truncate files on which mandatory locking
@@ -234,9 +224,7 @@ vn_open(pnamep, seg, filemode, createmode, vpp, crwhy)
 
 		vattr.va_size = 0;
 		vattr.va_mask = AT_SIZE;
-		if ((error = VOP_SETATTR(vp, &vattr, 0, u.u_cred)) != 0) {
-			(void)VOP_CLOSE(vp, filemode, 1, 0, u.u_cred);
-		}
+		error = VOP_SETATTR(vp, &vattr, 0, u.u_cred);
 	}
 out:
 	if (error) {
@@ -291,8 +279,6 @@ vn_create(pnamep, seg, vap, excl, mode, vpp, why)
 		error = lookuppn(&pn, FOLLOW, &dvp, vpp); 
 	if (error) {
 		pn_free(&pn);
-		if (why == CRMKDIR && error == EINVAL)
-			error = EEXIST;		/* SVID */
 		return error;
 	}
 
@@ -305,24 +291,19 @@ vn_create(pnamep, seg, vap, excl, mode, vpp, why)
 		error = EROFS;
 	} else if (excl == NONEXCL && *vpp != NULL) {
 		/*
-		 * File is already there. If there is any
-		 * active mandatory lock on the file,
-		 * return EAGAIN.
+		 * The file is already there.
+		 * If we are writing, and there's a shared text
+		 * associated with the vnode, try to free it up once.
+		 * If we fail, we can't allow writing.
 		 */
-		if ((*vpp)->v_filocks != NULL) {
-			struct vattr vattr;
-			if (error = VOP_GETATTR((*vpp), &vattr, 0, u.u_cred)) {
-				VN_RELE(*vpp);
-				return error;
-			}
-			if (MANDLOCK((*vpp), vattr.va_mode)) {
-				VN_RELE(*vpp);
-				return EAGAIN;
-			}
+		if ((mode & VWRITE) && ((*vpp)->v_flag & VTEXT)) {
+			xrele(*vpp);
+			if ((*vpp)->v_flag & VTEXT)
+				error = ETXTBSY;
 		}
 		/*
-		 * We throw the vnode away to let VOP_CREATE
-		 * truncate the file in a non-racy manner.
+		 * We throw the vnode away to let VOP_CREATE truncate the
+		 * file in a non-racy manner.
 		 */
 		VN_RELE(*vpp);
 	}
@@ -482,7 +463,6 @@ vn_remove(fnamep, seg, dirflag)
 	struct pathname pn;		/* name of entry */
 	enum vtype vtype;
 	register int error;
-	register int rdonly;
 
 	if (error = pn_get(fnamep, seg, &pn))
 		return error;
@@ -500,27 +480,26 @@ vn_remove(fnamep, seg, dirflag)
 		goto out;
 	}
 
-	rdonly = ((vp->v_vfsp->vfs_flag & VFS_RDONLY) != 0);
+	/*
+	 * Make sure filesystem is writeable.
+	 */
+	if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
+		error = EROFS;
+		goto out;
+	}
 
 	/*
 	 * Don't unlink the root of a mounted filesystem, unless
 	 * it's marked unlinkable.
 	 */
 	if (vp->v_flag & VROOT) {
-		if (vp->v_vfsp->vfs_flag & VFS_UNLINKABLE)
+		if (vp->v_vfsp->vfs_flag & VFS_UNLINKABLE) {
 			error = dounmount(vp->v_vfsp, u.u_cred);
-		else
+			vp->v_vfsp = NULL;
+		} else
 			error = EBUSY;
 		if (error)
 			goto out;
-	}
-
-	/*
-	 * Make sure filesystem is writeable.
-	 */
-	if (rdonly) {
-		error = EROFS;
-		goto out;
 	}
 
 	/*

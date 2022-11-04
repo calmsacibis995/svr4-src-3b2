@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/rtld.c	1.10"
+#ident	"@(#)rtld:common/rtld.c	1.7"
 
 /* main run-time linking routines 
  *
@@ -61,7 +61,7 @@ Elf32_Dyn **rt_ret;
 		inttmp[i] = (Elf32_Dyn *)0;
 	while (interface->d_tag != DT_NULL)  {
 		if (interface->d_tag > 0) {
-			_rt_lasterr("%s: %s: internal interface error",(char*) _rt_name,_proc_name);
+			_rt_lasterr("ld.so: %s: internal interface error",_proc_name);
 			return(1);
 		}
 		inttmp[-interface->d_tag] = interface++;
@@ -74,7 +74,7 @@ Elf32_Dyn **rt_ret;
 	/* open /dev/zero if not open, for reading anonymous memory */
 	if (_devzero_fd == -1) {
 		if ((_devzero_fd = _open(DEV_ZERO, O_RDONLY)) == -1) {
-			_rt_lasterr("%s: %s: can't open %s",(char*) _rt_name,_proc_name,(CONST char *)DEV_ZERO);
+			_rt_lasterr("ld.so: %s: can't open %s",_proc_name,(CONST char *)DEV_ZERO);
 			return(1);
 		}
 	}
@@ -85,7 +85,7 @@ Elf32_Dyn **rt_ret;
 
 		/* null pointer an invalid file name */
 		if (pname == (char *)0) {
-			_rt_lasterr("%s: %s: internal interface error: null pathname specified",(char*) _rt_name,_proc_name);
+			_rt_lasterr("ld.so: %s: internal interface error: null pathname specified",_proc_name);
 			return(1);
 		}
 
@@ -106,8 +106,7 @@ Elf32_Dyn **rt_ret;
 				_ld_tail = _rtld_map;
 			}
 			else { /* not run-time linker - find and open file */
-				if ((fd = _so_find(pname, (CONST char**)
-					&pathname)) == -1) {
+				if ((fd = _so_find(pname, &pathname)) == -1) {
 
 					return(1);
 				}
@@ -164,8 +163,7 @@ Elf32_Dyn **rt_ret;
 				else { /* not run-time linker 
 					* find and open file
 					*/
-					if ((fd = _so_find(name, (CONST char**)
-						&pname)) == -1) 
+					if ((fd = _so_find(name, &pname)) == -1) 
 						return(1);
 	
 					/* map in object and add to end of map list */
@@ -187,7 +185,7 @@ Elf32_Dyn **rt_ret;
 	 */
 	if (_rt_tracing) {
 		for (lm = (struct rt_private_map *)NEXT(_ld_loaded); lm; lm = (struct rt_private_map *)NEXT(lm)) {
-			_rtfprintf(1, "%s: %s: file loaded: %s\n",(char*) _rt_name,_proc_name,NAME(lm));
+			_rtfprintf(1, "ld.so: %s: file loaded: %s\n",_proc_name,NAME(lm));
 		}
 		/* if _rt_warn not set, exit */
 		if (!_rt_warn)

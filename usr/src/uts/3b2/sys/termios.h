@@ -8,16 +8,16 @@
 #ifndef _SYS_TERMIOS_H
 #define _SYS_TERMIOS_H
 
-#ident	"@(#)head.sys:sys/termios.h	1.25"
+#ident	"@(#)head.sys:sys/termios.h	1.20"
 
-#include <sys/ttydev.h>
+/*
+ * ttold.h should always be included after termios.h. Otherwise, there
+ * will be clashes in defines. We want termios.h codes to take precedence
+ * over ttold.h codes.
+ */
 
 #ifndef _SYS_TYPES_H
 #include "sys/types.h"
-#endif
-
-#ifndef _POSIX_VDISABLE
-#define _POSIX_VDISABLE 0 /* Disable special character functions */
 #endif
 
 #define	CTRL(c)	((c)&037)
@@ -29,6 +29,17 @@
 /* some defines required by POSIX */
 #define	NCCS	19
 
+#ifndef _POSIX_VDISABLE
+#define _POSIX_VDISABLE 0 /* Disable special character functions */
+#endif
+
+#ifndef MAX_INPUT
+#define MAX_INPUT 512     /* Maximum bytes stored in the input queue */
+#endif
+
+#ifndef MAX_CANON
+#define MAX_CANON 256     /* Maximum bytes in a line for canoical processing */
+#endif
  
 /*
  * types defined by POSIX. These are better off in types.h, but 
@@ -43,8 +54,6 @@ typedef unsigned long speed_t;
  * These functions get mapped into ioctls.
  */
 
-#ifndef _KERNEL
-
 extern speed_t cfgetospeed (/* termios *termios_p */);
 extern int cfsetospeed (/* termios *termios_p, speed_t speed */);
 extern speed_t cfgetispeed (/* termios *termios_p */);
@@ -55,11 +64,10 @@ extern int tcsendbreak (/* int fildes, int duration */);
 extern int tcdrain (/* int fildes */);
 extern int tcflush (/* int fildes, int queue_selector */);
 extern int tcflow (/* int fildes, int action */);
-extern int tcsetpgrp (/* int fildes, pid_t pgrp_id */);
 extern pid_t tcgetpgrp (/* int fildes */);
-extern pid_t tcgetsid (/* int fildes */);
+extern int tcsetpgrp (/* int fildes, pid_t pgrp_id */);
 
-#endif
+
 
 /* control characters */
 #define	VINTR	0
@@ -167,6 +175,24 @@ extern pid_t tcgetsid (/* int fildes */);
 
 /* control modes */
 #define	CBAUD	0000017
+#define	B0	0
+#define	B50	0000001
+#define	B75	0000002
+#define	B110	0000003
+#define	B134	0000004
+#define	B150	0000005
+#define	B200	0000006
+#define	B300	0000007
+#define	B600	0000010
+#define	B1200	0000011
+#define	B1800	0000012
+#define	B2400	0000013
+#define	B4800	0000014
+#define	B9600	0000015
+#define	B19200	0000016
+#define EXTA	0000016
+#define	B38400	0000017
+#define EXTB	0000017
 #define	CSIZE	0000060
 #define	CS5	0
 #define	CS6	0000020
@@ -272,11 +298,7 @@ extern pid_t tcgetsid (/* int fildes */);
 #define TIOCFLUSH	(tIOC|16)
 #define TIOCSETC	(tIOC|17)
 #define TIOCGETC	(tIOC|18)
-/*
- * BSD ioctls that are not the same as XENIX are included here.
- * There are also some relevant ioctls from SUN/BSD sys/ttycom.h
- * BSD pty ioctls like TIOCPKT are not supported in SVR4.
- */
+/* BSD ioctls that are not the same as XENIX */
 
 #define	TIOCLBIS	(tIOC|127)	/* bis local mode bits */
 #define	TIOCLBIC	(tIOC|126)	/* bic local mode bits */
@@ -288,7 +310,6 @@ extern pid_t tcgetsid (/* int fildes */);
 #define	TIOCCDTR	(tIOC|120)	/* clear data terminal ready */
 #define	TIOCSLTC	(tIOC|117)	/* set local special chars */
 #define	TIOCGLTC	(tIOC|116)	/* get local special chars */
-#define	TIOCOUTQ	(tIOC|115)	/* driver output queue size */
 #define	TIOCNOTTY	(tIOC|113)	/* void tty association */
 #define	TIOCSTOP	(tIOC|111)	/* stop output, like ^S */
 #define	TIOCSTART	(tIOC|110)	/* start output, like ^Q */
@@ -370,7 +391,6 @@ struct termios {
 	cc_t		c_cc[NCCS];	/* control chars */
 };
 
-#ifndef _SYS_TTOLD_H
 
 /* Windowing structure to support JWINSIZE/TIOCSWINSZ/TIOCGWINSZ */
 struct winsize {
@@ -379,7 +399,5 @@ struct winsize {
 	unsigned short ws_xpixel;    /* horizontal size, pixels */
 	unsigned short ws_ypixel;    /* vertical size, pixels */
 };
-
-#endif /* end _SYS_TTOLD_H */
 
 #endif	/* _SYS_TERMIOS_H */

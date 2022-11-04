@@ -1,4 +1,4 @@
-#ident	"@(#)pkg.usrenv:postinstall	1.9"
+#ident	"@(#)pkg.usrenv:postinstall	1.8"
 # install SXT driver (for shl) using drvinstall and check error
 
 BOOT=/boot
@@ -38,12 +38,6 @@ fi
 
 installf $PKGINST /usr/options/$PKG.name
 echo $NAME > /usr/options/$PKG.name
-
-installf $PKGINST /usr/options/shell.name
-echo "Shell Programming Utilities" > /usr/options/shell.name
-
-installf $PKGINST /usr/options/calc.name
-echo "Calculation Utilities" > /usr/options/calc.name
 
 installf -f $PKGINST || exit 2
 exit 10

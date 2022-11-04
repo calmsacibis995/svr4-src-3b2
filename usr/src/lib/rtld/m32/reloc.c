@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:m32/reloc.c	1.12"
+#ident	"@(#)rtld:m32/reloc.c	1.10"
 
 /* 3B2 specific routines for performing relocations */
 
@@ -165,11 +165,11 @@ do_reloc(lm, reladdr, relsz)
 					&& (ELF32_ST_BIND(symref->st_info)
 					!= STB_WEAK)) {
 					if (_rt_warn) {
-						_rtfprintf(2, "%s: %s: relocation error: symbol not found: %s\n",(char*) _rt_name, _proc_name,name);
+						_rtfprintf(2, "ld.so: %s: relocation error: symbol not found: %s\n", _proc_name,name);
 						continue;
 					}
 					else {
-						_rt_lasterr("%s: %s: relocation error: symbol not found: %s",(char*) _rt_name, _proc_name, name);
+						_rt_lasterr("ld.so: %s: relocation error: symbol not found: %s", _proc_name, name);
 						return(0);
 					}
 				}
@@ -271,9 +271,9 @@ do_reloc(lm, reladdr, relsz)
 			break;
 		default:
 			if (_rt_warn)
-				_rtfprintf(2, "%s: %s: invalid relocation type %d at 0x%x\n",(char*) _rt_name,_proc_name,rtype,off);
+				_rtfprintf(2, "ld.so: %s: invalid relocation type %d at 0x%x\n",_proc_name,rtype,off);
 			else {
-				_rt_lasterr("%s: %s: invalid relocation type %d at 0x%x",(char*) _rt_name,_proc_name,rtype,off);
+				_rt_lasterr("ld.so: %s: invalid relocation type %d at 0x%x",_proc_name,rtype,off);
 				return(0);
 			}
 			break;

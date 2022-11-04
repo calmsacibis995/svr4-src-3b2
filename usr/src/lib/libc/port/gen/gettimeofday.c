@@ -5,13 +5,11 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/gettimeofday.c	1.3"
+#ident	"@(#)libc-port:gen/gettimeofday.c	1.1"
 
-#ifndef DSHLIB
 #ifdef __STDC__
 	#pragma weak gettimeofday = _gettimeofday
 	#pragma weak settimeofday = _settimeofday
-#endif
 #endif
 #include "synonyms.h"
 #include <sys/time.h>

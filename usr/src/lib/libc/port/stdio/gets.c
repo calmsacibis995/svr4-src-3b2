@@ -5,14 +5,13 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/gets.c	3.13"
+#ident	"@(#)libc-port:stdio/gets.c	3.12"
 /*LINTLIBRARY*/
 #include "synonyms.h"
 #include "shlib.h"
 #include <stdio.h>
 #include "stdiom.h"
 #include <memory.h>
-#include <errno.h>
 
 char *
 gets(buf)	/* read a single line from stdin, replace the '\n' with '\0' */
@@ -23,10 +22,8 @@ gets(buf)	/* read a single line from stdin, replace the '\n' with '\0' */
 	register char *p;
 	register Uchar *bufend;
 
-	if (!(stdin->_flag & (_IOREAD | _IORW))) {
-		errno = EBADF;
+	if (!(stdin->_flag & (_IOREAD | _IORW)))
 		return 0;
-	}
 	if (stdin->_base == 0)
 	{
 		if ((bufend = _findbuf(stdin)) == 0)

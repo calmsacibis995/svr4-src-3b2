@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)fs:fs/rfs/rf_cirmgr.c	1.10.2.8"
+#ident	"@(#)fs:fs/rfs/rf_cirmgr.c	1.10.3.1"
 
 #include "sys/list.h"
 #include "sys/param.h"
@@ -23,23 +23,19 @@
 #include "sys/vnode.h"
 #include "vm/seg.h"
 #include "rf_admin.h"
-#include "sys/rf_messg.h"
 #include "sys/rf_comm.h"
 #include "sys/inline.h"
 #include "sys/debug.h"
 #include "sys/nserve.h"
 #include "sys/rf_cirmgr.h"
 #include "sys/tihdr.h"
+#include "sys/rf_messg.h"
 #include "sys/hetero.h"
 #include "sys/systm.h"
 #include "rf_auth.h"
 #include "sys/cmn_err.h"
 #include "rf_canon.h"
 #include "sys/strmdep.h"
-
-#ifdef DEBUG
-int	gdp_call_demon;
-#endif
 
 /*
  * Streamhead/virtual circuit manager for RFS.
@@ -169,11 +165,7 @@ gdp_init()
 		gp->idmap[0] = 0;
 		gp->idmap[1] = 0;
 		gp->input.oneshot = 0;
-		gp->timeout = 0;
 		gdp_cleanhdr(gp);
-#ifdef DEBUG
-		gp->inseq = gp->outseq = 0;
-#endif
 	}
 	return 0;
 }
@@ -199,18 +191,9 @@ gdp_discon(message, gp)
 	char	*message;
 	gdp_t	*gp;
 {
-	cmn_err(CE_NOTE, "%s: disconnecting on gdp %x, remote %s",
+	cmn_err(CE_WARN, "%s: disconnecting on gdp %x, remote %s",
 	  message, (int)gp, gp->token.t_uname);
 	gdp_dodiscon(gp);
-}
-
-void
-gdp_j_accuse(message, gp)
-	char	*message;
-	gdp_t	*gp;
-{
-	cmn_err(CE_NOTE, "%s: gdp %x, remote %s",
-	  message, (int)gp, gp->token.t_uname);
 }
 
 void
@@ -220,8 +203,8 @@ gdp_kill()
 	register gdp_t *endgdp = gdp + maxgdp;
 
 	for (tmp = gdp; tmp < endgdp; tmp++) {
-		if (tmp->constate == GDPCONNECT) {
-			gdp_clean_circuit(tmp->queue);
+		if (tmp->constate != GDPFREE) {
+			gdp_clean_circuit (tmp->queue);
 		}
 	}
 }
@@ -253,7 +236,7 @@ gdp_rput(q, bp)
 	case M_PROTO:
 	case M_PCPROTO:
 
-		/* Assume the 1st block M_PROTO/M_PCPROTO is not fragmented. */
+		/*Assume the 1st block M_PROTO/M_PCPROTO is not fragmented. */
 
 		Tp = (union T_primitives *)bp->b_rptr;
 		switch ((int)Tp->type) {
@@ -338,7 +321,9 @@ asm("gdpbaddiscon:");
 
 	case M_ERROR:
 	case M_HANGUP:
-		gdp_dodiscon(gp);
+		gp->constate = GDPDISCONN;
+		rf_daemon_flag |= RFDDISCON;
+		wakeup((caddr_t)&rf_daemon_rd->rd_qslp);
 		goto free;
 
 	default:
@@ -356,19 +341,8 @@ gdp_rsrv(qp)
 	register mblk_t		*splitbp;
 	register gdp_t		*gp;
 
-#if defined(u3b2) && !defined(lint) && !defined(CXREF)
-	ASSERT(ipl() <= 0x1e000);	/* splstr */
-#endif
 
 	gp = QPTOGP(qp);
-	gp->timeout = 0;
-
-	if (gp->constate != GDPCONNECT) {
-		while (bp = getq(qp)) {
-			freeb(bp);
-		}
-		return;
-	}
 
 	if (gp->input.oneshot) {
 		while (bp = getq(qp)) {
@@ -468,8 +442,7 @@ asm("GDPPMC:");
 					gp->hdr = NULL;
 					gp->idata = NULL;
 					gdp_cleanhdr(gp);
-					gdp_discon("gdp_rsrv: bad header data",
-					  gp);
+					gdp_discon("gdp_rsrv: bad data", gp);
 					return;
 				}
 				gp->input.mcdecan = 1;
@@ -564,10 +537,10 @@ asm("GDPPR:");
 			if (gp->hetero == ALL_CONV && !gp->input.rhdecan) {
 				if (!rf_rhfcanon(gp->hdr, gp)) {
 					if (bp && bp != (mblk_t *)1) {
+
 						putbq(qp, bp);
 					}
-					gdp_discon("gdp_rsrv bad header data",
-					  gp);
+					gdp_discon("gdp_rsrv bad header", gp);
 					return;
 				}
 				gp->input.rhdecan = 1;
@@ -633,32 +606,6 @@ eom:
 			gdp_cleanhdr(gp);
 
 			RF_MSG(bp)->m_queue = (long)qp;
-#ifdef DEBUG
-			{
-				rf_message_t	*msg;
-
-				/*
-				 * By checking filler0 for a nonzero value, we
-				 * let non-participants slip by.
-				 */
-
-				msg = RF_MSG(bp);
-				if (gp->version > RFS1DOT0 &&
-				  msg->filler0 && msg->filler0 != gp->inseq) {
-					cmn_err(CE_NOTE,
-					  "msg sequence %d gdp sequence %d\n",
-					msg->filler0, gp->inseq);
-					if (gdp_call_demon) {
-						call_demon();
-					}
-				}
-				gp->inseq = msg->filler0 + 1;
-			}
-#endif
-
-			ASSERT(bp->b_wptr - bp->b_rptr >=
-			  RF_MCSZ + GDP_RHSZ(gp, RF_COM(bp)));
-
 			rf_deliver(bp);
 
 			if (!splitbp || (bp = splitbp) == (mblk_t *)1) {
@@ -708,7 +655,7 @@ frag:
 		}
 	}
 	if (canput(qp)) {
-		wakeprocs(qp->q_ptr, PRMPT);
+		wakeup(qp->q_ptr);
 	}
 }
 
@@ -739,9 +686,8 @@ gdp_process(qp, bp)
 
 		if (gp->hetero == ALL_CONV && !gp->input.mcdecan) {
 			if (!rf_mcfcanon(bp)) {
-				gdp_discon("gdp_process bad header data", gp);
-				freeb(bp);
-				return 1;
+				gdp_discon("gdp_process bad message header", gp);
+				return 0;
 			}
 			gp->input.mcdecan = 1;
 		}
@@ -751,10 +697,8 @@ gdp_process(qp, bp)
 
 			if (gp->hetero == ALL_CONV && !gp->input.rhdecan) {
 				if (!rf_rhfcanon(bp, gp)) {
-					gdp_discon(
-					  "gdp_process bad header type", gp);
-					freeb(bp);
-					return 1;
+					gdp_discon("gdp_process bad header", gp);
+					return 0;
 				}
 				gp->input.rhdecan = 1;
 			}
@@ -762,40 +706,15 @@ gdp_process(qp, bp)
 
 				/* All headers and data present. */
 
-#ifdef DEBUG
-			{
-				rf_message_t	*msg;
-
-				/*
-				 * By checking filler0 for a nonzero value, we
-				 * let non-participants slip by.
-				 */
-
-				msg = RF_MSG(bp);
-				if (gp->version > RFS1DOT0 &&
-				  msg->filler0 && msg->filler0 != gp->inseq) {
-					cmn_err(CE_NOTE,
-					  "msg sequence %d gdp sequence %d\n",
-					msg->filler0, gp->inseq);
-					if (gdp_call_demon) {
-						call_demon();
-					}
-				}
-				gp->inseq = msg->filler0 + 1;
-			}
-
-#endif
-				ASSERT(bp->b_wptr - bp->b_rptr >=
-				  RF_MCSZ + GDP_RHSZ(gp, cop));
-
 				RF_MSG(bp)->m_queue = (long)qp;
 				rf_deliver(bp);
 				return 1;
-
 			} else if (msg->m_size < msgsize) {
 				gdp_discon("gdp_process bad size", gp);
-				freeb(bp);
-				return 1;
+				if (cop->co_type == RF_RESP_MSG) {
+					RF_RESP(bp)->rp_errno = EPROTO;
+				}
+				return 0;
 			}
 		}
 		if (gp->input.oneshot && RF_MSG(bp)->m_size != msgsize) {
@@ -841,12 +760,10 @@ gdp_init_circuit(fd, gdpp, tokenp, qpp, gmp)
 	stp->sd_flag |= STPLEX;		/* in case someone else can open late */
 	fp->f_count++;			/* for consistency */
 
+	/* point gdp at q */
 	gdpp->queue = qp;
 	gdpp->mntcnt = 0;
 	gdpp->timeskew_sec = 0;
-#ifdef DEBUG
-	gdpp->inseq = gdpp->outseq = 0;
-#endif
 
 	/* point q at gdp structure  and intialize q */
 
@@ -856,10 +773,10 @@ gdp_init_circuit(fd, gdpp, tokenp, qpp, gmp)
 	WR(qp)->q_flag |= QWANTR;
 
 	gdpp->file = fp;
+	gdpp->constate = GDPCONNECT;
 	/*
 	 * strip M_PROTO:T_GR_IND
 	 */
-
 	for (mp = qp->q_first; mp; ) {
 		mblk_t * emp, *tmp;
 
@@ -903,8 +820,6 @@ stripbad:
 	gdpp->ngroups_max = gmp->ngroups_max;
 	gdpp->idmap[0] = 0;
 	gdpp->idmap[1] = 0;
-	gdpp->constate = GDPCONNECT;
-
 	bp->b_datap->db_type = M_PCPROTO;
 	((struct T_info_req *)(bp->b_wptr))->PRIM_type = T_INFO_REQ;
 	bp->b_wptr += sizeof(struct T_info_req);
@@ -945,7 +860,6 @@ gdp_clean_circuit(qp)
 	gdpp->version = 0;
 	gdpp->timeskew_sec = 0;
 	gdpp->mntcnt = 0;
-	gdpp->timeout = 0;
 	gdp_tokclear (gdpp);
 	if (gdpp->idmap[0]) {
 		rf_freeidmap(gdpp->idmap[0]);
@@ -957,9 +871,6 @@ gdp_clean_circuit(qp)
 	gdpp->idmap[1] = 0;
 	gdpp->input.oneshot = 0;
 	gdpp->sysid = gdpp - gdp + 1;
-#ifdef DEBUG
-	gdpp->inseq = gdpp->outseq = 0;
-#endif
 	gdp_cleanhdr(gdpp);
 }
 
@@ -1025,11 +936,9 @@ STATIC void
 gdp_dodiscon(gp)
 	gdp_t	*gp;
 {
-	if (gp->constate == GDPCONNECT) {
-		gp->constate = GDPDISCONN;
-		rf_daemon_flag |= RFDDISCON;
-		wakeprocs((caddr_t)&rf_daemon_rd->rd_qslp, PRMPT);
-	}
+	gp->constate = GDPDISCONN;
+	rf_daemon_flag |= RFDDISCON;
+	wakeup((caddr_t)&rf_daemon_rd->rd_qslp);
 }
 
 STATIC void

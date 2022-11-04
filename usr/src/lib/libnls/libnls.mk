@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)libnls:libnls.mk	1.2"
+#ident	"@(#)libnls:libnls.mk	1.1"
 #
 # libnls.mk: makefile for network listener library
 #
@@ -22,7 +22,7 @@ LINTFLAGS = -b -x
 # change the next line to compile with -g
 # OPT	= -g
 
-LIB = $(ROOT)/usr/lib
+LIBDIR = $(ROOT)/usr/lib
 
 LIBID	= bin
 INCID	= bin
@@ -52,7 +52,7 @@ $(LIBNLS)(nlsrequest.o):	$(INC)/stdio.h $(INC)/ctype.h $(INC)/fcntl.h \
 				$(INC)/listen.h
 
 install:	all
-		install -f $(LIB) -u $(LIBID) -g $(LIBID) -m 644 $(LIBNLS)
+		install -f $(LIBDIR) -u $(LIBID) -g $(LIBID) -m 644 $(LIBNLS)
 
 clean:
 	-rm -f *.o

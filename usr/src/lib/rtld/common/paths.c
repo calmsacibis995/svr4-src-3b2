@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)rtld:common/paths.c	1.5"
+#ident	"@(#)rtld:common/paths.c	1.3"
 
 /* PATH setup and search functions */
 
@@ -46,7 +46,7 @@ CONST char **pathname;
 	DPRINTF(LIST, (2, "rtld: _so_find(%s, 0x%x)\n", (filename ? filename : (CONST char *)"0"), (unsigned long)pathname));
 
 	if (!filename) {
-		_rt_lasterr("%s: %s: attempt to open file with null name",(char*) _rt_name,_proc_name);
+		_rt_lasterr("ld.so: %s: attempt to open file with null name",_proc_name);
 		return(-1);
 	}
 
@@ -60,12 +60,12 @@ CONST char **pathname;
 
 	flen = (p - filename) + 1; /* length includes null at end */
 	if (flen >= PATH_MAX) {
-		_rt_lasterr("%s: %s: file name too long: %s",(char*) _rt_name,_proc_name,filename);
+		_rt_lasterr("ld.so: %s: file name too long: %s",_proc_name,filename);
 		return(-1);
 	}
 	if (slash) {
 		if ((fd = _open(filename, O_RDONLY)) == -1) {
-			_rt_lasterr("%s: %s: can't open %s",(char*) _rt_name,_proc_name,filename);
+			_rt_lasterr("ld.so: %s: can't open %s",_proc_name,filename);
 			return(-1);
 		}
 		if ((p = _rtmalloc(flen)) == 0) {
@@ -96,7 +96,7 @@ CONST char **pathname;
 		}
 	}
 	/* if here, no files found */
-	_rt_lasterr("%s: %s: can't find %s",(char*) _rt_name,_proc_name,filename);
+	_rt_lasterr("ld.so: %s: can't find %s",_proc_name,filename);
 	return(-1);
 }
 

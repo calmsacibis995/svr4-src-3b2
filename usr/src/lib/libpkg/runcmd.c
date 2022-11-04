@@ -6,12 +6,11 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:runcmd.c	1.8.2.2"
+#ident	"@(#)libpkg:runcmd.c	1.8.1.1"
 
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <fcntl.h>
 #include <sys/types.h>
 
 static char	*errfile = NULL;
@@ -27,36 +26,8 @@ extern pid_t	fork(),
 extern int	execl(),
 		unlink();
 
-void
-rpterr()
-{
-	FILE	*fp;
-	int	c;
-
-	if(errfile) {
-		if(fp = fopen(errfile, "r")) {
-			while((c = getc(fp)) != EOF)
-				putc(c, stderr);
-			(void) fclose(fp);
-		}
-		(void) unlink(errfile);
-		errfile = NULL;
-	}
-}
-
-void
-ecleanup()
-{
-	if(errfile) {
-		(void) unlink(errfile);
-		errfile = NULL;
-	}
-}
-
-int
-esystem(cmd, ifd, ofd)
+esystem(cmd)
 char *cmd;
-int ifd, ofd;
 {
 	char	*errfile;
 	int	status;
@@ -67,19 +38,10 @@ int ifd, ofd;
 		progerr("unable to create temp error file, errno=%d", errno);
 		return(-1);
 	}
+
 	pid = fork();
 	if(pid == 0) {
 		/* child */
-		if(ifd > 0) {
-			(void)close(0);
-			(void)fcntl(ifd, F_DUPFD, 0);
-			(void)close(ifd);
-		}
-		if(ofd >= 0 && ofd != 1) {
-			(void)close(1);
-			(void)fcntl(ofd, F_DUPFD, 1);
-			(void)close(ofd);
-		}
 		freopen(errfile, "w", stderr);
 		execl("/sbin/sh", "/sbin/sh", "-c", cmd, NULL);
 		progerr("exec of <%s> failed, errno=%d", cmd, errno);
@@ -91,7 +53,7 @@ int ifd, ofd;
 
 	/* parent process */
 	sighold(SIGINT);
-	pid = waitpid(pid, &status, 0);
+	pid = wait(&status);
 	sigrelse(SIGINT);
 
 	if(pid < 0)
@@ -106,13 +68,10 @@ int ifd, ofd;
 		/* terminated by a signal */
 		status = status & 0177;
 	}
-	if(status == 0)
-		ecleanup();
 	return(status);
 }
 
-FILE *
-epopen(cmd, mode)
+FILE *epopen(cmd, mode)
 char	*cmd, *mode;
 {
 	char	*buffer;
@@ -146,14 +105,19 @@ char	*cmd, *mode;
 	return(pp);
 }
 
-int
-epclose(pp)
-FILE *pp;
+void
+rpterr()
 {
-	int n;
+	FILE	*fp;
+	int	c;
 
-	n = pclose(pp);
-	if(n == 0)
-		ecleanup();
-	return(n);
+	if(errfile) {
+		if(fp = fopen(errfile, "r")) {
+			while((c = getc(fp)) != EOF)
+				putc(c, stderr);
+			(void) fclose(fp);
+		}
+		(void) unlink(errfile);
+		errfile = NULL;
+	}
 }

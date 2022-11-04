@@ -5,7 +5,25 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)netinet:netinet/tcp_timer.c	1.5"
+#ident	"@(#)netinet:netinet/tcp_timer.c	1.4"
+
+/*
+ * System V STREAMS TCP - Release 2.0 
+ *
+ * Copyright 1987, 1988 Lachman Associates, Incorporated (LAI) All Rights Reserved. 
+ *
+ * The copyright above and this notice must be preserved in all copies of this
+ * source code.  The copyright above does not evidence any actual or intended
+ * publication of this source code. 
+ *
+ * This is unpublished proprietary trade secret source code of Lachman
+ * Associates.  This source code may not be copied, disclosed, distributed,
+ * demonstrated or licensed except as expressly authorized by Lachman
+ * Associates. 
+ *
+ * System V STREAMS TCP was jointly developed by Lachman Associates and
+ * Convergent Technologies. 
+ */
 
 /*
  *  		PROPRIETARY NOTICE (Combined)
@@ -26,25 +44,6 @@
  *  	(c) 1986,1987,1988,1989  Sun Microsystems, Inc.
  *  	(c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *  	          All rights reserved.
- */
-
-/*
- * System V STREAMS TCP - Release 3.0 
- *
- * Copyright 1987, 1988, 1989 Lachman Associates, Incorporated (LAI) 
- * All Rights Reserved. 
- *
- * The copyright above and this notice must be preserved in all copies of this
- * source code.  The copyright above does not evidence any actual or intended
- * publication of this source code. 
- *
- * This is unpublished proprietary trade secret source code of Lachman
- * Associates.  This source code may not be copied, disclosed, distributed,
- * demonstrated or licensed except as expressly authorized by Lachman
- * Associates. 
- *
- * System V STREAMS TCP was jointly developed by Lachman Associates and
- * Convergent Technologies. 
  */
 
 #define STRNET
@@ -77,9 +76,6 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
-#ifdef SYSV
-#include <sys/cmn_err.h>
-#endif
 
 int             tcpnodelack = 0;
 int		tcp_keepidle = TCPTV_KEEP_IDLE;
@@ -113,38 +109,12 @@ tcp_fasttimo()
 /*
  * Tcp protocol timeout routine called every 500 ms. Updates the timers in
  * all active tcb's and causes finite state machine actions if timers expire. 
- * (tcp_slowtimo now processes timers by calling tcp_dotimers under the
- * I/O lock.)
  */
-struct tcpcb *
-tcp_dotimers(tp)
-struct tcpcb *tp;
-{
-	register int    i;
-
-	i = splstr();
-	tp->t_flags &= ~TF_NEEDTIMER;
-	splx(i);
-	for (i = 0; i < TCPT_NTIMERS; i++) {
-		if (tp->t_timer[i] && --tp->t_timer[i] == 0) {
-			if (!tcp_timers(tp, i))
-				return (struct tcpcb *) 0;
-			if ((tp->t_inpcb->inp_protoopt & SO_DEBUG)
-			    || tcpalldebug != 0)
-				tcp_trace(TA_TIMER, tp->t_state, tp,
-					  (struct tcpiphdr *) 0, i);
-		}
-	}
-	tp->t_idle++;
-	if (tp->t_rtt)
-		tp->t_rtt++;
-	return tp;
-}
-
 tcp_slowtimo()
 {
 	register struct inpcb *ip, *ipnxt;
 	register struct tcpcb *tp;
+	register int    i;
 
 	tcp_maxidle = TCPTV_KEEPCNT * tcp_keepintvl;
 	/*
@@ -157,8 +127,25 @@ tcp_slowtimo()
 	for (; ip != &tcb; ip = ipnxt) {
 		ipnxt = ip->inp_next;
 		tp = intotcpcb(ip);
-		if (tp)
-			tcp_io(tp, TF_NEEDTIMER, NULL);
+		if (tp == 0) {
+			continue;
+		}
+		for (i = 0; i < TCPT_NTIMERS; i++) {
+			if (tp->t_timer[i] && --tp->t_timer[i] == 0) {
+				tcp_timers(tp, i);
+				if ((tp->t_inpcb->inp_protoopt & SO_DEBUG)
+				    || tcpalldebug != 0)
+					tcp_trace(TA_TIMER, tp->t_state, tp,
+						  (struct tcpiphdr *) 0, i);
+				if (ipnxt->inp_prev != ip)
+					goto tpgone;
+			}
+		}
+		tp->t_idle++;
+		if (tp->t_rtt)
+			tp->t_rtt++;
+tpgone:
+		;
 	}
 	tcp_iss += TCP_ISSINCR / PR_SLOWHZ;	/* increment iss */
 #ifdef TCP_COMPAT_42
@@ -191,8 +178,6 @@ tcp_timers(tp, timer)
 	int             timer;
 {
 	register int    rexmt;
-
-	extern void	lingertimer();
 
 	switch (timer) {
 
@@ -279,7 +264,7 @@ tcp_timers(tp, timer)
 		tp->snd_cwnd = tp->t_maxseg;
 		tp->snd_ssthresh = win * tp->t_maxseg;
 		}
-		tcp_output(tp);
+		tcp_io(tp, TF_NEEDOUT, NULL);
 		break;
 
 		/*
@@ -290,7 +275,7 @@ tcp_timers(tp, timer)
 		tcpstat.tcps_persisttimeo++;
 		tcp_setpersist(tp);
 		tp->t_force = 1;
-		tcp_output(tp);
+		tcp_io(tp, TF_NEEDOUT, NULL);
 		break;
 
 		/*
@@ -333,13 +318,9 @@ tcp_timers(tp, timer)
 		} else
 			tp->t_timer[TCPT_KEEP] = tcp_keepidle;
 		break;
-dropit:
+	dropit:
 		tcpstat.tcps_keepdrops++;
 		tp = tcp_drop(tp, ETIMEDOUT);
-		break;
-
-	case TCPT_LINGER:
-		lingertimer(tp);
 		break;
 
 	default:
@@ -349,59 +330,31 @@ dropit:
 	return (tp);
 }
 
-lingerstart(tp)
-	struct	tcpcb	*tp;
-{
-	if (tp) {
-		tp->t_linger = 1;
-		tcpstat.tcps_linger++;
-		tp->t_timer[TCPT_LINGER] = (tp->t_inpcb->inp_linger * PR_SLOWHZ);
-	} else {
-#ifdef SYSV
-		cmn_err(CE_WARN, "lingerstart: null tp");
-#else
-		printf( "lingerstart: null tp");
-#endif
-	}
-}
-
 void
 lingertimer(tp)
 	struct tcpcb   *tp;
 {
-	if (!tp) {
-#ifdef SYSV
-		cmn_err(CE_WARN, "lingertimer: null tp");
-#else
-		printf( "lingertimer: null tp");
-#endif
-		return;
-	}
-		
 	tp->t_qsize = 0;
-	tp->t_linger = 0;
-	tp->t_timer[TCPT_LINGER] = 0;
-	tcpstat.tcps_lingerexp++;
+	*tp->t_ltidp = 0;
+	tp->t_ltidp = NULL;
+	tp->t_inpcb->inp_q = NULL;
 	wakeup((caddr_t) tp);
 	tcp_io(tp, TF_NEEDOUT, NULL);
-	return;
 }
 
 tcp_cancelinger(tp)
 	struct tcpcb *tp;
 {
-	if (!tp) {
-#ifdef SYSV
-		cmn_err(CE_WARN, "tcp_cancelinger: null tp");
-#else
-		printf( "tcp_cancelinger: null tp");
-#endif
-		return;
-	}
-	if (tp->t_linger) {
-		tp->t_linger = 0;
-		tp->t_timer[TCPT_LINGER] = 0;
-		wakeup((caddr_t) tp);
-		tcpstat.tcps_lingercan++;
-	}
+	int             s;
+
+	s = splnet();
+        if (tp->t_ltidp) {
+                untimeout(*tp->t_ltidp);
+                *tp->t_ltidp = 0;
+                tp->t_ltidp = NULL;
+                tp->t_inpcb->inp_q = NULL;
+                splx(s);
+                wakeup((caddr_t) tp);
+        } else
+                splx(s);
 }

@@ -1,0 +1,37 @@
+#ident	"@(#)pkg.slnmap:postinstall	1.1"
+
+installf $PKGINST /usr/options/$PKG.name
+echo $NAME > /usr/options/$PKG.name
+
+#
+#	Udpate the /etc/netconfig file
+#
+if grep '[ 	]osinet[ 	][ 	]*-[ 	][ 	]*/dev/starlan[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "starlan	tpi_cots	v	osinet	-	/dev/starlan	/usr/lib/straddr.so" >>/etc/netconfig
+fi
+
+if grep '[ 	]osinet[ 	][ 	]*-[ 	][ 	]*/dev/starlandg[ 	]' /etc/netconfig >/dev/null 2>&1
+then
+	: Already there!
+else
+	echo "starlandg	tpi_clts	v	osinet	-	/dev/starlandg	/usr/lib/straddr.so" >>/etc/netconfig
+fi
+
+#
+#	Set STRMSGSZ to 4096
+#
+
+ed /etc/master.d/kernel <<! >/dev/null 2>&1
+/STRMSGSZ = 0$/s/0/4096/
+w
+q
+!
+
+cd /boot
+/usr/sbin/mkboot -k KERNEL
+
+installf -f $PKGINST
+exit 10

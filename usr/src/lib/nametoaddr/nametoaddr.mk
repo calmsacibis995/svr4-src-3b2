@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)nametoaddr:nametoaddr.mk	1.6"
+#ident	"@(#)nametoaddr:nametoaddr.mk	1.2"
 #
 # makefile for name to address mapping dynamic linking libraries.
 #
@@ -15,47 +15,39 @@ TESTDIR = .
 INC = $(ROOT)/usr/include
 INS = install
 CFLAGS = -O
+COMPONENTS = npack straddr tcpip
 FRC =
 
 all:
-	@for i in * ; do  \
-		if [ -d $$i ] ; then \
-			cd $$i;\
-			echo "##### make -f $$i.mk \"MAKE=$(MAKE)\" \"AS=$(AS)\" \"CC=$(CC)\" \"LD=$(LD)\" \"FRC=$(FRC)\" \"INC=$(INC)\" \"MORECPP=$(MORECPP)\" \"DASHO=$(DASHO)\"" ;\
-			make -f $$i.mk "MAKE=$(MAKE)" "AS=$(AS)" "CC=$(CC)" "LD=$(LD)" "FRC=$(FRC)" "INC=$(INC)" "MORECPP=$(MORECPP)" "DASHO=$(DASHO)";\
-			cd ..; \
-		fi; \
+	@for i in $(COMPONENTS);\
+		do cd $$i;\
+		make -f $$i.mk "MAKE=$(MAKE)" "AS=$(AS)" "CC=$(CC)" "LD=$(LD)" "FRC=$(FRC)" "INC=$(INC)" "MORECPP=$(MORECPP)" "DASHO=$(DASHO)";\
+		cd ..;\
 	done;
 
 install: 
-	@for i in * ; do  \
-		if [ -d $$i ] ; then \
-			cd $$i;\
-			echo $$i;\
-			echo "##### make install -f $$i.mk \"MAKE=$(MAKE)\" \"AS=$(AS)\" \"CC=$(CC)\" \"LD=$(LD)\" \"FRC=$(FRC)\" \"INC=$(INC)\" \"MORECPP=$(MORECPP)\" \"DASHO=$(DASHO)\"" ;\
-			make install -f $$i.mk "MAKE=$(MAKE)" "AS=$(AS)" "CC=$(CC)" "LD=$(LD)" "FRC=$(FRC)" "INC=$(INC)" "MORECPP=$(MORECPP)" "DASHO=$(DASHO)";\
-			cd ..;\
-		fi; \
+	for i in $(COMPONENTS);\
+		do cd $$i;\
+		echo $$i;\
+		make install -f $$i.mk "MAKE=$(MAKE)" "AS=$(AS)" "CC=$(CC)" "LD=$(LD)" "FRC=$(FRC)" "INC=$(INC)" "MORECPP=$(MORECPP)" "DASHO=$(DASHO)";\
+		cd ..;\
 	done;
 
 clean:
-	@for i in * ; do  \
-		if [ -d $$i ] ; then \
-			cd $$i;\
-			echo $$i;\
-			make -f $$i.mk clean;\
-			cd .. ;\
-		fi; \
+	for i in $(COMPONENTS);\
+	do\
+		cd $$i;\
+		echo $$i;\
+		make -f $$i.mk clean;\
+		cd .. ;\
 	done
 
 clobber:
-	@for i in * ; do  \
-		if [ -d $$i ] ; then \
-			cd $$i;\
-			echo $$i;\
-			make -f $$i.mk clobber;\
-			cd .. ;\
-		fi; \
+	for i in $(COMPONENTS);\
+		do cd $$i;\
+		echo $$i;\
+		make -f $$i.mk clobber;\
+		cd .. ;\
 	done
 
 FRC:

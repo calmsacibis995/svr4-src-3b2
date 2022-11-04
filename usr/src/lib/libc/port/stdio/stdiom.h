@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/stdiom.h	1.9"
+#ident	"@(#)libc-port:stdio/stdiom.h	1.8"
 /*
 * stdiom.h - shared guts of stdio therefore it doesn't need a surrounding #ifndef 
 */
@@ -39,9 +39,10 @@ extern Uchar *_bufendtab[];
 #	define MULTIBFSZ(SZ)    ((SZ) - (SZ % BUFSIZ))
 #endif
 
-#undef _bufend
+#ifndef _bufend
 #define _bufend(iop) (((iop)->_file < _NFILE) ? _bufendtab[(iop)->_file] : \
 	_realbufend(iop))
+#endif
 #define setbufend(iop, end) \
 	if (iop->_file < _NFILE) _bufendtab[(iop)->_file] = end; \
 	else _setbufend(iop,end)

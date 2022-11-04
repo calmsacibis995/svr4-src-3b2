@@ -8,7 +8,7 @@
 #ifndef _SYS_RF_MESSG_H
 #define _SYS_RF_MESSG_H
 
-#ident	"@(#)head.sys:sys/rf_messg.h	1.24"
+#ident	"@(#)head.sys:sys/rf_messg.h	1.17"
 
 /*
  * RFS network message definitions
@@ -23,20 +23,6 @@
  * version of rf_request_t.
  */
 #define RF_MAXGROUPS	32
-
-/*
- * A gift denotes a reference to a remote receive descriptor.  If the
- * gift denotes a GENERAL receive descriptor, the receive descriptor
- * is on a server, is persistent, and in turn denotes a file
- * on the server.  Otherwise the receive descriptor is SPECIFIC,
- * transient, and is merely one end of a communications channel.
- * gift_gen tags instances of the denoted receive descriptor, is
- * undefined for old clients/servers.
- */
-typedef struct rf_gift {
-	long	gift_id;
-	long	gift_gen;
-} rf_gift_t;
 
 #ifdef _KERNEL
 
@@ -75,12 +61,14 @@ typedef struct rf_sigset {
  * The message structure is the header to every message.
  */
 typedef struct rf_message {
-	long		filler0;	/* used as sequence w/ DEBUG */
-	long	 	m_stat;		/* see stat values below */
-	rf_gift_t	m_dest;		/* rcvd to which this goes */
-	rf_gift_t	m_gift;		/* rcvd of reference we are giving */
-	long 		m_size;		/* size of this message	*/
-	long		m_queue;	/* streams queue message came in on */
+	long	filler0;	/* not used */
+	long 	m_stat;		/* see stat values below */
+	long	m_dest;		/* rcvd index to which this goes */
+	long	filler1;	/* not used */
+	long	m_giftid;
+	long	filler2;	/* not used */
+	long 	m_size;		/* size of this message	*/
+	long	m_queue;	/* streams queue message came in on */
 } rf_message_t;
 
 /*
@@ -97,11 +85,17 @@ typedef struct rf_message {
 
 /*
  * Well-known receive queue indices.
- * SIGRDX used to be 1, but that symbol was unused.  DAEMON_RD
+ * SIGRDX used to be 1, but that symbol was unused.  RECOVER_RD
  * remains 2 for compatibility.
  */
 #define MOUNT_RD	0L	/* Mount request receive descriptor */
-#define DAEMON_RD	2L	/* Recovery receive descriptor */
+#define RECOVER_RD	2L	/* Recovery receive descriptor */
+
+/* tags for variant message types
+ */
+#define RF_REQ_MSG	1	/* request message type */
+#define RF_RESP_MSG	2	/* response message type */
+#define RF_NACK_MSG	3	/* RFS flow control nack message type */
 
 /*
  * In the original remote system call protocol, opcodes for remote service
@@ -118,8 +112,8 @@ typedef struct rf_message {
  * is of no concern, and opcodes can be chosen arbitrarily.
  */
 #define RFSETFL		0
-#define RFDELMAP	1
-#define RFADDMAP	2
+#define RFUNMAP		1
+#define RFMAP		2
 #define RFREAD		3
 #define RFWRITE		4
 #define RFOPEN		5
@@ -144,10 +138,8 @@ typedef struct rf_message {
 #define DUUMOUNT	22	/* retained for compatability;
 				 * umount(2), not old rumount(2)
 				 * must '..' back to client */
-#define RFSETATTR	23	/* VOP_SETATTR */
-#define RFACCESS	24	/* VOP_ACCESS */
-#define RFPATHCONF	25	/* VOP_PATHCONF */
-#define RFTMO		26	/* virtual circuit timeout */
+#define RFSETATTR	23	/* for VOP_SETATTR */
+#define RFACCESS	24	/* pure VOP_ACCESS */
 
 #define DUFSTAT		28
 #define DUUTIME		30
@@ -178,8 +170,8 @@ typedef struct rf_message {
 				 * 3.X turned this into another op */
 #define RFUMOUNT	98	/* differs from sys call for compatability;
 				 * 3.X turned this into another op */
-#define DUSTATVFS	103	/* name-based */
-#define RFSTATVFS	104	/* vnode-based */
+#define RFSTATVFS	103	/* vnode-based */
+#define DUSTATVFS	104	/* name-based */
 #define RFCOPYIN	106
 #define RFCOPYOUT	107
 #define RFLINK		109
@@ -228,22 +220,10 @@ typedef struct rf_common {
 	long	co_uid;		/* client uid */
 	long	co_gid;		/* client gid */
 	long	co_ftype;
-	union {
-		long	nlink;	/* RFS1DOT0 only */
-		long	svr4pad;
-	} co_un;
+	long	co_nlink;
 	long	co_size;
 	long	co_mntid;
 } rf_common_t;
-
-#define co_nlink co_un.nlink
-
-/*
- * co_type values are tags for variant message types
- */
-#define RF_REQ_MSG	1	/* request message */
-#define RF_RESP_MSG	2	/* response message */
-#define RF_NACK_MSG	3	/* RFS flow control nack message */
 
 #define RF_COM(bp)	((rf_common_t *)(RF_MSG(bp) + 1))
 
@@ -272,23 +252,6 @@ struct rqchown {
  */
 struct rqrele {
 	long	vcount;		/* unused in SVR3 */
-};
-
-/* unused in SVR3 */
-struct rqpathconf {
-	long	cmd;
-};
-
-/*
- * Used by RFADDMAP, and RFDELMAP.  The server is able to record
- * current mapping because addmaps and delmaps also go remote.  Only maxprot
- * is sent in all cases because prot may be manipulated above the file
- * system interface.
- */
-struct rqmap {
-	long	offset;
-	ulong	len;
-	ulong	maxprot;
 };
 
 struct rqclose {
@@ -391,15 +354,10 @@ struct rqslink {
 	long	targetln;
 };
 
-struct rqlink {
-	rf_gift_t	from;	/* gen meaningful only SVR4 and later */
+struct rqrflink {
+	long	link;
 };
 
-/*
- * Client pathname should be in "normal" form before it is sent with
- * a RFLOOKUP request.  Otherwise, path displacement with ".." or
- * ENOENT will be unexpected.
- */
 struct rqlookup {
 	long	flags;
 };
@@ -410,8 +368,8 @@ struct rqlookup {
  * call will fail gracefully.
  */
 struct rqrename {
-	rf_gift_t	from;
-	rf_gift_t	to;
+	long	frdid;
+	long	trdid;
 };
 
 struct rqcoredump {
@@ -433,16 +391,14 @@ struct rqcachedis {
 
 struct rqgetattr {
 	long mask;
-	long	flags;
 };
 
 struct rqsetattr {
 	long flags;
 };
 
-/* SVR4 and later */
 struct rqrmdir {
-	rf_gift_t	dir;
+	long	connid;
 };
 
 /* RECOVERY OPCODES
@@ -463,8 +419,6 @@ union rq_arg {
 	struct rqmode_op	rqmode_op;
 	struct rqchown		rqchown;
 	struct rqrele		rqrele;
-	struct rqpathconf	rqpathconf;
-	struct rqmap		rqmap;
 	struct rqclose		rqclose;
 	struct rqcreate		rqcreate;
 	struct rqopen		rqopen;
@@ -481,7 +435,7 @@ union rq_arg {
 	struct rqustat		rqustat;
 	struct rqxfer		rqxfer;
 	struct rqsrmount	rqsrmount;
-	struct rqlink		rqlink;
+	struct rqrflink		rqrflink;
 	struct rqlookup		rqlookup;
 	struct rqrename		rqrename;
 	struct rqsynctime	rqsynctime;
@@ -501,8 +455,7 @@ union rq_arg {
 struct rqv2 {
  	long	rqv2_ngroups;
  	long	rqv2_groups[RF_MAXGROUPS];
-	long	rqv2_rrdir_gen;
-	long	pad[2];		/* with RF_MAXGROUPS at 32, takes the
+	long	pad[3];		/* with RF_MAXGROUPS at 32, takes the
 				 * message + request less data to 256 bytes */
 };
 
@@ -536,7 +489,7 @@ struct rqsymlink {
 #define ULIMIT		(u.u_rlimit[RLIMIT_FSIZE].rlim_cur)
 
 typedef struct rf_request {
-	long			rq_rrdir_id;
+	long			rq_rrdir;
 	daddr_t			rq_ulimit;
 	union rq_arg		rq_arg;
 	long			rq_flags;
@@ -548,8 +501,6 @@ typedef struct rf_request {
 #define rq_mode_op	rq_arg.rqmode_op
 #define rq_chown	rq_arg.rqchown
 #define rq_rele		rq_arg.rqrele
-#define rq_pathconf	rq_arg.rqpathconf
-#define rq_map		rq_arg.rqmap
 #define rq_close	rq_arg.rqclose
 #define rq_create	rq_arg.rqcreate
 #define rq_open		rq_arg.rqopen
@@ -566,7 +517,7 @@ typedef struct rf_request {
 #define rq_ustat	rq_arg.rqustat
 #define rq_xfer		rq_arg.rqxfer
 #define rq_srmount	rq_arg.rqsrmount
-#define rq_link	rq_arg.rqlink
+#define rq_rflink	rq_arg.rqrflink
 #define rq_lookup	rq_arg.rqlookup
 #define rq_rename	rq_arg.rqrename
 #define rq_synctime	rq_arg.rqsynctime
@@ -578,7 +529,6 @@ typedef struct rf_request {
 #define rq_rmdir	rq_arg.rqrmdir
 #define rq_ngroups	rqv2.rqv2_ngroups
 #define rq_groups	rqv2.rqv2_groups
-#define rq_rrdir_gen	rqv2.rqv2_rrdir_gen
 
 #define RF_REQ(bp)	((rf_request_t *)(RF_COM(bp) + 1))
 
@@ -591,9 +541,8 @@ typedef struct rf_request {
 #define RF_MIN_REQ(version) (((version) == 1) ? RFV1_MINREQ : RFV2_MINREQ)
 
 /* request flags (rq_flags) */
-#define RQ_MNDLCK	0x1	/* used only by old protocol, suppresses
-				 * inode locking on remote op and caching
-				 * of mand lock-enabled files */
+#define RQ_MNDLCK	0x1
+
 
 /* Arg structures for RFS response opcodes.
  *
@@ -627,18 +576,18 @@ struct rp_all {
 /*
  * For old protocol ops that return new file references.
  */
-struct rpv1giftinfo {
+struct rpv1gift {
 	long	svr3pad0;
 	long	mode;
 };
 
 /* pathlen set by lookup, not by flakey /proc ioctl that opens a file */
-struct rpv2giftinfo {
+struct rpv2gift {
 	long	pathlen;
 	long	flags;
 };
-#define RPG_NOMAP	0x01
-#define RPG_NOSWAP	0x02
+
+#define RPG_NOMAP	1
 
 /* RFREAD(I), RFWRITE(I) - used only by SVR4 server talking to old client */
 struct rprdwr {
@@ -678,8 +627,8 @@ struct rpv2 {
 };
 
 union rp_arg {
-	struct rpv1giftinfo	rpv1giftinfo;
-	struct rpv2giftinfo	rpv2giftinfo;
+	struct rpv1gift		rpv1gift;
+	struct rpv2gift		rpv2gift;
 	struct rprdwr		rprdwr;
 	struct rpxfer		rpxfer;
 	struct rpcopyout	rpcopyout;
@@ -697,17 +646,15 @@ typedef struct rf_response {
 	struct rpv2		rpv2;
 } rf_response_t;
 
-#define RP_MNDLCK	0x8000	/* used only by old protocol, suppresses
-				 * inode locking on remote op and caching
-				 * of mand lock-enabled files */
+#define RP_MNDLCK	0x8000	/* mandatory lock set */
 #define RP_CACHE_ON	0x1	/* This file's data may be cached.  When
 				 * this is set, rpv2_vcode is also set.
 				 */
 #define DU_CACHE_ENABLE 0x2     /* remote cacheing is enabled by 3.X server */
 
 
-#define rp_v1giftinfo	rp_arg.rpv1giftinfo
-#define rp_v2giftinfo	rp_arg.rpv2giftinfo
+#define rp_v1gift	rp_arg.rpv1gift
+#define rp_v2gift	rp_arg.rpv2gift
 #define rp_rdwr		rp_arg.rprdwr
 #define rp_xfer		rp_arg.rpxfer
 #define rp_copyout	rp_arg.rpcopyout

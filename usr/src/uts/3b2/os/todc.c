@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/todc.c	1.8"
+#ident	"@(#)kernel:os/todc.c	1.6.1.3"
 /*
  * This file contains routines to access the hardware
  * time of day clock:  rtodc to read it, wtodc to write it.

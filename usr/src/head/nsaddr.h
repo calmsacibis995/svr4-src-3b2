@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head:nsaddr.h	1.10"
+#ident	"@(#)head:nsaddr.h	1.9"
 
 #ifndef _NSADDR_H
 #define _NSADDR_H
@@ -30,15 +30,9 @@ struct address {
 	struct netbuf	addbuf;
 };
 
-#ifdef __STDC__
 struct netbuf	*stoa(char *, struct netbuf *);
 char 		*atos(char *, struct netbuf *, int);
 struct address	*astoa(char *, struct address *);
 char		*aatos(char *, struct address *, int);
-#else
-struct netbuf	*stoa();
-char 		*atos();
-struct address	*astoa();
-char		*aatos();
-#endif
+
 #endif 	/* _NSADDR_H */

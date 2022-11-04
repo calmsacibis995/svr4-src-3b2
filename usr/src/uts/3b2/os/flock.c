@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/flock.c	1.17"
+#ident	"@(#)kernel:os/flock.c	1.15.1.1"
 
 /*
  * This file contains all of the file/record locking specific routines.
@@ -42,7 +42,7 @@
 #define	SLEEP(ptr, pri)	sleep((caddr_t)(ptr), pri)
 
 #define	WAKEUP(ptr)	if (ptr->stat.wakeflg) { \
-				wakeprocs((caddr_t)(ptr), PRMPT); \
+				wakeup((caddr_t)(ptr)); \
 				ptr->stat.wakeflg = 0 ; \
 			}
 #define SAMEOWNER(a, b)	(((a)->l_pid == (b)->l_pid) && \
@@ -434,19 +434,13 @@ reclock(vp, lckdat, cmd, flag, offset)
 				  (struct filock *)NULL)) == NULL)
 					retval = ENOLCK;
 				else {
-					if (cmd & RCMDLCK)
-						return EINTR;
 					found->stat.wakeflg++;
 					sf->stat.blk.pid = found->set.l_pid;
 					sf->stat.blk.sysid = found->set.l_sysid;
-					if (cmd & INOFLCK)
-						VOP_RWUNLOCK(vp);
 					if (SLEEP(found, PCATCH|(PZERO+1)))
 						retval = EINTR;
 					else
 						contflg = 1;
-					if (cmd & INOFLCK)
-						VOP_RWLOCK(vp);
 					sf->stat.blk.pid = 0;
 					sf->stat.blk.sysid = 0;
 					delflck(&sleeplcks, sf);
@@ -499,7 +493,7 @@ chklock(vp, iomode, offset, len, fmode)
 	bf.l_len = len;
 	bf.l_pid = u.u_procp->p_epid;
 	bf.l_sysid = u.u_procp->p_sysid;
-	i = (fmode & (FNDELAY|FNONBLOCK)) ? INOFLCK : INOFLCK|SLPFLCK;
+	i = (fmode & (FNDELAY|FNONBLOCK)) ? 0 : SLPFLCK;
 	if ((i = reclock(vp, &bf, i, 0, offset)) || bf.l_type != F_UNLCK)
 		error = i ? i : EAGAIN;
 	return error;

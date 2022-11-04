@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:io/mau.c	1.8"
+#ident	"@(#)kernel:io/mau.c	1.6.1.3"
 
 /*
  * support functions for the WE 32106 Math Accelerator Unit
@@ -105,9 +105,6 @@ mau_setup()
 void
 mau_save()
 {
-
-	/* Send NOP to MAU to clear hang problem */
-	asm("   SPOPRS &0x4e7f, $0x0");
 
 	/* Only need to save context if process used mau during */
 	/* last time slice as indicated by non-zero CSC bit   */
@@ -210,9 +207,6 @@ k_siginfo_t *infop;
 		infop->si_code = ILL_COPROC;
 		return;
 	}
-
-	/* Send NOP to MAU to clear hang problem */
-	asm("   SPOPRS &0x4e7f, $0x0");
 
 	/* Get the ASR from the MAU and store it in asr 
 	 */
@@ -473,9 +467,6 @@ caddr_t *fault_addr;		/* used to contain/return fault addr */
 	unsigned long drbuf[3];
 	extern int chkprob();
 	
-
-	/* Send NOP to MAU to clear hang problem */
-	asm("   SPOPRS &0x4e7f, $0x0");
 
 	/* clear out probe flag in ublock */
 	u.u_pgproc = 0;

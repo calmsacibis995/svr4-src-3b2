@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:stdio/tempnam.c	1.7.1.9"
+#ident	"@(#)libc-port:stdio/tempnam.c	1.7.1.7"
 /*LINTLIBRARY*/
 #ifdef __STDC__
 	#pragma weak tempnam = _tempnam
@@ -14,19 +14,13 @@
 #include "shlib.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 #define max(A,B) (((A)<(B))?(B):(A))
 
+extern char *malloc(), *getenv(), *mktemp();
 extern int access();
 
-#ifdef __STDC__
-static char *pcopy(char *, const char *);
-#else
-static char *pcopy();
-#endif
-
-static char *seed="AAA";
+static char *pcopy(), *seed="AAA";
 
 char *
 tempnam(dir, pfx)

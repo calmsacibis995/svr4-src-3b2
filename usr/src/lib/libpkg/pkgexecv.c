@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:pkgexecv.c	1.8.1.2"
+#ident	"@(#)libpkg:pkgexecv.c	1.8.1.1"
 
 #include <stdio.h>
 #include <string.h>
@@ -24,10 +24,9 @@ extern void	exit(),
 
 /*VARARGS*/
 int
-pkgexecv(filein, fileout, arg, fd)
+pkgexecv(filein, fileout, arg)
 char	*filein, *fileout;
 char	*arg[];
-int fd;
 {
 	int	n, status, upper, lower;
 	pid_t	pid;
@@ -39,10 +38,8 @@ int fd;
 		return(-1);
 	} else if(pid) {
 		/* parent */
-		if(fd >= 0)
-			(void)close(fd);
 		func = signal(SIGINT, SIG_IGN);
-		n = waitpid(pid, &status, 0);
+		n = wait(&status);
 		if(n != pid) {
 			progerr("wait for %d failed, pid=%d errno=%d", 
 				pid, n, errno);

@@ -1,9 +1,9 @@
-#ident	"@(#)pkg.usrenv:pkginfo	1.2"
+#ident	"@(#)pkg.usrenv:pkginfo	1.1"
 # required parameters
 PKG="usrenv"
-ARCH="3B2"
+ARCH="3b2"
 VERSION=""
-NAME="User Environment Utilities"
+NAME="user environment utilities"
 CATEGORY="system"
 CLASSES="none"
 MAXINST="1"

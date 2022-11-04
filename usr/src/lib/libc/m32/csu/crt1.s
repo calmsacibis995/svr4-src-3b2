@@ -1,11 +1,5 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 	.file	"crt1.s"
-	.ident	"@(#)libc-m32:csu/crt1.s	1.18"
+	.ident	"@(#)libc-m32:csu/crt1.s	1.16"
 	_section23_(.pesel,i,strtab)
 	.text
 # C runtime startoff
@@ -18,7 +12,7 @@
 	.globl	_start
 	.globl	_init
 	.globl	_mcount
-	.globl	environ
+#	.globl	environ
 
 # global entities defined elsewhere, but used here
 	.globl	__fpstart
@@ -70,9 +64,11 @@ _fgdef_(_start):
 _fgdef_(_mcount):		# dummy version for the case when
 	rsb			# files have been compiled with -p but
 				# not loaded with load module
-	.globl	__longdouble_used
 	.data
 	.align	4
 
 _dgdef_(__longdouble_used):
+	.globl	__longdouble_used
+
+_dwdef_(`environ'):
 	.word	0

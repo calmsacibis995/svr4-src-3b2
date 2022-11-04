@@ -8,7 +8,7 @@
 #ifndef _SYS_PROCFS_H
 #define _SYS_PROCFS_H
 
-#ident	"@(#)head.sys:sys/procfs.h	1.23"
+#ident	"@(#)head.sys:sys/procfs.h	1.22"
 
 #include "sys/types.h"
 #include "sys/time.h"
@@ -201,9 +201,9 @@ typedef struct prcred {
 	uid_t	pr_euid;	/* Effective user id */
 	uid_t	pr_ruid;	/* Real user id */
 	uid_t	pr_suid;	/* Saved user id (from exec) */
-	gid_t	pr_egid;	/* Effective group id */
-	gid_t	pr_rgid;	/* Real group id */
-	gid_t	pr_sgid;	/* Saved group id (from exec) */
+	uid_t	pr_egid;	/* Effective group id */
+	uid_t	pr_rgid;	/* Real group id */
+	uid_t	pr_sgid;	/* Saved group id (from exec) */
 	u_int	pr_ngroups;	/* Number of supplementary groups */
 } prcred_t;
 

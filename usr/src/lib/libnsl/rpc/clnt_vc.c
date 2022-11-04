@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)librpc:clnt_vc.c	1.3"
+#ident	"@(#)librpc:clnt_vc.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -64,7 +64,6 @@ static char sccsid[] = "@(#)clnt_vc.c 1.19 89/03/16 Copyr 1988 Sun Micro";
 
 extern int errno;
 extern int t_errno;
-extern char *malloc();
 
 static struct clnt_ops	*clnt_vc_ops();
 static int		read_vc();

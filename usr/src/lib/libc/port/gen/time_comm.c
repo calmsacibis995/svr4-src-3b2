@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/time_comm.c	1.28"
+#ident	"@(#)libc-port:gen/time_comm.c	1.20"
 /*
  * Functions that are common to ctime(3C) and cftime(3C)
  */
@@ -29,14 +29,11 @@
 static char	*getdigit();
 static char	*gettime();
 static int	getdst();
-static int	posixgetdst();
-static char	*posixsubdst();
 static void	getusa();
 static char	*getzname();
 static int	sunday();
 static long 	detzcode();
 static int	_tzload();
-static char	*tzcpy();
 
 extern void	_ltzset();
 
@@ -45,17 +42,13 @@ extern void	_ltzset();
 #define	SEC_PER_DAY	(24*60*60)
 #define	SEC_PER_YEAR	(365*24*60*60)
 #define	LEAP_TO_70	(70/4)
-#define FEB28		(58)
 
-
-#define MINTZNAME	3
+#define MAXTZNAME	3
 #define	year_size(A)	(((A) % 4) ? 365 : 366)
 
-static time_t 	start_dst = -1 ;    /* Start date of alternate time zone */
-static time_t  	end_dst = -1 ;      /* End date of alternate time zone */
+static time_t 	start_dst ;    /* Start date of alternate time zone */
+static time_t  	end_dst;      /* End date of alternate time zone */
 extern const short	__month_size[];
-extern const int __yday_to_month[];
-extern const int __lyday_to_month[];
 
 #ifndef TRUE
 #define TRUE		1
@@ -81,8 +74,8 @@ struct state {
 };
 
 static struct state	*_tz_state;
-static struct tm	tm;
 
+static int		_tz_is_set = FALSE;
 
 struct tm *
 localtime(timep)
@@ -95,7 +88,9 @@ const time_t *timep;
 	long				daybegin, dayend;
 	time_t				curr;
 
-	_ltzset(*timep);
+
+	if (!_tz_is_set)
+		_ltzset(*timep);
 	s = _tz_state;
 
 	t = *timep - timezone;
@@ -103,7 +98,7 @@ const time_t *timep;
 	if (!daylight)
 		return(tmp);
 
-	if (s != 0 && start_dst != -1)
+	if (s != 0 && start_dst)
 		/* Olson method */
 		curr = t;
 	else
@@ -111,25 +106,18 @@ const time_t *timep;
 		curr = tmp->tm_yday*SEC_PER_DAY + tmp->tm_hour*SEC_PER_HOUR +
 			tmp->tm_min*SEC_PER_MIN + tmp->tm_sec;
 
-	if ( start_dst == -1 && end_dst == -1)
+	if ( start_dst == 0 && end_dst == 0)
 		getusa(&daybegin, &dayend, tmp);
 	else
 	{
 		daybegin = start_dst;
 		dayend  = end_dst;
 	}
-	if (daybegin <= dayend) {
-		if (curr >= daybegin && curr < dayend) {
-			t = *timep - altzone;
-			tmp = gmtime(&t);
-			tmp->tm_isdst = 1;
-		}
-	} else {	/* Southern Hemisphere */
-		if (!(curr >= dayend && curr < daybegin)) {
-			t = *timep - altzone;
-			tmp = gmtime(&t);
-			tmp->tm_isdst = 1;
-		}
+	if (curr >= daybegin && curr < dayend)
+	{
+		t = *timep - altzone;
+		tmp = gmtime(&t);
+		tmp->tm_isdst = 1;
 	}
 	return(tmp);
 }
@@ -141,6 +129,7 @@ const time_t *clock;
 	register struct tm *	tmp;
 
 	tmp = offtime(clock, 0L);
+	tzname[0] = "GMT";
 	return tmp;
 }
 
@@ -159,6 +148,7 @@ long		offset;
 	register int		y;
 	register int		yleap;
 	register const int *		ip;
+	static struct tm	tm;
 
 	tmp = &tm;
 	days = *clock / SECS_PER_DAY;
@@ -214,12 +204,13 @@ time_t time0;
 time_t mktime(timeptr)
 struct tm *timeptr;
 {
+	extern const int __yday_to_month[];
+	extern const int __lyday_to_month[];
 	struct tm	*tptr;
 	long	secs;
 	int	temp;
 	int	isdst = 0;
 	long	daybegin, dayend;
-	struct tm	stm;
 
 	secs = timeptr->tm_sec + SEC_PER_MIN * timeptr->tm_min +
 		SEC_PER_HOUR * timeptr->tm_hour +
@@ -250,12 +241,10 @@ struct tm *timeptr;
 			isdst = -1;
 		secs += timezone;
 	}
-	if (timeptr != &tm)
-		stm = tm;
 	tptr = localtime((time_t *)&secs);
 
 	if (isdst == -1) {
-		if (start_dst == -1 && end_dst == -1)
+		if (start_dst == 0 && end_dst == 0)
 			getusa(&daybegin, &dayend, tptr);
 		else {
 			daybegin = start_dst;
@@ -263,23 +252,13 @@ struct tm *timeptr;
 		}
 		temp = tptr->tm_sec + SEC_PER_MIN * tptr->tm_min +
 			SEC_PER_HOUR * tptr->tm_hour + SEC_PER_DAY * tptr->tm_yday;
-		if (daybegin <= dayend) {
-			if (temp >= daybegin && temp < dayend + (timezone - altzone)) {
-				secs -= (timezone - altzone);
-				tptr = localtime((time_t *)&secs);
-			}
-		} else {	/* Southern Hemisphere */
-			if (!(temp >= dayend + (timezone - altzone) || temp < daybegin)) {
-				secs -= (timezone - altzone);
-				tptr = localtime((time_t *)&secs);
-			}
+		if (temp >= daybegin && temp < dayend) {
+			secs -= (timezone - altzone);
+			tptr = localtime((time_t *)&secs);
 		}
 	}
 
 	*timeptr = *tptr;
-	if (timeptr != &tm)
-		tm = stm;
-
 	if (secs < 0)
 		return(-1);
 	else
@@ -293,13 +272,9 @@ time_t tim;
 	register char *	name;
 	int i;
 
-	if((name = getenv("TZ")) == 0 || *name == '\0') {
-		/* TZ is not present, use GMT */
-		strcpy(tzname[0],"GMT");
-		strcpy(tzname[1],"   ");
-		timezone = altzone = daylight = 0;
+	_tz_is_set = TRUE;
+	if((name = getenv("TZ")) == 0 || *name == '\0')
 		return; /* TZ is not present, use GMT */
-	}
 	if (name[0] == ':') /* Olson method */ {
 		name++;
 		if (_tzload(name) != 0) {
@@ -312,9 +287,7 @@ time_t tim;
 			*/
 			if (tim == 0)
 				tim = time(NULL);
-			if (!(tzname[0]=tzcpy(tzname[0],&_tz_state->chars[0])))
-				return;
-			strcpy(tzname[1],"   ");
+			tzname[0] = tzname[1] = &_tz_state->chars[0];
 			timezone = -_tz_state->ttis[0].tt_gmtoff;
 			daylight = 0;
 			start_dst = end_dst = 0;
@@ -323,8 +296,7 @@ time_t tim;
 
 				ttisp = &_tz_state->ttis[_tz_state->types[i]];
 				if (ttisp->tt_isdst) {
-					if (!(tzname[1]=tzcpy(tzname[1],&_tz_state->chars[ttisp->tt_abbrind])))
-						return;
+					tzname[1] = &_tz_state->chars[ttisp->tt_abbrind];
 					daylight = 1;
 					altzone = -ttisp->tt_gmtoff;
 					start_dst = _tz_state->ats[i];
@@ -333,8 +305,7 @@ time_t tim;
 					else
 						end_dst = INT_MAX;
 				} else {
-					if (!(tzname[0]=tzcpy(tzname[0],&_tz_state->chars[ttisp->tt_abbrind])))
-						return;
+					tzname[0] = &_tz_state->chars[ttisp->tt_abbrind];
 					timezone = -ttisp->tt_gmtoff;
 				}
 			}
@@ -342,25 +313,21 @@ time_t tim;
 	}
 	else /* POSIX method */ {
 		/* Get main time zone name and difference from GMT */
-		if ( ((name = getzname(name,&tzname[0])) == 0) || 
+		if ( ((name = getzname(name,tzname[0])) == 0) || 
 			((name = gettime(name,&timezone,1)) == 0)) {
 				/* No offset from GMT given, so use GMT */
-				strcpy(tzname[0],"GMT");
-				strcpy(tzname[1],"   ");
+				tzname[0] = "GMT";
 				return;
 		}
-		strcpy(tzname[1],"   ");
 		altzone = timezone - SEC_PER_HOUR;
 		start_dst = end_dst = 0;
 		daylight = 0;
 
-		/* Get alternate time zone name */
-		if ( (name = getzname(name,&tzname[1])) == 0) {
-			strcpy(tzname[1],"   ");
-			return;
-		}
 
-		start_dst = end_dst = -1;
+		/* Get alternate time zone name */
+		if ( (name = getzname(name,tzname[1])) == 0)
+			return;
+
 		daylight = 1;
 
 		/* If the difference between alternate time zone and
@@ -372,10 +339,7 @@ time_t tim;
 		if ( (name = gettime(name,&altzone,1)) == 0 || 
 			(*name != ';' && *name != ','))
 				return;
-		if (*name == ';')
-			getdst(name + 1,&start_dst, &end_dst);
-		else
-			posixgetdst(name + 1, &start_dst, &end_dst, tim);
+		getdst(name + 1,&start_dst, &end_dst);
 	}
 }
 
@@ -388,45 +352,22 @@ tzset()
 static char *
 getzname(p, tz)
 char *p;
-char **tz;
+char *tz;
 {
-	register char *q = p;
-	register char c;
-	
-	if (!isalpha(*q))
-		return(0);
-	while (isalpha(*++q)) ;
-	c = *q;
-	*q = '\0';
-	if (!(*tz=tzcpy(*tz, p))) {
-		*q = c;
-		return(0);
-	}
-	*q = c;
-	return(q);	
-}
+	int n = MAXTZNAME;
 
-static char *
-tzcpy(s1, s2)
-char *s1, *s2;
-{
-	size_t	len;
-	if (strlen(s1) >= (len = strlen(s2))) {
-		strcpy(s1, s2);
-		if (len < MINTZNAME) {
-			s1 += len;
-			for (; len <= MINTZNAME; len++)
-				*s1++ = ' ';
-			*s1 = '\0';
-		}
-	} else {
-		if ((s1 = malloc(len+1)) == NULL)
-			return(0);
-		strcpy(s1, s2);
-	}
-	return(s1);
+	if (!isalpha(*p))
+		return(0);
+	do
+	{
+		*tz++ = *p ;
+	} while (--n > 0 && isalpha(*++p) );
+	while(isalpha(*p))
+		p++;
+	while(--n >= 0)
+		*tz++ = ' ';		/* Pad with blanks */
+	return(p);	
 }
-
 
 static char *
 gettime(p, timez, f)
@@ -494,8 +435,6 @@ time_t *e;
 	if ( (p = getdigit(p,&lsd)) == 0 )
 		return(0);
 	lsd -= 1; 	/* keep julian count in sync with date  1-366 */
-	if (lsd < 0 || lsd > 365)
-		return(0);
 	if ( (*p == '/') &&  ((p = gettime(p+1,&st,0)) == 0) )
 			return(0);
 	if (*p == ',')
@@ -503,8 +442,6 @@ time_t *e;
 		if ( (p = getdigit(p+1,&led)) == 0 )
 			return(0);
 		led -= 1; 	/* keep julian count in sync with date  1-366 */
-		if (led < 0 || led > 365)
-			return(0);
 		if ((*p == '/') &&  ((p = gettime(p+1,&et,0)) == 0) )
 				return(0);
 	}
@@ -513,190 +450,6 @@ time_t *e;
 	*e = (long)(led * SEC_PER_DAY + et - (timezone - altzone));
 	return(1);
 }
-static int
-posixgetdst(p,s,e,tim)
-char *p;
-time_t *s;
-time_t *e;
-time_t tim;	/* Time now */
-{
-	int lsd,led;
-	struct tm *std_tm;
-	unsigned char stdtype, alttype;
-	int stdjul, altjul;
-	int stdm, altm;
-	int stdn, altn;
-	int stdd, altd;
-	int xthru = 0;
-	int wd_jan01, wd;
-	int d, w;
-	time_t t;
-	time_t st,et;
-	st = et = 7200;	/* Default for start and end time is 02:00:00 */
-
-	if ((p = posixsubdst(p,&stdtype,&stdjul,&stdm,&stdn,&stdd,&st)) == 0)
-		return(0);
-	if (*p != ',')
-		return(0);
-	if ((p = posixsubdst(p+1,&alttype,&altjul,&altm,&altn,&altd,&et)) == 0)
-		return(0);
-
-	t = tim - timezone;
-	std_tm = gmtime(&t);
-
-	while (xthru++ < 2) {
-		lsd = stdjul;
-		led = altjul;
-		if (stdtype == 'J' && isleap(std_tm->tm_year))
-			if (lsd > FEB28)
-				++lsd;		/* Correct for leap year */
-		if (alttype == 'J' && isleap(std_tm->tm_year))
-			if (led > FEB28)
-				++led;		/* Correct for leap year */
-		if (stdtype == 'M') {		/* Figure out the Julian Day */
-			wd_jan01 = std_tm->tm_wday -
-				(std_tm->tm_yday % DAYS_PER_WEEK);
-			if (wd_jan01 < 0)
-				wd_jan01 += DAYS_PER_WEEK;
-			if (isleap(std_tm->tm_year))
-				wd = (wd_jan01 + __lyday_to_month[stdm-1]) %
-					DAYS_PER_WEEK;
-			else
-				wd = (wd_jan01 + __yday_to_month[stdm-1]) %
-					DAYS_PER_WEEK;
-			for (d = 1; wd != stdd; ++d)
-				wd = ((wd+1) % DAYS_PER_WEEK);
-			for (w = 1; w != stdn; ++w) {
-				d += DAYS_PER_WEEK;
-				if (d > __mon_lengths[
-					isleap(std_tm->tm_year)][stdm]) {
-					d -= DAYS_PER_WEEK;
-					break;
-				}
-			}
-			if (isleap(std_tm->tm_year))
-				lsd = __lyday_to_month[stdm-1] + d - 1;
-			else
-				lsd = __yday_to_month[stdm-1] + d - 1;
-		}
-		if (alttype == 'M') {		/* Figure out the Julian Day */
-			wd_jan01 = std_tm->tm_wday -
-				(std_tm->tm_yday % DAYS_PER_WEEK);
-			if (wd_jan01 < 0)
-				wd_jan01 += DAYS_PER_WEEK;
-			if (isleap(std_tm->tm_year))
-				wd = (wd_jan01 + __lyday_to_month[altm-1]) %
-					DAYS_PER_WEEK;
-			else
-				wd = (wd_jan01 + __yday_to_month[altm-1]) %
-					DAYS_PER_WEEK;
-			for (d = 1; wd != altd; ++d)
-				wd = ((wd+1) % DAYS_PER_WEEK);
-			for (w = 1; w != altn; ++w) {
-				d += DAYS_PER_WEEK;
-				if (d > __mon_lengths[
-					isleap(std_tm->tm_year)][altm]) {
-					d -= DAYS_PER_WEEK;
-					break;
-				}
-			}
-			if (isleap(std_tm->tm_year))
-				led = __lyday_to_month[altm-1] + d - 1;
-			else
-				led = __yday_to_month[altm-1] + d - 1;
-		}
-		if ((lsd <= led) || (xthru == 2))
-			break;
-		else {	/* Southern Hemisphere */
-			t = tim - altzone;
-			std_tm = gmtime(&t);
-		}
-	}	/* for (;;)	*/
-	*s = (long) (lsd * SEC_PER_DAY + st);
-	*e = (long) (led * SEC_PER_DAY + et - (timezone - altzone));
-	return(1);
-}
-
-static char *
-posixsubdst(p,type,jul,m,n,d,tm)
-char *p;
-unsigned char *type;
-int *jul, *m, *n, *d;
-time_t *tm;
-{
-
-/*
-**	nnn where nnn is between 0 and 365.
-*/
-	if (isdigit(*p)) {
-		if ( (p = getdigit(p,jul)) == 0 )
-			return(0);
-		if (*jul < 0 || *jul > 365)
-			return(0);
-		*type = '\0';
-	}
-/*
-** J<1-365> where February 28 is always day 59, and March 1 is ALWAYS
-** day 60.  It is not possible to specify February 29.
-**
-** This is a hard problem.  We can't figure out what time it is until
-** we know when daylight savings time begins and ends, and we can't
-** know that without knowing what time it is!?!  Thank you, POSIX!
-**
-**
-*/
-	else if (*p == 'J') {
-		if ((p = getdigit(p+1,jul)) == 0) 
-			return(0);
-		if (*jul <= 0 || *jul > 365)
-			return(0);
-		--(*jul);		/* make it between 0 and 364 */
-		*type = 'J';
-	}
-/*
-** Mm.n.d
-**	Where:
-**	m is month of year (1-12)
-**	n is week of month (1-5)
-**		Week 1 is the week in which the d'th day first falls
-**		Week 5 means the last day of that type in the month
-**			whether it falls in the 4th or 5th weeks.
-**	d is day of week (0-6) 0 == Sunday
-**
-** This is a hard problem.  We can't figure out what time it is until
-** we know when daylight savings time begins and ends, and we can't
-** know that without knowing what time it is!?!  Design by committee.
-** The saving grace is that this probably the right way to specify
-** Daylight Savings since most countries change on the first/last
-** Someday of the month.
-*/
-	else if (*p == 'M') {
-		if ((p = getdigit(p+1,m)) == 0)
-			return(0);
-		if (*m <= 0 || *m > 12)
-			return(0);
-		if (*p != '.')
-			return(0);
-		if ((p = getdigit(p+1,n)) == 0)
-			return(0);
-		if (*n <= 0 || *n > 5)
-			return(0);
-		if (*p != '.')
-			return(0);
-		if ((p = getdigit(p+1,d)) == 0)
-			return(0);
-		if (*d < 0 || *d > 6)
-			return(0);
-		*type = 'M';
-	}
-	else
-		return(0);
-
-	if ((*p == '/') && ((p = gettime(p+1,tm,0)) == 0))
-		return(0);
-	return(p);
-}
-
 
 static void
 getusa(s, e, t)

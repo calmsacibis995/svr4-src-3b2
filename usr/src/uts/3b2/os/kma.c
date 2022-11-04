@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)kernel:os/kmem.c	1.50"
+#ident	"@(#)kernel:os/kmem.c	1.43.1.1"
 
 /*
  *	kernel memory allocator
@@ -29,6 +29,9 @@
  *					
  */
 
+#define	PARANOID	1	/* include debugging/tracing		*/
+				/*	this should eventually go in	*/
+				/*	kmacct driver			*/
 
 #include	"sys/types.h"
 #include	"sys/param.h"
@@ -43,9 +46,10 @@
 #include	"sys/stream.h"
 #include	"sys/strsubr.h"
 #include	"sys/systm.h"
-#ifdef DEBUG
+#ifdef PARANOID
 #include	"sys/kmacct.h"
-#endif /* DEBUG */
+#include	"sys/errno.h"
+#endif /* PARANOID */
 
 /******************************CONSTANTS*********************************/
 
@@ -65,7 +69,7 @@
 #define	BIGBYTES	16384	/* big pool size in bytes		*/
 #define	BIGCLICKS	btoc(BIGBYTES)		/* ... in pages		*/
 
-#define	NIDLEP		128	/* size of list of free pools		*/
+#define	NIDLEP		32	/* size of list of free pools		*/
 
 #ifndef _KERNEL
 #define	MAXPOOLS	256	/* # pools for user-level debug trace	*/
@@ -208,16 +212,10 @@ typedef struct bpool {
 	unchar		*bp_startp;	/* unaligned start address	*/
 	unchar		*bp_alignp;	/* aligned start address	*/
 	ulong		bp_inuse;	/* # of MAXA* buffers in use	*/
-	ulong		bp_status;	/* current status of pool	*/
 	ulong		*bp_bitmapp;	/* pointer to bitmap		*/
 	ulong		bp_expmin;	/* exponent of smallest class	*/
 	ulong		bp_expmax;	/* exponent of largest class	*/
 } bufpool;
-
-/*
- *	Buffer pool status flags; bp_status.
- */
-#define	BP_IDLE	0x1
 
 /*
  *	Hash structure
@@ -235,16 +233,6 @@ typedef struct hpool {
 
 
 /*******************************MACROS***********************************/
-
-#ifdef DEBUG
-#define	PARANOID(a,b,c,d) \
-	if (Km_Paranoid || kmacctflag) kmem_worry((a),(b),(c),(d))
-#else
-#define	PARANOID(a,b,c,d)
-#endif /* DEBUG */
-
-
-
 
 /*	Buffer free list macros (macros rather than routines for speed)	*/
 
@@ -424,6 +412,8 @@ STATIC int	Km_SmAllocOn;	/* TRUE -> are in the middle of		*/
 				/*	allocating a small pool		*/
 STATIC int	Km_BgAllocOn;	/* TRUE -> are in the middle of		*/
 				/*	allocating a big pool		*/
+STATIC int	Km_FreeOn;	/* TRUE -> are in the middle of		*/
+				/*	freeing a pool			*/
 
 int	Km_pools[KMEM_NCLASS];	/* # of pools in each class	*/
 int	Km_allocspool;		/* # of calls to kmem_allocspool */
@@ -438,29 +428,48 @@ int	Km_freepool;		/* # of calls to kmem_freepool */
  */
 unchar	*Km_Golden[2];
 
-#ifdef DEBUG
+#ifdef PARANOID
 /*
- * stuff to help debug panics caused by drivers/modules using memory
- * after it's freed, or writing past the end of allocated memory.
- *
- * if Km_Paranoid is set, we'll call kmem_worry() to check freelist headers
+ * if Km_Paranoid is set, will call kmem_check() to check freelist headers
  * on entering and leaving kmem_alloc(), kmem_free(), and kmem_coalesce().
- * if Km_CheckAll is also set, will check entire freelist, instead of just
- * headers
+ * Km_Paranoid may be set from demon proms ("sw Km_Paranoid 1").
+ * if the freelist is trashed, will call demon.
+ * if Km_Paranoid and Km_CheckAll both are set, it will check the entire
+ * freelist, not just the headers.
  *
  * if kmacctflag is set, the KMACCT driver will collect counts of memory
  * usage to detect memory allocated but never freed.
  *
- * if Km_TraceAddr is set, kmem_worry() will call demon when allocating or 
- * freein that addr.
+ * if Km_TraceAddr is set, will call demon when allocate or free that addr.
  *
  */
 int	Km_Paranoid = FALSE;
 int	Km_CheckAll = FALSE;
-int	kmacctflag = FALSE;
+int	kmacctflag = FALSE;	/* for KMACCT driver	*/
+int	Km_Recurse;		/* count recursion depth in kmem_coalsece */
 unchar	*Km_TraceAddr = (unchar *)NULL;
-extern void	kmem_worry();
-#endif /* DEBUG */
+
+/*
+ * use Km_Alloc and Km_Free to keep track of who alloc'd & freed addrs.
+ * have NREC of each -- will wrap when full.
+ */
+
+#define NUMCALL 6
+#define NREC    500
+
+struct callrec {
+	caddr_t	caller[NUMCALL];
+	unchar	*addr;
+	ulong	size;
+} Km_Alloc[NREC+1], Km_Free[NREC+1];
+
+STATIC int      Km_i, Km_j;	/* indices for Km_Alloc & Km_Free resp. */
+STATIC int      Km_iwrap, Km_jwrap;	/* wrap flags	*/
+STATIC int      Km_Low = MINASMALL;
+STATIC int      Km_High = MAXABIG;
+STATIC int	Km_Max = 5; 	/* max number of alloc/frees to print */
+
+#endif /* PARANOID */
 
 
 /*	kmem routines	*/
@@ -477,6 +486,22 @@ STATIC int	kmem_allocspool();
 STATIC int	kmem_allocbpool();
 STATIC void	kmem_coalesce();
 
+#ifdef PARANOID
+void		kmem_check();	/* check freelist 			*/
+void     	kmem_trace();	/* trace usage of an address		*/
+int		cntausers();	/* count allocations of an addr		*/
+int		cntfusers();	/* count free's of an addr		*/
+void		cntusers();	/* count alloc's and free's of an addr	*/
+void		prausers();	/* print alloc's of an addr		*/
+void		prfusers();	/* print free's of an addr		*/
+void		prusers();	/* print alloc's and free's of an addr	*/
+STATIC void	prarange();	/* internal routine for print trace	*/
+STATIC void	prfrange();	/* internal routine for print trace	*/
+STATIC void     kmem_getcaller();/* get stack trace			*/
+void		kmem_trace();	/* trace address usage			*/
+
+extern int	s3blookup();	/* to get symbol names (is in DEBUG)	*/
+#endif /* PARANOID */
 
 
 /*	external variables	*/
@@ -571,7 +596,7 @@ int	flags;		/* flags	*/
 	if ( ((availrmem - SMALLCLICKS) < tune.t_minarmem) ||
 	    ((availsmem - SMALLCLICKS) < tune.t_minasmem) ) {
 		Km_SmAllocOn = FALSE;
-		wakeprocs((caddr_t)&Km_SmAllocOn, PRMPT);
+		wakeup((caddr_t)&Km_SmAllocOn);
 		return(FAILURE);
 	}
 	availrmem -= SMALLCLICKS;
@@ -582,7 +607,7 @@ int	flags;		/* flags	*/
 		availrmem += SMALLCLICKS;
 		availsmem += SMALLCLICKS;
 		Km_SmAllocOn = FALSE;
-		wakeprocs((caddr_t)&Km_SmAllocOn, PRMPT);
+		wakeup((caddr_t)&Km_SmAllocOn);
 		return(FAILURE);
 	}
 	pages_pp_kernel += SMALLCLICKS;
@@ -620,7 +645,6 @@ int	flags;		/* flags	*/
 	poolp->bp_startp = startp;
 	poolp->bp_alignp = memp;
 	poolp->bp_inuse = 0;
-	poolp->bp_status = 0;
 	poolp->bp_expmin = MINSIDX;
 	poolp->bp_expmax = MAXSIDX;
 
@@ -683,7 +707,7 @@ int	flags;		/* flags	*/
 	Km_NewSmall = poolp;
 
 	Km_SmAllocOn = FALSE;
-	wakeprocs((caddr_t)&Km_SmAllocOn, PRMPT);
+	wakeup((caddr_t)&Km_SmAllocOn);
 	return(SUCCESS);
 }
 
@@ -743,7 +767,7 @@ int	flags;		/* flags	*/
 	if ( ((availrmem - BIGCLICKS) < tune.t_minarmem) ||
 	     ((availsmem - BIGCLICKS) < tune.t_minasmem) ) {
 		Km_BgAllocOn = FALSE;
-		wakeprocs((caddr_t)&Km_BgAllocOn, PRMPT);
+		wakeup((caddr_t)&Km_BgAllocOn);
 		return(FAILURE);
 	}
 	availrmem -= BIGCLICKS;
@@ -754,7 +778,7 @@ int	flags;		/* flags	*/
 		availrmem += BIGCLICKS;
 		availsmem += BIGCLICKS;
 		Km_BgAllocOn = FALSE;
-		wakeprocs((caddr_t)&Km_BgAllocOn, PRMPT);
+		wakeup((caddr_t)&Km_BgAllocOn);
 		return(FAILURE);
 	}
 	startp = memp;
@@ -780,7 +804,7 @@ int	flags;		/* flags	*/
 		availrmem += BIGCLICKS;
 		availsmem += BIGCLICKS;
 		Km_BgAllocOn = FALSE;
-		wakeprocs((caddr_t)&Km_BgAllocOn, PRMPT);
+		wakeup((caddr_t)&Km_BgAllocOn);
 		return(FAILURE);
 	}
 	pages_pp_kernel += BIGCLICKS;
@@ -790,7 +814,6 @@ int	flags;		/* flags	*/
 	poolp->bp_startp = startp;
 	poolp->bp_alignp = memp;
 	poolp->bp_inuse = 0;
-	poolp->bp_status = 0;
 	poolp->bp_expmin = MINBIDX;
 	poolp->bp_expmax = MAXBIDX;
 
@@ -847,7 +870,7 @@ int	flags;		/* flags	*/
 	Km_NewBig = poolp;
 
 	Km_BgAllocOn = FALSE;
-	wakeprocs((caddr_t)&Km_BgAllocOn, PRMPT);
+	wakeup((caddr_t)&Km_BgAllocOn);
 	return(SUCCESS);
 }
 
@@ -892,8 +915,10 @@ int	flags;		/* flags				*/
 
 	if ( size == 0 )
 		return((_VOID *)NULL);
-
-	PARANOID("entering kmem_alloc", KMACCT_ALLOC, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("entering kmem_alloc", Km_CheckAll);
+#endif /* PARANOID */
 	if ( size <= MAXASMALL ) {
 		listp = Km_FreeLists + SMINOFFSET;
 		tmpsiz = MINASMALL;
@@ -920,8 +945,10 @@ int	flags;		/* flags				*/
 				(void) sleep((caddr_t)&Km_OsizeWanted, PZERO);
 				goto osizeagain;
 			}
-			PARANOID("leaving kmem_alloc", KMACCT_ALLOC,
-							(_VOID *)NULL, 0);
+#ifdef PARANOID
+			if ( Km_Paranoid )
+				kmem_check("leaving kmem_alloc", Km_CheckAll);
+#endif /* PARANOID */
 			return((_VOID *)NULL);
 		}
 
@@ -941,14 +968,38 @@ int	flags;		/* flags				*/
 				goto osizeagain;
 			}
 			++kmeminfo.km_fail[KMEM_OSIZE];
-			PARANOID("leaving kmem_alloc", KMACCT_ALLOC,
-							(_VOID *)NULL, 0);
+#ifdef PARANOID
+			if ( Km_Paranoid )
+				kmem_check("leaving kmem_alloc", Km_CheckAll);
+#endif /* PARANOID */
 			return((_VOID *)NULL);
 		}
 		pages_pp_kernel += clicks;
 		kmeminfo.km_alloc[KMEM_OSIZE] += (ulong)ctob(clicks);
-		PARANOID("leaving kmem_alloc", KMACCT_ALLOC,
-						(_VOID *)bufp, size);
+#ifdef PARANOID
+		if ( Km_Paranoid ) {
+			int	i;
+
+			kmem_check("leaving kmem_alloc", Km_CheckAll);
+			if ( size >= Km_Low && size <= Km_High ) {
+				if ( (i = Km_i++) >= NREC ) {
+					Km_iwrap++;
+					i = Km_i = 0;
+				}
+				kmem_getcaller(NUMCALL, Km_Alloc[i].caller);
+				Km_Alloc[i].size = size;
+				Km_Alloc[i].addr = (unchar *)bufp;
+			}
+		}
+		if ( kmacctflag )
+			kmaccount(KMACCT_ALLOC, size, (caddr_t *)bufp);
+		if ( bufp == (freebuf *)Km_TraceAddr ) {
+			cmn_err(CE_NOTE,
+			"^kmem_alloc: returning traced address 0x%x\n",
+			bufp);
+			call_demon();
+		}
+#endif /* PARANOID */
 		return((_VOID *)bufp);
 	}
 
@@ -969,7 +1020,10 @@ int	flags;		/* flags				*/
 	 *	kmem_coalesce().  fb_mapp, fb_mask will have been init'd
 	 *	in kmem_coalesce().
 	 */
-	PARANOID("kmem_alloc @allocMaxagain", KMACCT_ALLOC, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("kmem_alloc @allocMaxagain", Km_CheckAll);
+#endif /* PARANOID */
 	if ( (bufp = listp->fl_nextp) != (freebuf *)listp ) {
 		if ( tmpsiz < max && bufp->fb_union.fb_state != DELAYED ) {
 			*bufp->fb_union.fb_mapp |= bufp->fb_mask;
@@ -992,8 +1046,30 @@ int	flags;		/* flags				*/
 		else
 			kmeminfo.km_alloc[KMEM_LARGE] += (ulong)tmpsiz;
 
-		PARANOID("leaving kmem_alloc", KMACCT_ALLOC,
-						(_VOID *)bufp, size);
+#ifdef PARANOID
+		if ( Km_Paranoid ) {
+			int	i;
+
+			kmem_check("leaving kmem_alloc", Km_CheckAll);
+			if ( size >= Km_Low && size <= Km_High ) {
+				if ( (i = Km_i++) >= NREC ) {
+					Km_iwrap++;
+					i = Km_i = 0;
+				}
+				kmem_getcaller(NUMCALL, Km_Alloc[i].caller);
+				Km_Alloc[i].size = size;
+				Km_Alloc[i].addr = (unchar *)bufp;
+			}
+		}
+		if ( kmacctflag )
+			kmaccount(KMACCT_ALLOC, size, (caddr_t *)bufp);
+		if ( bufp == (freebuf *)Km_TraceAddr ) {
+			cmn_err(CE_NOTE,
+			"^kmem_alloc: returning traced address 0x%x\n",
+			bufp);
+			call_demon();
+		}
+#endif /* PARANOID */
 		return((_VOID *)bufp);
 	}
 
@@ -1010,8 +1086,10 @@ int	flags;		/* flags				*/
 		++listp;
 
   allocagain:
-		PARANOID("kmem_alloc @allocagain", KMACCT_ALLOC,
-						(_VOID *)NULL, 0);
+#ifdef PARANOID
+		if ( Km_Paranoid )
+			kmem_check("kmem_alloc @allocagain", Km_CheckAll);
+#endif /* PARANOID */
 		if ( (bufp = listp->fl_nextp) != (freebuf *)listp ) {
 			/*
 			 * We found a buffer.  Take it from the list.
@@ -1046,8 +1124,31 @@ int	flags;		/* flags				*/
 				kmeminfo.km_alloc[KMEM_SMALL] += (ulong)newsiz;
 			else
 				kmeminfo.km_alloc[KMEM_LARGE] += (ulong)newsiz;
-			PARANOID("leaving kmem_alloc", KMACCT_ALLOC,
-						(_VOID *)bufp, size);
+#ifdef PARANOID
+			if ( Km_Paranoid ) {
+				int	i;
+
+				kmem_check("leaving kmem_alloc", Km_CheckAll);
+				if ( size >= Km_Low && size <= Km_High ) {
+					if ( (i = Km_i++) >= NREC ) {
+						Km_iwrap++;
+						i = Km_i = 0;
+					}
+					kmem_getcaller(NUMCALL,
+						Km_Alloc[i].caller);
+					Km_Alloc[i].size = size;
+					Km_Alloc[i].addr = (unchar *)bufp;
+				}
+			}
+			if ( kmacctflag )
+				kmaccount(KMACCT_ALLOC, size, (caddr_t *)bufp);
+			if ( bufp == (freebuf *)Km_TraceAddr ) {
+				cmn_err(CE_NOTE,
+				"^kmem_alloc: returning traced address 0x%x\n",
+				bufp);
+				call_demon();
+			}
+#endif /* PARANOID */
 			return((_VOID *)bufp);
 
 		}
@@ -1146,7 +1247,10 @@ int	flags;		/* flags				*/
 	 *	We can't get another buffer pool, and we can't sleep
 	 *	until memory is freed up.
 	 */
-	PARANOID("leaving kmem_alloc", KMACCT_ALLOC, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("leaving kmem_alloc", Km_CheckAll);
+#endif /* PARANOID */
 	return((_VOID *)NULL);
 }
 
@@ -1275,7 +1379,30 @@ size_t	size;	/* size (in bytes)	*/
 		return;
 	bufp = (freebuf *)addr;
 
-	PARANOID("entering kmem_free", KMACCT_FREE, addr, size);
+#ifdef PARANOID
+	if ( Km_Paranoid ) {
+		int	j;
+
+		kmem_check("entering kmem_free", Km_CheckAll);
+		if ( size >= Km_Low && size <= Km_High ) {
+			if ( (j = Km_j++) >= NREC ) {
+				Km_jwrap++;
+				j = Km_j = 0;
+			}
+			kmem_getcaller(NUMCALL, Km_Free[j].caller);
+			Km_Free[j].size = size;
+			Km_Free[j].addr = (unchar *)bufp;
+		}
+	}
+	if ( kmacctflag )
+		kmaccount(KMACCT_FREE, size, (caddr_t *)addr);
+	if ( bufp == (freebuf *)Km_TraceAddr ) {
+		cmn_err(CE_NOTE,
+		"^kmem_free: freeing traced address 0x%x\n",
+		bufp);
+		call_demon();
+	}
+#endif /* PARANOID */
 
 
 	if ( size > MAXABIG ) {
@@ -1287,7 +1414,10 @@ size_t	size;	/* size (in bytes)	*/
 		/*
 		 * address must be aligned on page boundary
 		 */
-		ASSERT ( ((ulong)bufp & (ulong)(PAGESIZE-1)) == 0 );
+		if ( ((ulong)bufp & (ulong)(PAGESIZE-1)) != 0 )
+			cmn_err(CE_PANIC,
+			    "kmem_free: buffer 0x%x (size 0x%x bytes) not aligned for PAGESIZE 0x%x\n",
+			    bufp, size, PAGESIZE);
 
 		clicks = btoc(size);
 		sptfree((caddr_t)addr, (int)clicks, 1);
@@ -1301,13 +1431,16 @@ size_t	size;	/* size (in bytes)	*/
 		 */
 		if ( Km_OsizeWanted > 0 && Km_OsizeWanted <= size ) {
 			Km_OsizeWanted = 0;
-			wakeprocs((caddr_t)&Km_OsizeWanted, PRMPT);
+			wakeup((caddr_t)&Km_OsizeWanted);
 		}
 		if ( strbcwait && !strbcflag ) {
 			setqsched();
 			strbcflag = TRUE;
 		}
-		PARANOID("leaving kmem_free", KMACCT_FREE, (_VOID *)NULL, 0);
+#ifdef PARANOID
+		if ( Km_Paranoid )
+			kmem_check("leaving kmem_free", Km_CheckAll);
+#endif /* PARANOID */
 		return;
 	}
 
@@ -1361,19 +1494,15 @@ size_t	size;	/* size (in bytes)	*/
 			if ( --(bufp->fb_union.fb_poolp->bp_inuse) == 0 &&
 			bufp->fb_union.fb_poolp != Km_NewSmall &&
 			bufp->fb_union.fb_poolp != Km_NewBig ) {
-				if ( Km_IdleI < NIDLEP ) {
-					if ( (bufp->fb_union.fb_poolp->bp_status & BP_IDLE) == 0 ) {
-						Km_Idlep[Km_IdleI++] =
-						  bufp->fb_union.fb_poolp;
-						bufp->fb_union.fb_poolp->bp_status |= BP_IDLE;
-					}
-				}
+				if ( Km_IdleI < NIDLEP )
+					Km_Idlep[Km_IdleI++] =
+						bufp->fb_union.fb_poolp;
 #ifdef DEBUG
 				else
 					cmn_err(CE_WARN,
 					"kmem_free: idle list full\n");
 #endif /* DEBUG */
-				wakeprocs((caddr_t)Km_Idlep, PRMPT);
+				wakeup((caddr_t)Km_Idlep);
 			}
 		}
 	} else {
@@ -1403,18 +1532,21 @@ size_t	size;	/* size (in bytes)	*/
 	if ( size <= MAXASMALL ) {
 		if ( Km_SmallWanted > 0 && Km_SmallWanted <= size ) {
 			Km_SmallWanted = 0;
-			wakeprocs((caddr_t)&Km_SmallWanted, PRMPT);
+			wakeup((caddr_t)&Km_SmallWanted);
 		}
 	} else if ( Km_BigWanted > 0 && Km_BigWanted <= size ) {
 		Km_BigWanted = 0;
-		wakeprocs((caddr_t)&Km_BigWanted, PRMPT);
+		wakeup((caddr_t)&Km_BigWanted);
 	}
 	if ( strbcwait && !strbcflag ) {
 		setqsched();
 		strbcflag = TRUE;
 	}
 
-	PARANOID("leaving kmem_free", KMACCT_FREE, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("leaving kmem_free", Km_CheckAll);
+#endif /* PARANOID */
 	return;
 }
 
@@ -1457,7 +1589,11 @@ ulong			max;	/* max size for class		  */
 	ulong			bmask;	/* correctly-shifted buddy mask	*/
 	freebuf			*buf2p;	/* for accelerated coalescing	*/
 
-	PARANOID("entering kmem_coalesce", KMACCT_FREE, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	++Km_Recurse;
+	if ( Km_Paranoid )
+		kmem_check("entering kmem_coalesce", Km_CheckAll);
+#endif /* PARANOID */
 	/*
 	 * find the associated pool
 	 * compute the mask for this buffer
@@ -1474,7 +1610,10 @@ ulong			max;	/* max size for class		  */
 
   freeagain:
 
-	PARANOID("kmem_coalesce @freeagain", KMACCT_FREE, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("kmem_coalesce @freeagain", Km_CheckAll);
+#endif /* PARANOID */
 
 	/*
 	 * Compute the mask for the buddy
@@ -1514,20 +1653,14 @@ ulong			max;	/* max size for class		  */
 				bufp->fb_union.fb_poolp = poolp;
 				if ( --(poolp->bp_inuse) == 0 &&
 				poolp != Km_NewSmall && poolp != Km_NewBig ) {
-					if ( Km_IdleI < NIDLEP ) {
-						if ( (poolp->bp_status & BP_IDLE) == 0 ) {
-							Km_Idlep[Km_IdleI++] =
-							  poolp;
-							poolp->bp_status |=
-							  BP_IDLE;
-						}
-					}
+					if ( Km_IdleI < NIDLEP )
+						Km_Idlep[Km_IdleI++] = poolp;
 #ifdef DEBUG
 					else
 						cmn_err(CE_WARN,
 						"kmem_coalesce: idle list full\n");
 #endif /* DEBUG */
-					wakeprocs((caddr_t)Km_Idlep, PRMPT);
+					wakeup((caddr_t)Km_Idlep);
 				}
 			}
 			/*
@@ -1537,12 +1670,11 @@ ulong			max;	/* max size for class		  */
 				if ( Km_SmallWanted > 0 &&
 				Km_SmallWanted <= tmpsiz ) {
 					Km_SmallWanted = 0;
-					wakeprocs((caddr_t)&Km_SmallWanted,
-					    PRMPT);
+					wakeup((caddr_t)&Km_SmallWanted);
 				}
 			} else if ( Km_BigWanted > 0 && Km_BigWanted <= tmpsiz ) {
 				Km_BigWanted = 0;
-				wakeprocs((caddr_t)&Km_BigWanted, PRMPT);
+				wakeup((caddr_t)&Km_BigWanted);
 			}
 		} else {
 			/*
@@ -1555,14 +1687,17 @@ ulong			max;	/* max size for class		  */
 			if ( listp->fl_slack == 0 
 			&& (buf2p = listp->fl_nextp) != (freebuf *)listp
 			&& buf2p->fb_union.fb_state == DELAYED ) {
-				UNLINKHEAD(listp, buf2p);
-				kmem_coalesce(buf2p, listp, tmpsiz, max);
+					UNLINKHEAD(listp, buf2p);
+					kmem_coalesce(buf2p, listp, tmpsiz, max);
 			} else
 				listp->fl_slack = 0;
 			goto freeagain;
 		}
-		PARANOID("leaving kmem_coalesce", KMACCT_FREE,
-						(_VOID *)NULL, 0);
+#ifdef PARANOID
+		if ( Km_Paranoid )
+			kmem_check("leaving kmem_coalesce", Km_CheckAll);
+		--Km_Recurse;
+#endif /* PARANOID */
 		return;
 	}
 	/*
@@ -1576,7 +1711,11 @@ ulong			max;	/* max size for class		  */
 	bufp->fb_union.fb_mapp = wordp;
 	bufp->fb_mask = mask;
 	TAILFREE(listp, bufp);
-	PARANOID("leaving kmem_coalesce", KMACCT_FREE, (_VOID *)NULL, 0);
+#ifdef PARANOID
+	if ( Km_Paranoid )
+		kmem_check("leaving kmem_coalesce", Km_CheckAll);
+	--Km_Recurse;
+#endif /* PARANOID */
 	return;
 }
 
@@ -1608,6 +1747,12 @@ kmem_freepool()
 
 	for ( ;; ) {
 	    ++Km_freepool;	/* count "calls" to kmem_freepool() */
+	    /*
+	     * if already in process of freeing a pool, don't start again
+	     */
+	    if ( Km_FreeOn == TRUE )
+	    	goto fp_sleep;
+	    Km_FreeOn = TRUE;
 
 	    /*
 	     *	copy the pools to be freed from Km_Idlep to Km_Idle2p.
@@ -1623,9 +1768,8 @@ kmem_freepool()
 
 	    while ( --Km_IdleJ >= 0 ) {
 
-		poolp = Km_Idle2p[Km_IdleJ];
-
-		ASSERT(poolp != (bufpool *)NULL);
+		if ( (poolp = Km_Idle2p[Km_IdleJ]) == (bufpool *)NULL )
+			continue;	/* while */
 
 		/*
 		 *	find max-size freelist for this class pool
@@ -1649,7 +1793,6 @@ kmem_freepool()
 		oldpri = splhi();
 
 		if ( poolp->bp_inuse > 0 ) {
-			poolp->bp_status &= ~BP_IDLE;
 			splx(oldpri);
 			continue;	/* while */
 		}
@@ -1669,6 +1812,7 @@ kmem_freepool()
 		splx(oldpri);
 
 		/*	find hash structure for this pool */
+		hashp = (hashpool *)NULL;
 		i = HASH(poolp->bp_startp);
 		if ( max == MAXABIG )
 			j = HASH(poolp->bp_startp + BIGBYTES - 1);
@@ -1683,6 +1827,7 @@ kmem_freepool()
 			"kmem_freepool %d: no hashpool in HashList[%d] for pool 0x%x\n",
 			__LINE__, i, poolp);
 		}
+		psize = (ulong)(hashp->hp_endp) - (ulong)(hashp->hp_alignp);
 		oldpri = splhi();
 		DELHASH(hashp, i);
 		splx(oldpri);
@@ -1702,12 +1847,6 @@ kmem_freepool()
 		}
 
 		if ( max == MAXABIG ) {
-			kmeminfo.km_mem[KMEM_LARGE] -= 
-				((ulong)(hashp->hp_endp) -
-				(ulong)(hashp->hp_alignp));
-			--Km_pools[KMEM_LARGE];
-			psize = BIGCLICKS;
-
 			sptfree((caddr_t)poolp->bp_startp, BIGCLICKS, 1);
 			availrmem += BIGCLICKS;
 			availsmem += BIGCLICKS;
@@ -1720,21 +1859,20 @@ kmem_freepool()
 			kmem_free((_VOID *)poolp, 
 				(sizeof(bufpool) + (2*sizeof(hashpool)) +
 						(BIGBYTES/(MINBIG*8))));
+			kmeminfo.km_mem[KMEM_LARGE] -= psize;
+			--Km_pools[KMEM_LARGE];
 		} else {
 			/*
 			 * freeing the pool will also free associated
 			 * structures and bitmap
 			 */
-			kmeminfo.km_mem[KMEM_SMALL] -= 
-				((ulong)(hashp->hp_endp) -
-				(ulong)(hashp->hp_alignp) - (2*MAXASMALL));
-			--Km_pools[KMEM_SMALL];
-			psize = SMALLCLICKS;
-
 			sptfree((caddr_t)poolp->bp_startp, SMALLCLICKS, 1);
 			availrmem += SMALLCLICKS;
 			availsmem += SMALLCLICKS;
 			pages_pp_kernel -= SMALLCLICKS;
+
+			kmeminfo.km_mem[KMEM_SMALL] -= psize;
+			--Km_pools[KMEM_SMALL];
 		}
 		if ( Km_OsizeWanted > 0 && Km_OsizeWanted <= psize ) {
 			/*
@@ -1743,12 +1881,14 @@ kmem_freepool()
 			 * waiting for memory
 			 */
 			Km_OsizeWanted = 0;
-			wakeprocs((caddr_t)&Km_OsizeWanted, PRMPT);
+			wakeup((caddr_t)&Km_OsizeWanted);
 		}
+		poolp = (bufpool *)NULL;
 	    }	/* end "while ( --Km_IdleJ >= 0 )" */
+	    Km_FreeOn = FALSE;
 fp_sleep:
-	    wakeprocs((caddr_t)&Km_SmAllocOn, PRMPT); /*insurance against race*/
-	    wakeprocs((caddr_t)&Km_BgAllocOn, PRMPT); /*insurance against race*/
+	    wakeup((caddr_t)&Km_SmAllocOn);	/* insurance against race */
+	    wakeup((caddr_t)&Km_BgAllocOn);	/* insurance against race */
 	    sleep((caddr_t)Km_Idlep, PZERO);
 	}
 }
@@ -1769,3 +1909,555 @@ kmem_avail()
 		+ (kmeminfo.km_mem[KMEM_LARGE] - kmeminfo.km_alloc[KMEM_LARGE]) ));
 }
 
+
+#ifdef PARANOID
+/*
+ * kmem_check(s, all)		freelist check
+ * char	s;		text to print on error
+ * int	all;		whether to walk entire freelist or just headers
+ *
+ * for debugging, to be called from demon debugger ("c kmem_check u.u_comm 0"
+ * or "c kmem_check u.u_comm 1")
+ *
+ * also called on entry to or exit from kmem_alloc, kmem_free, kmem_coealesce
+ * if Km_Paranoid is set.
+ *
+ * walks freelist, looking for trashed pointers.
+ * if all is set, walks entire freelist.  if not, just looks at head & tail
+ * pointers (fl_nextp and fl_prevp) off Km_FreeLists.
+ *
+ * if any pointer is trashed, prints warning and calls demon.
+ * only check pointers that are not one of the elements of the Km_FreeLists
+ * array.  "trashed" if it's not properly aligned or if it's < 0x40000000
+ * or > 0x40500000
+ *
+ */
+
+#define	ADDR1	(freebuf *)0x40000000
+#define	ADDR2	(freebuf *)0x40500000
+/* BADADDR1 -- address must be 'size'-aligned */
+#define BADADDR1(x)  ( ( (x) < (freebuf *)&Km_FreeLists[SMINOFFSET] \
+		        || (x) > (freebuf *)&Km_FreeLists[BMAXOFFSET] ) \
+		      && ( ((ulong)(x) & (ulong)(size-1)) != 0 \
+		           || ((x) < ADDR1) || ((x) > ADDR2) ) )
+/* BADADDR2 -- only word alignment matters */
+#define BADADDR2(x)  ( ((ulong)(x) & (ulong)3) != 0 \
+		           || ((x) < ADDR1) || ((x) > ADDR2) )
+
+/* is this the size request we are interested in */
+#define SIZECHECK(s,b) ((s==0) || ((b <= s) && (b > (s/2))))
+
+int	Km_DebugInst = NULL;	/* set if DEBUG module is in kernel */
+				/* after check, will be ENOPKG if   */
+				/* DEBUG is not in kernel           */
+
+void
+kmem_check(s, all)
+char	*s;
+int	all;
+{
+	register freebuf	*head, *tail, *p;
+	register int		i, size;
+	int			bad, stop = 0, oldpri;
+	void			why1(), why2();
+
+	for ( size = MINASMALL, i = SMINOFFSET;
+	      size <= MAXABIG && i <= BMAXOFFSET; ++i, size *= 2 ) {
+
+
+		/*
+		 * have to spl this or interrupts cause bogus failures
+		 */
+		oldpri = splhi();
+
+		if ( (head = Km_FreeLists[i].fl_nextp) == (freebuf *)&Km_FreeLists[i] ) {
+			splx(oldpri);
+			continue;	/* empty list -- continue in 'for' */
+		}
+		tail = Km_FreeLists[i].fl_prevp;
+		bad = 0; 	/* innocent until proven guilty */
+
+		if ( BADADDR1(head) ) {
+			cmn_err(CE_WARN,
+			"^%s: %u-byte freelist header trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_prevp = 0x%x\n",
+			s, size, head, tail);
+			why1(head, size);
+			bad++;
+		} else if ( BADADDR1(tail) ) {
+			cmn_err(CE_WARN,
+			"^%s: %u-byte freelist header trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_prevp = 0x%x\n",
+			s, size, head, tail);
+			why1(tail, size);
+			bad++;
+		} else {
+			if ( BADADDR1(head->fb_nextp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist head pointer (fl_nextp) trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_nextp->fb_nextp = 0x%x\n\t\tfl_nextp->fb_prevp = 0x%x\n",
+				s, size, head, head->fb_nextp, head->fb_prevp);
+				why1(head->fb_nextp, size);
+				bad++;
+			}
+			if ( BADADDR1(head->fb_prevp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist head pointer (fl_nextp) trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_nextp->fb_nextp = 0x%x\n\t\tfl_nextp->fb_prevp = 0x%x\n",
+				s, size, head, head->fb_nextp, head->fb_prevp);
+				why1(head->fb_prevp, size);
+				bad++;
+			}
+			if ( BADADDR1(tail->fb_nextp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist tail pointer (fl_prevp) trashed:\n\t\tfl_prevp = 0x%x\n\t\tfl_prevp->fb_nextp = 0x%x\n\t\tfl_prevp->fb_prevp = 0x%x\n",
+				s, size, tail, tail->fb_nextp, tail->fb_prevp);
+				why1(tail->fb_nextp, size);
+				bad++;
+			}
+			if ( BADADDR1(tail->fb_prevp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist tail pointer (fl_prevp) trashed:\n\t\tfl_prevp = 0x%x\n\t\tfl_prevp->fb_nextp = 0x%x\n\t\tfl_prevp->fb_prevp = 0x%x\n",
+				s, size, tail, tail->fb_nextp, tail->fb_prevp);
+				why1(tail->fb_prevp, size);
+				bad++;
+			}
+
+
+			/* if union holds a pool or bitmap pointer, check it */
+			if ( head->fb_union.fb_state != DELAYED
+			&& BADADDR2((freebuf *)head->fb_union.fb_mapp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist head pointer (fl_nextp) trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_nextp->fb_fb_union.fb_%s = 0x%x\n",
+				s, size, head,
+				( ( size == MAXASMALL || size == MAXABIG) ?
+					"poolp" : "mapp" ),
+				head->fb_union.fb_mapp);
+				why2(head->fb_union.fb_mapp);
+				bad++;
+			}
+			if ( tail->fb_union.fb_state != DELAYED
+			&& BADADDR2((freebuf *)tail->fb_union.fb_mapp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist tail pointer (fl_nextp) trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_nextp->fb_fb_union.fb_%s = 0x%x\n",
+				s, size, tail,
+				( ( size == MAXASMALL || size == MAXABIG) ?
+					"poolp" : "mapp" ),
+				tail->fb_union.fb_mapp);
+				why2(tail->fb_union.fb_mapp);
+				bad++;
+			}
+
+		}
+		stop += bad;
+		if ( bad || !all ) {	/* don't go further with bad pointers */
+			splx(oldpri);
+			continue;	/* for */
+		}
+
+		/* walk entire freelist */
+		for ( p = head->fb_nextp; p != (freebuf *)&Km_FreeLists[i];
+		      p = p->fb_nextp ) {
+			if ( BADADDR1(p->fb_nextp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist trashed:\n\t\tbufp = 0x%x\n\t\tbufp->fb_nextp = 0x%x\n\t\tbufp->fb_prevp = 0x%x\n",
+				s, size, p, p->fb_nextp, p->fb_prevp);
+				why1(p->fb_nextp, size);
+				bad++;
+				break;
+			}
+			if ( BADADDR1(p->fb_prevp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist trashed:\n\t\tbufp = 0x%x\n\t\tbufp->fb_nextp = 0x%x\n\t\tbufp->fb_prevp = 0x%x\n",
+				s, size, p, p->fb_nextp, p->fb_prevp);
+				why1(p->fb_prevp, size);
+				bad++;
+				break;
+			}
+			if ( p->fb_union.fb_state != DELAYED
+			&& BADADDR2((freebuf *)p->fb_union.fb_mapp) ) {
+				cmn_err(CE_WARN,
+				"^%s: %u-byte freelist trashed:\n\t\tfl_nextp = 0x%x\n\t\tfl_nextp->fb_fb_union.fb_%s = 0x%x\n",
+				s, size, p,
+				( ( size == MAXASMALL || size == MAXABIG) ?
+					"poolp" : "mapp" ),
+				p->fb_union.fb_mapp);
+				why2(p->fb_union.fb_mapp);
+				bad++;
+			}
+		}
+		splx(oldpri);
+		stop += bad;
+	}
+	if (stop)
+		call_demon();
+	return;
+}
+
+void
+why1(x, size)
+freebuf *x;
+int	size;
+{
+	cmn_err(CE_CONT, "^kmem_check failed this test:\n");
+	cmn_err(CE_CONT,
+"^( ( (x) < (freebuf *)&Km_FreeLists[SMINOFFSET]\\\n");
+	cmn_err(CE_CONT,
+"^    || (x) > (freebuf *)&Km_FreeLists[BMAXOFFSET] ) \\\n");
+	cmn_err(CE_CONT,
+"^ && ( ((ulong)(x) & (ulong)(size-1)) != 0 \\\n");
+	cmn_err(CE_CONT,
+"^      || ((x) < ADDR1) || ((x) > ADDR2) ) )\n");
+	cmn_err(CE_CONT,
+"^( ( 0x%x < 0x%x\\\n", x, &Km_FreeLists[SMINOFFSET]);
+	cmn_err(CE_CONT,
+"^    || 0x%x > 0x%x ) \\\n", x, &Km_FreeLists[BMAXOFFSET]);
+	cmn_err(CE_CONT,
+"^ && ( ((ulong)0x%x & (ulong)(0x%x)) != 0 \\\n", x, (size-1));
+	cmn_err(CE_CONT,
+"^      || (0x%x < 0x%x) || (0x%x > 0x%x) ) )\n", x, ADDR1, x, ADDR2);
+
+	return;
+}
+
+
+void
+why2(x)
+ulong *x;
+{
+	cmn_err(CE_CONT, "^kmem_check failed this test:\n");
+	cmn_err(CE_CONT,
+"^( ((ulong)(x) & (ulong)3) != 0 \\\n");
+	cmn_err(CE_CONT,
+"^  || ((x) < ADDR1) || ((x) > ADDR2) )\n");
+	cmn_err(CE_CONT,
+"^( (0x%x & (ulong)3) != 0 \\\n", x);
+	cmn_err(CE_CONT,
+"^  || (0x%x < 0x%x) || (0x%x > 0x%x) )\n", x, ADDR1, x, ADDR2);
+
+	return;
+}
+
+/*
+ * kmem_trace(addr, flag)	trace/count uses of addr
+ *
+ * if flag is  0 then print out all uses of addr (and before) addr;
+ * if flag is !0 then print out number of uses of addr (and before) addr;
+ */
+void
+kmem_trace(addr, flag)
+register uint	addr;
+int		flag;
+{
+	register uint	size, mask;
+	register uint	baddr;
+
+	/* since we are only saving records for this range
+	 * we can only find matches in this range
+	 */
+	for ( size = Km_Low;  size <= Km_High; size *= 2 ) {
+
+		/*
+		 * if addr is on boundary x
+		 * 	check(addr, x)
+		 *	check(addr-x, x)
+		 *	NOTE not checking addr + x
+		 * else addr is inside an x-byte buffer
+		 *	check(addr&(x-1), x);
+		 */
+
+		mask = ~(size - 1);
+		baddr = (uint)addr & (uint)mask;
+		if ( baddr == addr)  {
+
+			if (flag != 0) {  /* just do count */
+				cntusers(addr, size);
+				cntusers(addr-size, size);
+			} else {
+				prausers(addr, size);
+				prfusers(addr, size);
+				prausers(addr-size, size);
+				prfusers(addr-size, size);
+			}
+		} else {
+			if (flag != 0) {  /* just do count */
+				cntusers(baddr, size);
+			} else {
+				prusers(baddr, size);
+			}
+		}
+
+	}
+}
+
+/* cntusers -- count alloc/free's of addr */
+void
+cntusers(addr, size)
+uint addr, size;
+{
+	register int cnt;
+	if (cnt = cntausers(addr, size))
+		cmn_err(CE_CONT, "^%d kmem_alloc of size %d at addr 0x%x\n",
+			cnt, size, addr);
+
+	if (cnt = cntfusers(addr, size))
+		cmn_err(CE_CONT, "^%d kmem_free  of size %d at addr 0x%x\n",
+			cnt, size, addr);
+}
+
+
+/* count allocs */
+int
+cntausers(addr, size)
+uint	addr, size;
+{
+	register int i, cnt = 0;
+
+	for ( i = 0; i < NREC; i++ ) {
+		if ((Km_Alloc[i].addr == (unchar *)addr) &&
+		    SIZECHECK(size, Km_Alloc[i].size)) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+/* count frees */
+int
+cntfusers(addr, size)
+uint	addr, size;
+{
+	register int i, cnt = 0;
+	for ( i = 0; i < NREC; i++ ) {
+		if ((Km_Free[i].addr == (unchar *)addr) &&
+		    SIZECHECK(size, Km_Free[i].size)) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+/* prusers -- print trace of alloc/free's of addr */
+void
+prusers(addr, size)
+uint addr, size;
+{
+	prausers(addr, size);
+	prfusers(addr, size);
+}
+
+
+/* print allocs */
+void
+prausers(addr, size)
+uint addr, size;
+{
+	int more = 0;
+
+	/* We do this in reverse order to get last usage,
+	 * Km_[ij] always points to next entry - entry is still valid
+	 */
+	if (Km_i != 0) {
+		prarange(Km_i - 1, 0, addr, size, &more);
+	}
+	prarange(NREC - 1, Km_i, addr, size, &more);
+
+}
+
+/* print frees */
+void
+prfusers(addr, size)
+uint addr, size;
+{
+	int more = 0;
+
+	/* We do this in reverse order to get last usage,
+	 * Km_[ij] always points to next entry - entry is still valid
+	 */
+	if (Km_j != 0) {
+		prfrange(Km_j - 1, 0, addr, size, &more);
+	}
+	prfrange(NREC - 1, Km_j, addr, size, &more);
+
+}
+
+STATIC
+void
+prarange(start, end, addr, size, more)
+int	start, end;
+uint	addr, size;
+int	*more;
+{
+	register int i, j;
+
+	if ( Km_DebugInst == NULL )
+		Km_DebugInst = s3blookup((uint)Km_Alloc[0].caller[0]);
+
+	for ( i = start; i >= end; i-- ) {
+		if ((Km_Alloc[i].addr == (unchar *)addr) &&
+		    SIZECHECK(size, Km_Alloc[i].size)) {
+			if ( (*more)++ > Km_Max ) {
+				cmn_err(CE_CONT, "^Stopping at Km_Max\n");
+				break;
+			}
+			cmn_err(CE_CONT, "^allocated %u bytes at 0x%x to:\n",
+				Km_Alloc[i].size, addr );
+			for ( j = 0; j < NUMCALL; ++j )
+				if (Km_Alloc[i].caller[j])
+					if ( Km_DebugInst != ENOPKG )
+					    cmn_err(CE_CONT, "^\t\t0x%x %s\n",
+					    Km_Alloc[i].caller[j],
+					    (char *)s3blookup((uint)Km_Alloc[i].caller[j]));
+					else
+					    cmn_err(CE_CONT, "^\t\t0x%x\n",
+					    Km_Alloc[i].caller[j]);
+		}
+	}
+}
+
+STATIC
+void
+prfrange(start, end, addr, size, more)
+int	start, end;
+uint	addr, size;
+int	*more;
+{
+	register int i, j;
+
+	if ( Km_DebugInst == NULL )
+		Km_DebugInst = s3blookup((uint)Km_Free[0].caller[0]);
+
+	for ( i = start; i >= end; i-- ) {
+		if ((Km_Free[i].addr == (unchar *)addr) &&
+		    SIZECHECK(size, Km_Free[i].size)) {
+			if ( (*more)++ > Km_Max ) {
+				cmn_err(CE_CONT, "^Stopping at Km_Max\n");
+				break;
+			}
+			cmn_err(CE_CONT, "^freed %u bytes at 0x%x from:\n",
+				Km_Free[i].size, addr );
+			for ( j = 0; j < NUMCALL; ++j )
+				if (Km_Free[i].caller[j])
+					if ( Km_DebugInst != ENOPKG )
+					    cmn_err(CE_CONT, "^\t\t0x%x %s\n",
+					    Km_Free[i].caller[j],
+					    (char *)s3blookup((uint)Km_Free[i].caller[j]));
+					else
+					    cmn_err(CE_CONT, "^\t\t0x%x\n",
+					    Km_Free[i].caller[j]);
+		}
+	}
+}
+
+/*
+ * The following routines and macros are machine dependent.  They 
+ * backtrack through the stack, collecting return PC's.
+ */
+
+ asm int 
+getfp()
+{
+	MOVW	%fp, %r0
+}
+
+ asm int 
+getsp()
+{
+	MOVW	%sp, %r0
+}
+
+ asm int 
+getap()
+{
+	MOVW	%ap, %r0
+}
+
+/*
+ * The kernel text start address and kernel text length parameters should
+ * agree with the kernel text origin and length values given in the
+ * kernel ifile.  These are used to detect when we traced back out of
+ * the kernel stack.
+ */
+
+#define	KTXTSTRT	0x40000000
+#define	KTXTLEN		0x00160000
+
+/*
+ * kmem_getcaller(num, pcstack) backtracks through the stack to retrieve
+ * the previous NUM calling routines; PCSTACK is a pointer to an
+ * array of at least NUM entries where the addresses are to be
+ * placed.  The first address is always the routine that called
+ * kmem_getcaller().  This code is taken from debug/trace.c.
+ * There is no guarantee that all NUM entries belong in the same
+ * trace, and there is no protection against stack underflow.
+ */
+
+STATIC void
+kmem_getcaller(num, pcstack)
+	int	num;
+	caddr_t	pcstack[];
+{
+	register int	fp	= getfp();
+	register int	sp	= getsp();
+	register int	ap	= getap();
+	register caddr_t *pc	= pcstack;	
+	register int	i;
+	register int	*oldpcptr; 
+
+	for (i = 0; i < num; i++) {
+
+		if (fp > ap) 
+			oldpcptr = (int *)(fp - 9 * sizeof(char *)); 
+		else 
+			oldpcptr = (int *)(sp - 2 * sizeof(char *)); 
+
+		*pc = (caddr_t) *oldpcptr++; 
+	
+		if ((*pc < (caddr_t) KTXTSTRT) ||
+			(*pc > (caddr_t) (KTXTSTRT + KTXTLEN))) {
+			*pc++ = (caddr_t) NULL;
+			break;
+		}
+
+		++pc;
+		sp = ap; 
+		ap = *oldpcptr++; 
+		if (fp > sp) 
+			fp = *oldpcptr; 
+	} 
+
+	while (i < num) {
+		*pc++ = (caddr_t) NULL;
+		++i;
+	}
+}
+
+/*
+ *	kmem_find:	look for 'addr' in freelists
+ */
+void
+kmem_find(addr)
+register void	*addr;
+{
+	register freebuf	*p;
+	register int		i, size;
+
+	for ( size = MINASMALL, i = SMINOFFSET;
+	      size <= MAXABIG && i <= BMAXOFFSET;
+	      ++i, size *= 2 ) {
+		for ( p = Km_FreeLists[i].fl_nextp;
+		      p != (freebuf *)&Km_FreeLists[i];
+		      p = p->fb_nextp ) {
+			if ( p == (freebuf *)addr ) {
+				cmn_err(CE_NOTE,
+				"^kmem_find: found address 0x%x in %u-byte freelist\nprev ptr = 0x%x, next = 0x%x\n",
+				p, size, p->fb_prevp, p->fb_nextp);
+				return;
+			}
+			if ( BADADDR1(p) ) {
+				cmn_err(CE_WARN,
+				"^kmem_find: %u-byte freelist trashed:\n\t\tbufp = 0x%x\n",
+				size, p);
+				break;
+			}
+		}
+	}
+	return;
+}
+#endif /* PARANOID */

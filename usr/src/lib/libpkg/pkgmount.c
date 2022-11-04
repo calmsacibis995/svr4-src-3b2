@@ -6,7 +6,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*LINTLIBRARY*/
-#ident	"@(#)libpkg:pkgmount.c	1.10.2.1"
+#ident	"@(#)libpkg:pkgmount.c	1.10"
 
 #include <stdio.h>
 #include <string.h>
@@ -26,9 +26,9 @@ extern int	getvol(),
 
 #define CMDSIZ	256
 #define ERR_FSTYP	"unable to determine fstype for <%s>"
-#define MOUNT		"/sbin/mount"
-#define UMOUNT		"/sbin/umount"
-#define FSTYP		"/sbin/fstyp"
+#define MOUNT		"/etc/mount"
+#define UMOUNT		"/etc/umount"
+#define FSTYP		"/etc/fstyp"
 
 #define LABEL0	"Insert %%v %d of %d for <%s> package into %%p."
 #define LABEL1	"Insert %%v for <%s> package into %%p."
@@ -38,10 +38,10 @@ extern int	getvol(),
 int	Mntflg = 0;
 
 int
-pkgmount(devp, pkg, part, nparts, getvolflg)
+pkgmount(devp, pkg, part, nparts)
 struct pkgdev *devp;
 char	*pkg;
-int	part, nparts, getvolflg;
+int	part, nparts;
 {
 	int	n, flags;
 	char	*pt, prompt[64], cmd[CMDSIZ];
@@ -57,10 +57,9 @@ int	part, nparts, getvolflg;
 	else
 		(void) sprintf(prompt, LABEL3);
 
-
 	for(;;) {
-		if(getvolflg && (n = getvol(devp->bdevice, NULL, 
-		   (devp->rdonly ? 0 : DM_FORMFS|DM_WLABEL), prompt))) {
+		if(n = getvol(devp->bdevice, NULL, 
+		   (devp->rdonly ? 0 : DM_FORMFS|DM_WLABEL), prompt)) {
 			if(n == 3)
 				return(3);
 			if(n == 2)
@@ -69,32 +68,21 @@ int	part, nparts, getvolflg;
 				progerr("unable to obtain package volume");
 			return(99);
 		}
-		getvolflg = 1;
 
 		if(devp->fstyp == NULL) {
 			(void) sprintf(cmd, "%s %s", FSTYP, devp->bdevice);
 			if((pp = epopen(cmd, "r")) == NULL) {
-				rpterr();
 				logerr(ERR_FSTYP, devp->bdevice);
 				continue;
 			}
 			cmd[0] = '\0';
-			if(fgets(cmd, CMDSIZ, pp) == NULL) {
-				logerr(ERR_FSTYP, devp->bdevice);
-				(void) pclose(pp);
-				continue;
-			}
-			if(epclose(pp)) {
-				rpterr();
+			fread(cmd, 1, CMDSIZ, pp);
+			if(pclose(pp)) {
 				logerr(ERR_FSTYP, devp->bdevice);
 				continue;
 			}
 			if(pt = strpbrk(cmd, " \t\n"))
 				*pt = '\0';
-			if(cmd[0] == '\0') {
-				logerr(ERR_FSTYP, devp->bdevice);
-				continue;
-			}	
 			devp->fstyp = strdup(cmd);
 		}
 

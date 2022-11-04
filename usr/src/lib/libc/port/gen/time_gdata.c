@@ -5,13 +5,15 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libc-port:gen/time_gdata.c	1.4"
+#ident	"@(#)libc-port:gen/time_gdata.c	1.2"
 
+#ifndef ABI
 #ifdef __STDC__
 	#pragma weak altzone = _altzone
 	#pragma weak daylight = _daylight
 	#pragma weak timezone = _timezone
 	#pragma weak tzname = _tzname
+#endif
 #endif
 #include	"synonyms.h"
 #include	<sys/types.h>
@@ -20,4 +22,4 @@
 time_t	timezone = 0;
 time_t	altzone = 0;
 int 	daylight = 0;
-char 	*tzname[] = {"GMT","   "};
+char 	*tzname[] = {"GMT","GMT"};

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libm:port/powf.c	1.7"
+#ident	"@(#)libm:port/powf.c	1.6"
 /*LINTLIBRARY*/
 /*
  *	Single precision power function.
@@ -42,8 +42,6 @@ float powf(register float x, register float y)
 	if (!x) {
 		if (y > zero)
 			return (x); /* (0 ** pos) == 0 */
-		if ((y == (float)0.0) && (_lib_version != c_issue_4))
-			return((float)1.0);
 		goto domain;
 	}
 	neg = 0;
@@ -96,10 +94,7 @@ float powf(register float x, register float y)
 
 domain:
 	exc.type = DOMAIN;
-	if ((x == (float)0.0) && (_lib_version != c_issue_4))
-		exc.retval = -HUGE_VAL;
-	else
-		exc.retval = 0.0;
+	exc.retval = 0.0;
 	if (_lib_version == strict_ansi)
 		errno = EDOM;
 	else if (!matherr(&exc)) {

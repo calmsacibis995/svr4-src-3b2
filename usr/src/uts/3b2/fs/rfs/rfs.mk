@@ -5,7 +5,7 @@
 #	The copyright notice above does not evidence any
 #	actual or intended publication of such source code.
 
-#ident	"@(#)fs:fs/rfs/rfs.mk	1.26"
+#ident	"@(#)fs:fs/rfs/rfs.mk	1.23"
 
 ROOT =
 STRIP = strip
@@ -172,13 +172,10 @@ rf_comm.$O: \
 	$(INC)/sys/fs/rf_vfs.h \
 	$(INC)/sys/file.h \
 	rf_admin.h \
-	$(INC)/sys/buf.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(INC)/sys/kmem.h \
 	$(INC)/sys/fbuf.h \
 	$(INC)/vm/page.h \
-	$(INC)/vm/pvn.h \
 	$(FRC)
 
 rf_rsrc.$O: \
@@ -233,15 +230,12 @@ rf_admin.$O: \
 	rfcl_subr.h \
 	rf_admin.h \
 	$(INC)/sys/uio.h \
-	$(INC)/sys/buf.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(INC)/vm/seg_kmem.h \
 	$(INC)/sys/fcntl.h \
 	$(INC)/sys/flock.h \
 	$(INC)/sys/file.h \
 	$(INC)/sys/session.h \
-	$(INC)/sys/kmem.h \
 	$(FRC)
 
 rf_canon.$O: \
@@ -298,8 +292,6 @@ rf_sys.$O: \
 	$(INC)/sys/dirent.h \
 	rf_admin.h \
 	$(INC)/sys/cred.h \
-	$(INC)/sys/buf.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(INC)/sys/file.h \
 	rfcl_subr.h \
@@ -351,13 +343,10 @@ rfsr_subr.$O: \
 	$(INC)/sys/statvfs.h \
 	rf_auth.h \
 	rfcl_subr.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(INC)/sys/hetero.h \
 	rf_canon.h \
 	$(INC)/sys/sysinfo.h \
-	$(INC)/sys/kmem.h \
-	$(INC)/sys/mman.h \
 	$(INC)/sys/fs/rf_acct.h \
 	$(FRC)
 
@@ -415,11 +404,9 @@ rfsr_ops.$O: \
 	$(INC)/vm/seg_map.h \
 	rf_canon.h \
 	$(INC)/sys/mman.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	du.h \
 	$(INC)/sys/kmem.h \
-	$(INC)/fs/fs_subr.h \
 	$(FRC)
 
 rf_serve.$O: \
@@ -454,8 +441,6 @@ rf_serve.$O: \
 	$(INC)/sys/file.h \
 	$(INC)/sys/acct.h \
 	$(INC)/sys/systm.h \
-	$(INC)/sys/kmem.h \
-	$(INC)/vm/seg_kmem.h \
 	rf_auth.h \
 	rf_admin.h \
 	$(FRC)
@@ -508,8 +493,6 @@ du.$O: \
 	rf_auth.h \
 	du.h \
 	$(INC)/sys/inline.h \
-	$(INC)/sys/buf.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(FRC)
 
@@ -557,7 +540,6 @@ rf_vfsops.$O: \
 	rf_canon.h \
 	$(INC)/sys/buf.h \
 	$(INC)/sys/uio.h \
-	$(INC)/vm/page.h \
 	rf_cache.h \
 	$(INC)/sys/kmem.h \
 	$(FRC)
@@ -619,7 +601,6 @@ rf_cache.$O: \
 	$(INC)/sys/vfs.h \
 	$(INC)/sys/stat.h \
 	$(INC)/sys/statfs.h \
-	$(INC)/sys/buf.h \
 	rf_cache.h \
 	rfcl_subr.h \
 	$(INC)/sys/immu.h \
@@ -669,12 +650,12 @@ rfcl_subr.$O: \
 	$(INC)/sys/kmem.h \
 	$(INC)/sys/mount.h \
 	$(INC)/sys/systm.h \
+	rf_cache.h \
 	$(INC)/sys/mode.h \
 	$(INC)/sys/pathname.h \
 	$(INC)/vm/page.h \
 	$(INC)/vm/seg_map.h \
 	$(INC)/vm/pvn.h \
-	rf_cache.h \
 	$(FRC)
 
 rf_vnops.$O: \

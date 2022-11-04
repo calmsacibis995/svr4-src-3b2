@@ -6,7 +6,7 @@
 #	actual or intended publication of such source code.
 
 
-#ident	"@(#)librpc:librpc.mk	1.9.1.12"
+#ident	"@(#)librpc:librpc.mk	1.9.1.8"
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #	PROPRIETARY NOTICE (Combined)
@@ -33,6 +33,9 @@
 #
 # Kernel level sources are missing here. Only USER
 #	level rpc sources here
+#
+# Sources missing as of now:
+#	xdr_float.c\	#because xdr_float is processor specific
 #
 # Sources deleted because of duplicate or obsolete functionality
 #	clnt_udp.c\ clnt_tcp.c
@@ -62,6 +65,7 @@
 #	svc_generic.c\ : All the new interface routines for svc side
 #
 # Sources in the compatibility package
+#	clnt_bsoc.c\
 #	clnt_soc.h
 #	dbx_rpc.c\
 #	pmap_clnt.c\
@@ -78,6 +82,12 @@
 #	svcdesname.c\
 #	svc_authdes.c\
 #
+# Sources in transient package.
+#	getdname.o
+#	syslog.c\
+#	port.c\
+#	gethostname.c\
+#
 # Headers included in component head.usrs:
 # HDRS = auth.h auth_des.h auth_unix.h auth_sys.h clnt.h clnt_soc.h \
 #	keyprot.h \
@@ -92,7 +102,7 @@ STRIP	= strip
 SIZE	= size
 INS	= install
 INC	= $(ROOT)/usr/include 
-CPPFLAGS = -O -Kpic -I$(INC) -DPORTMAP -D_NSL_RPC_ABI
+CPPFLAGS = -O -Kpic -I$(INC) -DPORTMAP
 CFLAGS	= $(CPPFLAGS) 
 
 HDRS =	auth.h auth_des.h auth_sys.h auth_unix.h clnt.h clnt_soc.h \
@@ -108,8 +118,9 @@ SECOBJS=auth_des.o authdes_prot.o getdname.o key_prot.o key_call.o \
 INETOBJS=gthostnamadr.o gethostent.o inet_ntoa.o
 
 OBJS =	$(SECOBJS) $(INETOBJS)  auth_none.o auth_sys.o authsys_prot.o \
+	clnt_bcast.o clnt_bsoc.o clnt_generic.o clnt_dg.o clnt_vc.o \
 	clnt_perror.o clnt_raw.o clnt_simple.o \
-	clnt_dg.o clnt_vc.o clnt_generic.o clnt_bcast.o getdname.o \
+	getdname.o \
 	gethostname.o getrpcent.o \
 	pmap_clnt.o pmap_prot.o port.o \
 	rpc_callmsg.o rpc_comdata.o rpcdname.o\
@@ -124,7 +135,7 @@ LIBOBJS= ../auth_des.o ../authdes_prot.o ../getdname.o ../key_prot.o ../key_call
 	../netname.o ../netnamer.o ../openchild.o ../rpcdname.o ../rtime_tli.o \
 	../svcauth_des.o ../svcdesname.o \
 	../auth_none.o ../auth_sys.o ../authsys_prot.o \
-	../clnt_bcast.o ../clnt_generic.o \
+	../clnt_bcast.o ../clnt_bsoc.o ../clnt_generic.o \
 	../clnt_dg.o ../clnt_vc.o \
 	../clnt_perror.o ../clnt_raw.o ../clnt_simple.o \
 	../getdname.o \
@@ -202,6 +213,14 @@ clnt_bcast.o: clnt_bcast.c\
 	$(INC)/rpc/nettype.h\
 	$(INC)/stdio.h\
 	$(INC)/errno.h
+ 
+clnt_bsoc.o: clnt_bsoc.c\
+	$(INC)/rpc/rpc.h\
+	$(INC)/rpc/nettype.h\
+	$(INC)/rpc/pmap_prot.h\
+	$(INC)/stdio.h\
+	$(INC)/errno.h\
+	$(INC)/netinet/in.h
  
 clnt_dg.o: clnt_dg.c\
 	$(INC)/rpc/rpc.h\

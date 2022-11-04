@@ -1,10 +1,4 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
-#ident	"@(#)libc-m32:shared_objects	1.14"
+#ident	"@(#)libc-m32:shared_objects	1.3"
 
 align.o
 rtboot.o
@@ -24,6 +18,7 @@ rtld.o
 rtsetaddr.o
 rtsetup.o
 rtmemcpy.o
+rtisastream.o
 rtsyscall.o
 getpid.P
 mprotect.P
@@ -44,9 +39,6 @@ utime.P
 ctime.P
 _locale.P
 strftime.P
-getdate.P
-getdate_data.o
-./getdate_gd.P
 xstat.P
 lxstat.P
 xmknod.P
@@ -98,7 +90,7 @@ getw.P
 putchar.P
 putw.P
 ctypefcns.P
-values-Xt.o
+./values-Xt.o
 atof.P
 abs.P
 atoi.P
@@ -109,14 +101,13 @@ ltostr.P
 atol.P
 biglitpow.P
 ldexp.P
-modf.P
 div.P
 sbrk.P
 import_def.P
 malloc.P
 memcpy.P
 memmove.P
-calloc.P
+./calloc.P
 memset.P
 _findbuf.P
 sigsend.P
@@ -152,8 +143,6 @@ _flsbuf.P
 _wrtchk.P
 dtop.P
 frexp.P
-scalb.P
-logb.P
 getenv.P
 getopt.P
 ./opt_data.P
@@ -167,7 +156,6 @@ msync.P
 mlock.P
 munlock.P
 pathconf.P
-fpathconf.P
 priocntl.P
 ptod.P
 setpospar.P
@@ -175,8 +163,8 @@ _rename.P
 _sigaction.P
 acct.P
 alarm.P
-./cerror.P
-./sh_data.P
+cerror.P
+sh_data.P
 chdir.P
 chmod.P
 chown.P
@@ -207,7 +195,6 @@ m32_data.P
 memcntl.P
 mkdir.P
 mknod.P
-isastream.P
 fattach.P
 fdetach.P
 mount.P
@@ -275,17 +262,23 @@ fnegs.P
 ftstol.P
 ftstou.P
 _set_tab.P
+ctype.P
 new_list.o
+getgrbuf.P
+getgrent.P
+getgrgid.P
 getgrnam.P
 getlogin.P
+getpwbuf.P
+getpwent.P
 getpwnam.P
-cat_init.P
-catclose.P
-catgets.P
-catopen.P
+getpwuid.P
 gettxt.P
+getut.P
 localeconv.P
 opendir.P
+putpwbuf.P
+putpwent.P
 readdir.P
 rename.P
 rewinddir.P
@@ -334,7 +327,6 @@ tell.P
 putenv.P
 hsearch.P
 fmtmsg.P
-nftw.P
 _xftw.P
 bsearch.P
 getpass.P
@@ -347,8 +339,6 @@ setpgrp.P
 tmpnam.P
 cuserid.P
 initgroups.P
-./getpwent.P
-./getgrent.P
 mkdev.P
 pt.P
 ./truncate.P
@@ -367,9 +357,3 @@ tcsetattr.P
 tcsetpgrp.P
 getsubopt.P
 nl_langinfo.P
-./syslog.P
-./select.P
-./gettimeofday.P
-./sysinfo.P
-./vfork.P
-./hrtsys.P

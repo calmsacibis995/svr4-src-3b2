@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)head.sys:sys/rpc/svc.h	1.6"
+#ident	"@(#)head.sys:sys/rpc/svc.h	1.5"
 
 /*      @(#)svc.h 1.35 88/12/17 SMI      */
 
@@ -103,9 +103,6 @@ typedef struct {
 #endif
 	struct opaque_auth xp_verf;	 /* raw response verifier */
 	caddr_t		xp_p1;		 /* private: for use by svc ops */
-#ifdef _KERNEL
-	u_int		xp_p1len;	 /* size of p1 */
-#endif
 	caddr_t		xp_p2;		 /* private: for use by svc ops */
 	caddr_t		xp_p3;		 /* private: for use by svc lib */
 } SVCXPRT;
@@ -359,6 +356,6 @@ svc_raw_create();
 #else
 /* kernel based rpc
  */
-extern int svc_tli_kcreate();
+extern SVCXPRT *svc_tli_kcreate();
 #endif /* !_KERNEL */
 #endif /* !_RPC_SVC_H */

@@ -5,7 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"@(#)libgen:p2open.c	1.5.8.1"
+#ident	"@(#)libgen:p2open.c	1.5.6.3"
 
 #ifdef __STDC__
 	#pragma weak p2open = _p2open
@@ -22,6 +22,8 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/utsname.h>
+#undef uname
 
 extern FILE	*fdopen();
 extern int	close(),
@@ -72,6 +74,7 @@ FILE	*fp[2]; /* file pointer array to cmd stdin and stdout */
 	return  0;
 }
 
+static int vers;
 int
 p2close(fp)
 FILE	*fp[2];
@@ -82,6 +85,7 @@ FILE	*fp[2];
 			(*istat)(),
 			(*qstat)();
 	pid_t pid, r;
+	struct utsname uname_buf;
 	pid = popen_pid[fileno(fp[0])];
 	if(pid != popen_pid[fileno(fp[1])])
 		return -1;
@@ -92,8 +96,19 @@ FILE	*fp[2];
 	istat = signal(SIGINT, SIG_IGN);
 	qstat = signal(SIGQUIT, SIG_IGN);
 	hstat = signal(SIGHUP, SIG_IGN);
-	while ((r = waitpid(pid, &status, 0)) == (pid_t)-1 
-		&& errno == EINTR)
+	if(vers == 0) {
+		if (uname(&uname_buf) > 0)
+			vers = 2; /* SVR4 system */
+		else
+			vers = 1;
+	}
+	if (vers == 2)
+		while ((r = wait(&status)) != pid && r != (pid_t)-1
+			|| errno == EINTR)
+			;
+	else
+		while ((r = waitpid(pid, &status, 0)) == (pid_t)-1 
+			&& errno == EINTR)
 			;
 	if (r == (pid_t)-1)		
 		status = -1;

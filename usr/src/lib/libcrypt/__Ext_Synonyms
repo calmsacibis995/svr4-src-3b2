@@ -1,0 +1,15 @@
+#ident	"@(#)libcrypt:__Ext_Synonyms	1.3"
+
+# functions, some are undocumented but are necessary for compatibility
+setkey		_setkey
+encrypt		_encrypt
+crypt		_crypt
+des_setkey	_des_setkey
+des_encrypt	_des_encrypt
+des_crypt	_des_crypt
+des_decrypt1	_des_decrypt1
+des_encrypt1	_des_encrypt1
+run_setkey	_run_setkey
+run_crypt	_run_crypt
+crypt_close	_crypt_close
+makekey		_makekey

@@ -1,9 +1,3 @@
-#	Copyright (c) 1988 AT&T
-#	All Rights Reserved 
-#	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF AT&T
-#	The copyright notice above does not evidence any 
-#	actual or intended publication of such source code.
-
 #ident	"@(#)curses:demo/pacman/README	1.2"
 Pacman has been tested on cbosgd (running 4.1BSD with the fast timer
 driver added), and on vanilla 5.0 systems on a VAX and on a 3B.

@@ -5,8 +5,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-
-#ident	"@(#)librpc:svc_run.c	1.3"
+#ident	"@(#)librpc:svc_run.c	1.2"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 *	PROPRIETARY NOTICE (Combined)
@@ -38,14 +37,11 @@ static char sccsid[] = "@(#)svc_run.c 1.9 89/02/28 Copyr 1984 Sun Micro";
  */
 #include <rpc/rpc.h>
 #include <sys/errno.h>
-#include <sys/resource.h>
 #ifdef SYSLOG
 #include <sys/syslog.h>
 #else
 #define LOG_ERR 3
 #endif /* SYSLOG */
-
-static int all_done();
 
 void
 svc_run()
@@ -55,9 +51,6 @@ svc_run()
 
 	for (;;) {
 		readfds = svc_fdset;
-		if (all_done()) {
-			break;
-		}
 		switch (select(_rpc_dtbsize(), &readfds, (fd_set *)0, (fd_set *)0,
 			       (struct timeval *)0)) {
 		case -1:
@@ -72,22 +65,4 @@ svc_run()
 			svc_getreqset(&readfds);
 		}
 	}
-}
-
-static int
-all_done()
-{
-     	static struct rlimit rl;
-      	int i;
-
-      	if (rl.rlim_max == 0) {
-		getrlimit(RLIMIT_NOFILE, &rl);
-      		if (rl.rlim_max == 0)
-			return(0);
-	}
-
-      	for (i = 0; i < rl.rlim_max ; i++)
-		if (FD_ISSET(i, &svc_fdset))
-      			return(0);
-      	return(1);
 }
